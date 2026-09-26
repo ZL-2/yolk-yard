@@ -5,6 +5,7 @@ const guestFire=new GuestFire();
 const guestPresentation=new GuestPresentation();
 import {applyBuildState} from './building.js';
 import {BuildingUI} from './building-ui.js';
+import {snappedFacing} from './building-rules.js';
 import {arenaBonuses,BONUS_NAMES,bonusStatus} from './streaks.js';
 import { connectionReport } from './connection-report.js';
 import {RoyaleSimulation} from './royale.js';
@@ -262,7 +263,7 @@ function settingsMenu() {
       )
       .join(
         "",
-      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>Low · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
+      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>Low · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Aim binding resets. Edit confirms; Esc cancels.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
     "settings",
   );
   bindingEditor=new KeybindEditor(dialog.querySelector(".keybind-list"),settings.keybinds,bindings=>{settings.keybinds=bindings;keys.clear();queuedActions.clear();input.fire=input.aim=false;save("yolk-settings",settings);});
@@ -823,6 +824,7 @@ function processEvents() {
             : "Popper collected",
       );
     }
+    if(e.type==='build-result'&&e.player===localId)buildUI.result(e);
     if (e.type === "notice") notice(e.text);
     if (e.type === "elimination") {
       sound.death(me ? Math.hypot(me.x-e.x, me.z-e.z) : 0,e);
@@ -1194,6 +1196,12 @@ document.addEventListener("pointerlockchange", () => {
     pauseMenu();
 });
 function pressControl(code) {
+  if(buildUI.edit){
+    if(settings.keybinds.buildEdit.includes(code)){buildUI.action('confirm');return;}
+    if(settings.keybinds.aim.includes(code)){buildUI.action('reset');return;}
+    if(settings.keybinds.fire.includes(code)){keys.add(code);return;}
+  }
+
   if(settings.keybinds.chat.includes(code)&&net?.ready&&screen!=="menu"){chat.open();return;}
   keys.add(code);
   for (const action of ['jump', 'fire', 'reload', 'popper', 'interact']) {
@@ -1205,9 +1213,9 @@ function pressControl(code) {
   for(const [action,step] of [['nextSlot',1],['previousSlot',-1]])if(settings.keybinds[action].includes(code)){const count=state?.royale?6:2;input.slot=(input.slot+step+count)%count;buildControls.buildMode=false;}
   if(state?.royale){
     if(settings.keybinds.pickaxe.includes(code)){input.slot=5;buildControls.buildMode=false;buildUI.cancel();}
-    for(const [key,piece] of [['buildWall','wall'],['buildFloor','floor'],['buildStairs','stairs'],['buildRoof','roof']])if(settings.keybinds[key].includes(code)){buildControls.buildType=piece;buildControls.buildMode=true;buildUI.cancel();}
+    for(const [key,piece] of [['buildWall','wall'],['buildFloor','floor'],['buildStairs','stairs'],['buildRoof','roof']])if(settings.keybinds[key].includes(code)){buildUI.choose(piece);}
     for(const [key,action] of [['buildToggle','toggle'],['buildRotate','rotate'],['buildMaterial','material']])if(settings.keybinds[key].includes(code))buildUI.action(action);
-    if(settings.keybinds.buildEdit.includes(code)){if(buildUI.edit)buildUI.action('confirm');else{const p=state.players.find(p=>p.id===localId);if(buildUI.beginEdit(state,p,view.buildMap)){document.exitPointerLock?.();}}}
+    if(settings.keybinds.buildEdit.includes(code)){if(buildUI.edit)buildUI.action('confirm');else{const p=state.players.find(p=>p.id===localId);buildUI.beginEdit(state,predicted?{...p,...predicted}:p,view.buildMap);}}
     if(settings.keybinds.buildRepair.includes(code)){if(sim)sim.playerAction(localId,'build-repair');else net?.send({type:'player-action',action:'build-repair'});}
     if(['primary','sidearm','slot3','slot4','slot5'].some(k=>settings.keybinds[k].includes(code))){buildControls.buildMode=false;buildUI.cancel();}
     for(let i=3;i<=5;i++)if(settings.keybinds['slot'+i].includes(code))input.slot=i-1;
@@ -1265,7 +1273,7 @@ document.addEventListener("keydown", (e) => {
   if (screen !== 'game') return;
   if (e.code === 'Escape') {
     e.preventDefault();
-    if (!e.repeat) pauseMenu();
+    if (!e.repeat){if(buildUI.edit)buildUI.action('cancel');else pauseMenu();}
     return;
   }
   if (paused) return;
@@ -1304,7 +1312,7 @@ document.addEventListener("mouseup", (e) => {
 });
 function aimSensitivity() {
   const p=state?.players.find(p=>p.id===localId);
-  const aiming = (actionDown("aim") || touch.aim)&&(!p?.inventory||!!p.inventory[p.slot]?.weapon);
+  const aiming = !buildControls.editing && (actionDown("aim") || touch.aim)&&(!p?.inventory||!!p.inventory[p.slot]?.weapon);
   return aiming ? settings.scopeSensitivity : 1;
 }
 let menuMousePoint=null;
@@ -1339,7 +1347,7 @@ document.addEventListener('click',e=>{
   const rect=e.target.getBoundingClientRect();royaleUI.waypoint={x:(e.clientX-rect.left)/rect.width*512-256,z:(e.clientY-rect.top)/rect.height*512-256};sound.cue('ui-select');
  }
  if(e.target.closest('[data-build-control="repair"]')){if(sim)sim.playerAction(localId,'build-repair');else net?.send({type:'player-action',action:'build-repair'});}
- if(e.target.closest('[data-build-control="edit"]')){const p=state?.players.find(p=>p.id===localId);if(p)buildUI.beginEdit(state,p,view.buildMap);}
+ if(e.target.closest('[data-build-control="edit"]')){const p=state?.players.find(p=>p.id===localId);if(p)buildUI.beginEdit(state,predicted?{...p,...predicted}:p,view.buildMap);}
  if(e.target.closest('button')){sound.unlock();sound.cue('ui-select',null,.45);}
 });
 // Native desktop dragging, touch dragging, and keyboard reordering share one action.
@@ -1423,6 +1431,11 @@ document.addEventListener("graphics-lost", () => {
 function frameInput() {
   const active = !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && state?.players.find(p => p.id === localId)?.health > 0;
   buildControls.yaw=input.yaw;buildControls.pitch=input.pitch;
+  buildControls.buildFacing=snappedFacing(input.yaw,buildControls.buildMode?buildControls.buildFacing:undefined);
+  if(!actionDown('fire')&&!touch.fire)buildControls.suppressBuildFire=false;
+  if(buildUI.edit&&active){const me=predicted||state.players.find(p=>p.id===localId);if(me)buildUI.sample({...me,yaw:input.yaw,pitch:input.pitch},actionDown('fire')||touch.fire,!!settings.confirmEditOnRelease);}
+  if(buildUI.edit&&!active)buildUI.down=false;
+
   const nextInput = {
     seq: ++seq,
     yaw: input.yaw,
@@ -1439,17 +1452,17 @@ function frameInput() {
       : 0,
     jump:
       active && (actionDown("jump") || touch.jump || queuedActions.has("jump")),
-    fire: active && !buildControls.editing && (actionDown("fire") || touch.fire || queuedActions.has("fire")),
-    aim: active && (actionDown("aim") || touch.aim),
+    fire: active && !buildControls.editing && !buildControls.suppressBuildFire && (actionDown("fire") || touch.fire || queuedActions.has("fire")),
+    aim: active && !buildControls.editing && (actionDown("aim") || touch.aim),
     reload:
       active &&
       (actionDown("reload") || touch.reload || queuedActions.has("reload")),
     popper:
-      active &&
+      active && !buildControls.editing &&
       (actionDown("popper") ||
         touch.popper ||
         queuedActions.has("popper")),
-    ...buildControls,
+    buildMode:active&&buildControls.buildMode,buildType:buildControls.buildType,buildMaterial:buildControls.buildMaterial,buildRotation:buildControls.buildRotation,editing:buildControls.editing,
     slot: input.slot,
     sprint:active&&(actionDown('sprint')||touch.sprint),
     interact:active&&(actionDown('interact')||touch.interact||queuedActions.has('interact')),
@@ -1547,7 +1560,7 @@ function loop(now) {
     presentation.player,
     dt,
     screen === "game",
-    !paused && !chat.opened && (actionDown("aim") || touch.aim),
+    !paused && !chat.opened && !buildControls.editing && (actionDown("aim") || touch.aim),
     profile,
   );
   if (hudClock > 0.06) {
@@ -1600,6 +1613,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
       paused,
       predicted,
       input: { ...input },
+      building: {...buildControls},
       camera: view?.camera.rotation.toArray(),
       drawCalls: view?.renderer.info.render.calls,
       scope: {

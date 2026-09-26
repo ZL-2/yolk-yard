@@ -1789,3 +1789,10 @@ body.in-royale .match-center{display:none}
 #dialog[data-kind="owner-dashboard"] h3{margin:20px 0 10px}
 #owner-form{display:grid;gap:12px;margin-top:16px}#owner-error{color:#ff9d9d;margin:12px 0}
 @media(max-width:600px){.owner-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.owner-metrics>div{padding:10px}}
+/* Manual editing stays in the world; only contextual prompts are screen-space. */
+.build-edit{pointer-events:none;top:67%;padding:8px 14px;background:#102641b8;min-width:270px;border:0;box-shadow:none;transform:translateX(-50%)}
+.build-edit strong{font-size:13px;letter-spacing:.1em}.build-edit .edit-status{font-size:11px;margin:5px 0 8px;color:#d7eeff}
+.build-edit.invalid .edit-status{color:#ff8c93}.build-edit .edit-prompts{display:flex;justify-content:center;gap:12px}.build-edit .edit-prompts button{pointer-events:auto;background:transparent;border:0;color:white;font-size:11px;font-weight:800;padding:4px}
+.harvest-gain{display:flex;align-items:center;gap:5px}.harvest-gain svg{width:29px;height:29px;fill:#e8f4ff33;stroke:#fff;stroke-width:1.8}
+@media(max-width:750px){.build-edit{top:48%;min-width:240px}.build-edit .edit-prompts{gap:4px}.build-edit .edit-prompts button{padding:8px}.build-target{top:30%}}
+.manual-editing .build-target{top:32%}.manual-editing .build-target span{font-size:11px}

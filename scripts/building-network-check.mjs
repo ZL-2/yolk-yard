@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import {startRealtimeServer} from '../server/realtime/index.js';
+import WebSocket from 'ws';
+import {Network} from '../src/network.js';
+import {RoyaleSimulation} from '../src/royale.js';
+import {safeProfile} from '../src/data.js';
+import {applyBuildState,damageObject,rebuildMap} from '../src/building.js';
+import {wallDistance} from '../src/physics.js';
+globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
+globalThis.window={YOLK_NETWORK:{relay:'ws://127.0.0.1:9002/game'}};
+const server=await startRealtimeServer({port:9002,host:'127.0.0.1'});
+const sim=new RoyaleSimulation({mode:'royale',bots:0,capacity:2,fill:false});sim.addPlayer('host',safeProfile({name:'Builder Host'}));
+let state,actionCount=0;
+const host=new Network({getCheckpoint:()=>sim.checkpoint(),getChatState:()=>sim.snapshot(),onJoin:(id,p)=>!!sim.admitPlayer(id,p),onInput:(id,i)=>sim.setInput(id,i,true),onPlayerAction:(id,a)=>{actionCount++;sim.playerAction(id,a);}});
+const guest=new Network({onState:s=>{if(s.royale&&!s.royale.builds&&state?.royale)s.royale={...s.royale,builds:state.royale.builds,worldDamage:state.royale.worldDamage};state=s;}});let timer,inputTimer;const wait=async fn=>{const end=Date.now()+15000;while(!fn()){assert.ok(Date.now()<end,'Timed out waiting for build synchronization');await new Promise(r=>setTimeout(r,25));}};
+try{
+ const code=await host.host();host.broadcast(sim.snapshot());await guest.join(code,safeProfile({name:'Guest Builder'}));sim.startRound();
+ sim.map={size:256,theme:'royale',boxes:[]};sim.worldBoxes=[];sim.worldDamage={};sim.builds=[];sim.chests=[];sim.loot=[];
+ for(const p of sim.players.values())Object.assign(p,{x:p.id==='host'?40:0,y:0,z:0,yaw:0,pitch:0,health:100,flight:'ground',grounded:true,slot:5,materials:{wood:100,brick:100,metal:100}});
+ let seq=0,input={yaw:0,pitch:0,slot:5,buildMode:true,buildType:'wall',buildMaterial:'brick',fire:true};
+ timer=setInterval(()=>{sim.tick(1/60);host.broadcast(sim.snapshot());},1000/60);
+ inputTimer=setInterval(()=>guest.input({...input,seq:++seq}),1000/60);
+ await wait(()=>sim.builds.length===1&&state?.royale?.builds?.length===1);input.fire=false;
+ const b=sim.builds[0],p=sim.players.get(guest.id);assert.equal(b.owner,guest.id);assert.equal(b.material,'brick');assert.equal(p.materials.brick,90);
+ const change=mask=>guest.send({type:'player-action',action:'build-change:'+JSON.stringify({id:b.id,revision:b.revision||0,mask,path:[],yaw:0,pitch:0})});
+ change(16);await wait(()=>state.royale.builds[0]?.mask===16);assert.equal(sim.builds[0].mask,16);
+ const remote={size:256,boxes:[]};applyBuildState(remote,state.royale);assert.equal(wallDistance(remote,{x:0,y:2,z:0},{x:0,y:0,z:-1},9),9);
+ let count=actionCount;change(511);await wait(()=>actionCount>count);assert.equal(b.mask,16);
+ change(0);await wait(()=>state.royale.builds[0].mask===0);assert.ok(wallDistance(sim.map,{x:0,y:2,z:0},{x:0,y:0,z:-1},9)<9);
+ const hp=b.health;b.owner='host';count=actionCount;change(16);await wait(()=>actionCount>count);assert.equal(b.mask,0);b.owner=guest.id;
+ change(18);await wait(()=>state.royale.builds[0].mask===18);input.buildMode=false;p.z=-4;input.interact=true;
+ await wait(()=>state.royale.builds[0].doorOpen);input.interact=false;
+ applyBuildState(remote,state.royale);assert.equal(wallDistance(remote,{x:0,y:1,z:0},{x:0,y:0,z:-1},9),9);
+ sim.worldBoxes=[{objectId:'test-tree',x:4,y:0,z:-4,w:1,h:4,d:1,material:'wood',kind:'tree'}];rebuildMap(sim);const bank=p.materials.wood;damageObject(sim,sim.worldBoxes[0],50,p);await wait(()=>state.players.find(v=>v.id===guest.id).materials.wood>bank);
+ damageObject(sim,sim.map.boxes.find(v=>v.buildId),1000);await wait(()=>state.royale.builds.length===0);applyBuildState(remote,state.royale);assert.ok(!remote.boxes.some(v=>v.buildId));
+ console.log('PASS real relay guest placement, spending, legal/illegal/opponent edits, reset, door collision, harvesting and destruction snapshots');
+}finally{clearInterval(timer);clearInterval(inputTimer);guest.destroy();host.destroy();await server.close();}

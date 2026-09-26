@@ -211,7 +211,7 @@ export function sanitizeInput(i = {}) {
     reload: !!i.reload,
     popper: !!i.popper,
     slot: Number.isInteger(i.slot) && i.slot>=0 && i.slot<6 ? i.slot : 0,
-    buildMode: !!i.buildMode, buildType: ["wall","floor","stairs","roof"].includes(i.buildType)?i.buildType:"wall", buildMaterial:["wood","brick","metal"].includes(i.buildMaterial)?i.buildMaterial:"wood", buildRotation:Number.isInteger(i.buildRotation)?((i.buildRotation%4)+4)%4:0,
+    editing:!!i.editing, buildMode: !!i.buildMode, buildType: ["wall","floor","stairs","roof"].includes(i.buildType)?i.buildType:"wall", buildMaterial:["wood","brick","metal"].includes(i.buildMaterial)?i.buildMaterial:"wood", buildRotation:Number.isInteger(i.buildRotation)?((i.buildRotation%4)+4)%4:0,
     sprint: !!i.sprint, interact: !!i.interact, drop: !!i.drop,
     swapSlot: Number.isInteger(i.swapSlot) && i.swapSlot>=0 && i.swapSlot<5 ? i.swapSlot : -1,
   };

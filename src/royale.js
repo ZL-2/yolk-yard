@@ -1,4 +1,4 @@
-import {inventory,resetBuilding,rebuildMap,buildingTick,editBuilding,damageObject,MATERIALS} from './building.js';
+import {inventory,resetBuilding,rebuildMap,buildingTick,editBuilding,damageObject,MATERIALS,constructionTick,toggleDoor} from './building.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {botInput as tacticalBotInput} from './bots.js';
 import {beginEquip} from './equip.js';
@@ -129,6 +129,8 @@ export class RoyaleSimulation extends Simulation {
   this.emit('royale-cue',{cue:'chest-open',player:p.id,x:chest.x,y:chest.y,z:chest.z});return true;
  }
  interact(p,input,dt){
+  if(input.editing)return;
+  if(input.interact&&!p.interactLatch&&toggleDoor(this,p)){p.interactLatch=true;return;}
   for(const item of [...this.loot])if((item.ammoType||item.resource)&&this.accessible(p,item,1.6))this.takeLoot(p,item);
   const chest=this.chests.filter(c=>!c.opened&&this.accessible(p,c,3.3)).sort((a,b)=>dist(p,a)-dist(p,b))[0];
   if(input.interact&&chest){
@@ -285,7 +287,7 @@ export class RoyaleSimulation extends Simulation {
   }
   for(const chest of this.chests)if(chest.landAt&&this.time>=chest.landAt&&!chest.landed){chest.landed=true;this.emit('royale-cue',{cue:'supply-land',x:chest.x,y:chest.y,z:chest.z});}
   this.pads=this.pads.filter(p=>p.until>this.time);
-  for(const b of this.builds){const def=MATERIALS[b.material];if(b.health<b.maxHealth&&this.time-b.created<=def.seconds&&this.time-b.lastDamage>2){b.health=Math.min(b.maxHealth,b.health+dt*(def.health-def.start)/def.seconds);this.buildVersion++;}}
+  constructionTick(this);
   this.updateProjectiles(dt);
   const living=[...this.players.values()].filter(p=>p.health>0&&!p.spectating);this.alive=living.length;
   if(living.length<=1)this.finish();
@@ -353,7 +355,7 @@ export class RoyaleSimulation extends Simulation {
  restore(checkpoint){super.restore(checkpoint);this.worldBoxes=(ROYALE_MAP.authored||ROYALE_MAP.boxes).filter(b=>!b.buildId).map(b=>({...b}));this.map={...ROYALE_MAP,boxes:[]};rebuildMap(this);return this;}
  snapshot(){
   const state=super.snapshot();
-  state.players=state.players.map(p=>{const source=this.players.get(p.id);return {...p,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestProgress:source.chestProgress||0};});
+  state.players=state.players.map(p=>{const source=this.players.get(p.id);return {...p,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestProgress:source.chestProgress||0};});
   state.royale={round:this.round,builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,loot:this.loot.map(i=>({...i})),chests:this.chests.map(c=>({...c})),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds};
   return state;
  }
