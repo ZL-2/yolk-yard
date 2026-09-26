@@ -5,7 +5,8 @@ import {pieceBoxes} from '../src/building.js';
 import {stairCamera} from '../src/stair-camera.js';
 const player=()=>({id:'a',x:0,y:0,z:-3,health:100,grounded:true,vy:0,yaw:Math.PI,pitch:0,weapon:'sprinter'});
 for(const dt of [1/20,1/60,1/144])for(const narrow of [true,false])test(`stairs stay grounded up and down, narrow=${narrow}, dt=${dt}`,()=>{
- const map={size:50,boxes:narrow?pieceBoxes({id:'a',x:0,y:0,z:0,type:'stairs',rotation:0,mask:0,material:'wood'}):Array.from({length:8},(_,i)=>({x:0,z:-1.8+i*.8,w:4,d:.82,y:0,h:(i+1)*.4}))};
+ // This fixture walks toward +Z; the new camera-forward default ascends -Z.
+ const map={size:50,boxes:narrow?pieceBoxes({id:'a',x:0,y:0,z:0,type:'stairs',rotation:2,mask:0,material:'wood'}):Array.from({length:8},(_,i)=>({x:0,z:-1.8+i*.8,w:4,d:.82,y:0,h:(i+1)*.4}))};
  const p=player(),end=narrow?1.5:3.5;let previous=0;
  for(let i=0;p.z<end&&i<3000;i++){movePlayer(p,{forward:1},map,dt);assert.ok(p.grounded,`lost ground at ${p.z}, ${p.y}`);assert.ok(p.y>=previous-1e-7);previous=p.y;}
  assert.ok(p.y>=3.1);
