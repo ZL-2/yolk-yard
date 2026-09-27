@@ -5,10 +5,10 @@ const url='https://zl-2.github.io/yolk-yard/',expected='e1a8be4f7369451057da8d0d
 let version;
 for(let i=0;i<12;i++){
  const response=await fetch(url+'version.json?t='+Date.now(),{signal:AbortSignal.timeout(15000),cache:'no-store'});
- if(response.ok){version=await response.json();if(version.release===42&&version.build===expected)break;}
+ if(response.ok){version=await response.json();if(Number(version.release)===52&&version.build===expected)break;}
  await new Promise(r=>setTimeout(r,5000));
 }
-assert.equal(version?.release,42);assert.equal(version?.build,expected);
+console.log('Published version observed',JSON.stringify(version));assert.equal(Number(version?.release),52);assert.equal(version?.build,expected);
 console.log('PASS live version',JSON.stringify(version));
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const errors=[],out='test-results/live-quality42';await mkdir(out,{recursive:true});
@@ -32,5 +32,5 @@ try{
  assert.equal(await page.locator('#royale-fullmap').getAttribute('width'),'720');
  await page.screenshot({path:out+'/published-island-map.png'});console.log('PASS published island map opens');
  assert.deepEqual(errors,[]);
- await writeFile(out+'/report.json',JSON.stringify({url,version,errors,checks:['production release 42 and exact commit','transport entry','L flight dismissal','pointer lock retained','no menu opened','island map opens']},null,2));
+ await writeFile(out+'/report.json',JSON.stringify({url,version,errors,checks:['production release 52 and exact commit','transport entry','L flight dismissal','pointer lock retained','no menu opened','island map opens']},null,2));
 }catch(error){console.error(error);throw error;}finally{await browser.close();}
