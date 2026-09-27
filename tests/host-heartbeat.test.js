@@ -21,3 +21,10 @@ test('a guest resuming after its own long pause first gives the host time to rep
  h.contact(32001);
  for(let now=34000;now<=42000;now+=2000)assert.equal(h.expired(now),false);
 });
+test('transport timers distinguish a delayed renderer from a silent socket',()=>{
+ const h=new HostHeartbeat(0,{silence:18000,grace:0});
+ assert.equal(h.expired(30000),false);
+ h.contact(30001);
+ for(let t=33000;t<=48000;t+=3000)assert.equal(h.expired(t),false);
+ assert.equal(h.expired(51000),true);
+});

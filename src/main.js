@@ -1,4 +1,7 @@
 import {StreakUI} from './streak-ui.js';
+import {PartyClient} from './party-client.js';
+import {lobbyMarkup,modeMarkup,socialMarkup,EXPERIENCES} from './lobby-ui.js';
+import {teammates,wonRoyale,isDuos} from './teams.js';
 import {arrangeSettings} from './settings-layout.js';
 import {eggsMarkup,formatEggs} from './currency-ui.js';
 import {GuestPresentation} from './guest-presentation.js';
@@ -19,6 +22,7 @@ import { ChatPanel } from "./chat-ui.js";
 import { moderateText, safeName } from "./moderation.js";
 import {matchOptions, targetLabel} from "./match-options.js";
 import "./style.css";
+import "./lobby.css";
 import './settings-layout.css';
 import './egg-shop.css';
 import {EggShop} from './egg-shop.js';
@@ -100,7 +104,7 @@ let stats = read("yolk-stats", { matches: 0, kills: 0, wins: 0 }),
   options = matchOptions({map:"yard", mode:"ffa", fill:true});
 const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},stats.eggs||0),matchEarnings=new MatchEarnings();
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
-let eggShop,lastEarnAction=-Infinity,earnMatch=0;
+let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
 let view,
   sim = null,
   net = null,
@@ -187,6 +191,7 @@ const chat = new ChatPanel($("#app"), {
 });
 function remember() {
   save("yolk-profile", profile);
+  party?.updateProfile(profile);
   if (sim) {if(sim.setProfile(localId, profile)===false)renamePrompt();}
   else net?.profile(profile);
 }
@@ -194,35 +199,12 @@ function titleBar() {
   return `<div class="topbar"><button class="brand" type="button" aria-label="Yolk Yard">YOLK<br><span>YARD</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
 function renderMenu() {
-  const w = weapon(profile.weapon);
-  $("#menu").innerHTML =
-    `<div class="menu-shade"></div>${titleBar()}<main class="menu-layout"><section class="panel play-panel"><div class="eyebrow">GOOD EGGS. GREAT AIM.</div><h1>Time to<br>scramble.</h1><label class="name-label" for="player-name">YOUR NAME</label><input class="field" id="player-name" maxlength="18" value="${esc(profile.name)}" autocomplete="off" spellcheck="false" aria-describedby="name-safety"><p class="name-safety" id="name-safety" role="status"></p><button class="primary play-home" data-action="play">PLAY <span>▶</span></button>${connectionButton}</section><div class="character-caption"><div class="eyebrow">READY TO HATCH</div><strong>${esc(profile.name)}</strong><button class="icon-btn" data-action="customize">Egg Shop</button></div><section class="panel loadout-panel"><div class="eyebrow weapon-role">YOUR LOADOUT · ${w.role}</div><img class="loadout-portrait" src="${view.weaponPreview(w.id)}" alt="${w.name} weapon model"><h3>${w.name}</h3><p class="weapon-desc">${w.desc}</p><div class="weapon-list">${WEAPONS.filter(
-      (w) => !w.secondary,
-    )
-      .map(
-        (v, i) =>
-          `<button class="weapon-key ${v.id === w.id ? "active" : ""}" data-weapon="${v.id}" title="${v.name}" aria-label="Select ${v.name}" aria-pressed="${v.id === w.id}">${i + 1}</button>`,
-      )
-      .join("")}</div>${[
-      ["POWER", Math.min(100, w.damage * w.pellets)],
-      ["FIRE RATE", Math.min(100, 9 / w.interval)],
-      ["MOBILITY", w.speed * 11],
-    ]
-      .map(
-        ([n, v]) =>
-          `<div class="stat">${n}<div class="stat-bar"><span style="width:${v}%"></span></div></div>`,
-      )
-      .join(
-        "",
-      )}<div class="account-stats"><span>Total Matches <b>${stats.matches.toLocaleString()}</b></span><span>Eliminations <b>${stats.kills.toLocaleString()}</b></span><span class="account-eggs">${eggsMarkup(eggWallet.value.balance)}</span></div></section></main><div class="footer"><span class="footer-right">WASD + MOUSE &nbsp; / &nbsp; <button data-action="about">About & credits</button></span></div>`;
-  $("#player-name").addEventListener("change", (e) => {
-    const checked=moderateText(e.target.value,{kind:"name"});
-    profile.name = safeName(e.target.value);
-    const nameStatus=$("#name-safety");if(nameStatus)nameStatus.textContent=checked.ok ? "" : "That name was filtered. Please choose a friendly nickname.";
-    const caption=$(".character-caption strong");if(caption)caption.textContent=profile.name;
-    e.target.value = profile.name;
-    remember();
-  });
+  $("#menu").innerHTML=lobbyMarkup({profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance});
+  view?.setParty(party?.party?.members.filter(m=>m.id!==party.id).map(m=>m.profile)||[]);
+}
+function profileMenu(){
+  modal('Player details',`<label for="player-name">YOUR NAME</label><input class="field" id="player-name" maxlength="18" value="${esc(profile.name)}" autocomplete="off"><p id="name-safety" role="status"></p><button class="primary" data-action="close">DONE</button>`,'profile');
+  $('#player-name').onchange=e=>{const checked=moderateText(e.target.value,{kind:'name'});profile.name=safeName(e.target.value);e.target.value=profile.name;$('#name-safety').textContent=checked.ok?'':'That name was filtered. Choose a friendly nickname.';remember();renderMenu();};
 }
 function modal(title, body, type = "generic") {
   if(type==="error")sound.cue("ui-error");
@@ -294,15 +276,15 @@ function loadoutMenu() {
   );
 }
 let customTab = "shell";
-function customizeMenu() {
+function customizeMenu(tab='shop') {
   modal('Egg Shop','<div id="egg-shop"></div>','egg-shop');
   eggShop??=new EggShop({wallet:eggWallet,view,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
-  eggShop.open($('#egg-shop'));
+  eggShop.tab=tab;eggShop.category='all';eggShop.page=0;eggShop.open($('#egg-shop'));
 }
 function helpMenu() {
   modal(
     "How to play",
-    `<p>Move, aim, and tag the other eggs. You return after 3 seconds when your shell health runs out. Health recovers after 6 seconds without a hit.</p><table class="controls-table">${[
+    `<p>Move, aim, and tag the other eggs. Arena modes allow respawns. Yolk Royale gives each contestant one life: in Duos, watch your teammate after elimination and share your team’s final placement.</p><p>Upper-shell hits receive a critical bonus on most blasters. The reticle shows your current spread; a mint reticle marks a settled first shot. ADS improves accuracy, while each blaster has its own recoil, range and recovery. Scopes keep precise aiming stable. Explosive blasters have no critical bonus.</p><table class="controls-table">${[
       ...CONTROLS.map(([id, label]) => [controlLabel(id), label]),
       ["Mouse", "Look"],
       ["Escape", "Menu"],
@@ -315,7 +297,7 @@ function helpMenu() {
   );
 }
 function ruleSummary(o) {
-  if(o.mode==='royale')return `${o.capacity} contestants · ${o.fill?"Fill with bots":o.bots+" bots"} · ${o.storm==='quick'?'Quick':'Normal'} storm · One life`;
+  if(o.mode==='royale')return `${o.teamSize===2?'Duos':'Solo'} · ${o.capacity} contestants · ${o.fill?"Fill with bots":o.bots+" bots"} · ${o.storm==='quick'?'Quick':'Normal'} storm · One life`;
   return `${o.minutes} min · ${o.scoreLimit} eliminations to win · ${o.bots} bots · ${BOT_DIFFICULTIES[o.difficulty-1]}`;
 }
 function setupMenu(editing = false, draft = null) {
@@ -324,9 +306,11 @@ function setupMenu(editing = false, draft = null) {
   const nextRound = editing && state.phase === "results";
   const select = (id,label,items,value) => `<label>${label}<select class="field" id="setup-${id}">${items.map(([key,text])=>`<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
   modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Create Match",
-    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?'Last egg standing wins. Two contestants minimum. All loot is found on Sunnybreak.':'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Offline waits 10 seconds; online waits up to 60 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>`, "setup");
+    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last egg standing wins. Two contestants minimum.'} All loot is found on Sunnybreak.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Spawn Island waits up to 60 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
   if(editing && !net) $("#setup-visibility").disabled=true;
   const royale=o.mode==='royale';
+  if(!editing)$('#setup-mode').disabled=true;
+  if(royale&&o.teamSize===2){$('#setup-capacity').querySelector('option[value="2"]')?.remove();if(o.capacity<4)$('#setup-capacity').value='4';}
   for(const key of ['minutes','scoreLimit']){$(`#setup-${key}`).closest('label').hidden=royale;$(`#setup-${key}`).disabled=royale;}
   for(const key of ['capacity','storm'])$(`#setup-${key}`).closest('label').hidden=!royale;
   $('#setup-map').disabled=royale;
@@ -339,7 +323,7 @@ function setupMenu(editing = false, draft = null) {
 }
 function getOptions() {
   if (![...document.querySelectorAll('#dialog input[type="number"]')].every(input=>input.disabled||input.reportValidity())) return null;
-  return matchOptions({...Object.fromEntries(["map","mode","bots","difficulty","minutes","scoreLimit","capacity","storm","fill"].map(key=>[key,$(`#setup-${key}`).value])),fill:$("#setup-fill").value==='on',session:net?'online':sim?.options.session});
+  return matchOptions({...options,...party?.party?.selection,...Object.fromEntries(["map","mode","bots","difficulty","minutes","scoreLimit","capacity","storm","fill"].map(key=>[key,$(`#setup-${key}`).value])),fill:$("#setup-fill").value==='on',session:net?'online':sim?.options.session});
 }
 function saveMatchSettings(start = false) {
   if (!sim || state?.phase === "playing") return;
@@ -435,9 +419,9 @@ function roundIntro(){
   dialog.close();dialogType='';paused=true;keys.clear();queuedActions.clear();input.fire=input.aim=false;
   const p=state.players.find(p=>p.id===localId),ranked=state.players.filter(p=>!p.spectating||p.place).sort((a,b)=>b.kills-a.kills||a.deaths-b.deaths||b.points-a.points);
   const place=state.royale?p?.place:p?1+ranked.filter(other=>other.kills>p.kills||other.kills===p.kills&&other.deaths<p.deaths).length:0;
-  const win=state.royale?state.royale.winnerId===localId:mode(state.options.mode).teams?state.scores[p?.team]>state.scores[1-p?.team]:place===1;
+  const win=state.royale?wonRoyale(state,localId):mode(state.options.mode).teams?state.scores[p?.team]>state.scores[1-p?.team]:place===1;
   const title=state.royale?(win?'VICTORY YOLK ROYALE':place?'YOU PLACED #'+place:'ROUND COMPLETE'):mode(state.options.mode).teams?(state.scores[0]===state.scores[1]?'TEAM DRAW':win?'TEAM VICTORY':'ROUND COMPLETE'):'YOU PLACED #'+place;
-  const banner=$('#round-banner');banner.className=win?'victory':'placement';banner.innerHTML=`<span>${state.royale?'LAST EGG STANDING':mode(state.options.mode).name.toUpperCase()}</span><strong>${esc(title)}</strong><p>${!state.royale&&place?'YOUR PLACE #'+place+' · ':''}${p?.kills||0} ELIMINATIONS</p>`;banner.hidden=false;
+  const banner=$('#round-banner');banner.className=win?'victory':'placement';banner.innerHTML=`<span>${state.royale?(isDuos(state.options)?'LAST DUO STANDING':'LAST EGG STANDING'):mode(state.options.mode).name.toUpperCase()}</span><strong>${esc(title)}</strong><p>${!state.royale&&place?'YOUR PLACE #'+place+' · ':''}${p?.kills||0} ELIMINATIONS</p>`;banner.hidden=false;
   if(!state.royale)sound.cue(win?'victory':'round-start');
   resultAt=performance.now()+4200;
 }
@@ -461,7 +445,7 @@ function callbacks() {
     },
     onNameRequired:()=>renamePrompt(),
     onNameAccepted:()=>{if(dialogType==='rename'){dialog.close();dialogType='';if(screen==='game')void resume();}},
-    onJoin: (id, p) => !!sim?.admitPlayer(id,p),
+    onJoin: (id, p, admission) => !!sim?.admitPlayer(id,p,admission),
     onLeave: (id) => sim?.leavePlayer(id),
     onRoster: ids => sim?.setConnectedHumans?.(ids),
     onPlayerAction: (id, action) => sim?.playerAction(id, action),
@@ -515,13 +499,14 @@ function beginSim() {
   seq = 0;
   predicted = null;
 }
-async function createRoom(preset = null, visibilityOverride = null, automatic = false) {
+async function createRoom(preset = null, visibilityOverride = null, automatic = false, launch = null) {
   if (busy) return;
   const next = preset?.mode ? matchOptions(preset) : getOptions();
   if (!next) return;
   options=matchOptions({...next,session:'online'});autoQueue=automatic;
   const visibility=visibilityOverride||$('#setup-visibility')?.value||'public';
   beginSim();
+  if(launch?.admission)sim.assignTeam?.(sim.players.get("host"),launch.admission);
   busy = true;
   modal(
     "Opening your room",
@@ -532,10 +517,11 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   attempt.maxConnections=(options.mode==='royale'?Math.min(options.capacity,MAX_HUMANS):8)-1+(options.mode==='royale'?MAX_SPECTATORS:0);
   net = attempt;
   try {
-    await attempt.host();
+    await attempt.host(launch?.code);
     if (attempt !== net) return;
     attempt.setVisibility(visibility);
-    if(sim instanceof RoyaleSimulation){sim.startRound();state=sim.snapshot();attempt.broadcast(state);}
+    if(sim instanceof RoyaleSimulation)sim.startRound();
+    state=sim.snapshot();attempt.broadcast(state);attempt.publishRoom();
     localId = attempt.id;
     screen = "lobby";
     paused = true;
@@ -544,6 +530,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     $("#menu").hidden = true;
     $("#lobby").hidden = false;
     if(state?.phase==='playing')enterGame(true);else renderLobby();
+    return true;
   } catch (e) {
     if (attempt !== net) return;
     attempt.destroy();
@@ -552,14 +539,15 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     state = null;
     modal(
       "Room could not open",
-      `<div class="error-box">${esc(e.message)}</div>${connectionButton}<button class="primary" data-action="start-local">START LOCAL MATCH</button><button class="plain" data-action="setup" style="margin-top:12px">Try creating a room again</button>`,
+      `<div class="error-box">${esc(e.message)}</div>${connectionButton}<button class="primary" data-action="find-public">TRY MATCHMAKING AGAIN</button><button class="plain" data-action="setup" style="margin-top:12px">Try creating a room again</button>`,
       "error",
     );
   } finally {
     busy = false;
   }
 }
-async function joinRoom(publicCode, quiet=false) {
+async function joinRoom(publicCode, quiet=false, ticket=null) {
+  if(!ticket&&party?.ready){await queueParty(false,cleanCode(publicCode||$("#join-code")?.value));return;}
   if (checkingConnection) { toast('Wait for the connection check to finish.'); return; }
   if (busy) return;
   const code = cleanCode(typeof publicCode === "string" ? publicCode : $("#join-code")?.value);
@@ -584,7 +572,7 @@ async function joinRoom(publicCode, quiet=false) {
   seq = 0;
   pendingInputs = [];
   try {
-    localId = await attempt.join(code, profile);
+    localId = await attempt.join(code, profile, ticket);
     if (attempt !== net) return;
     screen = "lobby";
     paused = true;
@@ -632,7 +620,6 @@ function launchRound(){
   if(sim.startRound()===false){toast('Invite another egg or add a bot before launching.');return false;}
   state=sim.snapshot();net?.broadcast(state);enterGame(true);return true;
 }
-function startLocalMatch() {autoQueue=false;options=matchOptions({...options,session:'offline'});beginSim();launchRound();}
 function enterGame(capture = false) {
   guestFire.reset();
   connectionReport.network.reset();
@@ -687,7 +674,8 @@ let spectateTarget = null;
 let spawnIntentUntil = 0;
 function switchSpectator(step) {
   sound.cue('spectator-switch');
-  const players = state?.players.filter(p => p.id !== localId && !p.spectating && p.health > 0) || [];
+  const me=state?.players.find(p=>p.id===localId),mates=state?.players.filter(p=>teammates(state.options,me,p)&&p.health>0&&!p.spectating)||[];
+  const players = mates.length?mates:state?.players.filter(p => p.id !== localId && !p.spectating && p.health > 0) || [];
   const index = players.findIndex(p => p.id === spectateTarget);
   spectateTarget = players.length ? players[(index + step + players.length) % players.length].id : null;
 }
@@ -715,11 +703,12 @@ function pauseMenu() {
     "pause",
   );
 }
-function leave(confirm = false) {
+function leave(confirm = false,notifyParty=true) {
+  if(notifyParty){activeLaunch=null;void partyRequest("returned");}
   earnMatch++;
   buildControls.buildMode=false;buildUI.cancel();
   resultAt=0;$("#round-banner").hidden=true;damageSources.length=0;
-  matchRequest++;autoQueue=false;sound.stopWorld();royaleUI.waypoint=null;royaleUI.root.hidden=true;document.body.classList.remove('in-royale','in-spawn-island');
+  matchRequest++;autoQueue=false;sound.stopWorld();royaleUI.waypoint=null;royaleUI.root.hidden=true;document.body.classList.remove('in-royale','in-spawn-island','in-duos');
   net?.destroy();
   net = null;
   chat.reset();
@@ -747,7 +736,7 @@ function leave(confirm = false) {
   void updates.check();
 }
 function scoresHTML(s = state) {
-  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Egg</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.health>0?'Alive':p.place?'Eliminated':'Spectator'}</td></tr>`).join('')}</tbody></table>`;
+  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Egg</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isDuos(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
 
   return `<table class="scores"><thead><tr><th>Egg</th><th>Elims</th><th>Downs</th><th>Score</th></tr></thead><tbody>${[
     ...(s?.players || []),
@@ -767,7 +756,7 @@ function resultsMenu() {
     stats.kills += p.kills;
     stats.eggs = eggWallet.value.earned;
     if (
-      state.royale ? state.royale.winnerId===p.id : mode(state.options.mode).teams
+      state.royale ? wonRoyale(state,p.id) : mode(state.options.mode).teams
         ? state.scores[p.team] > state.scores[1 - p.team]
         : state.winner === p.name + " wins"
     )
@@ -775,7 +764,7 @@ function resultsMenu() {
     save("yolk-stats", stats);
   }
   modal(
-    state.royale ? state.royale.winnerId===localId ? "VICTORY YOLK!" : "Round complete" : "That’s a wrap.",
+    state.royale ? wonRoyale(state,localId) ? "VICTORY YOLK!" : "Round complete" : "That’s a wrap.",
     `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">◒ ${matchEarnings.total||0} eggs earned this round · Wallet: ${eggWallet.value.balance} eggs</p>${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${sim || net?.isHost ? '<button class="primary" data-action="rematch">PLAY AGAIN</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">Find public match</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
     "results",
   );
@@ -802,19 +791,20 @@ function processEvents() {
     if (e.id <= lastEvent) continue;
     lastEvent = e.id;
     if (state.time - e.time > 1.6) continue;
-    if(!sim&&e.player===localId&&guestFire.confirm(e,performance.now()/1000))continue;
+    const echoed=!sim&&e.player===localId&&guestFire.confirm(e,performance.now()/1000);
+    if(echoed)e.echoed=true;
     view.event(e, localId);
     const me = state.players.find((p) => p.id === localId);
     sound.event(e,me,state);
     if(e.type==='streak-bonus'&&e.player===localId){streakUI.announce(e,state.options.mode);sound.pickup();}
-    if(e.type==='royale-eliminated'&&e.player===localId){spectateTarget=me?.killerId;pendingInputs=[];predicted=null;}
-    if (e.type === "shot") {
+    if(e.type==='royale-eliminated'&&e.player===localId){spectateTarget=state.players.find(p=>teammates(state.options,me,p)&&p.health>0)?.id||me?.killerId;pendingInputs=[];predicted=null;}
+    if (e.type === "shot"&&!echoed) {
       const distance = me
         ? Math.hypot(e.origin.x - me.x, e.origin.z - me.z)
         : 0;
       sound.shot(e.weapon, distance, e.origin);
     }
-    if (e.type === "launch") sound.shot(e.popper?"pip":e.weapon, me&&e.origin?Math.hypot(me.x-e.origin.x,me.z-e.origin.z):0,e.origin);
+    if (e.type === "launch"&&!echoed) sound.shot(e.popper?"pip":e.weapon, me&&e.origin?Math.hypot(me.x-e.origin.x,me.z-e.origin.z):0,e.origin);
     if (e.type === "explosion")
       sound.pop(me ? Math.hypot(me.x - e.x, me.z - e.z) : 0,e);
     if (e.type === "hit") {
@@ -844,7 +834,8 @@ function processEvents() {
       sound.death(me ? Math.hypot(me.x-e.x, me.z-e.z) : 0,e);
       const row = document.createElement("div");
       row.className = "kill-line" + (e.player === localId ? " me" : "");
-      row.innerHTML = `${esc(e.name)} <span>${esc(e.weapon)}</span> ${esc(e.targetName)}`;
+      const ally=id=>teammates(state.options,me,state.players.find(p=>p.id===id))?"◆ ":"";
+      row.innerHTML = `${ally(e.player)}${esc(e.name)} <span>${esc(e.weapon)}</span> ${ally(e.target)}${esc(e.targetName)}`;
       row.dataset.expire = String(performance.now() + 5500);
       $("#feed").prepend(row);
       while ($("#feed").children.length > 4) $("#feed").lastChild.remove();
@@ -953,12 +944,14 @@ function hud() {
     !paused &&
     p.reloadEnd <= state.time;
   $("#crosshair").style.display =
-    p.health > 0 && armed && !paused && !aiming ? "block" : "none";
+    p.health > 0 && armed && !paused && !(aiming&&['scope','prism'].includes(gun(p).optic)) ? "block" : "none";
   // Convert the host's current angular shot spread to a screen-space radius.
-  const spread = p.shotSpread ?? gun(p).spread;
-  const halfAngle = spread * (gun(p).pellets > 1 ? 1 : 0.5);
+  const spread = (!sim?predicted?.shotSpread:null)??p.shotSpread??gun(p).spread;
+  const halfAngle = spread * .5;
   const radius = Math.tan(Math.min(halfAngle, 1)) * $("#world").clientHeight * view.camera.projectionMatrix.elements[5] / 2;
   $("#crosshair").style.setProperty("--crosshair-gap", `${clamp(radius, 4, 120)}px`);
+  $('#crosshair').classList.toggle('accuracy-ready',!!((!sim&&predicted?.firstShot)||p.firstShot));
+  $('#crosshair').classList.toggle('pellet-reticle',gun(p).pellets>1);
   $("#center-dot").hidden = !settings.centerDot;
   $("#hit-marker").hidden = !settings.hitMarkers || p.health <= 0 || paused || performance.now() >= hitUntil;
   const scoped =
@@ -986,39 +979,54 @@ async function copy(text) {
     );
   }
 }
-let playMode = 'royale';
-function playMenu(selected = playMode) {
- playMode = selected;
- const selectedMode = mode(selected), royale = selected === 'royale';
- modal('Play', `<div class="play-discover"><div class="eyebrow">CHOOSE YOUR EXPERIENCE</div><div class="play-mode-grid">${MODES.map(m=>`<button class="play-mode-card play-${m.id} ${m.id===selected?'selected':''}" data-action="play-${m.id}" aria-pressed="${m.id===selected}"><span class="mode-art" aria-hidden="true">${m.id==='royale'?'◈':m.id==='ffa'?'◎':'◆ ◆'}</span><span class="eyebrow">${m.id==='royale'?'32 CONTESTANTS · ONE LIFE':'8 PLAYERS · RESPAWNS'}</span><strong>${m.name}</strong><span>${m.description}</span></button>`).join('')}</div><section class="play-selection"><div><div class="eyebrow">SELECTED MODE</div><h3>${selectedMode.name}</h3><p>${royale?'Harvest. Build. Survive the storm.':'Choose your loadout and jump into the arena.'}</p><span class="play-fill">BOT FILL ON · Empty seats fill automatically</span></div><div class="play-options"><button class="primary" data-action="${royale?'royale-queue':'public-rooms'}">${royale?'FIND PUBLIC MATCH':'BROWSE PUBLIC MATCHES'}</button><button class="secondary" data-action="play-custom">CUSTOM MATCH</button><button class="plain" data-action="play-local">PLAY OFFLINE WITH BOTS</button></div></section><div class="play-footer"><button class="plain" data-action="public-rooms">Browse all matches</button><button class="plain" data-action="join">Join with room code</button></div></div>`, 'play');
+async function partyRequest(type,data={}){
+ try{return await party.request(type,data);}catch(error){toast(error.message);return null;}
 }
-function botDifficultyMenu(selected = playMode) {
- playMode = selected;
- modal('Play offline with bots', `<p>Choose your bot difficulty for ${esc(mode(selected).name)}.</p><label for="local-difficulty">BOT DIFFICULTY</label><select class="field" id="local-difficulty">${BOT_DIFFICULTIES.map((name,i)=>`<option value="${i+1}">${name}</option>`).join('')}</select><button class="primary" style="margin-top:22px" data-action="confirm-local">START MATCH</button><button class="plain" data-action="back-to-play">BACK</button>`, 'bot-difficulty');
+function playMenu(){modal('Choose your experience',modeMarkup(party?.party?.selection,party?.party?.leader!==party?.id),'play');}
+async function selectExperience(id){
+ const e=EXPERIENCES.find(e=>e.id===id);if(!e)return;
+ if(await partyRequest('select',{mode:e.mode,teamSize:e.teamSize,duoFill:party.party.selection.duoFill})){closeDialog();renderMenu();}
 }
-function startChosenBotMatch() {
- const difficulty=Number($('#local-difficulty')?.value);
- if(!Number.isInteger(difficulty)||difficulty<1||difficulty>BOT_DIFFICULTIES.length)return;
- options=matchOptions({mode:playMode,bots:playMode==='royale'?MAX_CONTESTANTS-1:7,fill:true,difficulty});
- startLocalMatch();
+async function socialMenu(){
+ if(!party?.ready){toast('The party service is connecting. Try again in a moment.');return;}
+ const players=await partyRequest('online');if(!players)return;
+ modal('Social & Party',socialMarkup(party.party,party.id,players),'social');
 }
-function royaleHome(){modal('Yolk Royale',`<div class="royale-brief"><div class="eyebrow">SUNNYBREAK ISLAND</div><h3>One island. One surviving egg.</h3><p>Board the Eggspress, choose your drop, and carry five items plus your permanent pickaxe. Harvest wood, brick and metal, then build and edit walls, floors, stairs and roofs. Find shields, healing, shock eggs and launch nests. Keep moving as the storm closes.</p><p class="hint">Solo · 32 contestants · Nine districts · One life</p></div><button class="primary" data-action="royale-queue">FIND PUBLIC MATCH</button><button class="secondary" data-action="royale-custom">CREATE PUBLIC / PRIVATE MATCH</button><button class="plain" data-action="royale-local">PLAY OFFLINE WITH BOTS</button><p class="hint">Warm up on Hatchling Atoll: 10 seconds offline, or 60 seconds online with an early departure when every contestant seat is filled by a real player. Practice gear resets at departure. Join before the Battle Bus; after departure, spectate living contestants. Hosting transfers automatically if the host leaves.</p>`,'royale-home');}
-async function quickRoyale(){
- if(state)leave(false);
- const request=++matchRequest;modal('Finding your flight','<div class="spinner"></div><p>Finding a waiting Yolk Royale match…</p><button data-action="cancel-connect">Cancel</button>','matchmaking');
+function receiveInvite(invite){
+ document.querySelector('.party-invitation')?.remove();
+ const node=document.createElement('aside');node.className='party-invitation';node.setAttribute('role','status');
+ node.innerHTML=`<strong>${esc(invite.name)} invited you to their party</strong><button data-party-accept="${invite.id}">ACCEPT</button><button data-party-decline="${invite.id}">DECLINE</button>`;
+ document.body.append(node);setTimeout(()=>node.remove(),Math.max(0,invite.expires-Date.now()));sound.cue('queue-found');
+}
+async function queueParty(custom=false,code=null){
+ if(state){toast('Return to the lobby before finding another match.');return;}
+ const selected=custom?getOptions():matchOptions({...party?.party?.selection,fill:true,bots:party?.party?.selection.mode==='royale'?31:7});
+ if(!selected)return;
+ if(custom&&(selected.mode!==party.party.selection.mode||selected.teamSize!==party.party.selection.teamSize)){
+  if(!await partyRequest('select',{...selected}))return;
+ }
+ if(await partyRequest('queue',{custom,code,options:selected,visibility:$('#setup-visibility')?.value||'public'})){dialog.close();dialogType='';renderMenu();}
+}
+async function launchParty(launch){
+ if(activeLaunch===launch.id)return;activeLaunch=launch.id;
+ if(net||state)leave(false,false);
+ let ok=false;
  try{
-   let rooms=(await directory.list()).rooms;
-   if(request!==matchRequest)return;
-   for(let pass=0;pass<2;pass++){
-     for(const room of queueCandidates(rooms).slice(0,3)){
-       if(request!==matchRequest)return;
-       if(await joinRoom(room.code,true)){sound.cue('queue-found');return;}
-     }
-     if(pass===0){await new Promise(resolve=>setTimeout(resolve,400+Math.random()*600));rooms=(await directory.list()).rooms;}
-   }
-   if(request!==matchRequest)return;
-   await createRoom({mode:'royale',bots:MAX_CONTESTANTS-1,capacity:MAX_CONTESTANTS,fill:true},'public',true);
- }catch(e){if(request===matchRequest)modal('Matchmaking unavailable',`<p class="error-box">${esc(e.message)}</p>${connectionButton}<button class="primary" data-action="royale-local">PLAY OFFLINE WITH BOTS</button><button data-action="royale-queue">Try again</button>`,'error');}
+  if(launch.host)ok=await createRoom(launch.options,launch.visibility,true,launch);
+  else ok=await joinRoom(launch.code,false,launch.ticket);
+  if(activeLaunch!==launch.id)return;
+  if(!ok)throw Error('Your party could not enter that match together.');
+  if(launch.host)await party.request('host-ready',{id:launch.id});
+  await party.request('joined',{id:launch.id});
+ }catch(error){await partyRequest('failed',{id:launch.id,reason:error.message});}
+}
+function initializeParty(){
+ party=new PartyClient(profile,{
+  status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'&&screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');},
+  change:p=>{if(screen==='menu')renderMenu();if(dialogType==='social')void socialMenu();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
+  invite:receiveInvite,launch:launchParty,
+  cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing';activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);toast(m.message);if(screen==='menu')renderMenu();}
+ });
 }
 function royaleMap(){if(!state?.royale)return;modal('Sunnybreak Island',royaleUI.mapHTML(),'royale-map');royaleUI.drawMap($('#royale-fullmap'),state,state.players.find(p=>p.id===localId),true);}
 function royaleInventory(){if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);royaleUI.inventoryKey='';modal('INVENTORY',royaleUI.inventoryHTML(p),'royale-inventory');royaleUI.updateInventory(p);}
@@ -1036,20 +1044,25 @@ const actions = {
  'owner-refresh':()=>ownerConsole.refresh(),
  'owner-logout':()=>ownerConsole.logout(),
  'play':()=>playMenu(),
- 'play-royale':()=>playMenu('royale'),
- 'play-ffa':()=>playMenu('ffa'),
- 'play-teams':()=>playMenu('teams'),
- 'play-custom':()=>{options=matchOptions({mode:playMode,fill:true});setupMenu();},
- 'play-local':()=>botDifficultyMenu(),
- 'confirm-local':startChosenBotMatch,
- 'back-to-play':()=>playMenu(),
+ 'lobby-home':()=>{if(screen==='menu')closeDialog();},
+ 'profile':profileMenu,
+ 'locker':()=>customizeMenu('locker'),
+ 'item-shop':()=>customizeMenu('shop'),
+ 'social':socialMenu,
+ 'career':()=>modal('Career',`<div class="account-stats"><span>Matches <b>${stats.matches}</b></span><span>Eliminations <b>${stats.kills}</b></span><span>Wins <b>${stats.wins}</b></span></div><p>Stats and earned Eggs are saved on this device.</p><button class="primary" data-action="close">DONE</button>`),
+ 'find-public':()=>queueParty(),
+ 'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
+ 'duo-fill':()=>partyRequest('select',{...party.party.selection,duoFill:true}),
+ 'duo-no-fill':()=>partyRequest('select',{...party.party.selection,duoFill:false}),
+ 'party-ready':()=>partyRequest('ready',{value:!party.party.members.find(m=>m.id===party.id)?.ready}),
+ 'party-cancel':()=>partyRequest('cancel'),
+ 'party-leave':()=>partyRequest('leave'),
+ 'party-privacy':()=>partyRequest('privacy',{value:party.party.privacy==='open'?'invite':'open'}),
   'connection-report': showConnectionReport,
   'run-connection-check': runConnectionCheck,
   'copy-connection-report': copyConnectionReport,
- 'royale-home':royaleHome,
- 'royale-queue':quickRoyale,
- 'royale-custom':()=>{options=matchOptions({mode:'royale',fill:true});setupMenu();},
- 'royale-local':()=>botDifficultyMenu('royale'),
+ 'royale-home':playMenu,
+ 'royale-queue':()=>{leave(false);void queueParty();},
  'royale-map':royaleMap,
  'royale-inventory':royaleInventory,
  'royale-clear-marker':()=>{royaleUI.waypoint=null;},
@@ -1078,8 +1091,7 @@ const actions = {
   "match-settings": () => setupMenu(true),
   "save-match-settings": () => saveMatchSettings(),
   "apply-rematch": () => saveMatchSettings(true),
-  "start-local": startLocalMatch,
-  "create-room": createRoom,
+  "create-room":()=>queueParty(true),
   "join-room": joinRoom,
   join: () => joinMenu(),
   loadout: loadoutMenu,
@@ -1130,13 +1142,17 @@ const actions = {
   about: () =>
     modal(
       "Made for a good scramble",
-      `<p>Yolk Yard is an original, independent egg arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. This game is not affiliated with Shell Shockers or Blue Wizard Digital.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 2.0 · All gameplay code is included in the project.</p>`,
+      `<p>Yolk Yard is an original, independent egg arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. This game is not affiliated with Shell Shockers or Blue Wizard Digital.</p><p style="margin-top:14px">Settings and match totals stay in this browser. The Social panel lists connected browser-session nicknames. Party invitations, membership and readiness are held by the relay; reconnect tokens stay in this tab, invitations expire after one minute, and disconnected parties expire after 90 seconds. There is no permanent friend list. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 2.0 · All gameplay code is included in the project.</p>`,
       "about",
     ),
 };
 document.addEventListener("click", (e) => {
-  const b = e.target.closest("button");
+  const b = e.target.closest("button,[data-action]");
   if (!b) return;
+  if(b.dataset.experience)void selectExperience(b.dataset.experience);
+  for(const [key,type]of [['partyInvite','invite'],['partyAccept','accept'],['partyDecline','decline'],['partyKick','kick'],['partyJoin','join']])if(b.dataset[key]){
+    void partyRequest(type,{id:b.dataset[key]}).then(ok=>{if(ok){if(type==='accept'||type==='decline')b.closest('.party-invitation')?.remove();if(type==='invite')toast('Invitation sent.');if(dialogType==='social')void socialMenu();}});
+  }
   if (b.dataset.action) {
     sound.unlock();
     actions[b.dataset.action]?.();
@@ -1469,6 +1485,7 @@ function frameInput() {
 
   const nextInput = {
     seq: ++seq,
+    shotTime:sim?state?.time:guestPresentation.poses.targetTime(guestPresentation.time),
     yaw: input.yaw,
     pitch: input.pitch,
     forward: active
@@ -1534,7 +1551,9 @@ function loop(now) {
       const me = state.players.find((p) => p.id === localId);
       if (me?.health > 0) {
         if (!predicted) predicted = { ...me,fall:me.fall?{...me.fall}:null,launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+        const beforeMove={x:predicted.x,z:predicted.z};
         predictMovement(predicted, i, getMap(state.options.map), 1 / 60, state.royale);
+        predicted.vx=(predicted.x-beforeMove.x)*60;predicted.vz=(predicted.z-beforeMove.z)*60;
         predicted.moving = Math.abs(i.forward) + Math.abs(i.strafe) > 0.1;
         {
           const shot=guestFire.step(predicted,i,Math.max(state.time,guestPresentation.time),now/1000,state.round);
@@ -1567,7 +1586,7 @@ function loop(now) {
   processEvents();
   const me = state?.players.find((p) => p.id === localId);
   if(me&&screen==='game'){
-    const won=state.royale?state.royale.winnerId===localId:mode(state.options.mode).teams?state.scores[me.team]>state.scores[1-me.team]:state.winner===me.name+' wins';
+    const won=state.royale?wonRoyale(state,localId):mode(state.options.mode).teams?state.scores[me.team]>state.scores[1-me.team]:state.winner===me.name+' wins';
     matchEarnings.sample({key:earnMatch+':'+(state.royale?.matchId||net?.code||'local')+':'+state.round,dt,eligible:!state.royale?.practice,active:!state.royale?.practice&&state.phase==='playing'&&me.health>0&&!me.spectating&&!paused&&!document.hidden&&now-lastEarnAction<10000,kills:me.kills,doubleEggs:me.eggsUntil>state.time,finished:state.phase==='results'||!!state.royale&&me.place>0&&me.health<=0,won,place:state.royale?me.place:0},(id,amount,label)=>{void eggWallet.award(id,amount,label).then(()=>{toast('+'+amount+' eggs · '+label);}).catch(error=>toast(error.message));});
   }
   if (me?.spectating && !state.players.some(p => p.id === spectateTarget && p.health > 0 && !p.spectating))
@@ -1622,6 +1641,7 @@ try {
   view = new View($("#world"), settings);
   view.buildControls=buildControls;view.buildMap=getMap('sunnybreak');
   renderMenu();
+  initializeParty();
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
   if (invite) joinMenu(formatCode(cleanCode(invite)));
@@ -1633,6 +1653,8 @@ try {
 // Development-only diagnostics. Vite removes this branch from the published bundle.
 if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
+    party:()=>({id:party?.id,party:party?.party,ready:party?.ready}),
+    partyMembers:()=>view?.partyEggs?.length||0,
     chatRead: () => ({rows:chat.inbox.rows,open:chat.opened,muted:[...chat.inbox.muted],chatEnabled:net?.chatEnabled}),
     chatPacket: packet => net?.send(packet),
     chatInject: message => {for(const conn of net?.connections.values()||[])conn.send({type:"chat-message",message});},
@@ -1644,6 +1666,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
       migrating:!!net?.migrating,
       screen,
       paused,
+      connection:connectionReport.text(__BUILD_ID__),
       predicted,
       input: { ...input },
       building: {...buildControls},

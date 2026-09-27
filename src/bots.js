@@ -7,7 +7,7 @@ import {selectWeapon,chooseObjective,coverPoint} from './bot-objectives.js';
 import {navigate} from './bot-navigation.js';
 export {BOT_SKILL};
 function combatGoal(sim,p,brain,target,w,skill){
- const d=dist(p,target),desired=w.pellets>1?6:w.projectile?22:w.optic==='scope'?40:18;
+ const d=dist(p,target),desired=(w.engage[0]+w.engage[1])*.5;
  const dx=p.x-target.x,dz=p.z-target.z,l=Math.hypot(dx,dz)||1;
  if(p.health<skill.retreat||p.reloadEnd>sim.time){const cover=coverPoint(sim,p,target);if(cover)return cover;}
  if(d>desired*1.45)return {x:target.x+dx/l*desired*.85,y:target.y,z:target.z+dz/l*desired*.85};
@@ -69,7 +69,7 @@ export function botInput(sim,p){
    brain.nextBurst=now+skill.burst+skill.pause+r()*.4;brain.burstUntil=now+skill.burst;
    const accurate=r()<skill.hit;brain.errorX=(r()-.5)*skill.error+(accurate?0:brain.side*(.65+r()*.8)/Math.max(5,distance));brain.errorY=(r()-.5)*skill.error*.65;brain.height=accurate?.78+(r()-.5)*.3:.25+r()*1.5;
   }
-  const lead=Math.min(1,distance/w.boltSpeed)*skill.lead,tx=target.x+(target.vx||0)*lead-p.x,tz=target.z+(target.vz||0)*lead-p.z;
+  const lead=w.hitscan?0:Math.min(1,distance/w.boltSpeed)*skill.lead,tx=target.x+(target.vx||0)*lead-p.x,tz=target.z+(target.vz||0)*lead-p.z;
   yaw=Math.atan2(-tx,-tz)+(brain.errorX||0)+Math.sin(now*1.7+(p.botSeed||0))*skill.error*.15;
   pitch=Math.atan2(target.y+(brain.height??.9)*(target.bodyScale||1)-p.y-1.43,Math.hypot(tx,tz))+(brain.errorY||0);
   fire=!(p.inventory&&slot===0)&&now>=brain.aimAt&&now<brain.burstUntil&&distance<(w.flightRange??w.range)*.95&&(!w.projectile||distance>7);
@@ -79,7 +79,7 @@ export function botInput(sim,p){
    if(material&&p.grounded)return {yaw:Math.atan2(p.x-target.x,p.z-target.z),pitch:0,slot,buildMode:true,buildType:p.health<skill.retreat||distance<16?'wall':'stairs',buildMaterial:material,fire:true,forward:0,strafe:0};
   }
   if(now>(brain.nextGrenade||0)&&distance>8&&distance<19){brain.nextGrenade=now+6+r()*7;
-   const friendly=[...sim.players.values()].some(t=>t!==p&&mode(sim.options.mode).teams&&t.team===p.team&&dist(t,target)<5);
+   const friendly=[...sim.players.values()].some(t=>teammates(sim.options,p,t)&&dist(t,target)<5);
    if(!friendly&&r()<skill.grenade){if(!p.inventory&&p.poppers>0){popper=true;pitch=.35;}else if(p.inventory){const index=p.inventory.findIndex(i=>i?.id==='popper');if(index>0)brain.utility={slot:index,yaw,pitch:.35,until:now+1};}}
   }
  }else if(target&&task.kind==='investigate'){yaw=Math.atan2(p.x-target.x,p.z-target.z);if(dist(p,target)<2){delete brain.memory[target.id];brain.decision=0;}}
@@ -90,3 +90,4 @@ export function botInput(sim,p){
  const moving=Math.hypot(move.mx,move.mz)>.1;
  return {yaw,pitch,forward:-Math.sin(yaw)*move.mx-Math.cos(yaw)*move.mz,strafe:Math.cos(yaw)*move.mx-Math.sin(yaw)*move.mz,fire,aim:visible&&!popper&&sim.options.difficulty>=2,reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room'].includes(task.kind)};
 }
+import {teammates} from './teams.js';

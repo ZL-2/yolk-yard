@@ -10,11 +10,11 @@ const state=(time,players)=>({time,players,phase:'playing',round:1,royale:{match
 test('guest firing feedback is immediate, rate limited, cosmetic and confirmed once',()=>{
  const fire=new GuestFire(),p=player(),original=structuredClone(p);
  const shot=fire.step(p,input(),1,1,1);
- assert.equal(shot.type,'shot');assert.equal(shot.predicted,true);assert.deepEqual(p,original);
+ assert.equal(shot.type,'shot');assert.equal(shot.predicted,true);assert.deepEqual(p.ammo,original.ammo);assert.deepEqual(p.inventory,original.inventory);assert.equal(p.health,original.health);assert.ok(p.recoilPitch>0);assert.equal(shot.shots.length,0);
  assert.equal(fire.step(p,input(2),1.02,1.02,1),null);
  assert.equal(fire.confirm({type:'hit',weapon:'sprinter'},1.03),false);
  assert.equal(fire.confirm(shot,1.05),true);assert.equal(fire.confirm(shot,1.06),false);
- assert.ok(fire.step(p,input(3),1.11,1.11,1));
+ assert.ok(fire.step(p,input(3),1.16,1.16,1));
 });
 test('guest never predicts firing while ineligible or without ammunition',()=>{
  for(const change of [{health:0},{flight:'dive'},{reloadEnd:2},{use:true},{ammo:[0]},{inventory:[null]}]){

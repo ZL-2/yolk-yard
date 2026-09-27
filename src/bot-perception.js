@@ -1,7 +1,8 @@
 import {mode,gun,weapon} from './data.js';
+import {teammates,teamMode} from './teams.js';
 import {wallDistance,dist,EYE} from './physics.js';
 import {wrapAngle,BOT_WORLD_SENSES} from './bot-config.js';
-export const hostile=(sim,p,t)=>t!==p&&t.health>0&&!t.spectating&&t.flight!=='transport'&&(!mode(sim.options.mode).teams||t.team!==p.team);
+export const hostile=(sim,p,t)=>t!==p&&t.health>0&&!t.spectating&&t.flight!=='transport'&&!teammates(sim.options,p,t);
 export function seesPoint(sim,p,t){const o={x:p.x,y:p.y+EYE,z:p.z},d={x:t.x-o.x,y:t.y+.9-o.y,z:t.z-o.z},len=Math.hypot(d.x,d.y,d.z)||1;return wallDistance(sim.map,o,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.08;}
 export function newBrain(sim,p){return {memory:{},eventId:Math.max(0,sim.eventId-32),perceiveAt:0,decision:0,aimAt:0,nextBurst:0,burstUntil:0,turnAt:sim.time,checkAt:sim.time+1,lastX:p.x,lastZ:p.z,side:sim.random()<.5?-1:1,visited:{},lootMemory:{},objective:'survey',target:null,targetUntil:0};}
 function hear(sim,p,brain,id,point,kind,damage=0){
@@ -17,6 +18,12 @@ export function observe(sim,p,brain,skill){
   if(e.type==='elimination'){delete brain.memory[e.target];continue;}
   if(e.type==='hit'&&e.target===p.id&&e.player!==p.id&&Number.isFinite(e.sourceX)){
    hear(sim,p,brain,e.player||'unknown', {x:e.sourceX,y:e.sourceY,z:e.sourceZ},'damage',e.amount||0);continue;
+  }
+  if(e.type==='hit'&&Number.isFinite(e.sourceX)){
+   const mate=sim.players.get(e.target),enemy=sim.players.get(e.player);
+   if(teammates(sim.options,p,mate)&&enemy&&hostile(sim,p,enemy)&&dist(p,mate)<skill.teamRange&&(dist(p,mate)<12||seesPoint(sim,p,mate))){
+    hear(sim,p,brain,enemy.id,{x:e.sourceX,y:e.sourceY,z:e.sourceZ},'callout');brain.memory[enemy.id].allyThreatAt=sim.time;brain.assistMate=mate.id;brain.assistUntil=sim.time+3;brain.decision=0;brain.perceiveAt=0;
+   }
   }
   const noisy=['shot','launch','explosion','harvest','royale-fx'].includes(e.type)||e.type==='royale-cue'&&['build-place','chest-open','land'].includes(e.cue);
   if(!noisy||e.player===p.id)continue;
@@ -43,7 +50,7 @@ export function observe(sim,p,brain,skill){
   }
  }
  // A short-range callout carries the teammate's observation, never live enemy state.
- if(mode(sim.options.mode).teams&&sim.time>(brain.shareAt||0)){
+ if(teamMode(sim.options)&&sim.time>(brain.shareAt||0)){
   brain.shareAt=sim.time+1.2;
   for(const mate of sim.players.values())if(mate!==p&&mate.team===p.team&&mate.health>0&&dist(p,mate)<skill.teamRange){
    const observation=mate.brain?.memory?.[mate.brain.target];if(observation?.visible&&sim.time-observation.seenAt<.5&&!brain.memory[observation.id])hear(sim,p,brain,observation.id,observation,'callout');
@@ -62,9 +69,10 @@ export function threatScore(sim,p,brain,m){
  const matchup=enemyWeapon?.pellets>1&&d<12?12:enemyWeapon?.projectile&&d<9?-10:0;
  const vulnerable=p.health<40&&active?10:0;
  const exposed=m.visible?45:6,weaponFit=own.pellets>1?(d<12?9:-6):own.optic==='scope'?(d>22?5:-3):0;
- const help=mode(sim.options.mode).teams&&[...sim.players.values()].some(t=>t!==p&&t.team===p.team&&t.health>0&&t.brain?.target===m.id&&dist(t,p)<25)?6:0;
+ const help=[...sim.players.values()].some(t=>teammates(sim.options,t,p)&&t.health>0&&t.brain?.target===m.id&&dist(t,p)<25)?6:0;
  const storm=sim.storm?.active&&d>20&&Math.hypot(m.x-sim.storm.nextX,m.z-sim.storm.nextZ)>sim.storm.nextRadius?16:0;
- return exposed+(m.confidence||0)*22+Math.min(40,m.damage||0)+incoming+matchup+vulnerable+weaponFit+help+(m.health<40?6:0)-Math.log1p(d)*8-age*3-storm;
+ const allyDanger=sim.time-(m.allyThreatAt??-100)<3?14:0;
+ return exposed+(m.confidence||0)*22+Math.min(40,m.damage||0)+incoming+matchup+vulnerable+weaponFit+help+allyDanger+(m.health<40?6:0)-Math.log1p(d)*8-age*3-storm;
 }
 export function selectThreat(sim,p,brain,skill){
  const memories=Object.values(brain.memory).filter(m=>!sim.players.has(m.id)||hostile(sim,p,sim.players.get(m.id)));

@@ -1,3 +1,4 @@
+import {lobbyScene} from './lobby-scene.js';
 import {lootModel,gliderModel} from './royale-art.js';
 import {inventoryPreview} from './inventory-previews.js';
 import {adsFov} from './weapon-presentation.js';
@@ -169,7 +170,7 @@ export function makeEgg(profile, team = -1, withWeapon = true) {
   }
   return group;
 }
-function label(text, color = "#ffffff", compact = false, critical = false) {
+function label(text, color = "#ffffff", compact = false, critical = false, runs = null) {
   const c = document.createElement("canvas");
   c.width = 512;
   c.height = 96;
@@ -188,7 +189,10 @@ function label(text, color = "#ffffff", compact = false, critical = false) {
     ctx.lineWidth = critical ? 7 : 6;
     ctx.strokeText(text.slice(0, 22), 256, 49, 460);
   }
-  ctx.fillText(text.slice(0, 22), 256, 49, 460);
+  if(runs){
+    ctx.textAlign='left';const width=runs.reduce((n,r)=>n+ctx.measureText(r.text).width,0),scale=Math.min(1,460/Math.max(1,width));ctx.translate(256-width*scale/2,0);ctx.scale(scale,1);let x=0;
+    for(const r of runs){ctx.fillStyle=r.color;ctx.strokeText(r.text,x,49);ctx.fillText(r.text,x,49);x+=ctx.measureText(r.text).width;}
+  }else ctx.fillText(text.slice(0, 22), 256, 49, 460);
   const texture = new THREE.CanvasTexture(c);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(
@@ -403,6 +407,11 @@ export class View {
     }
 
   }
+  setParty(profiles){
+    const key=JSON.stringify(profiles);if(key===this.partyPreviewKey)return;this.partyPreviewKey=key;
+    for(const egg of this.partyEggs||[]){this.scene.remove(egg);this.disposeGroup(egg);}this.partyEggs=[];
+    for(const [i,profile]of profiles.slice(0,1).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.1);egg.position.set(4.1+i*2.5,.08,-.7);egg.rotation.y=Math.PI+.35;this.scene.add(egg);this.partyEggs.push(egg);}
+  }
   preview(profile) {
     const signature = JSON.stringify(profile);
     if (signature === this.previewSignature) return;
@@ -417,6 +426,7 @@ export class View {
     const held=this.menuEgg.userData.held;held.updateMatrix();
     this.menuShoulders=this.menuEgg.userData.arms.userData.limbs.map(l=>l.shoulder.clone().applyMatrix4(held.matrix));
     this.scene.add(this.menuEgg);
+    if(!this.lobbyStage){this.lobbyStage=lobbyScene();this.scene.add(this.lobbyStage);}
   }
   aimMenu(clientX,clientY){
     const r=this.canvas.getBoundingClientRect();
@@ -578,21 +588,22 @@ export class View {
     if (e.type === "hit" && e.player === localId && Number.isFinite(e.x)) {
       const key=e.shotId!=null?e.player+':'+e.shotId+':'+e.target:null;
       const previous=key&&this.fx.find(f=>f.damageText&&f.shotKey===key&&f.life>0);
-      const total=(previous?.amount||0)+e.amount,critical=!!(e.precision||previous?.critical);
-      const next=label(String(Math.max(1,Math.round(total)))+(critical?'!':''),critical?'#ffcf52':'#ffffff',true,critical);
+      const total=(previous?.amount||0)+e.amount,critical=!!(e.precision||previous?.critical),shield=(previous?.shield||0)+(e.shield?e.amount:0),health=total-shield;
+      const runs=[];if(health>0)runs.push({text:String(Math.max(1,Math.round(health)))+(critical?'!':''),color:critical?'#ffcf52':'#ffffff'});if(shield>0)runs.push({text:(health>0?'  ':'')+'◆'+Math.max(1,Math.round(shield))+(critical?'!':''),color:'#79d9ff'});
+      const next=label('', '#ffffff',true,critical,runs);
       next.material.sizeAttenuation=false;next.material.needsUpdate=true;
       if(previous){
         previous.mesh.material.map?.dispose();previous.mesh.material.dispose();previous.mesh.material=next.material;
-        previous.amount=total;previous.critical=critical;previous.life=previous.max=.9;
+        previous.amount=total;previous.shield=shield;previous.critical=critical;previous.life=previous.max=.9;
       }else{
         const height=88/Math.max(1,this.canvas.clientHeight)/this.camera.projectionMatrix.elements[5];
         next.scale.set(height*512/96,height,1);next.position.set(e.x,e.y,e.z);this.effects.add(next);
-        this.fx.push({mesh:next,life:.9,max:.9,damageText:true,critical,drift:0,shotKey:key,amount:total});
+        this.fx.push({mesh:next,life:.9,max:.9,damageText:true,critical,drift:0,shotKey:key,amount:total,shield});
       }
     }
 
     if (e.type === "shot" || e.type === "launch") {
-      if (e.player === localId) this.recoil = Math.min(1.6, this.recoil + 0.85);
+      if (e.player === localId&&!e.echoed) this.recoil = Math.min(1.6, this.recoil + weapon(e.weapon).recoilUp*70);
       const actor = this.models.get(e.player);
       if(e.type==='launch'&&e.popper){
         if(e.player===localId)this.localThrowStart=this.clock;
@@ -695,7 +706,7 @@ export class View {
         model?.userData.muzzle?.getWorldPosition(new THREE.Vector3()) ||
         new THREE.Vector3(e.origin?.x || 0, e.origin?.y || 0, e.origin?.z || 0);
       if (local) this.lastMuzzleFlash = pos.clone();
-      const flash = new THREE.Mesh(
+      if(!e.echoed){const flash = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.085, 0),
         new THREE.MeshBasicMaterial({
           color: 0xffe3a0,
@@ -716,7 +727,7 @@ export class View {
         max: 0.055,
         ownedMaterial: true,
         ownedGeometry: true,
-      });
+      });}
       for (const shot of e.shots || []) {
         this.shotOffsets.set(shot.id, {
           delta: pos
@@ -730,8 +741,11 @@ export class View {
           shot.vy,
           shot.vz,
         ).normalize();
+        const end=shot.end?new THREE.Vector3(shot.end.x,shot.end.y,shot.end.z):null;
+        const length=end?Math.min(80,end.distanceTo(pos)):.65;
+        if(end)direction.copy(end).sub(pos).normalize();
         const trace = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.018, 0.027, 0.65, 7),
+          new THREE.CylinderGeometry(0.012, 0.02, length, 5),
           new THREE.MeshBasicMaterial({
             color: weapon(e.weapon).color,
             transparent: true,
@@ -739,7 +753,7 @@ export class View {
             toneMapped: false,
           }),
         );
-        trace.position.copy(pos);
+        trace.position.copy(pos);if(end)trace.position.addScaledVector(end.clone().sub(pos).normalize(),length/2);
         trace.quaternion.setFromUnitVectors(
           new THREE.Vector3(0, 1, 0),
           direction,
@@ -750,7 +764,7 @@ export class View {
           fresh: true,
           life: 0.04,
           max: 0.04,
-          v: new THREE.Vector3(shot.vx, shot.vy, shot.vz),
+          v: end?new THREE.Vector3():new THREE.Vector3(shot.vx, shot.vy, shot.vz),
           noGravity: true,
           ownedMaterial: true,
           ownedGeometry: true,
@@ -763,7 +777,11 @@ export class View {
     this.clock += dt;
     this.recoil = Math.max(0, this.recoil - dt * 7);
     this.loadMap(state?.options.map || "yard");
+    this.world.visible=playing;
+    if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x97c6c4;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(sky,playing?(map.theme==='royale'?330:72):40,playing?(map.theme==='royale'?1000:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
+    if(this.lobbyStage)this.lobbyStage.visible=!playing;
+    for(const egg of this.partyEggs||[])egg.visible=!playing;
     this.actors.visible = playing;
     this.effects.visible = playing;
     this.gunGroup.visible = playing && local?.health > 0 && (!local.inventory || local.flight==='ground');
@@ -779,9 +797,10 @@ export class View {
       blaster.position.lerp(new THREE.Vector3(0,pose.flight,0),blend);
       blaster.quaternion.slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(pose.spin,0,0)),blend);
       updateArms(this.menuEgg.userData.arms,pose.reload,blaster,0,1,{release:pose.release,blend});
-      this.camera.position.set(7.5, 5.2, 12.5);
-      this.camera.lookAt(0, 1.7, 0);
-      this.camera.fov = 51;
+      const partyOffset=this.partyEggs?.length?1:0,narrow=this.camera.aspect<.85;
+      this.camera.position.set(5.8+partyOffset,4.3,narrow?(partyOffset?22.5:19):12.5);
+      this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):1.8, 0);
+      this.camera.fov = narrow?47:48;
       this.camera.updateProjectionMatrix();
     } else if (local) {
       const killer = local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && p.health > 0);
@@ -792,7 +811,7 @@ export class View {
         this.stairEye.y + EYE * (p.bodyScale || 1) + (local.health <= 0 ? 0.8 : 0),
         p.z,
       );
-      this.camera.rotation.set(p.pitch, p.yaw, 0, "YXZ");
+      this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
       if (killer) {
         const back = new THREE.Vector3(Math.sin(p.yaw), 0.35, Math.cos(p.yaw)).normalize();
         const origin = {x:p.x, y:p.y+1.6, z:p.z};
@@ -901,12 +920,12 @@ export class View {
           model.userData.signature = sig;
           const name = label(
             p.name,
-            p.team === 0 && mode(state.options.mode).teams
+            teammates(state.options,p,local)
               ? "#b3f2ff"
               : "#ffffff",
           );
           name.position.y = 2.08;
-          name.visible = !state.royale;
+          name.visible = !state.royale||teammates(state.options,p,local);
           model.add(name);
           this.actors.add(model);
           this.models.set(p.id, model);
@@ -1157,3 +1176,4 @@ export class View {
     this.renderer.render(this.scene, this.camera);
   }
 }
+import {teammates} from './teams.js';

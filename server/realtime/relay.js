@@ -1,12 +1,15 @@
 import {randomUUID} from 'node:crypto';
 import {mergeRelayMessage} from '../../src/relay-queue.js';
+import {PartyService} from './parties.js';
 const MAX_FRAME=2_000_000, MAX_QUEUE=4_000_000, GRACE=10_000;
 const address=/^yolk-yard-v\d+-[A-Z2-9]{8}$/;
 // One persistent process owns every connected socket. No database in the data path.
 export class RealtimeRelay {
-  constructor(){this.peers=new Map();this.sessions=new Set();this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
+  constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
   attach(ws){
     let peer; const started=Date.now();
+    // Browser networking can answer native pings while a costly render blocks JS.
+    ws.on('pong',()=>{if(peer?.ws===ws)peer.lastSeen=Date.now();});
     const registration=setTimeout(()=>{if(!peer)ws.close(1008,'Register first');},10000);registration.unref?.();
     ws.on('message',(raw,binary)=>{
       try{
@@ -73,14 +76,14 @@ export class RealtimeRelay {
   }
   handle(peer,m){
     if(m.type==='list'){
-      const rooms=[...this.peers.values()].filter(p=>p.ws&&p.listing&&Date.now()-p.listedAt<15000).map(p=>p.listing).slice(0,100);
+      const rooms=[...this.peers.values()].filter(p=>p.ws&&p.listing&&p.listing.public!==false&&Date.now()-p.listedAt<15000).map(p=>p.listing).slice(0,100);
       this.send(peer,{type:'rooms',request:m.request,rooms});return;
     }
     if(m.type==='publish'){
       if(!address.test(peer.id))throw Error('Not a room');
       const r=m.room;
       if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!Number.isInteger(r.players)||r.players<1||r.players>20))throw Error('Invalid room');
-      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Egg').slice(0,32),map:String(r.map||'').slice(0,24),mode:String(r.mode||'').slice(0,24),players:r.players,capacity:Math.max(2,Math.min(20,Number(r.capacity)||8)),phase:r.phase}:null;
+      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Egg').slice(0,32),map:String(r.map||'').slice(0,24),mode:String(r.mode||'').slice(0,24),players:r.players,capacity:Math.max(2,Math.min(16,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(32,Number(r.contestantCapacity)||8)),teamSize:r.teamSize===2?2:1,public:r.public!==false,phase:r.phase}:null;
       peer.listedAt=Date.now();return;
     }
     if(m.type==='connect'){
@@ -97,6 +100,12 @@ export class RealtimeRelay {
         if(!entry||!['accept','data','close'].includes(entry.type)||typeof entry.channel!=='string')throw Error('Invalid entry');
         const other=peer.links.get(entry.channel);
         if(!other){this.send(peer,{type:'closed',channel:entry.channel});continue;}
+        if(entry.type==='data'&&entry.data?.type==='hello'){
+          const admission=entry.data.ticket?this.parties.claim(entry.data.ticket,peer.id,other.id):null;
+          if(entry.data.ticket&&!admission){this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'Your party reservation expired. Return to the lobby and try again.'}});continue;}
+          // Never forward a self-reported party or team claim.
+          entry.data={...entry.data,admission};delete entry.data.ticket;
+        }
         this.send(other,{type:entry.type==='accept'?'opened':entry.type==='close'?'closed':'data',channel:entry.channel,...(entry.type==='data'?{data:entry.data}:{})});
         if(entry.type==='close'){peer.links.delete(entry.channel);other.links.delete(entry.channel);}
       }return;
@@ -112,7 +121,7 @@ export class RealtimeRelay {
   sweep(){for(const peer of this.peers.values()){
     if(peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)this.remove(peer);
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
-    else this.flush(peer);
+    else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
-  close(){clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');}
+  close(){this.parties.close();clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');}
 }

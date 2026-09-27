@@ -6,7 +6,6 @@ import {
   movePlayer,
   direction,
   rayEgg,
-  isCenterHit,
   wallDistance,
   sanitizeInput,
   muzzleOrigin,
@@ -249,8 +248,9 @@ test("all seven primary classes can fire and serialize projectiles safely", () =
   }
 });
 
-test("bolts have finite travel, start at the muzzle, and keep a straight trajectory", () => {
+test("specialized long-range bolts have finite travel and configured drop", () => {
   const { s, a, b } = fixture();
+  a.weapon="needle";a.aim=true;a.accuracyState[0].spread=0;
   b.z = -30;
   s.random = () => .5;
   a.pitch = Math.atan2(.9 - 1.43, 38);
@@ -258,12 +258,12 @@ test("bolts have finite travel, start at the muzzle, and keep a straight traject
   const bolt = s.projectiles[0],
     m = muzzleOrigin(a, weapon(a.weapon));
   assert.ok(Math.abs(bolt.x - m.x) < 1e-8 && Math.abs(bolt.z - m.z) < 1e-8);
-  assert.ok(bolt.x > a.x && bolt.z < a.z && bolt.y < a.y + 1.43);
+  assert.ok(bolt.z < a.z && bolt.vy < 0,'the scoped bolt follows the downward sight line');
   const y = bolt.y,
     vy = bolt.vy;
   s.updateProjectiles(0.05);
   assert.equal(b.health, 100);
-  assert.equal(bolt.vy, vy);
+  assert.equal(bolt.vy, vy-bolt.gravity*.05);
   assert.ok(
     Math.abs(bolt.y - (y + vy * 0.05 - 0.5 * bolt.gravity * 0.05 ** 2)) < 1e-8,
   );
@@ -277,7 +277,7 @@ test("clear eye shots retract an obstructed muzzle without bypassing cover", () 
   s.map.boxes = [{ x: 0, y: 0, z: 7.1, w: 4, h: 1.3, d: 0.4 }];
   a.pitch = Math.atan2(0.9 - 1.43, 8);
   s.fire(a);
-  assert.equal(s.projectiles[0].y, a.y + 1.43);
+  assert.equal(s.events.findLast(e=>e.type==="shot").origin.y, a.y + 1.43);
   advance(s, 30);
   assert.ok(b.health < 100);
   b.health = 100;
@@ -287,7 +287,7 @@ test("clear eye shots retract an obstructed muzzle without bypassing cover", () 
   assert.equal(b.health, 100, "Full-height cover still stops the shot");
 });
 test("swept bolt collision catches thin cover between simulation ticks", () => {
-  const { s, a, b } = fixture();
+  const { s, a, b } = fixture();a.weapon="needle";a.aim=true;a.accuracyState[0].spread=0;
   s.map.boxes = [{ x: 0, y: 0, z: 3.7, w: 4, h: 3, d: 0.015 }];
   s.fire(a);
   s.projectiles[0].vz = -1200;
@@ -351,20 +351,10 @@ test("expanded arenas have usable objectives and multi-level navigation", () => 
   assert.equal(pass, null, "Underpass remains clear");
 });
 
-test("center hits reward aim without rewarding the shell rim", () => {
-  const p = {x:0,y:0,z:0}, d = {x:0,y:0,z:-1};
-  assert.equal(isCenterHit({x:0,y:0.87,z:8},d,p),true);
-  assert.equal(isCenterHit({x:0.4,y:0.87,z:8},d,p),false);
-  assert.equal(isCenterHit({x:0,y:1.5,z:8},d,p),false);
-  const {s,a,b} = fixture();
-  a.weapon = "needle";
-  a.pitch = Math.atan2(0.87-1.43,8);
-  s.fire(a);
-  advance(s, 12);
-  assert.equal(b.health, 0);
-  const event=s.events.find(e=>e.type==="hit");
-  assert.equal(event.precision,true);
-  assert.equal(event.amount,100);
+test("upper-shell critical hits have distinct authoritative feedback", () => {
+  const {s,a,b}=fixture();a.weapon="anchor";a.aim=true;a.accuracyState[0].spread=0;a.pitch=Math.atan2(1.5-1.43,8);
+  s.fire(a);const event=s.events.find(e=>e.type==="hit");assert.equal(event.precision,true);
+  assert.ok(Math.abs(event.amount-weapon('anchor').damage*weapon('anchor').critical)<.001);
 });
 test("lethal damage reports remaining health and serializes the killer", () => {
   const {s,a,b}=fixture();

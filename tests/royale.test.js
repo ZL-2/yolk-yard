@@ -38,8 +38,8 @@ test('five slots swap and drop without duplicating magazines or reserve ammo',()
  const s=make(),p=ground(s.players.get('host'));s.loot=[];
  for(const id of ['sprinter','pip','needle','scatter','comet'])assert.equal(s.takeLoot(p,s.dropWeapon(p,id)),true);
  p.slot=3;const replacement=s.dropWeapon(p,'peeper',4,3);assert.equal(s.takeLoot(p,replacement),true);assert.equal(p.inventory[3].id,'peeper');assert.equal(s.loot.filter(i=>i.id==='needle').length,1);
- p.bank.heavy=9;s.syncInventory(p);s.reload(p);advance(s,3);assert.equal(p.inventory[3].ammo,8);assert.equal(p.bank.heavy,4);
- s.dropSlot(p,3);assert.equal(s.loot.find(i=>i.id==='peeper').ammo,8);assert.equal(p.bank.heavy,4);
+ p.bank.heavy=9;s.syncInventory(p);s.reload(p);advance(s,3);assert.equal(p.inventory[3].ammo,weapon('peeper').magazine);assert.equal(p.bank.heavy,12-weapon('peeper').magazine);
+ s.dropSlot(p,3);assert.equal(s.loot.find(i=>i.id==='peeper').ammo,weapon('peeper').magazine);assert.equal(p.bank.heavy,12-weapon('peeper').magazine);
  p.bank.light=AMMO_CAPS.light;const ammo=s.dropAmmo(p,'light',50);assert.equal(s.takeLoot(p,ammo),false);assert.equal(ammo.count,50);
 });
 test('healing and shield use complete once, cancel on damage, and refuse full or capped stats',()=>{

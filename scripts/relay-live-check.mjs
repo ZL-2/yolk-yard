@@ -9,7 +9,7 @@ if(!endpoint)throw Error('Set YOLK_RELAY_URL to the deployed /game WebSocket URL
 if(new URL(endpoint).hostname.endsWith('.onrender.com')){
  const health=new URL('/health',endpoint.replace(/^ws/,'http'));let healthy=false;
  for(let attempt=0;attempt<4&&!healthy;attempt++){
-  try{const response=await fetch(health,{signal:AbortSignal.timeout(25000)});const status=await response.json();healthy=response.ok&&status.protocol==='yolk-realtime-v2';}catch{}
+  try{const response=await fetch(health,{signal:AbortSignal.timeout(25000)});const status=await response.json();healthy=response.ok&&status.protocol==='yolk-realtime-v2'&&status.gameVersion===VERSION&&status.features?.includes('parties');}catch{}
   if(!healthy)await new Promise(r=>setTimeout(r,1000));
  }
  assert.ok(healthy,'Replacement relay health check failed');
