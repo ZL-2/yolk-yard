@@ -20,7 +20,8 @@ try{
  await page.locator('#dialog [data-action="close"]').first().click();
  for(const action of ['play','play-royale','play-local','confirm-local'])await page.locator(`[data-action="${action}"]`).click();
  await page.waitForFunction(()=>window.__yolkTest?.read().state?.royale?.practice);
- let r=await read();assert.equal(r.state.royale.contestants,32);assert.ok(r.state.royale.queueEnds-r.state.time>30&&r.state.royale.queueEnds-r.state.time<=60);
+ let r=await read();assert.equal(r.state.royale.contestants,32);assert.ok(r.state.royale.queueEnds-r.state.time>0&&r.state.royale.queueEnds-r.state.time<=10);
+ await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.queueEnds=s.time+600;}));
  assert.equal(await page.locator('#royale-hotbar>.royale-slot kbd').innerText(),'P');
  assert.deepEqual(await page.locator('#royale-hotbar .royale-item-slots kbd').allTextContents(),['U','2','3','4','5']);
  await page.keyboard.press('KeyU');await hostSlot(1);await page.keyboard.press('Digit5');await hostSlot(5);await page.keyboard.press('KeyP');await hostSlot(0);
@@ -29,7 +30,6 @@ try{
  await page.screenshot({path:out+'/spawn-32.png'});pass('32-seat Spawn Island, authoritative countdown, rebound HUD prompts, dedicated pickaxe and five equal item slots');
  // The opening assertion covers the real deadline. Hold this controlled scene
  // while collecting software-GPU frames and exercising the build fixtures.
- await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.queueEnds=s.time+600;}));
  const frameTimes=await page.evaluate(()=>new Promise(resolve=>{const samples=[];let last=performance.now();function frame(now){samples.push(now-last);last=now;if(samples.length===120)resolve(samples);else requestAnimationFrame(frame);}requestAnimationFrame(frame);}));
  // Controlled build fixtures retain the real atoll terrain and collision map.
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.queueEnds=s.time+200;s.botInput=p=>({yaw:p.yaw,pitch:0,slot:0});for(const p of s.players.values())if(p.bot)Object.assign(p,{x:-45,z:-45,y:0});window.__yolkTest.pose({x:0,z:2,y:3.2,yaw:0,pitch:0,grounded:true,flight:'ground',slot:0});s.players.get('host').materials={wood:10,brick:10,metal:10};}));

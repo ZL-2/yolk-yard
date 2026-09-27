@@ -321,7 +321,7 @@ function setupMenu(editing = false, draft = null) {
   const nextRound = editing && state.phase === "results";
   const select = (id,label,items,value) => `<label>${label}<select class="field" id="setup-${id}">${items.map(([key,text])=>`<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
   modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Create Match",
-    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?'Last egg standing wins. Two contestants minimum. All loot is found on Sunnybreak.':'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Join during the 60-second warmup; arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>`, "setup");
+    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?'Last egg standing wins. Two contestants minimum. All loot is found on Sunnybreak.':'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Offline waits 10 seconds; online waits up to 60 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>`, "setup");
   if(editing && !net) $("#setup-visibility").disabled=true;
   const royale=o.mode==='royale';
   for(const key of ['minutes','scoreLimit']){$(`#setup-${key}`).closest('label').hidden=royale;$(`#setup-${key}`).disabled=royale;}
@@ -336,7 +336,7 @@ function setupMenu(editing = false, draft = null) {
 }
 function getOptions() {
   if (![...document.querySelectorAll('#dialog input[type="number"]')].every(input=>input.disabled||input.reportValidity())) return null;
-  return matchOptions({...Object.fromEntries(["map","mode","bots","difficulty","minutes","scoreLimit","capacity","storm","fill"].map(key=>[key,$(`#setup-${key}`).value])),fill:$("#setup-fill").value==='on'});
+  return matchOptions({...Object.fromEntries(["map","mode","bots","difficulty","minutes","scoreLimit","capacity","storm","fill"].map(key=>[key,$(`#setup-${key}`).value])),fill:$("#setup-fill").value==='on',session:net?'online':sim?.options.session});
 }
 function saveMatchSettings(start = false) {
   if (!sim || state?.phase === "playing") return;
@@ -450,6 +450,7 @@ function callbacks() {
     getCheckpoint:()=>sim?.checkpoint(),
     onHost:(checkpoint,departed)=>{
       sim=(checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options)).restore(checkpoint);
+      if(sim instanceof RoyaleSimulation)for(const p of sim.players.values())if(!p.bot)p.connected=p.id===net.id;
       for(const id of departed)sim.leavePlayer(id);
       state=sim.snapshot();localId=net.id;pendingInputs=[];predicted=null;
       const me=sim.players.get(localId);if(me){input.slot=me.slot;input.yaw=me.yaw;input.pitch=me.pitch;}
@@ -459,6 +460,7 @@ function callbacks() {
     onNameAccepted:()=>{if(dialogType==='rename'){dialog.close();dialogType='';if(screen==='game')void resume();}},
     onJoin: (id, p) => !!sim?.admitPlayer(id,p),
     onLeave: (id) => sim?.leavePlayer(id),
+    onRoster: ids => sim?.setConnectedHumans?.(ids),
     onPlayerAction: (id, action) => sim?.playerAction(id, action),
     onInput: (id, i) => sim?.setInput(id, i, true),
     onProfile: (id, p) => sim?.setProfile(id, p),
@@ -514,7 +516,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   if (busy) return;
   const next = preset?.mode ? matchOptions(preset) : getOptions();
   if (!next) return;
-  options=next;autoQueue=automatic;
+  options=matchOptions({...next,session:'online'});autoQueue=automatic;
   const visibility=visibilityOverride||$('#setup-visibility')?.value||'public';
   beginSim();
   busy = true;
@@ -627,7 +629,7 @@ function launchRound(){
   if(sim.startRound()===false){toast('Invite another egg or add a bot before launching.');return false;}
   state=sim.snapshot();net?.broadcast(state);enterGame(true);return true;
 }
-function startLocalMatch() {autoQueue=false;beginSim();launchRound();}
+function startLocalMatch() {autoQueue=false;options=matchOptions({...options,session:'offline'});beginSim();launchRound();}
 function enterGame(capture = false) {
   guestFire.reset();
   connectionReport.network.reset();
@@ -985,11 +987,11 @@ let playMode = 'royale';
 function playMenu(selected = playMode) {
  playMode = selected;
  const selectedMode = mode(selected), royale = selected === 'royale';
- modal('Play', `<div class="play-discover"><div class="eyebrow">CHOOSE YOUR EXPERIENCE</div><div class="play-mode-grid">${MODES.map(m=>`<button class="play-mode-card play-${m.id} ${m.id===selected?'selected':''}" data-action="play-${m.id}" aria-pressed="${m.id===selected}"><span class="mode-art" aria-hidden="true">${m.id==='royale'?'◈':m.id==='ffa'?'◎':'◆ ◆'}</span><span class="eyebrow">${m.id==='royale'?'32 CONTESTANTS · ONE LIFE':'8 PLAYERS · RESPAWNS'}</span><strong>${m.name}</strong><span>${m.description}</span></button>`).join('')}</div><section class="play-selection"><div><div class="eyebrow">SELECTED MODE</div><h3>${selectedMode.name}</h3><p>${royale?'Harvest. Build. Survive the storm.':'Choose your loadout and jump into the arena.'}</p><span class="play-fill">BOT FILL ON · Empty seats fill automatically</span></div><div class="play-options"><button class="primary" data-action="${royale?'royale-queue':'public-rooms'}">${royale?'FIND PUBLIC MATCH':'BROWSE PUBLIC MATCHES'}</button><button class="secondary" data-action="play-custom">CUSTOM MATCH</button><button class="plain" data-action="play-local">PLAY WITH BOTS</button></div></section><div class="play-footer"><button class="plain" data-action="public-rooms">Browse all matches</button><button class="plain" data-action="join">Join with room code</button></div></div>`, 'play');
+ modal('Play', `<div class="play-discover"><div class="eyebrow">CHOOSE YOUR EXPERIENCE</div><div class="play-mode-grid">${MODES.map(m=>`<button class="play-mode-card play-${m.id} ${m.id===selected?'selected':''}" data-action="play-${m.id}" aria-pressed="${m.id===selected}"><span class="mode-art" aria-hidden="true">${m.id==='royale'?'◈':m.id==='ffa'?'◎':'◆ ◆'}</span><span class="eyebrow">${m.id==='royale'?'32 CONTESTANTS · ONE LIFE':'8 PLAYERS · RESPAWNS'}</span><strong>${m.name}</strong><span>${m.description}</span></button>`).join('')}</div><section class="play-selection"><div><div class="eyebrow">SELECTED MODE</div><h3>${selectedMode.name}</h3><p>${royale?'Harvest. Build. Survive the storm.':'Choose your loadout and jump into the arena.'}</p><span class="play-fill">BOT FILL ON · Empty seats fill automatically</span></div><div class="play-options"><button class="primary" data-action="${royale?'royale-queue':'public-rooms'}">${royale?'FIND PUBLIC MATCH':'BROWSE PUBLIC MATCHES'}</button><button class="secondary" data-action="play-custom">CUSTOM MATCH</button><button class="plain" data-action="play-local">PLAY OFFLINE WITH BOTS</button></div></section><div class="play-footer"><button class="plain" data-action="public-rooms">Browse all matches</button><button class="plain" data-action="join">Join with room code</button></div></div>`, 'play');
 }
 function botDifficultyMenu(selected = playMode) {
  playMode = selected;
- modal('Play with bots', `<p>Choose your bot difficulty for ${esc(mode(selected).name)}.</p><label for="local-difficulty">BOT DIFFICULTY</label><select class="field" id="local-difficulty">${BOT_DIFFICULTIES.map((name,i)=>`<option value="${i+1}">${name}</option>`).join('')}</select><button class="primary" style="margin-top:22px" data-action="confirm-local">START MATCH</button><button class="plain" data-action="back-to-play">BACK</button>`, 'bot-difficulty');
+ modal('Play offline with bots', `<p>Choose your bot difficulty for ${esc(mode(selected).name)}.</p><label for="local-difficulty">BOT DIFFICULTY</label><select class="field" id="local-difficulty">${BOT_DIFFICULTIES.map((name,i)=>`<option value="${i+1}">${name}</option>`).join('')}</select><button class="primary" style="margin-top:22px" data-action="confirm-local">START MATCH</button><button class="plain" data-action="back-to-play">BACK</button>`, 'bot-difficulty');
 }
 function startChosenBotMatch() {
  const difficulty=Number($('#local-difficulty')?.value);
@@ -997,7 +999,7 @@ function startChosenBotMatch() {
  options=matchOptions({mode:playMode,bots:playMode==='royale'?MAX_CONTESTANTS-1:7,fill:true,difficulty});
  startLocalMatch();
 }
-function royaleHome(){modal('Yolk Royale',`<div class="royale-brief"><div class="eyebrow">SUNNYBREAK ISLAND</div><h3>One island. One surviving egg.</h3><p>Board the Eggspress, choose your drop, and carry five items plus your permanent pickaxe. Harvest wood, brick and metal, then build and edit walls, floors, stairs and roofs. Find shields, healing, shock eggs and launch nests. Keep moving as the storm closes.</p><p class="hint">Solo · 32 contestants · Nine districts · One life</p></div><button class="primary" data-action="royale-queue">FIND PUBLIC MATCH</button><button class="secondary" data-action="royale-custom">CREATE PUBLIC / PRIVATE MATCH</button><button class="plain" data-action="royale-local">PLAY LOCAL WITH BOTS</button><p class="hint">Warm up on Hatchling Atoll while the 60-second countdown runs. Practice gear resets at departure. Join before the Battle Bus; after departure, spectate living contestants. Hosting transfers automatically if the host leaves.</p>`,'royale-home');}
+function royaleHome(){modal('Yolk Royale',`<div class="royale-brief"><div class="eyebrow">SUNNYBREAK ISLAND</div><h3>One island. One surviving egg.</h3><p>Board the Eggspress, choose your drop, and carry five items plus your permanent pickaxe. Harvest wood, brick and metal, then build and edit walls, floors, stairs and roofs. Find shields, healing, shock eggs and launch nests. Keep moving as the storm closes.</p><p class="hint">Solo · 32 contestants · Nine districts · One life</p></div><button class="primary" data-action="royale-queue">FIND PUBLIC MATCH</button><button class="secondary" data-action="royale-custom">CREATE PUBLIC / PRIVATE MATCH</button><button class="plain" data-action="royale-local">PLAY OFFLINE WITH BOTS</button><p class="hint">Warm up on Hatchling Atoll: 10 seconds offline, or 60 seconds online with an early departure when every contestant seat is filled by a real player. Practice gear resets at departure. Join before the Battle Bus; after departure, spectate living contestants. Hosting transfers automatically if the host leaves.</p>`,'royale-home');}
 async function quickRoyale(){
  if(state)leave(false);
  const request=++matchRequest;modal('Finding your flight','<div class="spinner"></div><p>Finding a waiting Yolk Royale match…</p><button data-action="cancel-connect">Cancel</button>','matchmaking');
@@ -1013,7 +1015,7 @@ async function quickRoyale(){
    }
    if(request!==matchRequest)return;
    await createRoom({mode:'royale',bots:MAX_CONTESTANTS-1,capacity:MAX_CONTESTANTS,fill:true},'public',true);
- }catch(e){if(request===matchRequest)modal('Matchmaking unavailable',`<p class="error-box">${esc(e.message)}</p>${connectionButton}<button class="primary" data-action="royale-local">PLAY LOCAL WITH BOTS</button><button data-action="royale-queue">Try again</button>`,'error');}
+ }catch(e){if(request===matchRequest)modal('Matchmaking unavailable',`<p class="error-box">${esc(e.message)}</p>${connectionButton}<button class="primary" data-action="royale-local">PLAY OFFLINE WITH BOTS</button><button data-action="royale-queue">Try again</button>`,'error');}
 }
 function royaleMap(){if(!state?.royale)return;modal('Sunnybreak Island',royaleUI.mapHTML(),'royale-map');royaleUI.drawMap($('#royale-fullmap'),state,state.players.find(p=>p.id===localId),true);}
 function royaleInventory(){if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);royaleUI.inventoryKey='';modal('INVENTORY',royaleUI.inventoryHTML(p),'royale-inventory');royaleUI.updateInventory(p);}

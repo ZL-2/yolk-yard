@@ -188,6 +188,7 @@ export class Network {
         this.timers.delete(timeout);
         this.connections.set(conn.peer, conn);
         if(!this.members.some(m=>m.id===conn.peer))this.members.push({id:conn.peer,peerId:conn.peer,order:++this.memberOrder});
+        this.callbacks.onRoster?.([this.id,...[...this.connections].filter(([,c])=>c.open).map(([id])=>id)]);
         conn.send({
           type: "welcome",
           hostId:this.id,members:this.members,checkpoint:this.migrationData(),
@@ -223,6 +224,7 @@ export class Network {
         this.members=this.members.filter(m=>m.id!==conn.peer);
         this.chatRoom.remove(conn.peer);
         this.callbacks.onLeave?.(conn.peer);
+        this.callbacks.onRoster?.([this.id,...[...this.connections].filter(([,c])=>c.open).map(([id])=>id)]);
       }
     };
     conn.on("close", close);

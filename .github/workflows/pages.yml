@@ -42,6 +42,8 @@ jobs:
           retention-days: 7
       - run: npm run test:relay
       - run: npm run test:realtime
+      - name: Verify authoritative countdown, human-only early departure and shared Bus transition
+        run: node scripts/countdown-network-check.mjs
       - name: Verify Royale phases, spectator cutoff, falling loot and host migration
         run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay

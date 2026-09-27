@@ -3,7 +3,7 @@
 This update supersedes the old pickaxe numbering, 16-contestant target and
 30-second warmup described in earlier historical release notes. The publishing
 pipeline derives the displayed update number from the live release history;
-the source note number is not the deployment counter. Network protocol is 17.
+the source note number is not the deployment counter. Network protocol is 18.
 
 ## Population and pacing
 
@@ -153,3 +153,15 @@ storm alignment and desktop/compact inventory/vitals checks without page errors.
 
 The existing Pages pipeline also requires its unit, relay, realtime, Royale
 lifecycle and deployed-relay checks before publication.
+
+## Quality Update 57 — Ready for Departure
+
+Explicit offline sessions use ten elapsed seconds. Online sessions keep sixty
+seconds but depart immediately if connected human contestants fill the actual
+configured capacity. The 32-contestant and 16-human limits remain unchanged;
+a 32-seat match with sixteen humans and sixteen bots waits for the timer.
+Bots and spectators never count as human contestants. Transport admission and
+departure share the existing authoritative state machine; recovery reconnects
+confirm active humans instead of counting reserved or stale checkpoint records.
+Joining never resets the deadline. Bot fill is finalized at departure and the
+Bus phase locks out any duplicate transition or post-cutoff contestant join.

@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+  { number: "47", title: "Ready for Departure", changes: [
+    "Play Offline With Bots uses its own explicit session setting and a full ten-second Spawn Island countdown. Online matches retain sixty seconds, even when only one human is playing with bots.",
+    "Online public and custom matches depart immediately when every configured contestant seat contains a connected human. Bots, spectators, stale records and duplicate connections never satisfy the threshold; the existing 32-contestant and 16-human limits are preserved.",
+    "Joining players inherit the host's remaining time. Departure finalizes fill bots, locks the roster and resets practice equipment once. The warmup HUD separately reports real players and bots, and late arrivals remain spectator-only."
+  ] },
   { number: "46", title: "Connected Island — On-Time Departure", changes: [
     "Spawn Island now follows sixty real seconds of host time even when a slow frame drops physics work. The replicated countdown and host-recovery checkpoint keep everyone on the same deadline, without accelerating movement or match physics.",
     "Includes the full Connected Island update: connected building and automatic materials, scroll-wheel reset, repaired map geometry, visible storm, smarter bots, dedicated pickaxe plus five item slots, 32-contestant fill, larger vitals and rebalanced storm phases."
