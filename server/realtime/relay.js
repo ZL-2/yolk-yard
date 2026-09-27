@@ -8,6 +8,8 @@ export class RealtimeRelay {
   constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
   attach(ws){
     let peer; const started=Date.now();
+    // Browser networking can answer native pings while a costly render blocks JS.
+    ws.on('pong',()=>{if(peer?.ws===ws)peer.lastSeen=Date.now();});
     const registration=setTimeout(()=>{if(!peer)ws.close(1008,'Register first');},10000);registration.unref?.();
     ws.on('message',(raw,binary)=>{
       try{
@@ -119,7 +121,7 @@ export class RealtimeRelay {
   sweep(){for(const peer of this.peers.values()){
     if(peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)this.remove(peer);
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
-    else this.flush(peer);
+    else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
   close(){this.parties.close();clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');}
 }

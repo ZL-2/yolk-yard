@@ -18,6 +18,7 @@ try{
  await a.locator('.social-person').filter({hasText:nameB}).locator('[data-party-invite]').click();await b.locator('[data-party-accept]').click();
  await a.locator('#dialog [data-action="close"]').first().click();await a.locator('.yard-party').getByText(nameB,{exact:false}).waitFor();await b.locator('[data-action="party-ready"]').click();await a.waitForFunction(()=>!document.querySelector('.yard-queue-state').textContent.includes('Waiting for your teammate'));
  await a.screenshot({path:'test-results/live-lobby/party.png'});
+ for(const p of [a,b])await p.setViewportSize({width:960,height:540});
  await a.locator('#menu [data-action="play-custom"]').click();await a.locator('#setup-visibility').selectOption('private');await a.locator('#setup-capacity').selectOption('4');await a.locator('[data-action="create-room"]').click();
  for(const p of [a,b]){await p.locator('#royale-flight-help').filter({hasText:'2 real players'}).waitFor();await p.locator('#duo-hud').filter({hasText:p===a?nameB:nameA}).waitFor();}
  await b.screenshot({path:'test-results/live-lobby/island.png'});

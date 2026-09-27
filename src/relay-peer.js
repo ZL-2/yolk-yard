@@ -1,5 +1,6 @@
 import {mergeRelayMessage} from './relay-queue.js';
 import {SnapshotEncoder,SnapshotDecoder} from './snapshot-codec.js';
+import {HostHeartbeat} from './host-heartbeat.js';
 // Peer-shaped, ordered WebSocket transport; the game rules stay in Network.
 // Explicit peer configuration retains the local WebRTC development path.
 export const relayURL=()=>globalThis.window?.YOLK_NETWORK?.relay||'';
@@ -26,10 +27,10 @@ export class RelayPeer extends Events {
  start(){
   if(this.destroyed)return;
   try{this.socket=new WebSocket(relayURL());}catch{this.emit('error',{type:'socket-error'});return;}
-  const ws=this.socket;this.lastMessage=Date.now();
+  const ws=this.socket;this.transportHeartbeat=new HostHeartbeat(Date.now(),{silence:18000,grace:0});
   ws.addEventListener('open',()=>ws.send(JSON.stringify({type:'register',...(this.id?{id:this.id}:{}),...this.resume,...(this.protocol===2?{cursor:this.cursor}:{})})));
   ws.addEventListener('message',event=>{
-   if(ws!==this.socket)return;this.lastMessage=Date.now();this.receivedBytes+=event.data.length;let data;try{data=JSON.parse(event.data);}catch{return this.destroy();}
+   if(ws!==this.socket)return;this.transportHeartbeat.contact(Date.now());this.receivedBytes+=event.data.length;let data;try{data=JSON.parse(event.data);}catch{return this.destroy();}
    for(const m of Array.isArray(data)?data:[data]){
     if(m.relaySeq){
      if(m.relaySeq<=this.cursor){this.acknowledge();continue;}
@@ -55,7 +56,7 @@ export class RelayPeer extends Events {
    for(const conn of [...this.connections.values()])conn.finish();
    this.emit('disconnected');this.destroy();
   });
-  clearInterval(this.heartbeat);this.heartbeat=setInterval(()=>{if(Date.now()-this.lastMessage>18000)ws.close();else this.control({type:'heartbeat'});},3000);
+  clearInterval(this.heartbeat);this.heartbeat=setInterval(()=>{if(this.transportHeartbeat.expired(Date.now()))ws.close();else this.control({type:'heartbeat'});},3000);
  }
  control(message){
   if(this.protocol===2&&['heartbeat','ack'].includes(message.type)){

@@ -24,6 +24,9 @@ try{
  await a.locator('#menu [data-action="social"]').first().click();await a.locator(`[data-party-invite="${bid}"]`).click();await b.locator('[data-party-decline]').click();await a.waitForTimeout(1600);await a.locator(`[data-party-invite="${bid}"]`).click();await b.locator('[data-party-accept]').click();
  await a.waitForFunction(()=>window.__yolkTest.party().party.members.length===2);await b.waitForFunction(()=>window.__yolkTest.party().party.members.length===2);await a.locator('#dialog [data-action="close"]').first().click();
  await a.waitForFunction(()=>window.__yolkTest.partyMembers()===1);await b.locator('#menu [data-action="party-ready"]').click();await a.waitForFunction(()=>window.__yolkTest.party().party.members.every(m=>m.ready||m.id===window.__yolkTest.party().party.leader));await shot(a,'party-ready');await a.setViewportSize({width:390,height:768});await a.waitForTimeout(300);await shot(a,'party-390');await a.setViewportSize({width:1365,height:768});
+ // Both scenes share the CI software GPU. Layouts above are checked at full size;
+ // run the multiplayer gameplay sequence at the supported smaller game size.
+ for(const p of [a,b])await p.setViewportSize({width:960,height:540});
  await a.locator('#menu [data-action="play-custom"]').click();await a.locator('#setup-capacity').selectOption('8');await a.locator('#setup-visibility').selectOption('private');await a.locator('[data-action="create-room"]').click();
  await Promise.all([a,b].map(p=>p.waitForFunction(()=>window.__yolkTest.read().state?.royale?.stage==='spawn-island')));
  for(const p of [a,b])if(await p.locator('#dialog [data-action="resume"]').isVisible())await p.locator('#dialog [data-action="resume"]').click();
