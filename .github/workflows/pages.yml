@@ -29,6 +29,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Verify settings categories, controls and responsive layout
+        if: contains(github.event.head_commit.message, '[settings-layout]')
+        run: |
+          npx playwright install --with-deps chromium
+          node scripts/settings-layout-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[settings-layout]')
+        with:
+          name: settings-layout
+          path: test-results/settings
       - name: Verify Battle Royale inventory slot layout
         if: contains(github.event.head_commit.message, '[inventory-layout]')
         run: |

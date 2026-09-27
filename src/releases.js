@@ -1,4 +1,8 @@
 export const RELEASE_NOTES = [
+  { number: "49", title: "Settings, Your Way", changes: [
+    "Settings now use a wide category-tab layout with Video, Audio, Mouse, HUD, Gameplay and Keybinds sections, plus contextual descriptions for the selected option.",
+    "Yolk Yard paper-and-ink styling, gold active tabs, independently scrolling options, a persistent footer and a compact mobile layout keep every control easy to reach. Existing automatic saves, resets and keybind Apply / Discard behavior are preserved."
+  ] },
   { number: "48", title: "Six Slots, Full Width", changes: [
     "The Battle Royale inventory now reserves one dedicated pickaxe column and the remaining width for five equal item slots.",
     "Equipment cards no longer collapse into narrow strips at laptop or responsive panel sizes; empty and occupied slots keep identical dimensions."

@@ -1,4 +1,5 @@
 import {StreakUI} from './streak-ui.js';
+import {arrangeSettings} from './settings-layout.js';
 import {eggsMarkup,formatEggs} from './currency-ui.js';
 import {GuestPresentation} from './guest-presentation.js';
 import {predictMovement} from './guest-movement.js';
@@ -18,6 +19,7 @@ import { ChatPanel } from "./chat-ui.js";
 import { moderateText, safeName } from "./moderation.js";
 import {matchOptions, targetLabel} from "./match-options.js";
 import "./style.css";
+import './settings-layout.css';
 import './egg-shop.css';
 import {EggShop} from './egg-shop.js';
 import {EggWallet,MatchEarnings,ownedLoadout} from './egg-wallet.js';
@@ -239,7 +241,7 @@ function modal(title, body, type = "generic") {
 }
 function closeDialog() {
   if(dialogType==='egg-shop'&&screen==='menu')renderMenu();
-  if(dialogType==='settings'&&bindingEditor?.dirty){bindingEditor.message='Apply or Discard your keybind changes before closing.';bindingEditor.render();dialog.querySelector('.binding-footer')?.scrollIntoView({block:'nearest'});return;}
+  if(dialogType==='settings'&&bindingEditor?.dirty){bindingEditor.message='Apply or Discard your keybind changes before closing.';bindingEditor.render();dialog.querySelector('.dialog-body').dispatchEvent(new Event('settings-show-bindings'));dialog.querySelector('.binding-footer')?.scrollIntoView({block:'nearest'});return;}
   if(dialogType==='rename'){toast('Choose an available name to continue, or leave the match.');return;}
   if(['royale-inventory','royale-map'].includes(dialogType)){void resume();return;}
   sound.cue('ui-back');
@@ -261,7 +263,7 @@ function notice(text) {
 }
 function settingsMenu() {
   modal(
-    "Make it yours",
+    "Settings",
     `<p>Settings are saved on this browser.</p><button class="slider-reset-all" data-reset-slider="all">Reset all sliders</button>${SLIDERS
       .map(
         ([id, label, min, max, step]) =>
@@ -273,6 +275,7 @@ function settingsMenu() {
     "settings",
   );
   bindingEditor=new KeybindEditor(dialog.querySelector(".keybind-list"),settings.keybinds,bindings=>{settings.keybinds=bindings;keys.clear();queuedActions.clear();input.fire=input.aim=false;save("yolk-settings",settings);});
+  arrangeSettings(dialog);
 }
 function loadoutMenu() {
   modal(
