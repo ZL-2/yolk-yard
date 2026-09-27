@@ -1,23 +1,22 @@
-# Shared game relay
+# Shared game and party relay
 
-`service/src/relay.js` is the deployed WebSocket transport source, mirrored from the existing
-connection-check service. `relay-schema.sql` is its generated schema migration.
-The Worker routes `/game` to `gameSocket(request, env)` with its D1 `DB` binding.
-The deployed service also preserves `/health`, `/probe`, and `/rooms` diagnostics.
+The active production service is `server/realtime/`, a persistent Node 24
+WebSocket process. GitHub Pages serves the game; `public/network-config.js`
+selects the existing Render relay. `/game` carries authoritative host gameplay
+and `/social` owns lobby sessions, parties, invitations and admission tickets.
 
-The complete service project (entrypoint, schema, migrations and build script)
-is in `server/service/`. Its source is synchronized with the separately deployed
-service; GitHub Pages does not execute it. Do not deploy the test Node server as
-production: it deliberately uses a temporary local database and localhost.
+Build with `server/realtime/Dockerfile` from the repository root, or install
+production dependencies and run `npm run start:relay`. The container includes
+the shared profile moderation and match-option modules. Use one instance and
+the exact allowed browser origin. Read [realtime deployment details](realtime/README.md)
+before changing the service configuration.
 
-Run `npm run test:relay` using Node 24 to exercise real WebSockets, the production
-relay class, SQLite mailboxes, actual Network clients and both simulations.
-Covers public/private discovery, code join, ordered inputs, large checkpoints,
-host transfer, late admission, and connection renewal without losing channels.
-Local tests do not establish remote database latency or school-network capacity.
+`npm run test:realtime` checks actual WebSockets, Arena/Royale sessions, capacity,
+host transfer, socket recovery and sustained delivery. `node scripts/party-duos-check.mjs`
+checks real party admission, invitations, public/custom matchmaking, Duos and
+host/non-host combat confirmation. The release workflow verifies the live
+relay's protocol and party features before publishing the game.
 
-Messages retain ordering; room addresses are exclusive, channel recipients are
-bound to server-side sessions, listing publication requires owning the room
-address, and message/session bounds constrain queues. Resume credentials are
-random bearer tokens held only in browser memory during connection renewal.
-They are never logged, listed or stored in browser storage.
+`server/service/` and `npm run test:relay` retain the former D1 transport's
+compatibility fixtures. They are not a second active lobby or party service.
+Reconnect credentials are opaque bearer tokens; never log or publish them.

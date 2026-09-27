@@ -19,6 +19,12 @@ export function observe(sim,p,brain,skill){
   if(e.type==='hit'&&e.target===p.id&&e.player!==p.id&&Number.isFinite(e.sourceX)){
    hear(sim,p,brain,e.player||'unknown', {x:e.sourceX,y:e.sourceY,z:e.sourceZ},'damage',e.amount||0);continue;
   }
+  if(e.type==='hit'&&Number.isFinite(e.sourceX)){
+   const mate=sim.players.get(e.target),enemy=sim.players.get(e.player);
+   if(teammates(sim.options,p,mate)&&enemy&&hostile(sim,p,enemy)&&dist(p,mate)<skill.teamRange&&(dist(p,mate)<12||seesPoint(sim,p,mate))){
+    hear(sim,p,brain,enemy.id,{x:e.sourceX,y:e.sourceY,z:e.sourceZ},'callout');brain.memory[enemy.id].allyThreatAt=sim.time;brain.assistMate=mate.id;brain.assistUntil=sim.time+3;brain.decision=0;brain.perceiveAt=0;
+   }
+  }
   const noisy=['shot','launch','explosion','harvest','royale-fx'].includes(e.type)||e.type==='royale-cue'&&['build-place','chest-open','land'].includes(e.cue);
   if(!noisy||e.player===p.id)continue;
   const source=e.origin||e;if(!Number.isFinite(source.x)||!Number.isFinite(source.z))continue;
@@ -65,7 +71,8 @@ export function threatScore(sim,p,brain,m){
  const exposed=m.visible?45:6,weaponFit=own.pellets>1?(d<12?9:-6):own.optic==='scope'?(d>22?5:-3):0;
  const help=[...sim.players.values()].some(t=>teammates(sim.options,t,p)&&t.health>0&&t.brain?.target===m.id&&dist(t,p)<25)?6:0;
  const storm=sim.storm?.active&&d>20&&Math.hypot(m.x-sim.storm.nextX,m.z-sim.storm.nextZ)>sim.storm.nextRadius?16:0;
- return exposed+(m.confidence||0)*22+Math.min(40,m.damage||0)+incoming+matchup+vulnerable+weaponFit+help+(m.health<40?6:0)-Math.log1p(d)*8-age*3-storm;
+ const allyDanger=sim.time-(m.allyThreatAt??-100)<3?14:0;
+ return exposed+(m.confidence||0)*22+Math.min(40,m.damage||0)+incoming+matchup+vulnerable+weaponFit+help+allyDanger+(m.health<40?6:0)-Math.log1p(d)*8-age*3-storm;
 }
 export function selectThreat(sim,p,brain,skill){
  const memories=Object.values(brain.memory).filter(m=>!sim.players.has(m.id)||hostile(sim,p,sim.players.get(m.id)));

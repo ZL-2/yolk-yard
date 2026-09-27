@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {DRAW_POSES,beginEquip,equipPose} from '../src/equip.js';
 import {WEAPONS} from '../src/data.js';
 import {Simulation} from '../src/simulation.js';
+import {RoyaleSimulation} from '../src/royale.js';
+import {GuestFire} from '../src/guest-fire.js';
 test('every blaster holsters before drawing and settles exactly into its grip',()=>{
  const poses=new Set();
  for(const w of WEAPONS){
@@ -37,4 +39,16 @@ test('host switching cancels reload, replicates the draw clock, and delays held 
  assert.ok(p.equipStarted>first);assert.equal(p.slot,1);
  assert.equal(equipPose(p,sim.time).progress,0);
  sim.spawn(p);assert.equal(p.equipHolster,0);assert.equal(equipPose(p,sim.time).progress,0);
+});
+test('Royale and guest presentation retain a held trigger through a draw, then fire only once',()=>{
+ const sim=new RoyaleSimulation({bots:0,capacity:4,seed:12}),p=sim.addPlayer('host',{name:'Host'});sim.startRound();
+ let seq=0;const input=()=>({seq:++seq,slot:2,fire:true,yaw:p.yaw,pitch:0});
+ sim.setInput(p.id,input());sim.tick(1/60);const ammo=p.ammo[2],until=p.equipUntil;
+ const guest=new GuestFire(),visual=structuredClone(sim.snapshot().players.find(x=>x.id===p.id));
+ assert.equal(guest.step(visual,input(),until-.1,1,1),null);
+ assert.ok(guest.step(visual,input(),until+.01,1.11,1));
+ assert.equal(guest.step(visual,input(),until+2,3.1,1),null);
+ for(let n=0;n<100;n++){sim.setInput(p.id,input());sim.tick(1/60);}
+ assert.equal(p.ammo[2],ammo-1);
+ assert.equal(sim.events.filter(e=>e.type==='shot'&&e.player===p.id).length,1);
 });

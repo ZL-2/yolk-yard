@@ -51,6 +51,7 @@ export function chooseObjective(sim,p,brain,skill,target){
   return {kind:'fight',goal:target,enemy:target};
  }
  if(storm)return storm;
+ if(brain.assistUntil>sim.time&&p.health>=skill.retreat&&(!p.inventory||p.inventory.some(i=>i?.weapon&&i.ammo>0))){const mate=sim.players.get(brain.assistMate);if(mate?.health>0&&teammates(sim.options,p,mate))return {kind:'support',goal:{x:mate.x+brain.side*5,y:mate.y,z:mate.z}};}
  if(royale){
   const heal=p.inventory.findIndex(i=>i&&((ITEMS[i.id]?.kind==='heal'&&p.health<80)||(ITEMS[i.id]?.kind==='shield'&&p.shield<Math.min(100,ITEMS[i.id].cap||100))||(i.id==='splash'&&(p.health<85||p.shield<70))));
   if(heal>=1&&!underFire){if(target){const cover=coverPoint(sim,p,target);if(cover&&dist(p,cover)>1)return {kind:'cover',goal:cover};}return {kind:'heal',goal:{x:p.x,y:p.y,z:p.z},slot:heal};}

@@ -345,7 +345,7 @@ export class RoyaleSimulation extends Simulation {
      if(input.fire&&this.time>=p.nextShot&&(gun(p).automatic||!p.fireLatch||p.bot)&&!p.burstLeft&&!p.reloadEnd&&p.ammo[p.slot]>0){this.fire(p);p.nextShot=this.time+gun(p).interval;if(gun(p).burst){p.burstLeft=gun(p).burst-1;p.burstTime=this.time+gun(p).burstInterval;}}
      if(input.fire&&!p.fireLatch&&p.ammo[p.slot]===0&&p.reserve[p.slot]===0)this.emit('royale-cue',{player:p.id,cue:'weapon-empty'});
     }else if(!buildingAction&&input.fire&&!p.useLatch)this.beginUse(p);
-    p.fireLatch=!!input.fire;p.useLatch=!!input.fire;
+    p.fireLatch=!!input.fire&&this.time>=(p.equipUntil||0);p.useLatch=!!input.fire;
     if(p.use&&this.time>=p.use.end)this.finishUse(p);
     for(const pad of this.pads)if(this.time>=(p.nextLaunch||0)&&dist(p,pad)<2){launchPlayer(p,{source:'launchpad',vy:38});p.nextLaunch=this.time+3;this.emit('royale-cue',{player:p.id,cue:'launch',x:pad.x,y:pad.y,z:pad.z});}
    }
