@@ -18,8 +18,9 @@ function player(name,mode){const node={states:[],errors:[],chats:[],sim:null};no
 try{
  for(const mode of ['ffa','royale']){
   const host=player('Alpha',mode),guest=player('Bravo',mode),third=player('Charlie',mode);
-  const options={mode,map:mode==='royale'?'sunnybreak':'yard',bots:0,capacity:mode==='royale'?16:8,fillBots:false};
-  host.net.maxConnections=options.capacity-1;
+  const options={mode,map:mode==='royale'?'sunnybreak':'yard',bots:0,capacity:mode==='royale'?32:8,fillBots:false};
+  // Exercise legacy relay warmup capacity without triggering the separate full-human Bus test.
+  host.net.maxConnections=Math.min(options.capacity,16)-1;
   host.sim=mode==='royale'?new RoyaleSimulation(options):new Simulation(options);host.sim.addPlayer('host',host.profile);
   const code=await host.net.host();host.net.setVisibility('public');host.net.broadcast(host.sim.snapshot());host.net.publishRoom();
   await wait(()=>server.sqlite.prepare('SELECT count(*) n FROM relay_peers WHERE listing IS NOT NULL').get().n>0);
