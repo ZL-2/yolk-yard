@@ -99,7 +99,7 @@ export class Network {
           connectionReport.set("service","Failed","Matchmaking timed out after 14 seconds.");
           reject(
             new Error(
-              "The room service did not respond. Your network may block it; practice is available.",
+            "The room service did not respond. Please try again shortly.",
             ),
           );
         }, 14000,
@@ -355,7 +355,9 @@ export class Network {
     this.heartbeat = setInterval(() => {
       if (this.closed || this.isHost || this.migrating || this.peer?.reconnecting) return;
       const now=performance.now();this.send({ type: "ping", time: now });
-      if (this.ready && this.hostHeartbeat.expired(now))this.beginMigration();
+      // The persistent relay owns the room address and closes the host channel
+      // after a real disconnect. A slow host frame must not create a second host.
+      if (this.ready && this.hostHeartbeat.expired(now) && this.peer?.protocol!==2)this.beginMigration();
     }, 2000);
   }
   send(msg) {
