@@ -1,0 +1,30 @@
+name: Verify Quality Update 42 gameplay and live site
+on:
+  push:
+    branches: [quality-update-42-validation]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Check published release and real game UI
+        run: node scripts/quality42-live-check.mjs
+      - name: Complete chest, scope, weapon and rematch browser checks
+        env:
+          YOLK_QA_EQUIPMENT_ONLY: "1"
+        run: node scripts/island-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality42-live-and-gameplay
+          path: test-results
+          retention-days: 7
