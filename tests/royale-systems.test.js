@@ -87,6 +87,16 @@ test('32 filled seats, finite 60-second host countdown, admission cap, practice 
  const restored=new RoyaleSimulation().restore(s.checkpoint());assert.equal(restored.options.capacity,32);assert.equal(restored.stage,s.stage);assert.equal(restored.alive,s.alive);
  restored.phase='results';restored.stage='finished';restored.startRound();assert.equal([...restored.players.values()].filter(p=>p.contestant).length,32);assert.equal([...restored.players.values()].filter(p=>p.contestant&&!p.bot).length,16);assert.equal(restored.players.get('watch').spectating,true);
 });
+test('host warmup uses real elapsed time through slow frames and recovery without speeding up physics',()=>{
+ const s=new RoyaleSimulation({capacity:4,bots:0,fill:false,seed:43});s.addPlayer('host',{name:'Host'});s.addPlayer('guest',{name:'Guest'});s.startRound();
+ // Two rendered frames per second, six safe physics steps per frame.
+ for(let i=0;i<119;i++){s.advanceWarmupClock(.4);for(let j=0;j<6;j++)s.tick(1/60);}
+ assert.equal(s.stage,'starting');assert.ok(Math.abs(s.queueEnds-s.time-.5)<1e-8);assert.ok(s.time<12);
+ const recovered=new RoyaleSimulation().restore(s.checkpoint());assert.ok(Math.abs(recovered.snapshot().royale.queueEnds-recovered.time-.5)<1e-8);
+ recovered.advanceWarmupClock(.4);for(let j=0;j<7;j++)recovered.tick(1/60);
+ assert.equal(recovered.stage,'battle-bus');assert.equal(recovered.alive,2);assert.equal(recovered.players.get('guest').inventory.slice(1).filter(Boolean).length,0);
+ const started=recovered.startedAt;recovered.advanceWarmupClock(10);assert.equal(recovered.startedAt,started);assert.ok(recovered.elapsed<.1);
+});
 test('swept collision buckets agree with exhaustive geometry queries across boundaries',()=>{
  const boxes=Array.from({length:250},(_,i)=>({x:Math.sin(i*2.4)*90,z:Math.cos(i*1.7)*90,y:i%5,w:1+i%9,d:1+i%7,h:1+i%11}));
  const indexed={size:100,theme:'royale',boxes},exhaustive={...indexed,theme:'plain'};

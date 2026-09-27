@@ -1,4 +1,4 @@
-# Connected Island — Quality Update 55
+# Connected Island — Quality Updates 55–56
 
 This update supersedes the old pickaxe numbering, 16-contestant target and
 30-second warmup described in earlier historical release notes. The publishing
@@ -27,6 +27,11 @@ Fill creates bots in all unoccupied contestant seats. Humans replace those bots
 during the host's 60-second warmup. Departure closes admission. Observers do not
 affect placements, victory, fill, or alive counts, including after migration and
 rematches. Forty separated, collision-free warmup points support the roster.
+
+Update 56 also accounts for elapsed host time omitted by the physics frame
+clamp. Slow rendering therefore does not stretch the warmup. The existing
+replicated deadline stores the remaining wait through host recovery; physics
+continues to use bounded steps. A deliberately paused local game still pauses.
 
 Normal storm schedule, seconds since Bus departure:
 

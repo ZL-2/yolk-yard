@@ -1507,7 +1507,9 @@ let lastTime = performance.now(),
 function loop(now) {
   if(state?.royale){view.buildMap=getMap(state.options.map);applyBuildState(view.buildMap,state.royale);}
   if(screen==='game'&&!document.hidden)connectionReport.performance.frame(now-lastTime,net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');
-  const dt = Math.min(0.1, (now - lastTime) / 1000);
+  const elapsedFrame=Math.max(0,(now-lastTime)/1000),dt=Math.min(0.1,elapsedFrame);
+  const simulate=!(paused&&!net&&screen==='game'&&!['royale-inventory','royale-map'].includes(dialogType));
+  if(simulate)sim?.advanceWarmupClock?.(elapsedFrame-dt);
   lastTime = now;
   accumulator += dt;
   broadcastClock += dt;
@@ -1517,7 +1519,7 @@ function loop(now) {
     accumulator -= 1 / 60;
     const i = frameInput();
     if (sim) {
-      if (!(paused && !net && screen === "game" && !['royale-inventory','royale-map'].includes(dialogType))) {
+      if (simulate) {
         sim.setInput(localId, i);
         sim.tick(1 / 60);
       }

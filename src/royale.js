@@ -243,14 +243,20 @@ export class RoyaleSimulation extends Simulation {
   }
   if(action==='spectate'&&p.health>0){this.damage(p,null,p.health+p.shield+1,'Left round');if(p.flight==='transport'){p.health=0;this.eliminate(p);}}
  }
- tick(dt){
-  dt=clamp(dt,0,1/30);this.time+=dt;
-  if(this.phase!=='playing')return;
-  if(isWarmup(this.stage)){
+ advanceWarmupClock(unsteppedSeconds=0){
+  if(this.phase!=='playing'||!isWarmup(this.stage))return;
+  // The host's physics loop intentionally drops long frame gaps. Translate
+  // those elapsed seconds into the existing replicated deadline, so warmup
+  // still lasts sixty real seconds and checkpoints preserve the remaining wait.
+  if(Number.isFinite(unsteppedSeconds))this.queueEnds-=Math.max(0,unsteppedSeconds);
    const count=Math.ceil(this.queueEnds-this.time);this.stage=count<=5?RP.STARTING:RP.ISLAND;
    if(count>0&&count<=5&&this.lastCountdown!==count){this.lastCountdown=count;this.emit('royale-cue',{cue:'countdown'});}
    if(this.time>=this.queueEnds)this.beginBattle();
-  }
+ }
+ tick(dt){
+  dt=clamp(dt,0,1/30);this.time+=dt;
+  if(this.phase!=='playing')return;
+  this.advanceWarmupClock();
   const warmup=isWarmup(this.stage);
   if(!warmup){
   this.elapsed=this.time-this.startedAt;this.remaining=0;

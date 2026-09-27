@@ -1,4 +1,8 @@
 export const RELEASE_NOTES = [
+  { number: "46", title: "Connected Island — On-Time Departure", changes: [
+    "Spawn Island now follows sixty real seconds of host time even when a slow frame drops physics work. The replicated countdown and host-recovery checkpoint keep everyone on the same deadline, without accelerating movement or match physics.",
+    "Includes the full Connected Island update: connected building and automatic materials, scroll-wheel reset, repaired map geometry, visible storm, smarter bots, dedicated pickaxe plus five item slots, 32-contestant fill, larger vitals and rebalanced storm phases."
+  ] },
   { number: "45", title: "Connected Island", changes: [
     "Building automatically continues with the next usable material, while preserving deliberate selections. A shared host/preview solver ranks nearby grid attachments, including ramp-to-floor extensions, with consistent collision and resource validation.",
     "Wheel-up and wheel-down support contextual Edit + Reset edit bindings. Shared reset scrolling confirms in one gesture without switching equipment. A dedicated pickaxe precedes five equal slots numbered 1–5; HUD prompts follow your saved bindings.",
