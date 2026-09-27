@@ -31,14 +31,15 @@ try{
  const compact=await guest.evaluate(()=>{const box=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};};return {map:box('.royale-map-stack'),build:box('.build-hud'),health:box('.health-card'),items:box('#royale-hotbar')};});
  const separate=(a,b)=>a.right<=b.x||b.right<=a.x||a.bottom<=b.y||b.bottom<=a.y;
  assert.ok(separate(compact.map,compact.build));assert.ok(separate(compact.health,compact.items));assert.ok(separate(compact.health,compact.build));
- await guest.screenshot({path:out+'/compact-layout.png',timeout:15000});await guest.setViewportSize({width:1100,height:700});
+ await writeFile(out+'/compact-layout.json',JSON.stringify(compact,null,2));await guest.setViewportSize({width:1100,height:700});
  await guest.keyboard.press('Digit5');await guest.waitForFunction(()=>document.querySelector('#royale-hotbar [data-royale-slot="5"]').getAttribute('aria-pressed')==='true');await guest.keyboard.press('KeyP');
- await guest.screenshot({path:out+'/guest-spawn-32.png',timeout:15000});pass('Live guest replaces a bot in the filled 32-contestant warmup, with pickaxe and five functional numbered slots');
+ pass('Live guest replaces a bot in the filled 32-contestant warmup, with pickaxe and five functional numbered slots');
  await guest.waitForFunction(()=>!document.body.classList.contains('in-spawn-island')&&document.querySelector('#hud-map')?.textContent==='Sunnybreak Island',null,{timeout:240000});
  assert.equal(await guest.locator('#royale-hotbar .royale-item-slots .royale-slot').filter({hasText:'Empty'}).count(),5);
  await guest.waitForFunction(()=>document.querySelector('#royale-flight-title').textContent.includes('Choose your landing spot'));await guest.keyboard.down('Space');await guest.waitForFunction(()=>document.querySelector('#royale-flight-title').textContent==='Freefall');await guest.keyboard.up('Space');
  pass('Real host countdown transfers both browsers to Sunnybreak with reset equipment; non-host Bus exit works');
- await guest.screenshot({path:out+'/live-island.png',timeout:15000});
  const late=await make('Connected Observer');await late.locator('[data-action="play"]').click();await late.locator('[data-action="join"]').click();await late.locator('#join-code').fill(code);await late.locator('[data-action="join-room"]').click();await enter(late);await late.locator('#spectate-panel').waitFor();assert.equal(await late.locator('[data-action="rejoin"]').isVisible(),false);await late.locator('[data-action="spectate-next"]').click();pass('Live late-join observer receives the larger roster and can switch spectator targets');
  assert.deepEqual(errors,[]);await writeFile(out+'/report.json',JSON.stringify({version,checks,errors},null,2));
+ // Capture after the timed interactions, with one software GPU left to render.
+ await late.close();await guest.close();await host.setViewportSize({width:620,height:430});await host.screenshot({path:out+'/live-compact.png',timeout:120000});
 }finally{await Promise.all(browsers.map(b=>Promise.race([b.close(),new Promise(resolve=>setTimeout(resolve,5000))])));}
