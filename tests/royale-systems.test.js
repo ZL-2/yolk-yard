@@ -4,7 +4,7 @@ import {RoyaleSimulation} from '../src/royale.js';
 import {ROYALE_MAP} from '../src/royale-map.js';
 import {SPAWN_ISLAND} from '../src/spawn-island.js';
 import {groundAt} from '../src/terrain.js';
-import {canStand} from '../src/physics.js';
+import {canStand,wallDistance,direction} from '../src/physics.js';
 import {buildingTick,solvePlacement,validPlacement,pieceBoxes,rebuildMap,inventory,applyBuildState} from '../src/building.js';
 import {selectMaterial} from '../src/building-rules.js';
 import {normalizeBindings,assignBinding,wheelIntent,inventoryActionForSlot} from '../src/keybinds.js';
@@ -85,6 +85,12 @@ test('32 filled seats, finite 60-second host countdown, admission cap, practice 
  const spectator=s.admitPlayer('watch',{name:'Watcher'});assert.ok(spectator.spectating);assert.equal(s.alive,32);
  Object.assign(p,{flight:'ground',x:-230,y:0,z:-230});s.map={...s.map,terrain:null,boxes:[]};s.worldBoxes=[];p.inventory=inventory();p.inventory[5]={id:'mini',count:4};s.playerAction(p.id,'inventory-select-5');assert.equal(p.slot,5);s.playerAction(p.id,'inventory-swap-5-1');assert.equal(p.inventory[1].id,'mini');s.playerAction(p.id,'inventory-swap-1-5');s.playerAction(p.id,'inventory-drop-one-5');assert.equal(p.inventory[5].count,3);s.dropSlot(p,5);assert.equal(p.inventory[5],null);assert.equal(p.inventory[0].id,'pickaxe');
  const restored=new RoyaleSimulation().restore(s.checkpoint());assert.equal(restored.options.capacity,32);assert.equal(restored.stage,s.stage);assert.equal(restored.alive,s.alive);
+ restored.phase='results';restored.stage='finished';restored.startRound();assert.equal([...restored.players.values()].filter(p=>p.contestant).length,32);assert.equal([...restored.players.values()].filter(p=>p.contestant&&!p.bot).length,16);assert.equal(restored.players.get('watch').spectating,true);
+});
+test('swept collision buckets agree with exhaustive geometry queries across boundaries',()=>{
+ const boxes=Array.from({length:250},(_,i)=>({x:Math.sin(i*2.4)*90,z:Math.cos(i*1.7)*90,y:i%5,w:1+i%9,d:1+i%7,h:1+i%11}));
+ const indexed={size:100,theme:'royale',boxes},exhaustive={...indexed,theme:'plain'};
+ for(let i=0;i<500;i++){const p={x:Math.sin(i)*96,z:Math.cos(i*.73)*96,y:1+i%9},ray=direction(i*.32,Math.sin(i)*.4);assert.equal(wallDistance(indexed,p,ray,150),wallDistance(exhaustive,p,ray,150));assert.equal(canStand(indexed,p),canStand(exhaustive,p));}
 });
 test('larger opening circle preserves nested boundaries and tightens later phases',()=>{
  const s=makeStorm(()=>.6);assert.equal(s[0].closeAt,140);assert.equal(s[0].end,205);assert.equal(s[0].radius,225);

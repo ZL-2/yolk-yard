@@ -1836,3 +1836,11 @@ body.in-royale .match-center{display:none}
  .in-royale .royale-hotbar .royale-slot{width:100%;}
  .in-royale .royale-hotbar .slot-name{font-size:8px;}
 }
+@media(max-height:540px) and (min-width:600px) and (pointer:fine){
+ .royale-map-stack{top:48px;right:12px;width:100px;}
+ .royale-map-stack .royale-minimap span{font-size:8px;padding:2px 0;}
+ .royale-map-stats{font-size:8px;gap:3px;}
+ .royale-map-stats span{padding:3px 1px;}
+ .royale-map-stats b{font-size:10px;}
+ .build-hud{right:128px;}
+}

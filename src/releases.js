@@ -1,4 +1,12 @@
 export const RELEASE_NOTES = [
+  { number: "45", title: "Connected Island", changes: [
+    "Building automatically continues with the next usable material, while preserving deliberate selections. A shared host/preview solver ranks nearby grid attachments, including ramp-to-floor extensions, with consistent collision and resource validation.",
+    "Wheel-up and wheel-down support contextual Edit + Reset edit bindings. Shared reset scrolling confirms in one gesture without switching equipment. A dedicated pickaxe precedes five equal slots numbered 1–5; HUD prompts follow your saved bindings.",
+    "Sunnybreak foundations, stair landings, wall corners, roof trim and terrain transitions have been aligned. Roads now use the terrain surface itself. The storm has a clearly visible animated blue-violet wall driven by the actual safe-zone boundary.",
+    "Royale now targets 32 contestants with up to 16 humans, bot fill and four separate spectator seats. Forty clear Spawn Island points, distributed bot landings, guaranteed ground-floor weapons, matching ammo and district chest minimums support the larger match.",
+    "The host controls a 60-second Spawn Island countdown. Practice bots explore, idle and take limited turns at the range. Match bots can interrupt a distant fight for a much more dangerous nearby attacker, with commitment to prevent target flicker.",
+    "Storm movement starts 140 seconds after Bus departure, then tightens through eight phases ending at 8:46. Larger responsive health/shield bars improve combat readability. Narrow collision queries, bounded pathfinding and shared sparse snapshots control browser and network work. Refresh before joining updated rooms."
+  ] },
   { number: "44", title: "Smooth Boarding", changes: [
     "Inventory images are now pre-rendered from the actual item models, removing GPU readback stalls when entering matches and collecting new equipment. Island shaders prepare asynchronously while networking continues.",
     "Four separate spectator seats now fit safely alongside sixteen contestants on the deployed multiplayer relay. Admission and host recovery share the same capacity rule.",

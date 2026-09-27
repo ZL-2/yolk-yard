@@ -29,6 +29,16 @@ export class BuildingUI{
   const b=targetBuild(map,state.royale.builds,{...p,yaw:this.controls.yaw??p.yaw,pitch:this.controls.pitch??p.pitch});
   return canEdit(b,p);
  }
+ resetWithWheel(state,p,map){
+  if(!this.edit){
+   const b=targetBuild(map,state.royale.builds,{...p,yaw:this.controls.yaw??p.yaw,pitch:this.controls.pitch??p.pitch});
+   // Consume later notches in the same reset gesture without reopening an
+   // already unedited piece or leaking that gesture into item scrolling.
+   if(!canEdit(b,p)||!b.mask&&!b.path?.length)return;
+   if(!this.beginEdit(state,p,map))return;
+  }
+  this.action('reset');this.action('confirm');
+ }
  beginEdit(state,p,map){if(!p||p.health<=0||p.flight!=='ground')return false;const pose={...p,yaw:this.controls.yaw??p.yaw,pitch:this.controls.pitch??p.pitch},b=targetBuild(map,state.royale.builds,pose);if(!canEdit(b,p))return false;
   this.edit={...b,path:[...(b.path||[])]};this.pending=false;this.error='';this.down=false;this.root.classList.add('manual-editing');this.controls.editing=true;this.controls.editTarget=b.id;this.renderEdit();return true;
  }

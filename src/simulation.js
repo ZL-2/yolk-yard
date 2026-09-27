@@ -849,8 +849,8 @@ export class Simulation {
     }
     return best;
   }
-  checkpoint() {
-    const skip=new Set(['map','nav','random','players','inputs','remoteInputs','events']);
+  checkpoint(exclude=[]) {
+    const skip=new Set(['map','nav','random','players','inputs','remoteInputs','events',...exclude]);
     const data=Object.fromEntries(Object.entries(this).filter(([key,value])=>!skip.has(key)&&typeof value!=='function'));
     return structuredClone({...data,players:[...this.players.values()],events:this.events,randomState:this.random.state()});
   }

@@ -1215,8 +1215,7 @@ function pressControl(code) {
     const intent=wheelIntent(settings.keybinds,code,{royale:true,editing:!!buildUI.edit,eligible});
     if(intent!=='scroll'){
       if(intent==='reset-confirm'){
-        if(!buildUI.edit)buildUI.beginEdit(state,pose,view.buildMap);
-        buildUI.action('reset');buildUI.action('confirm');
+        buildUI.resetWithWheel(state,pose,view.buildMap);
       }else if(intent==='edit')buildUI.beginEdit(state,pose,view.buildMap);
       else if(intent!=='consume')buildUI.action(intent);
       return;
