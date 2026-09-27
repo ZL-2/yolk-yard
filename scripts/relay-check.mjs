@@ -25,7 +25,7 @@ try{
   await wait(()=>server.sqlite.prepare('SELECT count(*) n FROM relay_peers WHERE listing IS NOT NULL').get().n>0);
   assert.ok((await directory.list()).rooms.some(r=>r.code===code));
   await guest.net.join(code,guest.profile);await third.net.join(code,third.profile);
-  host.sim.startRound();
+  host.sim.startRound();if(mode==='royale')host.sim.queueEnds=host.sim.time+360;
   // Explicit broadcasts also exercise large Royale snapshots/checkpoints.
 
   await wait(()=>guest.states.some(s=>s.phase==='playing')&&third.states.some(s=>s.phase==='playing'));

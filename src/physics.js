@@ -1,3 +1,4 @@
+import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon } from "./data.js";
 import {groundAt,terrainHit} from './terrain.js';
 export const RADIUS = 0.46,
@@ -37,7 +38,7 @@ export function rayBox(o, d, b, max = Infinity) {
 // Spatial buckets keep large-island collision proportional to nearby cover.
 const collisionIndex = new WeakMap();
 export function invalidateCollision(map){collisionIndex.delete(map);}
-function candidates(map,o,d=null,max=0,radius=0){
+export function candidates(map,o,d=null,max=0,radius=0){
  if(map.theme!=='royale')return map.boxes;
  let grid=collisionIndex.get(map);
  if(!grid){grid=new Map();for(const b of map.boxes){for(let x=Math.floor((b.x-b.w/2)/16);x<=Math.floor((b.x+b.w/2)/16);x++)for(let z=Math.floor((b.z-b.d/2)/16);z<=Math.floor((b.z+b.d/2)/16);z++){const k=x+','+z;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(b);}}collisionIndex.set(map,grid);}
@@ -100,7 +101,12 @@ function pushAxis(p,map,axis,delta) {
 export function movePlayer(p, input, map, dt) {
   // Bound displacement through narrow risers, including low-frame-rate clients.
   const steps=Math.max(1,Math.ceil(Math.min(dt,.1)/(1/60)));
-  for(let i=0;i<steps;i++)movePlayerStep(p,input,map,Math.min(dt,.1)/steps);
+  for(let i=0;i<steps;i++){
+    const before=beginFallStep(p);movePlayerStep(p,input,map,Math.min(dt,.1)/steps);
+    let normalY=1;
+    if(p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.hypot(1,gx,gz);}
+    if(p.flight!=='transport')finishFallStep(p,before,normalY);
+  }
 }
 function movePlayerStep(p, input, map, dt) {
   if (p.health <= 0) return;
@@ -123,11 +129,12 @@ function movePlayerStep(p, input, map, dt) {
     pushAxis(p,map,'z',(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)/length*speed*dt);
     p.x=clamp(p.x,-map.size+.5,map.size-.5);p.z=clamp(p.z,-map.size+.5,map.size-.5);
     let floor=groundAt(map,p.x,p.z);for(const b of candidates(map,p))if(b.y+b.h<=p.y+.045&&Math.abs(p.x-b.x)<b.w/2+RADIUS-.015&&Math.abs(p.z-b.z)<b.d/2+RADIUS-.015)floor=Math.max(floor,b.y+b.h);
+    if(!p.fall)p.fall={apex:p.y,immune:true,source:'bus'};
     if(toggle){if(p.flight==='dive')p.flight='glide';else if(p.flight==='glide'&&p.y-floor>32)p.flight='dive';}
     if(p.flight==='launch'){
       p.vy-=20*dt;
       const ceiling=worldHit(map,{x:p.x,y:p.y+HEIGHT,z:p.z},{x:0,y:1,z:0},Math.max(0,p.vy*dt));
-      if(ceiling||p.vy<=0){p.flight='glide';p.vy=-6;}
+      if(ceiling||p.vy<=0){p.flight=p.forceGlider?'glide':'ground';p.vy=Math.min(0,p.vy);}
     }else{if(p.y-floor<=24)p.flight='glide';p.vy=p.flight==='glide'?-6:-25;}
     p.y+=p.vy*dt;p.grounded=false;
     if(p.y<=floor){p.y=floor;p.vy=0;p.grounded=true;p.flight='ground';p.jumpLatch=!!input.jump;}
@@ -162,8 +169,9 @@ function movePlayerStep(p, input, map, dt) {
   const oldSurfaceY=p.y, followedGround=!!map.terrain&&wasGrounded&&Math.abs(p.y-groundAt(map,p.x,p.z))<.1;
   pushAxis(p, map, "x", dx);
   pushAxis(p, map, "z", dz);
+  if(p.launchVelocity&&!p.grounded){pushAxis(p,map,'x',p.launchVelocity.x*dt);pushAxis(p,map,'z',p.launchVelocity.z*dt);p.launchVelocity.x*=Math.exp(-.4*dt);p.launchVelocity.z*=Math.exp(-.4*dt);}
   const ground=groundAt(map,p.x,p.z);
-  if(followedGround&&Math.abs(p.y-oldSurfaceY)<.05)p.y=ground;
+  if(followedGround&&Math.abs(p.y-oldSurfaceY)<.05&&Math.abs(ground-oldSurfaceY)<=.43)p.y=ground;
   // Follow short descents without falling and landing on every individual tread.
   if(wasGrounded){
     let support=ground;
@@ -213,7 +221,7 @@ export function sanitizeInput(i = {}) {
     slot: Number.isInteger(i.slot) && i.slot>=0 && i.slot<6 ? i.slot : 0,
     editing:!!i.editing, buildMode: !!i.buildMode, buildType: ["wall","floor","stairs","roof"].includes(i.buildType)?i.buildType:"wall", buildMaterial:["wood","brick","metal"].includes(i.buildMaterial)?i.buildMaterial:"wood", buildRotation:Number.isInteger(i.buildRotation)?((i.buildRotation%4)+4)%4:0,
     sprint: !!i.sprint, interact: !!i.interact, drop: !!i.drop,
-    swapSlot: Number.isInteger(i.swapSlot) && i.swapSlot>=0 && i.swapSlot<5 ? i.swapSlot : -1,
+    swapSlot: Number.isInteger(i.swapSlot) && i.swapSlot>=1 && i.swapSlot<6 ? i.swapSlot : -1,
   };
 }
 

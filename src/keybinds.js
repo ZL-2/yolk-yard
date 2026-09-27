@@ -23,7 +23,8 @@ export const CONTROLS = [
   ['slot3','Slot 3 (Royale)','Digit3',null],
   ['slot4','Slot 4 (Royale)','Digit4',null],
   ['slot5','Slot 5 (Royale)','Digit5',null],
-  ['pickaxe','Pickaxe (Royale)','Digit6',null],
+  ['slot6','Slot 6 (Royale)','Digit6',null],
+  ['pickaxe','Pickaxe shortcut (Royale)','KeyP',null],
   ['buildToggle','Build mode (Royale)','KeyH',null],
   ['buildWall','Wall (Royale)','KeyZ',null],
   ['buildFloor','Floor (Royale)','KeyC',null],
@@ -46,6 +47,7 @@ export function assignBinding(bindings,action,slot,code){
  return {bindings:next,removed};
 }
 export function normalizeBindings(saved) {
+  if(saved?.pickaxe?.[0]==='Digit6'&&!saved.slot6)saved={...saved,pickaxe:['KeyP',saved.pickaxe[1]],slot6:['Digit6',null]};
   const used = new Set();
   const ordered=[...CONTROLS].sort((a,b)=>Number(Array.isArray(saved?.[b[0]]))-Number(Array.isArray(saved?.[a[0]])));
   const result=Object.fromEntries(ordered.map(([id,, ...defaults]) => [id,

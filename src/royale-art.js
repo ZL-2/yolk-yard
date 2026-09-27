@@ -122,7 +122,11 @@ export function treeModel(g,t,raw){
 export function propModel(g,p,raw){
  if(islandProp(g,p,raw))return;
  const {block:box,cone,rock,cylinder,torus,beam}=artKit(raw),{x,y=0,z,w,d,h,kind}=p;
- if(kind==='rock'){
+ if(kind==='target'){
+  cylinder(g,x,y+.75,z,.08,1.5,0x6b7961,8);box(g,x,y+.12,z,1.1,.24,.65,0x9c8061);
+  rock(g,x,y+1.65,z,.58,.77,.14,0xfff3d2,2);
+  for(const side of [-1,1]){const ring=torus(g,x,y+1.65,z+side*.16,.27,.045,0xd17e4e);ring.scale.y=1.2;rock(g,x,y+1.65,z+side*.17,.13,.17,.035,0xf1c552,1);}
+ }else if(kind==='rock'){
   const m=rock(g,x,y+h*.45,z,w*.5,h*.55,d*.5,0x929789,1);m.rotation.y=(p.seed||0)*2.4;
   rock(g,x-w*.19,y+h*.81,z,.6,.16,.55,0xb7ba9b);
  }else if(kind==='lamp'){

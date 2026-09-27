@@ -1,3 +1,4 @@
+import {isWarmup} from './royale-phases.js';
 import { connectionReport, errorCode, watchConnection } from './connection-report.js';
 import Peer from "peerjs";
 import { RelayPeer, relayURL } from "./relay-peer.js";
@@ -199,7 +200,7 @@ export class Network {
       }
       if (!accepted) return;
       if (msg.type === "input") this.callbacks.onInput?.(conn.peer, msg.input);
-      else if (msg.type === "player-action" && (["respawn", "spectate", "rejoin", "team-entry-0", "team-entry-1"].includes(msg.action)||/^inventory-(select-[0-4]|drop-[0-4]|drop-one-[0-4]|split-[0-4]|swap-[0-4]-[0-4])$/.test(msg.action)||typeof msg.action==='string'&&msg.action.length<350&&(msg.action==='build-repair'||msg.action.startsWith('build-change:'))))
+      else if (msg.type === "player-action" && (["respawn", "spectate", "rejoin", "team-entry-0", "team-entry-1"].includes(msg.action)||/^inventory-(select-[0-5]|drop-[1-5]|drop-one-[1-5]|split-[1-5]|swap-[1-5]-[1-5])$/.test(msg.action)||typeof msg.action==='string'&&msg.action.length<350&&(msg.action==='build-repair'||msg.action.startsWith('build-change:'))))
         this.callbacks.onPlayerAction?.(conn.peer, msg.action);
       else if (msg.type === "profile") {
         const profile=safeProfile(msg.profile);
@@ -288,7 +289,7 @@ export class Network {
             !s ||
             s.version !== VERSION ||
             !Array.isArray(s.players) ||
-            s.players.length > 20
+            s.players.length > 24
           )
             return;
           this.lastState = performance.now();
@@ -303,7 +304,7 @@ export class Network {
             return player;
           });
           s.round=Number.isSafeInteger(s.round)?Math.max(0,s.round):0;
-          s.options=matchOptions(s.options);
+          s.options=matchOptions(s.options);if(s.royale)s.options.map=isWarmup(s.royale.stage)?'hatchery-atoll':'sunnybreak';
           s.winner=safeSystemText(s.winner, 'Round complete');
           s.events=Array.isArray(s.events)?s.events.slice(-128).map(e=>{
             const event={...e};
@@ -413,14 +414,15 @@ export class Network {
   }
   publishRoom() {
     const s = this.snapshot;
-    const humans=s?.players.filter(p=>!p.bot)||[];
+    const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
     const capacity=s?.options.capacity||8;
-    const listing=this.visibility === "public" && s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Egg",map:s.options.map,mode:s.options.mode,players:humans.length,capacity,phase:s.phase} : null;
+    const listing=this.visibility === "public" && s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Egg",map:s.options.map,mode:s.options.mode,players:s.royale&&!s.royale.accepting?s.players.filter(p=>p.contestant).length:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase} : null;
     if(relayURL())(this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer)?.publish?.(listing);
     else directory.publish(listing);
   }
   broadcast(state) {
     this.snapshot = state;
+    this.maxConnections=(state.options.capacity||8)-1+(state.royale?8:0);
     if (performance.now() - (this.lastPublish || 0) > 2000) { this.lastPublish = performance.now(); this.publishRoom(); }
     state = {...state, visibility:this.visibility,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,network:{hostId:this.id,members:this.members,chatSequence:this.chatRoom.sequence}};
     const worldVersion=state.royale?`${state.royale.matchId}:${state.round}:${state.royale.lootVersion}:${state.royale.buildVersion}`:null;
@@ -438,10 +440,10 @@ export class Network {
       if (!conn.open || (conn.dataChannel?.bufferedAmount || 0) >= 131072) continue;
       let outgoing=state;
       if(state.royale){
-        const version=state.round+':'+state.royale.lootVersion;
+        const version=state.royale.matchId+':'+state.options.map+':'+state.round+':'+state.royale.lootVersion;
         if(conn.royaleVersion===version){const {loot,chests,...royale}=state.royale;outgoing={...state,royale};}
         conn.royaleVersion=version;
-        const buildVersion=state.round+':'+state.royale.buildVersion;
+        const buildVersion=state.royale.matchId+':'+state.options.map+':'+state.round+':'+state.royale.buildVersion;
         if(conn.buildVersion===buildVersion){const {builds,worldDamage,...royale}=outgoing.royale;outgoing={...outgoing,royale};}
         conn.buildVersion=buildVersion;
       }
@@ -485,8 +487,8 @@ export class Network {
         this.hostHeartbeat=new HostHeartbeat(this.lastState);
         this.callbacks.onStatus?.('New host connected. Match continues.');
       }else if(msg.type==='state'&&welcomed){
-        const s=msg.state;if(s?.version!==VERSION||!Array.isArray(s.players)||s.players.length>20)return;
-        s.players=s.players.map(p=>({...p,...safeProfile(p)}));s.options=matchOptions(s.options);s.winner=safeSystemText(s.winner,'Round complete');
+        const s=msg.state;if(s?.version!==VERSION||!Array.isArray(s.players)||s.players.length>24)return;
+        s.players=s.players.map(p=>({...p,...safeProfile(p)}));s.options=matchOptions(s.options);if(s.royale)s.options.map=isWarmup(s.royale.stage)?'hatchery-atoll':'sunnybreak';s.winner=safeSystemText(s.winner,'Round complete');
         s.events=(s.events||[]).slice(-120).map(e=>{const next={...e};for(const key of ['name','targetName'])if(key in next)next[key]=safeName(next[key]);for(const key of ['text','winner','weapon'])if(key in next)next[key]=safeSystemText(next[key]);return next;});
         this.lastState=performance.now();this.snapshot=s;this.members=s.network?.members||this.members;this.hostId=s.network?.hostId||this.hostId;
         this.hostHeartbeat.contact(this.lastState);
@@ -510,7 +512,7 @@ export class Network {
     const checkpoint=this.lastCheckpoint;
     this.chatRoom.sequence=Math.max(checkpoint.chat?.sequence||0,this.snapshot?.network?.chatSequence||0);this.chatRoom.enabled=this.chatEnabled=checkpoint.chat?.enabled!==false;
     this.chatMuted=checkpoint.chat?.muted||[];this.chatRoom.muted=new Set(this.chatMuted);this.chatRoom.members=new Map(checkpoint.chat?.members||[]);this.chatRoom.reports=new Set(checkpoint.chat?.reports||[]);this.kicked=new Set(checkpoint.kicked||[]);
-    this.maxConnections=(checkpoint.simulation.options.capacity||8)-1;
+    this.maxConnections=(checkpoint.simulation.options.capacity||8)-1+(checkpoint.simulation.options.mode==='royale'?8:0);
     this.callbacks.onHost?.(checkpoint.simulation,[...this.failedHosts]);
     this.lastPublish=0;this.lastCheckpointSent=0;this.claimRoomAddress();
     this.callbacks.onStatus?.('You are now the host. The match continues.');

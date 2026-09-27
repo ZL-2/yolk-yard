@@ -1,3 +1,4 @@
+import {lootModel,gliderModel} from './royale-art.js';
 import {adsFov} from './weapon-presentation.js';
 import {animatePickaxe} from './pickaxe-animation.js';
 import {buildIsland,RoyaleView} from './royale-view.js';
@@ -351,7 +352,7 @@ export class View {
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;
     this.camera.near=map.theme==='royale'?.15:.025;
     this.camera.updateProjectionMatrix();this.scopeCamera.updateProjectionMatrix();
-    (map.theme==='royale'?buildIsland:buildArena)(this.world, map, { block, ball, cylinder, mat, palette });
+    (map.theme==='royale'?buildIsland:buildArena)(this.world, map.authored?{...map,boxes:map.authored}:map, { block, ball, cylinder, mat, palette });
     for (let i = 0; i < 2; i++) {
       const [x, z] = map.bases[i];
       const ring = new THREE.Mesh(
@@ -465,12 +466,13 @@ export class View {
     return this.portraits.get(id);
   }
   shopPortrait(item,angle=0){
-    this.shopPortraits??=new Map();const key=item.id+':'+angle;if(this.shopPortraits.has(key))return this.shopPortraits.get(key);
+    this.shopPortraits??=new Map();const key=(item.previewKey||item.id)+':'+angle;if(this.shopPortraits.has(key))return this.shopPortraits.get(key);
     if(!this.portraitRenderer){this.portraitRenderer=new THREE.WebGLRenderer({alpha:true,antialias:true});this.portraitRenderer.setPixelRatio(1);}
     this.portraitRenderer.setSize(320,320);
     const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0x768697,3));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(-3,5,-4);scene.add(light);
     let model;
-    if(item.slot==='outfit')model=makeEgg({...item.profile,outfit:item.id},-1,false);
+    if(item.starter){const kit={block,ball,cylinder,mat,palette};model=item.slot==='pickaxe'?lootModel({id:'pickaxe',pickaxe:true},kit,{ground:false}):item.slot==='glider'?gliderModel(kit):item.slot==='wrap'?makeBlaster('sprinter'):makeEgg({...item.profile,outfit:''},-1,false);}
+    else if(item.slot==='outfit')model=makeEgg({...item.profile,outfit:item.id},-1,false);
     else if(item.slot==='wrap')model=makeBlaster('sprinter',item.id);
     else if(item.slot==='pickaxe')model=makeShopPickaxe(item.id);
     else if(item.slot==='backbling')model=makeShopBack(item.id);
@@ -853,9 +855,9 @@ export class View {
         if(this.localArms){this.localArms.rotation.x=local.use ? -.35+Math.sin(this.clock*6)*.06 : 0;}
         this.gunGroup.rotation.z+=local.sprinting?.35:0;
         if(local.use){this.gunGroup.position.y+=.08+Math.sin(this.clock*8)*.015;this.gunGroup.rotation.x=-.3;}
-        if(local.flight==='transport'){
+        if(p.flight==='transport'){
           this.camera.position.set(p.x+Math.sin(p.yaw)*24,p.y+16,p.z+Math.cos(p.yaw)*24);this.camera.lookAt(p.x,p.y+3,p.z);this.camera.fov=80;this.camera.updateProjectionMatrix();
-        }else if(local.health>0&&local.flight!=='ground'){
+        }else if(p.health>0&&p.flight!=='ground'){
           this.camera.position.set(p.x+Math.sin(p.yaw)*6,p.y+3.5,p.z+Math.cos(p.yaw)*6);this.camera.rotation.set(Math.min(p.pitch,-.18),p.yaw,0,'YXZ');
         }
       }
@@ -979,7 +981,7 @@ export class View {
           model.position.add(pivot).sub(rotatedPivot);
           model.position.y += bob;
         }
-        if(p.inventory)this.royaleView.animateActor(model,p,this.clock);
+        if(p.inventory)this.royaleView.animateActor(model,p,this.clock,dt);
       }
       for (const [id, model] of this.models)
         if (!seen.has(id)) {

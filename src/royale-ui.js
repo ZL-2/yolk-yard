@@ -1,3 +1,4 @@
+import {getMap} from './maps.js';
 import {buildIcon} from './building-ui.js';
 import {gun} from './data.js';
 import {ITEMS,RARITIES,itemInfo,transportAt,ammoType} from './royale-data.js';
@@ -23,14 +24,14 @@ export class RoyaleUI{
   this.root=document.querySelector('#royale-hud');
  }
  dismissFlight(){this.flightDismissed=true;document.getElementById('royale-flight').hidden=true;}
- slotMarkup(p,inventory=false){return (p.inventory||Array(5).fill(null)).map((item,index)=>{
+ slotMarkup(p,inventory=false){return (p.inventory||Array(6).fill(null)).map((item,index)=>{
   const info=itemInfo(item),rarity=RARITIES[item?.rarity||0];
   return `<button class="royale-slot ${index===p.slot?'selected':''}" data-royale-slot="${index}" ${inventory&&!item?.pickaxe?'draggable="true"':''} style="--rarity:${item?info.color:'#58636c'}" aria-label="Slot ${index+1}: ${escape(info.name)}" aria-pressed="${index===p.slot}"><kbd>${index+1}</kbd>${item?`<img src="${this.preview(item)}" alt="${escape(info.name)}" draggable="false">`:'<span class="empty-slot-mark">＋</span>'}<span class="slot-name">${escape(info.name)}</span>${item?`<b>${item.pickaxe?'∞':item.weapon?item.ammo:item.count+'×'}</b>`:''}${inventory&&item?`<small>${item.weapon?rarity.name:'Utility'}${item.weapon?' · '+'★'.repeat((item.rarity||0)+1):''}</small>`:''}</button>`;
  }).join('');}
  mapHTML(){return `<p class="hint">Choose a landing spot or plan your next rotation. Click the island to mark a waypoint.</p><canvas id="royale-fullmap" class="royale-fullmap" width="720" height="720" aria-label="Sunnybreak island map"></canvas><div class="map-legend"><span>● You</span><span>◯ Safe area</span><span>◌ Next circle</span><span>◆ Supply</span><span>◇ Landmark</span></div><div class="split-actions"><button data-action="royale-clear-marker">Clear marker</button><button class="primary" data-action="resume">RETURN TO GAME</button></div>`;}
  ammoHTML(p){return Object.entries(p.materials||{}).map(([id,count])=>`<div class="inventory-ammo resource-count">${buildIcon(id)}<span>${id}</span><b>${count}</b></div>`).join('')+Object.entries(p.bank||{}).map(([id,count])=>`<div class="inventory-ammo"><img src="${this.preview({id,ammoType:id})}" alt=""><span>${escape(id)}</span><b>${count}</b></div>`).join('');}
  inspectHTML(p){
-  const item=p.inventory[p.slot],info=itemInfo(item);if(item?.pickaxe)return '<div class="inspect-empty"><h3>PICKAXE</h3>Harvest wood, brick and metal. Permanent sixth slot. Cannot be dropped or replaced.</div>';if(!item)return '<div class="inspect-empty">Select an item to inspect it.</div>';
+  const item=p.inventory[p.slot],info=itemInfo(item);if(item?.pickaxe)return '<div class="inspect-empty"><h3>PICKAXE</h3>Harvest wood, brick and metal. Permanent first slot. Cannot be dropped or replaced.</div>';if(!item)return '<div class="inspect-empty">Select an item to inspect it.</div>';
   const rarity=RARITIES[item.rarity||0],w=item.weapon?gun(p):null,def=ITEMS[item.id];
   return `<div class="inspect-heading" style="--rarity:${info.color}"><span>${item.weapon?rarity.name+' · '+info.role:'UTILITY'}</span><h3>${escape(info.name)}</h3><img src="${this.preview(item)}" alt="${escape(info.name)}"></div><p>${escape(w?.desc||({heal:'Restores shell health.',shield:'Restores shield protection.',splash:'Restores nearby shell health and shields.',popper:'A throwable grenade with a short fuse.',impulse:'Launches you into the air.',launchpad:'Place a reusable launch pad.'}[def?.kind]))}</p>${w?`<dl class="weapon-stats"><div><dt>Damage</dt><dd>${(w.damage*w.pellets*(w.burst||1)).toFixed(0)}${w.pellets>1?' total pellets':w.burst?' per burst':''}</dd></div><div><dt>Fire rate</dt><dd>${(1/w.interval).toFixed(1)} / s</dd></div><div><dt>Magazine</dt><dd>${w.magazine}</dd></div><div><dt>Reload</dt><dd>${w.reload.toFixed(2)} s</dd></div><div><dt>Ammo</dt><dd>${ammoType(item.id)}</dd></div><div><dt>Reserve</dt><dd>${p.bank[ammoType(item.id)]||0}</dd></div></dl>`:`<dl class="weapon-stats"><div><dt>Use time</dt><dd>${def?.duration||0}s</dd></div><div><dt>Stack</dt><dd>${item.count} / ${def?.stack||1}</dd></div>${def?.amount?`<div><dt>Restores</dt><dd>${def.amount}</dd></div>`:''}</dl>`}`;
  }
@@ -49,24 +50,24 @@ export class RoyaleUI{
  }
  drawMap(canvas,state,p,full=false){
   if(!canvas||!state.royale)return;
-  const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height,size=512,s=w/size,map=ROYALE_MAP,r=state.royale;
-  const point=(x,z)=>[(x+256)*s,(z+256)*s];
+  const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height,map=getMap(state.options.map),size=map.size*2,s=w/size,r=state.royale,key=map.id+':'+w;
+  const point=(x,z)=>[(x+map.size)*s,(z+map.size)*s];
   c.clearRect(0,0,w,h);
   this.mapBackgrounds??=new Map();
-  if(!this.mapBackgrounds.has(w)){
+  if(!this.mapBackgrounds.has(key)){
    const bg=document.createElement('canvas');bg.width=w;bg.height=h;const b=bg.getContext('2d');
-   for(let z=-256;z<256;z+=2)for(let x=-256;x<256;x+=2){const [px,pz]=point(x,z),height=groundAt(map,x,z);b.fillStyle='#'+terrainColor(map,x,z).toString(16).padStart(6,'0');b.fillRect(px,pz,2*s+1,2*s+1);
+   for(let z=-map.size;z<map.size;z+=2)for(let x=-map.size;x<map.size;x+=2){const [px,pz]=point(x,z),height=groundAt(map,x,z);b.fillStyle='#'+terrainColor(map,x,z).toString(16).padStart(6,'0');b.fillRect(px,pz,2*s+1,2*s+1);
     const shade=Math.max(-.2,Math.min(.18,(groundAt(map,x-2,z-2)-height)*.055));if(Math.abs(shade)>.025){b.fillStyle=shade>0?`rgba(255,249,207,${shade})`:`rgba(24,55,48,${-shade})`;b.fillRect(px,pz,2*s+1,2*s+1);}}
    b.lineJoin='round';b.lineCap='round';for(const road of map.roads){b.strokeStyle=road.kind==='path'?'#bfb88d':'#b1b8a6';b.lineWidth=road.width*s;b.beginPath();road.points.forEach(([x,z],i)=>i?b.lineTo(...point(x,z)):b.moveTo(...point(x,z)));b.stroke();}
    b.fillStyle='#547b5c';for(const t of map.trees){const [x,z]=point(t.x,t.z);b.beginPath();b.arc(x,z,2*s,0,Math.PI*2);b.fill();}
    for(const building of map.buildings){const [x,z]=point(building.x-building.w/2,building.z-building.d/2);b.fillStyle='#415f65';b.fillRect(x+1,z+1,building.w*s,building.d*s);b.fillStyle=building.kind==='factory'?'#acc3c7':building.kind==='farm'?'#c79872':'#ebd3a8';b.fillRect(x,z,building.w*s,building.d*s);}
    for(const bridge of map.boxes.filter(o=>o.kind==='bridge'&&o.h<.5)){const [x,z]=point(bridge.x-bridge.w/2,bridge.z-bridge.d/2);b.fillStyle='#cfb887';b.fillRect(x,z,bridge.w*s,bridge.d*s);}
-   this.mapBackgrounds.set(w,bg);
+   this.mapBackgrounds.set(key,bg);
   }
-  c.drawImage(this.mapBackgrounds.get(w),0,0);
+  c.drawImage(this.mapBackgrounds.get(key),0,0);
   if(!full){c.font='800 8px system-ui';c.textAlign='center';c.fillStyle='#fff5d8';c.strokeStyle='#294f4b';c.lineWidth=2;for(const poi of map.districts){const [x,z]=point(poi.x,poi.z),name=poi.name.split(' ')[0].toUpperCase();c.strokeText(name,x,z-7);c.fillText(name,x,z-7);}}
   if(r.storm?.active){const q=r.storm,[x,z]=point(q.x,q.z);c.save();c.fillStyle='#725ac277';c.beginPath();c.rect(0,0,w,h);c.moveTo(x+q.radius*s,z);c.arc(x,z,q.radius*s,0,Math.PI*2,true);c.fill('evenodd');c.strokeStyle='#f6f5ff';c.lineWidth=full?3:2;c.beginPath();c.arc(x,z,q.radius*s,0,Math.PI*2);c.stroke();const [nx,nz]=point(q.nextX,q.nextZ);c.setLineDash([5,4]);c.strokeStyle='#fff';c.beginPath();c.arc(nx,nz,q.nextRadius*s,0,Math.PI*2);c.stroke();c.restore();}
-  if(r.route&&r.elapsed<r.route.duration){c.save();c.strokeStyle='#ffedb1';c.lineWidth=2;c.setLineDash([6,6]);c.beginPath();c.moveTo(...point(r.route.fromX,r.route.fromZ));c.lineTo(...point(r.route.toX,r.route.toZ));c.stroke();c.restore();const bus=transportAt(r.route,r.elapsed),[x,z]=point(bus.x,bus.z);c.fillStyle='#ffda70';c.fillRect(x-5,z-5,10,10);}
+  if(!r.practice&&r.route&&r.elapsed<r.route.duration){c.save();c.strokeStyle='#ffedb1';c.lineWidth=2;c.setLineDash([6,6]);c.beginPath();c.moveTo(...point(r.route.fromX,r.route.fromZ));c.lineTo(...point(r.route.toX,r.route.toZ));c.stroke();c.restore();const bus=transportAt(r.route,r.elapsed),[x,z]=point(bus.x,bus.z);c.fillStyle='#ffda70';c.fillRect(x-5,z-5,10,10);}
   if(full){for(const landmark of map.landmarks){const [x,z]=point(landmark.x,landmark.z);c.strokeStyle='#fff2b7';c.lineWidth=1.5;c.strokeRect(x-3,z-3,6,6);c.font='600 9px system-ui';c.textAlign='center';c.fillStyle='#ffefc2';c.fillText(landmark.name,x,z+12);}
    c.font='800 13px system-ui';c.textAlign='center';c.strokeStyle='#23453b';c.lineWidth=3;c.fillStyle='#fff9e5';for(const poi of map.districts){const [x,z]=point(poi.x,poi.z);c.strokeText(poi.name.toUpperCase(),x,z-35*s);c.fillText(poi.name.toUpperCase(),x,z-35*s);}}
   for(const chest of r.chests||[])if(chest.supply&&!chest.opened){const [x,z]=point(chest.x,chest.z);c.fillStyle='#ffd377';c.beginPath();c.moveTo(x,z-5);c.lineTo(x+5,z);c.lineTo(x,z+5);c.lineTo(x-5,z);c.closePath();c.fill();}
@@ -75,24 +76,28 @@ export class RoyaleUI{
   c.font=`800 ${full?18:12}px system-ui`;c.textAlign='center';c.fillStyle='#fff';c.fillText('N',w/2,full?23:16);
  }
  update(state,local,watched,label,paused){
-  const active=!!state?.royale;this.root.hidden=!active;document.body.classList.toggle('in-royale',active);
+  const active=!!state?.royale;this.root.hidden=!active;document.body.classList.toggle('in-royale',active);document.body.classList.toggle('in-spawn-island',!!state?.royale?.practice);
   if(!active||!local)return;
   const $=id=>document.getElementById(id),r=state.royale,p=watched||local;
   const matchKey=r.matchId+':'+state.round;if(this.flightMatch!==matchKey){this.flightMatch=matchKey;this.flightDismissed=false;}
   $('royale-flight-close').textContent=label('dismissFlight')+' Close';
-  const closest=ROYALE_MAP.districts.reduce((a,b)=>Math.hypot(b.x-p.x,b.z-p.z)<Math.hypot(a.x-p.x,a.z-p.z)?b:a);
+  const closest=getMap(state.options.map).districts.reduce((a,b)=>Math.hypot(b.x-p.x,b.z-p.z)<Math.hypot(a.x-p.x,a.z-p.z)?b:a);
   const heading=(((-p.yaw*180/Math.PI)%360)+360)%360;
   $('royale-compass').textContent=`${['N','NE','E','SE','S','SW','W','NW'][Math.round(heading/45)%8]}  ${Math.round(heading)}°  ·  ${Math.hypot(closest.x-p.x,closest.z-p.z)<62?closest.name:'Sunnybreak Wilds'}${this.waypoint?'   ◆ '+Math.round(Math.hypot(p.x-this.waypoint.x,p.z-this.waypoint.z))+' m':''}`;
-  $('royale-alive').textContent=r.alive;$('royale-elims').textContent=local.kills||0;$('royale-phase').textContent=r.elapsed<35?'DROP ZONE':`STORM ${r.storm.index+1}`;
+  $('royale-alive').textContent=r.alive;$('royale-elims').textContent=local.kills||0;$('royale-phase').textContent=r.practice?'SPAWN ISLAND':r.elapsed<35?'DROP ZONE':`STORM ${r.storm.index+1}`;
+  $('royale-alive').textContent=r.practice?r.contestants:r.alive;
   this.drawMap($('royale-mini'),state,p);this.drawMap($('royale-fullmap'),state,p,true);
   $('shield').textContent=Math.ceil(p.shield||0);$('shield-fill').style.width=Math.max(0,Math.min(100,p.shield||0))+'%';$('royale-stamina').textContent=Math.ceil(p.stamina||0);$('royale-stamina-fill').style.width=(p.stamina||0)+'%';
   const key=JSON.stringify([p.inventory,p.slot]);if(key!==this.lastKey){$('royale-hotbar').innerHTML=this.slotMarkup(p);this.lastKey=key;}
   this.updateInventory(local);
+  const warmup=r.practice;
+  $('royale-flight-close').hidden=warmup;
   const flight=['transport','dive','glide','launch'].includes(local.flight)&&local.health>0;
-  $('royale-flight').hidden=!flight||!!this.flightDismissed;$('royale-flight').classList.toggle('airborne',local.flight!=='transport');
+  $('royale-flight').hidden=(!flight&&!warmup)||(!warmup&&!!this.flightDismissed);$('royale-flight').classList.toggle('airborne',local.flight!=='transport');
   $('royale-flight-title').textContent=local.flight==='transport'?`${r.elapsed<3?'Doors open in '+Math.ceil(3-r.elapsed):'Choose your landing spot'}${r.elapsed>=3?' · '+Math.ceil(35-r.elapsed)+'s':''}`:local.flight==='dive'?'Freefall':'Shell glider deployed';
   $('royale-flight-help').textContent=local.flight==='transport'?'Open the map to mark a district. Leave the Eggspress when you are ready.':local.flight==='dive'?`${label('forward')} to steer · ${label('jump')} to deploy glider`:`${label('jump')} to dive again at altitude. Your glider opens automatically near the ground.`;
   $('royale-flight-button').hidden=['glide','launch'].includes(local.flight);$('royale-flight-button').disabled=local.flight==='transport'&&r.elapsed<3;$('royale-flight-button').textContent=local.flight==='transport'?`JUMP · ${label('jump')}`:`DEPLOY GLIDER · ${label('jump')}`;
+  if(warmup){$('royale-flight-title').textContent=`HATCHLING ATOLL · ${r.contestants}/${state.options.capacity} eggs`;$('royale-flight-help').textContent=`${r.contestants<2?'Waiting for another egg':'Eggspress departs in '+Math.max(0,Math.ceil(r.queueEnds-state.time))+'s'} · Practice equipment resets at departure`;$('royale-flight-button').hidden=true;}
   const outside=r.storm.active&&Math.hypot(p.x-r.storm.x,p.z-r.storm.z)>r.storm.radius;
   $('royale-storm-warning').textContent=outside?`IN THE STORM · ${Math.ceil(Math.hypot(p.x-r.storm.x,p.z-r.storm.z)-r.storm.radius)} m TO SAFETY`:r.storm.active?`${r.storm.closing?'STORM CLOSING':'STORM CLOSES IN'} ${Math.ceil(r.storm.seconds)}s`:'';
   $('royale-storm-warning').classList.toggle('danger',outside);this.root.classList.toggle('outside-storm',outside);
@@ -100,7 +105,7 @@ export class RoyaleUI{
   $('royale-use-label').textContent=use?`Using ${ITEMS[use.id].name} · ${Math.max(0,use.end-state.time).toFixed(1)}s`:'Searching chest…';
   $('royale-use-fill').style.width=(use?Math.min(1,(state.time-use.start)/(use.end-use.start)):Math.min(1,p.chestProgress/.8))*100+'%';
   let prompt='';if(local.health>0&&local.flight==='ground'&&!paused){
-   const accessible=item=>{if(dist(local,item)>3.2||item.landAt>state.time)return false;const from={x:local.x,y:local.y+.9,z:local.z},dx=item.x-from.x,dy=item.y+.6-from.y,dz=item.z-from.z,len=Math.hypot(dx,dy,dz)||1;return wallDistance(ROYALE_MAP,from,{x:dx/len,y:dy/len,z:dz/len},len)>=len-.15;};
+   const accessible=item=>{if(dist(local,item)>3.2||item.landAt>state.time)return false;const from={x:local.x,y:local.y+.9,z:local.z},dx=item.x-from.x,dy=item.y+.6-from.y,dz=item.z-from.z,len=Math.hypot(dx,dy,dz)||1;return wallDistance(getMap(state.options.map),from,{x:dx/len,y:dy/len,z:dz/len},len)>=len-.15;};
    const chest=r.chests.find(c=>!c.opened&&accessible(c));const item=r.loot.filter(i=>!i.ammoType&&accessible(i)).sort((a,b)=>dist(local,a)-dist(local,b))[0];
    if(chest)prompt=`<kbd>${escape(label('interact'))}</kbd> HOLD TO SEARCH ${chest.supply?'SUPPLY DROP':'CHEST'}`;
    else if(item){const info=itemInfo(item);prompt=`<kbd>${escape(label('interact'))}</kbd> ${escape(info.name)} <span style="color:${info.color}">${item.weapon?RARITIES[item.rarity||0].name: '×'+item.count}</span><small>${local.inventory.every(Boolean)?'Replaces selected slot':'Pick up'}</small>`;}

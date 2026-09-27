@@ -18,9 +18,10 @@ export function reward(wallet,id,amount,label){
 }
 export function ownedLoadout(wallet,profile){return Object.fromEntries(SHOP_SLOTS.map(slot=>[slot,wallet.owned.includes(profile?.[slot])&&shopItem(profile[slot])?.slot===slot?profile[slot]:'']));}
 export class EggWallet {
- constructor(storage,legacyEggs=0){this.storage=storage;this.legacyEggs=legacyEggs;this.value=this.read();this.error='';try{this.persist(this.value);}catch(error){this.error=error.message;}}
+ constructor(storage,legacyEggs=0){this.listeners=new Set();this.storage=storage;this.legacyEggs=legacyEggs;this.value=this.read();this.error='';try{this.persist(this.value);}catch(error){this.error=error.message;}}
  read(){let raw;try{raw=JSON.parse(this.storage.getItem(WALLET_KEY));}catch{}return normalizeWallet(raw,this.legacyEggs);}
- persist(next){try{this.storage.setItem(WALLET_KEY,JSON.stringify(next));}catch{throw Error('Browser storage is unavailable. Nothing was charged. Allow storage before buying.');}this.value=next;return next;}
+ persist(next){try{this.storage.setItem(WALLET_KEY,JSON.stringify(next));}catch{throw Error('Browser storage is unavailable. Nothing was charged. Allow storage before buying.');}this.value=next;for(const listener of this.listeners)listener(next);return next;}
+ subscribe(listener){this.listeners.add(listener);return ()=>this.listeners.delete(listener);}
  async change(fn){const run=()=>this.persist(fn(this.read()));return globalThis.navigator?.locks?globalThis.navigator.locks.request(WALLET_KEY,run):run();}
  buy(id){return this.change(w=>purchase(w,id));}
  award(id,amount,label){return this.change(w=>reward(w,id,amount,label));}
@@ -29,7 +30,8 @@ export class EggWallet {
 // do not count. Elimination rewards are capped at 30 per round.
 export class MatchEarnings {
  constructor(){this.key='';}
- sample({key,dt,active,kills,finished,won,place,doubleEggs=false},pay){
+ sample({key,dt,eligible=true,active,kills,finished,won,place,doubleEggs=false},pay){
+  if(!eligible)return;
   if(this.key!==key){this.key=key;this.id=globalThis.crypto.randomUUID();this.seconds=0;this.minutes=0;this.kills=kills||0;this.rewardedKills=0;this.finished=false;this.total=0;}
   const grant=(suffix,amount,label)=>{this.total+=amount;pay(this.id+':'+suffix,amount,label);};
   if(active&&!finished)this.seconds+=Math.min(.1,Math.max(0,dt));

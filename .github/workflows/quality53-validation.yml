@@ -1,0 +1,30 @@
+name: Quality 53 focused browser verification
+on:
+  push:
+    branches: [quality53-validation]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Gameplay and cosmetic browser flows
+        if: "!contains(github.event.head_commit.message, '[live-check]')"
+        run: node scripts/gameplay-browser-check.mjs && node scripts/egg-shop-browser-check.mjs
+      - name: Verify published Pages build and playable flow
+        if: "contains(github.event.head_commit.message, '[live-check]')"
+        run: node scripts/quality53-live-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality53-browser-evidence
+          path: test-results
+          retention-days: 7

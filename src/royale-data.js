@@ -13,7 +13,7 @@ export const ITEMS={
  flask:{name:'Shield Flask',kind:'shield',amount:50,cap:100,duration:4,stack:3,color:'#81a5ff',icon:'◈'},
  splash:{name:'Splash Egg',kind:'splash',amount:30,duration:.55,stack:4,color:'#74ebd9',icon:'✦'},
  popper:{name:'Popper',kind:'popper',duration:.35,stack:6,color:'#c091ef',icon:'●'},
- impulse:{name:'Impulse Egg',kind:'impulse',duration:.35,stack:3,color:'#ec9fff',icon:'◎'},
+ impulse:{name:'Shock Egg',kind:'impulse',duration:.35,stack:3,color:'#ec9fff',icon:'◎'},
  launchpad:{name:'Launch Nest',kind:'launchpad',duration:.6,stack:2,color:'#f9ca65',icon:'↟'},
 };
 export const itemInfo=item=>!item?{name:'Empty slot',color:'#7c8a98',icon:''}:item.pickaxe?{name:'Pickaxe',color:'#7aaddb',icon:''}:item.weapon?{...weapon(item.id),color:RARITIES[item.rarity||0].color,icon:'',name:weapon(item.id).name}:ITEMS[item.id]||{name:item.id,color:'#d6caa5',icon:'▥'};

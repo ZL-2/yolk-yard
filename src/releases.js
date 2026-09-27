@@ -1,4 +1,12 @@
 export const RELEASE_NOTES = [
+  { number: "43", title: "Hatch, Drop & Outplay", changes: [
+    "Warm up on playable Hatchling Atoll before the Eggspress. One authoritative countdown moves every contestant to Sunnybreak with fresh health, gear and materials. Practice actions never earn match rewards.",
+    "Battle Bus departure closes contestant admission. Active public matches offer Spectate, with eight separate spectator seats, protected win conditions and host-migration continuity.",
+    "Landing-based fall damage, one-landing Shock Egg protection without automatic gliders, and falling loot that settles on surviving floors after edits or destruction. Launch Nests retain intentional glider redeployment.",
+    "Shared bot intelligence now uses sight, sound, fading threat memory, cover, weapon ranges, team callouts and stuck recovery. Royale bots loot real pickups and chests, heal, harvest, build and rotate before the storm. All four difficulty names remain; harder bots get no extra supplies or hidden-player knowledge.",
+    "An original Shell Market design, six actual equipped Locker previews, compact account Eggs, animated arena streak upgrades with real timers, and smoother glider deployment, banking and landing.",
+    "Pickaxe is now slot 1; five items use slots 2–6. P is the dedicated pickaxe shortcut. L still closes flight tips. Controls remain rebindable. Refresh before joining updated rooms."
+  ] },
   { number: "42", title: "Sunnybreak Reborn", changes: [
     "A rebuilt island with nine named districts, 17 smaller landmarks, hills, river crossings, a tidal harbor, wooded ridges and a quarry. Sixty-one searchable buildings have 100 interior floors, roof routes, balconies and furnished rooms.",
     "Eleven remodeled blasters share detailed held, world and upright ground-loot representations. Five ammo pickups now have distinct cartridge, shell and rocket silhouettes.",
