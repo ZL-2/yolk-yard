@@ -1,13 +1,21 @@
-name: Quality 53 focused browser verification
+name: Quality 54 live multiplayer on independent runners
 on:
   push:
     branches: [quality53-validation]
 permissions:
   contents: read
+  actions: read
+concurrency:
+  group: yolk-live-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [host, guest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,15 +24,42 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Gameplay and cosmetic browser flows
-        if: "!contains(github.event.head_commit.message, '[live-check]')"
-        run: node scripts/gameplay-browser-check.mjs && node scripts/egg-shop-browser-check.mjs
-      - name: Verify published Pages build and playable flow
-        if: "contains(github.event.head_commit.message, '[live-check]')"
-        run: node scripts/quality53-live-check.mjs
+      - name: Prepare independent browser client
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROLE: ${{ matrix.role }}
+        run: |
+          mkdir -p test-results/distributed
+          node scripts/quality54-distributed-check.mjs "$ROLE" > "test-results/distributed/$ROLE.log" 2>&1 &
+          for i in $(seq 1 120); do
+            if test -f "test-results/distributed/$ROLE-ready.json"; then exit 0; fi
+            if test -f "test-results/distributed/$ROLE-result.json"; then cat "test-results/distributed/$ROLE.log"; exit 1; fi
+            sleep 2
+          done
+          cat "test-results/distributed/$ROLE.log"
+          exit 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quality54-${{ matrix.role }}-ready
+          path: test-results/distributed/${{ matrix.role }}-ready.json
+          retention-days: 1
+      - name: Complete the live gameplay checks
+        env:
+          ROLE: ${{ matrix.role }}
+        run: |
+          for i in $(seq 1 180); do
+            if test -f "test-results/distributed/$ROLE-result.json"; then
+              cat "test-results/distributed/$ROLE.log"
+              node -e "process.exit(JSON.parse(require('fs').readFileSync('test-results/distributed/'+process.env.ROLE+'-result.json')).ok?0:1)"
+              exit $?
+            fi
+            sleep 2
+          done
+          cat "test-results/distributed/$ROLE.log"
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: quality53-browser-evidence
-          path: test-results
+          name: quality54-${{ matrix.role }}-report
+          path: test-results/distributed/
           retention-days: 7
