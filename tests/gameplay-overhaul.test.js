@@ -37,6 +37,7 @@ test('late join is spectator-only at capacity; forged entry/input/build/pickup r
  s.leavePlayer(guest.id);assert.equal(s.alive,2);assert.equal(s.players.size,2);
  for(let i=0;i<4;i++)assert.ok(s.admitPlayer('observer-'+i,{name:'Observer '+i})?.lateSpectator);
  assert.equal(s.admitPlayer('overflow',{name:'Overflow'}),null);assert.equal(s.alive,2);
+ s.phase='results';s.stage='finished';s.startRound();assert.equal([...s.players.values()].filter(p=>p.contestant).length,2);assert.equal([...s.players.values()].filter(p=>p.lateSpectator).length,4);
 });
 
 test('ordinary landing damage uses the fall apex, respects small jumps, higher landing floors and shields',()=>{
