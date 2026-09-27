@@ -4,7 +4,7 @@ import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,harvestDefinition,buildStats,
 import {PIECES,pieceBoxes,validEdit,editRay,wallPattern} from './building-shapes.js';
 export {MATERIALS,GRID,COST,CAP,PIECES,pieceBoxes};
 export const pickaxe=()=>({id:'pickaxe',pickaxe:true,count:1,rarity:0});
-export const inventory=()=>[null,null,null,null,null,pickaxe()];
+export const inventory=()=>[pickaxe(),null,null,null,null,null];
 export function materialFor(b,map){
  const prop=map?.props?.find(p=>p.x===b.x&&p.z===b.z);
  if(b.kind==='tree'||['crate','bench'].includes(prop?.kind)||b.kind==='shelter')return 'wood';
@@ -43,7 +43,7 @@ export function aimedObject(map,p,range=5){
  return hit?.box?hit:null;
 }
 export function rebuildMap(sim){
- sim.map.boxes=[...sim.worldBoxes.filter(b=>!sim.worldDamage[b.objectId]?.destroyed),...sim.builds.flatMap(pieceBoxes)];invalidateCollision(sim.map);
+ sim.map.boxes=[...sim.worldBoxes.filter(b=>!sim.worldDamage[b.objectId]?.destroyed),...sim.builds.flatMap(pieceBoxes)];invalidateCollision(sim.map);sim.lootSupportDirty=true;sim.navigationRevision=(sim.navigationRevision||0)+1;
 }
 export function resetBuilding(sim){
  sim.worldBoxes=authoredBoxes(sim.map);sim.worldDamage={};sim.builds=[];sim.buildId=0;sim.buildVersion=0;rebuildMap(sim);
@@ -71,7 +71,7 @@ export function damageObject(sim,box,amount,harvester=null){
   harvester.materials[material]=(harvester.materials[material]||0)+earned;
   if(earned){harvester.lastHarvest={material,amount:earned,time:sim.time};sim.emit('harvest',{player:harvester.id,material,amount:earned,x:box.x,y:box.y+1,z:box.z});}
  }
- if(object.health<=0){object.destroyed=true;if(built)sim.builds=sim.builds.filter(b=>b!==built);sim.emit('royale-fx',{kind:'break',x:box.x,y:box.y,z:box.z});rebuildMap(sim);collapse(sim);for(const item of [...sim.loot,...sim.chests]){let floor=groundAt(sim.map,item.x,item.z);for(const b of sim.map.boxes)if(Math.abs(item.x-b.x)<=b.w/2&&Math.abs(item.z-b.z)<=b.d/2&&b.y+b.h<=item.y+.1)floor=Math.max(floor,b.y+b.h);if(item.y>floor+.1){item.y=floor;sim.lootVersion++;}}}
+ if(object.health<=0){object.destroyed=true;if(built)sim.builds=sim.builds.filter(b=>b!==built);sim.emit('royale-fx',{kind:'break',x:box.x,y:box.y,z:box.z});rebuildMap(sim);collapse(sim);}
  sim.buildVersion++;
 }
 export function swingPickaxe(sim,p){
@@ -96,7 +96,7 @@ export function buildingTick(sim,p,input){
   }
   return true;
  }
- if(p.slot===5){if(input.fire)swingPickaxe(sim,p);return true;}
+ if(p.slot===0){if(input.fire)swingPickaxe(sim,p);return true;}
  return false;
 }
 export function targetBuild(map,builds,p){

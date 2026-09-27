@@ -1,3 +1,4 @@
+import {tickLootMotion} from '../src/loot-motion.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ROYALE_MAP as map} from '../src/royale-map.js';
@@ -9,7 +10,7 @@ import {RoyaleSimulation} from '../src/royale.js';
 import {ammoType} from '../src/royale-data.js';
 import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
 import {damageObject} from '../src/building.js';
-const setup=seed=>{const s=new RoyaleSimulation({capacity:4,bots:0,fill:false,seed});s.addPlayer('host',{name:'Host'});s.addPlayer('guest',{name:'Guest'});s.startRound();return s;};
+const setup=seed=>{const s=new RoyaleSimulation({capacity:4,bots:0,fill:false,seed});s.addPlayer('host',{name:'Host'});s.addPlayer('guest',{name:'Guest'});s.startRound();s.beginBattle();return s;};
 test('all POIs and landmarks have supported, unobstructed loot across their floors',()=>{
  for(const p of [...map.floorLoot,...map.chests])assert.ok(validLootPoint(map,p,p.id.includes('chest')?.8:.7),p.id);
  for(const p of [...map.districts,...map.landmarks]){assert.ok(map.floorLoot.filter(a=>a.poi===p.id).length>=2,p.name);assert.ok(map.chests.some(a=>a.poi===p.id),p.name);}
@@ -35,8 +36,8 @@ test('match loot varies, restores exactly, pairs ammunition and survives support
  const restored=new RoyaleSimulation(a.options).restore(a.checkpoint());assert.deepEqual(restored.loot,a.loot);assert.deepEqual(restored.chests,a.chests);
  assert.equal(restored.random(),a.random());
  const high=a.loot.find(i=>i.y>groundAt(a.map,i.x,i.z)+3),support=a.map.boxes.find(b=>Math.abs(b.y+b.h-high.y)<.01&&Math.abs(b.x-high.x)<b.w/2&&Math.abs(b.z-high.z)<b.d/2);
- const uid=high.uid,before=a.loot.length;assert.ok(support);damageObject(a,support,10000);assert.equal(a.loot.length,before);assert.equal(a.loot.filter(i=>i.uid===uid).length,1);assert.ok(validLootPoint(a.map,high));
- a.phase='results';a.startRound();assert.notDeepEqual(a.loot,same.loot);assert.ok(a.chests.every(c=>!c.opened&&c.contents.length===3));assert.ok(a.loot.every(i=>validLootPoint(a.map,i)));
+ const uid=high.uid,before=a.loot.length;assert.ok(support);damageObject(a,support,10000);assert.equal(a.loot.length,before);assert.equal(a.loot.filter(i=>i.uid===uid).length,1);tickLootMotion(a);a.time+=3;tickLootMotion(a);assert.ok(validLootPoint(a.map,high));
+ a.phase='results';a.startRound();a.beginBattle();assert.notDeepEqual(a.loot,same.loot);assert.ok(a.chests.every(c=>!c.opened&&c.contents.length===3));assert.ok(a.loot.every(i=>validLootPoint(a.map,i)));
 });
 test('pickup deltas stay small after intervening movement frames and preserve removals',()=>{
  const items=Array.from({length:700},(_,uid)=>({uid,id:'sprinter',x:uid,y:0,z:4,weapon:true}));

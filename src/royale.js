@@ -1,3 +1,7 @@
+import {SPAWN_ISLAND} from './spawn-island.js';
+import {ROYALE_PHASES as RP,isWarmup,acceptsContestants,MAX_SPECTATORS} from './royale-phases.js';
+import {launchPlayer,resetAirborne,fallDamage} from './airborne.js';
+import {startLootFall,tickLootMotion} from './loot-motion.js';
 import {seedIslandLoot,rollChest,rollItem,placeLoot,supportBelow} from './royale-loot.js';
 import {inventory,resetBuilding,rebuildMap,buildingTick,editBuilding,damageObject,constructionTick,toggleDoor} from './building.js';
 import {ROYALE_MAP} from './royale-map.js';
@@ -13,24 +17,32 @@ import {ITEMS,ammoType,AMMO_CAPS,makeStorm,stormAt,makeFlight,transportAt} from 
 export class RoyaleSimulation extends Simulation {
  constructor(options={}){
   super({...options,mode:'royale'});this.map={...ROYALE_MAP,boxes:(ROYALE_MAP.authored||ROYALE_MAP.boxes).map(b=>({...b}))};resetBuilding(this);this.nav=navigation(ROYALE_MAP);this.matchId=globalThis.crypto.randomUUID();this.maxPlayers=this.options.capacity;
-  this.loot=[];this.chests=[];this.pads=[];this.lootId=0;this.lootVersion=0;this.startedAt=0;this.elapsed=0;this.alive=0;this.placements=[];this.supplyAt=135;this.queueEnds=0;
+  this.loot=[];this.chests=[];this.pads=[];this.lootId=0;this.lootVersion=0;this.startedAt=0;this.elapsed=0;this.alive=0;this.placements=[];this.supplyAt=135;this.queueEnds=0;this.stage=RP.WAITING;this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
  }
  addPlayer(id,profile,bot=false){
   if(this.players.has(id))return this.players.get(id);
-  const playing=this.phase==='playing',capacity=this.options.capacity;
-  if(this.players.size>=(capacity))return null;
-  this.maxPlayers=capacity;
+  const spectator=!acceptsContestants(this.stage),capacity=this.options.capacity;
+  if(spectator? [...this.players.values()].filter(p=>p.lateSpectator).length>=MAX_SPECTATORS : [...this.players.values()].filter(p=>p.contestant).length>=capacity)return null;
+  this.maxPlayers=capacity+MAX_SPECTATORS;
   const p=super.addPlayer(id,profile,bot);if(!p)return null;
-  p.materials={wood:0,brick:0,metal:0};p.slot=5;p.inventory=inventory();p.ammo=Array(6).fill(0);p.reserve=Array(6).fill(0);p.accuracyState=Array.from({length:6},()=>({}));
-  p.bank={light:0,medium:0,shells:0,heavy:0,rockets:0};p.shield=0;p.stamina=100;p.flight='lobby';p.use=null;p.place=0;p.eliminated=false;p.spectating=playing;p.awaitingEntry=false;p.health=playing?0:100;
+  p.materials={wood:0,brick:0,metal:0};p.slot=0;p.inventory=inventory();p.ammo=Array(6).fill(0);p.reserve=Array(6).fill(0);p.accuracyState=Array.from({length:6},()=>({}));
+  p.bank={light:0,medium:0,shells:0,heavy:0,rockets:0};p.shield=0;p.stamina=100;p.flight=spectator?'out':'ground';p.use=null;p.place=0;p.eliminated=false;p.spectating=spectator;p.lateSpectator=spectator;p.contestant=!spectator;p.awaitingEntry=false;p.health=spectator?0:100;
+  if(!spectator&&this.map.id===SPAWN_ISLAND.id)this.spawnWarmup(p);
   return p;
  }
- spawn(p){
-  // Entrants wait in the lobby, then start on the transport. Arena spawn
-  // searches are both irrelevant here and expensive over the whole island.
-  if(!p.inventory){p.health=100;p.grounded=true;return;}
-  // No external action can turn a spawn call into a second Royale life.
-  if(this.phase==='playing')return;
+ spawn(p){if(!p.inventory){p.health=100;p.grounded=true;return;}if(isWarmup(this.stage))this.spawnWarmup(p);}
+ spawnWarmup(p){
+  const points=[...SPAWN_ISLAND.spawns].sort(()=>this.random()-.5);
+  const point=points.find(([x,z])=>![...this.players.values()].some(o=>o!==p&&o.health>0&&Math.hypot(o.x-x,o.z-z)<2))||points[0];
+  Object.assign(p,{x:point[0],z:point[1],y:groundAt(SPAWN_ISLAND,...point),vy:0,grounded:true,flight:'ground',health:100,shield:0,stamina:100,slot:0,spectating:false,contestant:true,lateSpectator:false,awaitingEntry:false,kills:0,points:0,streak:0,materials:{wood:500,brick:500,metal:500},inventory:inventory(),use:null,brain:null});
+  p.inventory[1]={id:'sprinter',weapon:true,count:1,rarity:0,ammo:weapon('sprinter').magazine};
+  p.inventory[2]={id:'scatter',weapon:true,count:1,rarity:0,ammo:weapon('scatter').magazine};
+  p.bank={light:0,medium:180,shells:40,heavy:0,rockets:0};resetAirborne(p);this.syncInventory(p);
+ }
+ addBots(){
+  const humans=[...this.players.values()].filter(p=>!p.bot).length,target=Math.max(0,Math.min(this.options.capacity-humans,this.options.fill?this.options.capacity:this.options.bots));
+  let count=[...this.players.values()].filter(p=>p.bot).length,index=0;
+  while(count<target){const id='bot-'+index++;if(this.players.has(id))continue;const p=this.addPlayer(id,{name:this.uniqueBotName(['Benedict','Sunny','Omelette','Poach','Custard'][count%5]),...randomAppearance(this.random)},true);if(!p)break;count++;}
  }
  setProfile(id,profile){
   return super.setProfile(id,profile);
@@ -45,20 +57,31 @@ export class RoyaleSimulation extends Simulation {
   for(const p of [...this.players.values()])if(p.bot)this.players.delete(p.id);
   const humans=[...this.players.values()];
   const count=Math.min(this.options.capacity-humans.slice(0,this.options.capacity).length,this.options.fill?this.options.capacity: this.options.bots);
-  if(Math.min(humans.length,this.options.capacity)+Math.max(0,count)<2){this.emit('notice',{text:'Invite another egg or add a bot to launch.'});return false;}
+  this.stage=RP.WAITING;
   this.maxPlayers=this.options.capacity;const savedBots=this.options.bots;this.options.bots=Math.max(0,count);this.addBots();this.options.bots=savedBots;
+  this.matchId=globalThis.crypto.randomUUID();this.round++;this.phase='playing';this.stage=RP.ISLAND;this.queueEnds=this.time+30;this.startedAt=0;this.elapsed=0;this.winner='';this.winnerId=null;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.chests=[];this.lootId=0;this.lootVersion++;this.pads=[];this.alive=0;this.remaining=0;
+  this.map={...SPAWN_ISLAND,boxes:SPAWN_ISLAND.boxes.map(b=>({...b}))};resetBuilding(this);this.nav=navigation(SPAWN_ISLAND);this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
+  for(const [index,p]of [...this.players.values()].entries()){if(index<this.options.capacity)this.spawnWarmup(p);else Object.assign(p,{health:0,contestant:false,lateSpectator:true,spectating:true,flight:'out'});}
+  this.emit('warmup',{round:this.round});return true;
+ }
+ beginBattle(){
+  if(!isWarmup(this.stage)||this.phase!=='playing')return false;
+  const seats=[...this.players.values()].filter(p=>p.contestant);
+  if(seats.length<2){this.queueEnds=this.time+10;this.stage=RP.ISLAND;return false;}
+  this.stage=RP.BUS;
   this.map={...ROYALE_MAP,boxes:(ROYALE_MAP.authored||ROYALE_MAP.boxes).map(b=>({...b}))};resetBuilding(this);
-  this.phase='playing';this.round++;this.startedAt=this.time;this.elapsed=0;this.winner='';this.winnerId=null;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.lootId=0;this.lootVersion++;this.pads=[];this.supplyAt=135;this.queueEnds=0;
+  this.phase='playing';this.startedAt=this.time;this.elapsed=0;this.winner='';this.winnerId=null;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.lootId=0;this.lootVersion++;this.pads=[];this.supplyAt=135;this.queueEnds=0;
   this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);this.remaining=0;
   const landingSpots=this.map.floorLoot.filter((point,index)=>index%3===0&&!point.roof);
-  const seats=[...this.players.values()].sort((a,b)=>Number(a.bot)-Number(b.bot));
   for(const [index,p] of seats.entries()){
-   const contestant=index<this.options.capacity;
-   Object.assign(p,{health:contestant?100:0,shield:0,stamina:100,sprintRest:0,exhausted:false,sprinting:false,flight:contestant?'transport':'out',flightLatch:false,grounded:false,eliminated:!contestant,spectating:!contestant,awaitingEntry:false,spawnRequested:false,place:0,eliminatedAt:null,kills:0,deaths:0,points:0,streak:0,slot:5,materials:{wood:0,brick:0,metal:0},building:false,swingAt:-100,nextBuild:0,nextHarvest:0,poppers:0,reloadEnd:0,burstLeft:0,nextShot:0,fireLatch:false,shieldUntil:0,lastDamage:-100,respawnAt:0,killerId:null,crown:null,inventory:inventory(),ammo:Array(6).fill(0),reserve:Array(6).fill(0),accuracyState:Array.from({length:6},()=>({})),bank:{light:0,medium:0,shells:0,heavy:0,rockets:0},use:null,chestId:null,chestProgress:0,interactLatch:false,dropLatch:false,useLatch:false,botThink:0,botPath:[],botIntent:null,botIntentAt:0,brain:null,botDrop:4+this.random()*27,botLand:landingSpots[Math.floor(index*landingSpots.length/this.options.capacity)%landingSpots.length]});
-   Object.assign(p,transportAt(this.route,0));p.pitch=0;p.vy=0;
+   const contestant=p.contestant;
+   Object.assign(p,{health:contestant?100:0,shield:0,stamina:100,sprintRest:0,exhausted:false,sprinting:false,flight:contestant?'transport':'out',flightLatch:false,grounded:false,eliminated:!contestant,spectating:!contestant,awaitingEntry:false,spawnRequested:false,place:0,eliminatedAt:null,kills:0,deaths:0,points:0,streak:0,slot:0,materials:{wood:0,brick:0,metal:0},building:false,swingAt:-100,nextBuild:0,nextHarvest:0,poppers:0,reloadEnd:0,burstLeft:0,nextShot:0,fireLatch:false,shieldUntil:0,lastDamage:-100,respawnAt:0,killerId:null,crown:null,inventory:inventory(),ammo:Array(6).fill(0),reserve:Array(6).fill(0),accuracyState:Array.from({length:6},()=>({})),bank:{light:0,medium:0,shells:0,heavy:0,rockets:0},use:null,chestId:null,chestProgress:0,interactLatch:false,dropLatch:false,useLatch:false,botThink:0,botPath:[],botIntent:null,botIntentAt:0,brain:null,botDrop:4+this.random()*27,botLand:landingSpots[Math.floor(index*landingSpots.length/this.options.capacity)%landingSpots.length]});
+   const routeDx=this.route.toX-this.route.fromX,routeDz=this.route.toZ-this.route.fromZ;
+   p.botDrop=clamp(((p.botLand.x-this.route.fromX)*routeDx+(p.botLand.z-this.route.fromZ)*routeDz)/(routeDx*routeDx+routeDz*routeDz)*this.route.duration+this.random()*1.4-.7,3.2,32);
+   resetAirborne(p);Object.assign(p,{damageUntil:0,eggsUntil:0,miniUntil:0,streakArmor:0,restockUntil:0,bodyScale:1,nextLaunch:0,swapLatch:false,jumpLatch:false,botStuck:null});p.contestant=contestant;p.lateSpectator=false;Object.assign(p,transportAt(this.route,0));p.pitch=0;p.vy=0;
   }
   this.alive=seats.filter(p=>p.health>0).length;
-  seedIslandLoot(this);
+  this.nav=navigation(ROYALE_MAP);seedIslandLoot(this);
   this.emit('round',{round:this.round});this.emit('royale-cue',{cue:'transport-horn'});return true;
  }
  randomGun(){return rollItem(this.random,'ground','weapon').id;}
@@ -66,7 +89,7 @@ export class RoyaleSimulation extends Simulation {
   if(this.loot.length>=2400)return null;
   const supported={...point,y:supportBelow(this.map,point.x,point.z,point.y??groundAt(this.map,point.x,point.z))};
   const spot=placeLoot(this.map,supported,avoid.length?[...this.loot,...avoid]:this.loot);if(!spot)return null;
-  const drop={...item,uid:++this.lootId,...spot};this.loot.push(drop);this.lootVersion++;return drop;
+  const drop={...item,uid:++this.lootId,...spot};delete drop.motion;delete drop.spawnFrom;drop.y=Math.max(spot.y,point.y??spot.y);this.loot.push(drop);startLootFall(this,drop);this.lootVersion++;return drop;
  }
  dropWeapon(point,id,rarity=0,ammo=weapon(id).magazine){return this.dropLoot(point,{id,weapon:true,rarity,count:1,ammo});}
  dropAmmo(point,type,count){return this.dropLoot(point,{id:type,ammoType:type,count,rarity:0});}
@@ -81,7 +104,7 @@ export class RoyaleSimulation extends Simulation {
   p.reserve=p.inventory.map(i=>i?.weapon?p.bank[ammoType(i.id)]:0);
  }
  dropSlot(p,index=p.slot){
-  const item=p.inventory[index];if(!item||index===5)return;
+  const item=p.inventory[index];if(!item||index===0)return;
   // Drop at the feet: this always remains on the same reachable collision surface.
   if(!this.dropLoot(p,item))return false;p.inventory[index]=null;p.reloadEnd=0;p.burstLeft=0;p.use=null;this.syncInventory(p);
   this.emit('royale-cue',{player:p.id,cue:'item-drop',x:p.x,y:p.y,z:p.z});
@@ -93,8 +116,8 @@ export class RoyaleSimulation extends Simulation {
   let slot=!item.weapon?p.inventory.findIndex(i=>i?.id===item.id&&i.count<(ITEMS[i.id]?.stack||1)):-1;
   if(slot>=0){const add=Math.min(item.count,ITEMS[item.id].stack-p.inventory[slot].count);p.inventory[slot].count+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;}
   else {
-   slot=p.inventory.findIndex(i=>!i);if(slot<0){slot=p.slot===5?0:p.slot;if(this.dropSlot(p,slot)===false)return false;}
-   const {uid,x,y,z,...entry}=item;p.inventory[slot]={...entry};this.removeLoot(item);
+   slot=p.inventory.findIndex(i=>!i);if(slot<0){slot=p.slot===0?1:p.slot;if(this.dropSlot(p,slot)===false)return false;}
+   const {uid,x,y,z,motion,spawnFrom,spawnAt,...entry}=item;p.inventory[slot]={...entry};this.removeLoot(item);
    if(!p.inventory[p.slot] || p.inventory.filter(i=>i&&!i.pickaxe).length===1)p.slot=slot;
    beginEquip(p,this.time,true);
   }
@@ -104,7 +127,7 @@ export class RoyaleSimulation extends Simulation {
   if(!this.chests.includes(chest)||p.health<=0||p.flight!=='ground'||chest.opened||!this.accessible(p,chest,3.3))return false;
   chest.opened=true;this.lootVersion++;
   const contents=chest.contents||rollChest(this.random,chest.supply?'supply':chest.source||'chest');
-  for(const item of contents){const drop=this.dropLoot(chest,item,[chest]);if(drop){drop.spawnAt=this.time;drop.spawnFrom={x:chest.x,y:chest.y+.65,z:chest.z};}}
+  for(const item of contents){const drop=this.dropLoot({...chest,y:chest.y+.7},item,[chest]);if(drop){drop.spawnAt=this.time;drop.spawnFrom={x:chest.x,y:chest.y+.65,z:chest.z};}}
   delete chest.contents;
   this.emit('royale-cue',{cue:'chest-open',player:p.id,x:chest.x,y:chest.y,z:chest.z});return true;
  }
@@ -140,7 +163,7 @@ export class RoyaleSimulation extends Simulation {
    this.emit('royale-fx',{kind:'splash',x:p.x,y:p.y,z:p.z});
   }else if(def.kind==='popper'){this.launch(p,true);}
   else if(def.kind==='impulse'){
-   p.flight='launch';p.vy=28;p.grounded=false;p.flightLatch=true;
+   const d=direction(p.yaw);launchPlayer(p,{source:'shockwave',vy:28,vx:d.x*16,vz:d.z*16});
    this.emit('royale-fx',{kind:'impulse',x:p.x,y:p.y,z:p.z});
   }else if(def.kind==='launchpad'){
    this.pads.push({id:'pad-'+this.lootId++,x:p.x,y:p.y,z:p.z,until:this.time+180});
@@ -155,9 +178,9 @@ export class RoyaleSimulation extends Simulation {
   super.fire(p,burst);item.ammo=p.ammo[p.slot];
  }
  damage(victim,attacker,amount,source,precision=false,shotId=null){
-  if(victim.health<=0||victim.flight==='transport')return;
+  if(victim.health<=0||victim.spectating||isWarmup(this.stage)||victim.flight==='transport')return;
   amount=Math.max(0,amount);const old=victim.health;let absorbed=0;
-  if(source!=='Storm'&&victim.shield>0){absorbed=Math.min(victim.shield,amount);victim.shield-=absorbed;amount-=absorbed;
+  if(source!=='Storm'&&source!=='Fall'&&victim.shield>0){absorbed=Math.min(victim.shield,amount);victim.shield-=absorbed;amount-=absorbed;
    this.emit('royale-cue',{cue:victim.shield===0?'shield-break':'shield-hit',player:victim.id,x:victim.x,y:victim.y,z:victim.z});
   }
   this.cancelUse(victim);victim.chestProgress=0;victim.lastDamage=this.time;
@@ -168,7 +191,7 @@ export class RoyaleSimulation extends Simulation {
  eliminate(p){
   if(p.eliminated)return;
   p.eliminated=true;p.eliminatedAt=this.time;p.place=this.alive;p.flight='out';p.spectating=true;p.use=null;p.reloadEnd=0;p.burstLeft=0;
-  for(let i=0;i<5;i++)if(p.inventory[i])this.dropSlot(p,i);
+  for(let i=1;i<6;i++)if(p.inventory[i])this.dropSlot(p,i);
   for(const [type,count] of Object.entries(p.bank))if(count>0)this.dropAmmo(p,type,count);
   for(const [material,count] of Object.entries(p.materials))if(count>0)this.dropLoot(p,{id:material,resource:material,count});p.materials={wood:0,brick:0,metal:0};
   p.bank={light:0,medium:0,shells:0,heavy:0,rockets:0};this.syncInventory(p);this.inputs.delete(p.id);
@@ -178,17 +201,17 @@ export class RoyaleSimulation extends Simulation {
  admitPlayer(id,profile){
   if(this.players.has(id))return this.players.get(id);
   if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;
-  if(this.phase!=='playing')return super.admitPlayer(id,profile);
-  const bot=[...this.players.values()].find(p=>p.bot&&p.health>0&&!p.spectating)||[...this.players.values()].find(p=>p.bot);
-  if(!bot){if(this.players.size>=this.options.capacity)return null;return this.addPlayer(id,profile);}
-  this.players.delete(bot.id);this.inputs.delete(bot.id);
-  const oldId=bot.id;Object.assign(bot,safeProfile(profile),{id,bot:false,joinedOrder:++this.joinOrder,brain:null,ack:0,fireLatch:false});
-  for(const b of this.projectiles)if(b.owner===oldId)b.owner=id;for(const b of this.builds)if(b.owner===oldId)b.owner=id;
-  this.players.set(id,bot);this.emit('join',{player:id,name:bot.name});return bot;
+  if(acceptsContestants(this.stage)){
+   if([...this.players.values()].filter(p=>p.contestant).length>=this.options.capacity){const bot=[...this.players.values()].find(p=>p.bot&&p.contestant);if(!bot)return null;this.removePlayer(bot.id);}
+  }
+  // Admission is decided solely by authoritative phase. No client join flag can
+  // replace a bot, add a contestant or resurrect a spectator after the cutoff.
+  return this.addPlayer(id,profile);
  }
+
  leavePlayer(id){
   const p=this.players.get(id);if(!p)return;
-  if(this.phase==='playing'&&(this.options.fill||this.options.bots>0)){
+  if(this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant&&p.health>0&&!p.spectating&&(this.options.fill||this.options.bots>0)){
    this.players.delete(id);this.inputs.delete(id);
    let botId='bot-fill-'+this.joinOrder++;while(this.players.has(botId))botId+='x';
    Object.assign(p,randomAppearance(this.random),{id:botId,bot:true,name:this.uniqueBotName('Sunny'),brain:null,ack:0,botThink:0,botPath:[],botLand:p.botLand||this.map.floorLoot[0],botDrop:this.elapsed+2});
@@ -196,31 +219,40 @@ export class RoyaleSimulation extends Simulation {
    this.players.set(botId,p);this.emit('leave',{name:p.name});
   }else this.removePlayer(id);
  }
- removePlayer(id){const p=this.players.get(id);if(p&&this.phase==='playing'&&p.health>0){p.health=0;this.eliminate(p);}super.removePlayer(id);}
+ removePlayer(id){const p=this.players.get(id);if(p&&this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant&&p.health>0){p.health=0;this.eliminate(p);}super.removePlayer(id);}
  playerAction(id,action){
   const p=this.players.get(id);if(!p||this.phase!=='playing')return;
   if(p.health>0&&!p.spectating&&p.flight==='ground'&&action.startsWith('build-')){editBuilding(this,p,action);return;}
-  if(action==='inventory-select-5'&&p.health>0){p.slot=5;p.use=null;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);return;}
-  const change=/^inventory-(select|drop|drop-one|split|swap)-([0-4])(?:-([0-4]))?$/.exec(action);
+  if(action==='inventory-select-0'&&p.health>0&&!p.spectating){p.slot=0;p.use=null;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);return;}
+  const change=/^inventory-(select|drop|drop-one|split|swap)-([1-5])(?:-([1-5]))?$/.exec(action);
   if(change&&p.health>0&&!p.spectating&&p.flight==='ground'){
    const from=Number(change[2]),to=Number(change[3]);
    if(change[1]==='select'){p.slot=from;beginEquip(p,this.time,true);}
    else if(change[1]==='drop')this.dropSlot(p,from);
    else if(change[1]==='drop-one'){const item=p.inventory[from];if(item&&!item.weapon&&item.count>1){if(this.dropLoot(p,{...item,count:1}))item.count--;}else this.dropSlot(p,from);}
    else if(change[1]==='split'){const item=p.inventory[from],empty=p.inventory.findIndex(i=>!i);if(item&&!item.weapon&&item.count>1&&empty>=0){const count=Math.floor(item.count/2);item.count-=count;p.inventory[empty]={...item,count};}}
-   else if(Number.isInteger(to)&&to>=0&&to<5){[p.inventory[from],p.inventory[to]]=[p.inventory[to],p.inventory[from]];if(p.slot===from)p.slot=to;else if(p.slot===to)p.slot=from;beginEquip(p,this.time,true);}
+   else if(Number.isInteger(to)&&to>=1&&to<6){[p.inventory[from],p.inventory[to]]=[p.inventory[to],p.inventory[from]];if(p.slot===from)p.slot=to;else if(p.slot===to)p.slot=from;beginEquip(p,this.time,true);}
    this.cancelUse(p);p.reloadEnd=0;p.burstLeft=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'weapon-swap'});return;
   }
   if(action==='spectate'&&p.health>0){this.damage(p,null,p.health+p.shield+1,'Left round');if(p.flight==='transport'){p.health=0;this.eliminate(p);}}
  }
  tick(dt){
   dt=clamp(dt,0,1/30);this.time+=dt;
-  if(this.phase!=='playing'){const count=Math.ceil(this.queueEnds-this.time);if(this.queueEnds&&count>0&&count<=5&&this.lastCountdown!==count){this.lastCountdown=count;this.emit('royale-cue',{cue:'countdown'});}return;}
+  if(this.phase!=='playing')return;
+  if(isWarmup(this.stage)){
+   const count=Math.ceil(this.queueEnds-this.time);this.stage=count<=5?RP.STARTING:RP.ISLAND;
+   if(count>0&&count<=5&&this.lastCountdown!==count){this.lastCountdown=count;this.emit('royale-cue',{cue:'countdown'});}
+   if(this.time>=this.queueEnds)this.beginBattle();
+  }
+  const warmup=isWarmup(this.stage);
+  if(!warmup){
   this.elapsed=this.time-this.startedAt;this.remaining=0;
   const oldIndex=this.storm.index,oldClosing=this.storm.closing;
   this.storm=stormAt(this.stormSteps,this.elapsed);
   if(oldIndex!==this.storm.index||oldClosing!==this.storm.closing)this.emit('royale-cue',{cue:this.storm.closing?'storm-closing':'storm-reveal'});
   if(this.elapsed>this.supplyAt){this.supplyAt+=130;const angle=this.random()*Math.PI*2,r=Math.max(0,this.storm.radius-20)*this.random();const x=clamp(this.storm.x+Math.cos(angle)*r,-210,210),z=clamp(this.storm.z+Math.sin(angle)*r,-210,210);const spot=placeLoot(this.map,{x,z,y:surfaceAt(this.map,x,z)})||placeLoot(this.map,{x,z,y:groundAt(this.map,x,z)});if(spot)this.chests.push({id:'supply-'+this.lootId++,...spot,opened:false,supply:true,landAt:this.time+18,contents:rollChest(this.random,'supply')});this.lootVersion++;this.emit('royale-cue',{cue:'supply-incoming'});}
+  if(this.elapsed>=this.route.duration)this.stage=[...this.players.values()].some(p=>p.health>0&&['dive','glide'].includes(p.flight))?RP.DROP:RP.ACTIVE;
+  }
   for(const p of this.players.values()){
    if(p.health<=0||p.spectating)continue;
    const commands=p.bot?null:this.movementInput(p,dt);
@@ -232,17 +264,18 @@ export class RoyaleSimulation extends Simulation {
     Object.assign(p,transportAt(this.route,this.elapsed));
     if(this.elapsed>=3&&(input.jump||this.elapsed>=this.route.duration)){
      p.lastJumpPress=Math.max(p.lastJumpPress||0,input.jumpPress||0);
-     p.flight='dive';p.flightLatch=true;p.yaw=input.yaw||p.yaw;p.pitch=0;this.emit('royale-cue',{player:p.id,cue:'transport-exit'});
+     launchPlayer(p,{source:'bus'});p.yaw=input.yaw||p.yaw;p.pitch=0;this.emit('royale-cue',{player:p.id,cue:'transport-exit'});
     }
     continue;
    }
    const wasFlight=p.flight,oldGrounded=p.grounded,previous={x:p.x,y:p.y,z:p.z};
    const slot=clamp(Math.floor(input.slot??p.slot),0,5);
    if(slot!==p.slot){p.slot=slot;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);this.cancelUse(p);p.nextShot=Math.max(p.nextShot,this.time+.22);this.emit('royale-cue',{player:p.id,cue:'weapon-swap'});}
-   if(p.slot<5&&input.swapSlot>=0&&input.swapSlot<5&&input.swapSlot!==p.slot&&!p.swapLatch){const j=input.swapSlot;[p.inventory[p.slot],p.inventory[j]]=[p.inventory[j],p.inventory[p.slot]];p.reloadEnd=0;this.cancelUse(p);this.syncInventory(p);}
+   if(p.slot>0&&input.swapSlot>0&&input.swapSlot<6&&input.swapSlot!==p.slot&&!p.swapLatch){const j=input.swapSlot;[p.inventory[p.slot],p.inventory[j]]=[p.inventory[j],p.inventory[p.slot]];p.reloadEnd=0;this.cancelUse(p);this.syncInventory(p);}
    p.swapLatch=input.swapSlot>=0;
    if(input.sprint)this.cancelUse(p);
    this.moveWithCommands(p,input,dt,commands);p.moving=Math.hypot(p.x-previous.x,p.z-previous.z)>.001;p.aim=!!input.aim&&p.flight==='ground'&&!p.use&&!!p.inventory[p.slot]?.weapon;p.vx=(p.x-previous.x)/dt;p.vz=(p.z-previous.z)/dt;
+   if(p.landing){const amount=warmup?0:fallDamage(p.landing);p.landing=null;if(amount)this.damage(p,null,amount,'Fall');if(p.health<=0)continue;}
    if(wasFlight!==p.flight)this.emit('royale-cue',{player:p.id,cue:p.flight==='ground'?'land':p.flight==='dive'?'glider-cut':'glider-deploy',x:p.x,y:p.y,z:p.z});
    else if(!oldGrounded&&p.grounded)this.emit('royale-cue',{player:p.id,cue:'land',x:p.x,y:p.y,z:p.z});
    else if(oldGrounded&&!p.grounded&&p.vy>0)this.emit('royale-cue',{player:p.id,cue:'jump',x:p.x,y:p.y,z:p.z});
@@ -260,23 +293,25 @@ export class RoyaleSimulation extends Simulation {
     }else if(!buildingAction&&input.fire&&!p.useLatch)this.beginUse(p);
     p.fireLatch=!!input.fire;p.useLatch=!!input.fire;
     if(p.use&&this.time>=p.use.end)this.finishUse(p);
-    for(const pad of this.pads)if(this.time>=(p.nextLaunch||0)&&dist(p,pad)<2){p.flight='launch';p.vy=38;p.grounded=false;p.nextLaunch=this.time+3;this.emit('royale-cue',{player:p.id,cue:'launch',x:pad.x,y:pad.y,z:pad.z});}
+    for(const pad of this.pads)if(this.time>=(p.nextLaunch||0)&&dist(p,pad)<2){launchPlayer(p,{source:'launchpad',vy:38});p.nextLaunch=this.time+3;this.emit('royale-cue',{player:p.id,cue:'launch',x:pad.x,y:pad.y,z:pad.z});}
    }
-   if(this.storm.active&&(this.storm.radius<=.01||Math.hypot(p.x-this.storm.x,p.z-this.storm.z)>this.storm.radius)){if(this.alive>1)this.damage(p,null,this.storm.dps*dt,'Storm');}
+   if(!warmup&&this.storm.active&&(this.storm.radius<=.01||Math.hypot(p.x-this.storm.x,p.z-this.storm.z)>this.storm.radius)){if(this.alive>1)this.damage(p,null,this.storm.dps*dt,'Storm');}
 
   }
   for(const chest of this.chests)if(chest.landAt&&this.time>=chest.landAt&&!chest.landed){chest.landed=true;this.emit('royale-cue',{cue:'supply-land',x:chest.x,y:chest.y,z:chest.z});}
   this.pads=this.pads.filter(p=>p.until>this.time);
   constructionTick(this);
   this.updateProjectiles(dt);
-  const living=[...this.players.values()].filter(p=>p.health>0&&!p.spectating);this.alive=living.length;
+  tickLootMotion(this);if(warmup)return;
+  const living=[...this.players.values()].filter(p=>p.contestant&&p.health>0&&!p.spectating);this.alive=living.length;
   if(living.length<=1)this.finish();
  }
  finish(){
-  if(this.phase!=='playing')return;
+  if(this.phase!=='playing'||isWarmup(this.stage))return;
   const living=[...this.players.values()].filter(p=>p.health>0&&!p.spectating);
   if(living.length>1)return;
-  this.phase='results';this.winnerId=living[0]?.id||null;this.winner=living[0]?living[0].name+' wins':'No surviving eggs — draw';
+  this.stage=RP.ENDING;
+  this.phase='results';this.stage=RP.FINISHED;this.winnerId=living[0]?.id||null;this.winner=living[0]?living[0].name+' wins':'No surviving eggs — draw';
   if(living[0]){living[0].place=1;this.placements.push({id:living[0].id,name:living[0].name,place:1,kills:living[0].kills});}
   // If the final pair fell in the same simulation tick, both share the final place.
   if(!living.length){const final=this.placements.filter(x=>x.place<=2);for(const p of final){p.place=1;const player=this.players.get(p.id);if(player)player.place=1;}}
@@ -289,60 +324,22 @@ export class RoyaleSimulation extends Simulation {
  thinkBot(p){
   const input={yaw:p.yaw,pitch:0,forward:0,strafe:0,slot:p.slot,swapSlot:-1};
   if(p.flight==='transport'){input.jump=this.elapsed>=p.botDrop;return input;}
-  let goal=p.botLand;
+  let goal=p.botLand||{x:0,y:0,z:0};
   if(p.flight!=='ground'){
    const dx=goal.x-p.x,dz=goal.z-p.z;input.yaw=Math.atan2(-dx,-dz);input.forward=Math.hypot(dx,dz)>4?1:0;
    input.jump=p.flight==='dive'&&p.y<95;return input;
   }
-  // Finish a committed item action before choosing a gun again. A throw may
-  // also need one released trigger frame after firing the previous weapon.
-  if(p.use){if(p.brain)p.brain.utility=null;return {...input,slot:p.use.slot,pitch:p.pitch};}
-  const utility=p.brain?.utility;
-  if(utility&&utility.until>this.time&&p.inventory[utility.slot]?.id==='popper')return {...input,slot:utility.slot,yaw:utility.yaw,pitch:utility.pitch,fire:!p.useLatch};
-  if(utility)p.brain.utility=null;
-  const needGun=!p.inventory.some(i=>i?.weapon);
-  const danger=this.storm.active&&Math.hypot(p.x-this.storm.nextX,p.z-this.storm.nextZ)>this.storm.nextRadius*.82;
-  const targets=[...this.players.values()].filter(e=>e!==p&&e.health>0&&!e.spectating&&e.flight==='ground').sort((a,b)=>dist(p,a)-dist(p,b));
-  const enemy=targets[0],weaponSlot=p.inventory.findIndex(i=>i?.weapon&&(i.ammo>0||p.bank[ammoType(i.id)]>0));
-  const items=this.loot.filter(i=>(Math.abs(i.y-p.y)<18)&&(needGun?i.weapon:i.ammoType?(p.bank[i.ammoType]<AMMO_CAPS[i.ammoType]&&p.inventory.some(w=>w?.weapon&&ammoType(w.id)===i.ammoType)):(!i.weapon&&p.inventory.slice(0,5).filter(Boolean).length<5))).sort((a,b)=>dist(p,a)-dist(p,b));
-  const chest=this.chests.filter(c=>!c.opened&&(!c.landAt||c.landAt<this.time)).sort((a,b)=>dist(p,a)-dist(p,b))[0];
-  if(danger)goal={x:this.storm.nextX,y:groundAt(this.map,this.storm.nextX,this.storm.nextZ),z:this.storm.nextZ};
-  else if(items[0]&&dist(p,items[0])<(needGun?180:35))goal=items[0];
-  else if(needGun&&chest)goal=chest;
-  else if(enemy)goal=enemy;
-  else goal={x:this.storm.nextX,z:this.storm.nextZ};
-  if(p.botThink<=this.time){p.botPath=this.nav.path(p,goal);p.botThink=this.time+.8+this.random()*.3;}
-  while(p.botPath?.length&&dist(p,p.botPath[0])<.58)p.botPath.shift();
-  const toward={x:goal.x-p.x,y:0,z:goal.z-p.z},glen=Math.hypot(toward.x,toward.z)||1;
-  const clear=wallDistance(this.map,{x:p.x,y:p.y+.7,z:p.z},{x:toward.x/glen,y:0,z:toward.z/glen},glen)>=glen-.1;
-  let step=clear&&Math.abs((goal.y??groundAt(this.map,goal.x,goal.z))-p.y)<.6?goal:p.botPath?.[0]||goal;
-  let dx=step.x-p.x,dz=step.z-p.z,len=Math.hypot(dx,dz)||1;
-  input.yaw=Math.atan2(-dx,-dz);input.forward=len>.25?1:0;input.sprint=(danger||len>12)&&!needGun;
-  input.jump=!!p.botPath?.[0]&&p.botPath[0].y>p.y+.75;
-  if(!p.botStuck||this.time>p.botStuck.at+1.5){const stuck=p.botStuck&&Math.hypot(p.x-p.botStuck.x,p.z-p.botStuck.z)<.5&&len>2;p.botStuck={x:p.x,z:p.z,at:this.time};if(stuck){p.botThink=0;p.botDetour=this.time+.8;}}
-  if(p.botDetour>this.time){input.strafe=p.botSeed%2<1?1:-1;input.jump=true;}
-  if(chest&&this.accessible(p,chest,3.3))input.interact=true;
-  else if(items[0]&&this.accessible(p,items[0]))input.interact=!p.interactLatch;
-  if(weaponSlot>=0)input.slot=weaponSlot;
-  const heal=p.inventory.findIndex(i=>i&&!i.weapon&&((ITEMS[i.id]?.kind==='heal'&&p.health<65)||(ITEMS[i.id]?.kind==='shield'&&p.shield<50)));
-  if(heal>=0&&(!enemy||dist(p,enemy)>25)&&!danger){input.slot=heal;input.fire=!p.use;input.sprint=false;input.forward=0;return input;}
-  if(!danger&&(!enemy||dist(p,enemy)>24)&&p.materials.wood<30){const tree=this.map.boxes.filter(b=>b.kind==='tree'&&dist(p,b)<24).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(tree){const dx=tree.x-p.x,dz=tree.z-p.z,d=Math.hypot(dx,dz);return {...input,yaw:Math.atan2(-dx,-dz),pitch:0,forward:d>3?1:0,strafe:0,slot:5,fire:d<=3,sprint:false};}}
-  if(enemy&&dist(p,enemy)<28&&this.time-p.lastDamage<1.5&&p.materials.wood>=10&&this.time>(p.botBuildAt||0)){p.botBuildAt=this.time+3;return {...input,forward:0,strafe:0,yaw:Math.atan2(p.x-enemy.x,p.z-enemy.z),buildMode:true,buildType:'wall',buildMaterial:'wood',fire:true};}
-  if(enemy&&weaponSlot>=0){
-   const tactics=tacticalBotInput(this,p,{goal:danger?goal:null,enemy,travel:danger});
-   Object.assign(input,tactics);input.interact=!!input.interact;
-   if(danger)input.sprint=!input.fire;
-  }
-  return input;
+  return tacticalBotInput(this,p);
  }
+
  damageWorld(box,amount){damageObject(this,box,amount);}
  explode(b){if(!b.popper&&(b.travelled||0)<weapon(b.weapon).minRange)return;super.explode(b);const radius=b.popper?3:weapon(b.weapon).splashRadius;const seen=new Set();for(const box of [...this.map.boxes]){const id=box.buildId||box.objectId;if(seen.has(id))continue;const d=Math.hypot(Math.max(0,Math.abs(b.x-box.x)-box.w/2),Math.max(0,box.y-b.y,b.y-box.y-box.h),Math.max(0,Math.abs(b.z-box.z)-box.d/2));if(d<radius){seen.add(id);damageObject(this,box,150*(1-d/(radius*1.2)));}}}
  checkpoint(){const data=super.checkpoint();delete data.worldBoxes;return data;}
- restore(checkpoint){super.restore(checkpoint);this.worldBoxes=(ROYALE_MAP.authored||ROYALE_MAP.boxes).filter(b=>!b.buildId).map(b=>({...b}));this.map={...ROYALE_MAP,boxes:[]};rebuildMap(this);this.nav=navigation(ROYALE_MAP);return this;}
+ restore(checkpoint){super.restore(checkpoint);const base=isWarmup(this.stage)?SPAWN_ISLAND:ROYALE_MAP;this.worldBoxes=(base.authored||base.boxes).filter(b=>!b.buildId).map(b=>({...b}));this.map={...base,boxes:[]};rebuildMap(this);this.nav=navigation(base);return this;}
  snapshot(){
-  const state=super.snapshot();
-  state.players=state.players.map(p=>{const source=this.players.get(p.id);return {...p,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestProgress:source.chestProgress||0};});
-  state.royale={round:this.round,builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,loot:this.loot.map(i=>({...i})),chests:this.chests.map(({contents,...c})=>({...c})),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds};
+  const state=super.snapshot();state.options={...state.options,map:this.map.id};
+  state.players=state.players.map(p=>{const source=this.players.get(p.id);return {...p,contestant:source.contestant,lateSpectator:source.lateSpectator,fall:source.fall?{...source.fall}:null,redeploy:source.redeploy,forceGlider:source.forceGlider,launchVelocity:source.launchVelocity?{...source.launchVelocity}:null,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestProgress:source.chestProgress||0};});
+  state.royale={stage:this.stage,accepting:acceptsContestants(this.stage),practice:isWarmup(this.stage),contestants:[...this.players.values()].filter(p=>p.contestant).length,round:this.round,builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,loot:this.loot.map(i=>({...i})),chests:this.chests.map(({contents,...c})=>({...c})),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds};
   return state;
  }
 }

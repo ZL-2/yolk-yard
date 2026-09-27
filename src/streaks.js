@@ -29,6 +29,6 @@ export function bonusStatus(p,time) {
  const items=[];
  if(p.streakArmor>0)items.push(`Hard Boiled · ${Math.ceil(p.streakArmor)} shield${p.health>100?' (stored)':''}`);
  if(p.health>100)items.push(`Overheal · ${Math.ceil(p.health)} HP`);
- for(const [key,name] of [['damageUntil','Egg Breaker · 2× damage'],['eggsUntil','Double Eggs'],['miniUntil','Mini Egg'],['restockUntil','Restock']])if(p[key]>time)items.push(`${name} · ${Math.ceil(p[key]-time)}s`);
+ for(const [key,name] of [['damageUntil','Egg Breaker · 2× damage'],['eggsUntil','Double Eggs'],['miniUntil','Mini Egg']])if(p[key]>time)items.push(`${name} · ${Math.ceil(p[key]-time)}s`);
  return items;
 }

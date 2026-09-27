@@ -42,6 +42,8 @@ jobs:
           retention-days: 7
       - run: npm run test:relay
       - run: npm run test:realtime
+      - name: Verify Royale phases, spectator cutoff, falling loot and host migration
+        run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:

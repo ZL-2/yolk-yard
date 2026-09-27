@@ -3,9 +3,10 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 const server=await createServer({server:{host:'127.0.0.1',port:5192,strictPort:true,watch:null}});await server.listen();
-const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const browser=await chromium.launch({headless:true,...(process.env.YOLK_TEST_CHROME?{executablePath:process.env.YOLK_TEST_CHROME}:{}),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(30000);
 try{
+ await mkdir('test-results/egg-shop',{recursive:true});
  await page.goto('http://127.0.0.1:5192/?qa=1');
  await page.getByRole('button',{name:'Egg Shop',exact:true}).click();
  assert.equal(await page.getByRole('button',{name:'Egg studio',exact:true}).count(),0);
@@ -20,6 +21,8 @@ try{
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('yolk-profile')).wrap),'wrap-cloud');
  assert.match(await page.locator('.egg-balance').innerText(),/100/);
  await page.locator('[data-shop-tab="locker"]').click();
+ assert.equal(await page.locator('.locker-slots img').count(),6);assert.ok(await page.locator('.locker-slots img').evaluateAll(images=>images.every(i=>i.complete&&i.naturalWidth===320)));
+ await page.screenshot({path:'test-results/egg-shop/locker.png'});
  await page.locator('[data-shop-save="0"]').click();await page.locator('[data-shop-clear="wrap"]').click();await page.locator('[data-shop-load="0"]').click();
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('yolk-profile')).wrap),'wrap-cloud');
  await page.locator('[data-shop-tab="shop"]').click();

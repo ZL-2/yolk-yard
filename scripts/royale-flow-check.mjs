@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {startRealtimeServer} from '../server/realtime/index.js';
+import WebSocket from 'ws';
+import {Network} from '../src/network.js';
+import {RoyaleSimulation} from '../src/royale.js';
+import {directory} from '../src/directory.js';
+import {safeProfile} from '../src/data.js';
+import {rebuildMap} from '../src/building.js';
+import {groundAt} from '../src/terrain.js';
+import {launchPlayer} from '../src/airborne.js';
+globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
+globalThis.window={YOLK_NETWORK:{relay:'ws://127.0.0.1:9004/game'}};
+const server=await startRealtimeServer({port:9004,host:'127.0.0.1'}),nodes=[],timers=[];
+const wait=async(fn,ms=16000)=>{const end=Date.now()+ms;while(!fn()){assert.ok(Date.now()<end,'Timed out waiting for authoritative state');await new Promise(r=>setTimeout(r,25));}};
+function client(name){const n={state:null,errors:[],sim:null};n.profile=safeProfile({name});n.net=new Network({getCheckpoint:()=>n.sim?.checkpoint(),getChatState:()=>n.sim?.snapshot()||n.state,onJoin:(id,p)=>!!n.sim.admitPlayer(id,p),onLeave:id=>n.sim?.leavePlayer(id),onInput:(id,i)=>n.sim?.setInput(id,i,true),onPlayerAction:(id,a)=>n.sim?.playerAction(id,a),onState:s=>{if(s.royale&&!s.royale.loot&&n.state)s.royale={...s.royale,loot:n.state.royale.loot,chests:n.state.royale.chests};n.state=s;},onError:e=>n.errors.push(e),onHost:(cp,departed)=>{n.sim=new RoyaleSimulation(cp.options).restore(cp);for(const id of departed)n.sim.leavePlayer(id);}});nodes.push(n);let frames=0;timers.push(setInterval(()=>{if(n.sim&&!n.net.closed){n.sim.tick(1/60);if(++frames%3===0)n.net.broadcast(n.sim.snapshot());}},1000/60));return n;}
+try{
+ const host=client('Departure Host'),guest=client('Early Guest');host.sim=new RoyaleSimulation({capacity:4,bots:2,fill:false,seed:176});host.sim.addPlayer('host',host.profile);await host.net.host();host.sim.startRound();host.sim.queueEnds=host.sim.time+100;host.net.setVisibility('public');host.net.broadcast(host.sim.snapshot());
+ await wait(()=>[...server.relay.peers.values()].some(p=>p.listing));assert.equal((await directory.list()).rooms.find(r=>r.code===host.net.code).phase,'lobby');
+ await guest.net.join(host.net.code,guest.profile);await wait(()=>guest.state?.royale?.practice);const p=host.sim.players.get(guest.net.id);assert.equal(p.contestant,true);assert.equal(p.health,100);assert.equal(guest.state.options.map,'hatchery-atoll');
+ const start=p.z;for(let seq=1;seq<=20;seq++)guest.net.input({seq,forward:1,yaw:0,slot:1});await wait(()=>p.ack>=20);assert.ok(p.z<start-.5);console.log('PASS early non-host joins and moves on the same Spawn Island');
+ host.sim.queueEnds=host.sim.time+.1;await wait(()=>guest.state?.royale?.stage==='battle-bus');assert.equal(guest.state.options.map,'sunnybreak');assert.equal(p.inventory[0].id,'pickaxe');assert.equal(p.inventory.slice(1).filter(Boolean).length,0);assert.equal(p.flight,'transport');
+ host.net.publishRoom();await wait(()=>[...server.relay.peers.values()].some(q=>q.listing?.phase==='playing'));assert.equal((await directory.list()).rooms.find(r=>r.code===host.net.code).phase,'playing');
+ const late=client('Spectator Guest');await late.net.join(host.net.code,late.profile);await wait(()=>late.state?.players.some(q=>q.id===late.net.id));const spectator=host.sim.players.get(late.net.id),alive=host.sim.alive;assert.equal(spectator.contestant,false);assert.equal(spectator.spectating,true);
+ late.net.send({type:'player-action',action:'rejoin'});late.net.input({seq:1,fire:true,jump:true,buildMode:true});await new Promise(r=>setTimeout(r,150));assert.equal(spectator.health,0);assert.equal(host.sim.alive,alive);console.log('PASS Battle Bus cutoff, full-room spectator admission and rejected forged gameplay');
+ host.sim.time=host.sim.startedAt+5;for(let seq=21;seq<=23;seq++)guest.net.input({seq,jump:true,yaw:0,slot:0});await wait(()=>p.flight==='dive');guest.net.input({seq:24,jump:false});guest.net.input({seq:25,jump:true});guest.net.input({seq:26,jump:false});await wait(()=>p.flight==='glide');await wait(()=>late.state.players.find(q=>q.id===p.id)?.flight==='glide');console.log('PASS non-host Bus exit/glider input and spectator motion state');
+ const x=-85,z=-75,y=groundAt(host.sim.map,x,z);Object.assign(p,{x,y,z,flight:'ground',grounded:true,vy:0});launchPlayer(p,{source:'shockwave',vy:28});await wait(()=>guest.state.players.find(q=>q.id===p.id)?.fall?.source==='shockwave');assert.equal(p.flight,'ground');await wait(()=>p.grounded,8000);assert.equal(p.health,100);assert.equal(p.fall,null);console.log('PASS host-authoritative Shock Egg immunity, landing cleanup and no glider');
+ const item=host.sim.dropWeapon({x,y:y+12,z},'pip');assert.ok(item.motion);await wait(()=>guest.state.royale.loot.some(q=>q.uid===item.uid&&q.motion));await wait(()=>!item.motion,5000);await wait(()=>guest.state.royale.loot.some(q=>q.uid===item.uid&&!q.motion));assert.equal(guest.state.royale.loot.find(q=>q.uid===item.uid).y,item.y);console.log('PASS airborne loot settles identically on host, guest and spectator without per-frame loot messages');
+ await wait(()=>guest.net.lastCheckpoint?.simulation.stage===host.sim.stage);const matchId=host.sim.matchId;host.net.destroy();await wait(()=>guest.net.isHost&&guest.sim);assert.equal(guest.sim.matchId,matchId);assert.equal(guest.sim.players.get(late.net.id).contestant,false);assert.equal(guest.sim.loot.find(q=>q.uid===item.uid).y,item.y);console.log('PASS host migration retains phases, spectator status and settled loot');
+ guest.sim.phase='results';guest.sim.stage='finished';guest.sim.startRound();await wait(()=>late.state?.royale?.practice);assert.equal(late.state.options.map,'hatchery-atoll');assert.equal(late.state.royale.chests.length,0);assert.deepEqual(nodes.flatMap(n=>n.errors),[]);console.log('PASS new match resets the island, temporary state and late-join eligibility');
+}finally{for(const timer of timers)clearInterval(timer);for(const n of nodes)n.net.destroy();await server.close();}

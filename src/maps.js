@@ -1,4 +1,5 @@
 import {addArenaLayers} from './arena-layers.js';
+import {SPAWN_ISLAND} from './spawn-island.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {groundAt} from './terrain.js';
 const box = (x, z, w, d, h, color = "sand", y = 0, kind = "wall") => ({
@@ -315,7 +316,7 @@ for (const map of MAPS)
             box(x + dx, z + dz, 0.18, 0.18, 3.4, "navy", base, "frame"),
           );
     }
-export const getMap = (id) => id === "sunnybreak" ? ROYALE_MAP : MAPS.find((m) => m.id === id) || MAPS[0];
+export const getMap = (id) => id === "hatchery-atoll" ? SPAWN_ISLAND : id === "sunnybreak" ? ROYALE_MAP : MAPS.find((m) => m.id === id) || MAPS[0];
 export function surfaceAt(map, x, z) {
   let y = groundAt(map,x,z);
   for (const b of map.boxes)

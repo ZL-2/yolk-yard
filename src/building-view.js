@@ -29,7 +29,7 @@ export function updateBuildingView(rv,state,p){
  }
  for(const [id,c] of rv.buildMeshes)if(!seen.has(id)){rv.root.remove(c.mesh);rv.view.disposeGroup(c.mesh);rv.buildMeshes.delete(id);}
  if(!rv.weakpoint){rv.weakpoint=new THREE.Mesh(new THREE.RingGeometry(.18,.25,32),new THREE.MeshBasicMaterial({color:0x50cfff,depthTest:false,transparent:true,opacity:.95,side:THREE.DoubleSide}));rv.weakpoint.userData.ownedMaterial=true;rv.root.add(rv.weakpoint);}
- const aimed=p?.slot===5?aimedObject(rv.view.buildMap,p,5):null,weak=r.worldDamage?.[aimed?.box.objectId]?.weakpoint;rv.weakpoint.visible=!!weak;if(weak){rv.weakpoint.position.set(weak.x,weak.y,weak.z);rv.weakpoint.quaternion.copy(rv.view.camera.quaternion);}
+ const aimed=p?.slot===0?aimedObject(rv.view.buildMap,p,5):null,weak=r.worldDamage?.[aimed?.box.objectId]?.weakpoint;rv.weakpoint.visible=!!weak;if(weak){rv.weakpoint.position.set(weak.x,weak.y,weak.z);rv.weakpoint.quaternion.copy(rv.view.camera.quaternion);}
  const controls=rv.view.buildControls;updateEditView(rv,controls);
  const active=p?.health>0&&p.flight==='ground'&&controls?.buildMode&&!controls.editing;
  const proposal=active?placement({...p,yaw:controls.yaw??p.yaw,pitch:controls.pitch??p.pitch,buildFacing:controls.buildFacing},controls.buildType,controls.buildRotation,controls.buildMaterial):null;
