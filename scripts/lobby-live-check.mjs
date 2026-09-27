@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {VERSION} from '../src/data.js';
+import {safeName} from '../src/moderation.js';
 const base='https://zl-2.github.io/yolk-yard/',expected=(process.env.YOLK_EXPECTED_BUILD||process.env.GITHUB_SHA||'').replace(/^verify-live\//,'');
 assert.match(expected,/^[a-f0-9]{40}$/,'Provide the published game commit to verify');
 let version;
@@ -12,7 +13,8 @@ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-a
 await mkdir('test-results/live-lobby',{recursive:true});
 async function player(name){const c=await browser.newContext({viewport:{width:1365,height:768}}),p=await c.newPage();p.setDefaultTimeout(90000);await p.addInitScript(name=>{localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));},name);await p.goto(base+'?build='+version.build);pages.push(p);await p.locator('#menu [data-action="find-public"]:enabled').waitFor();return p;}
 try{
- const suffix=String(Date.now()).slice(-5),nameA='Check Sunny '+suffix,nameB='Check Buddy '+suffix;
+ const suffix=['Dawn','Dusk','Moss','Reed','Pear','Leaf','Gale','Glow','Rain','Snow'][Date.now()%10],nameA='Check Sunny '+suffix,nameB='Check Buddy '+suffix;
+ assert.equal(safeName(nameA),nameA);assert.equal(safeName(nameB),nameB);
  const a=await player(nameA),b=await player(nameB);
  assert.equal(await a.getByText('Play Offline With Bots',{exact:true}).count(),0);
  await a.locator('#menu [data-action="play"]').click();await a.locator('[data-experience="duos"]').click();await a.locator('#menu [data-action="social"]').first().click();
