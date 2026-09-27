@@ -1,7 +1,7 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
-const base='https://zl-2.github.io/yolk-yard/',out='test-results/connected-island-live',checks=[],errors=[],browsers=[];
+const base='https://zl-2.github.io/yolk-yard/',out='test-results/connected-island-live',checks=[],errors=[],browsers=[],pages=[];
 const ref=await fetch('https://api.github.com/repos/ZL-2/yolk-yard/git/ref/heads/main').then(r=>r.json());
 const version=await fetch(base+'version.json?verify='+Date.now(),{cache:'no-store'}).then(r=>r.json());
 assert.equal(version.build,process.env.YOLK_EXPECT_BUILD||ref.object.sha);assert.equal(version.release,'55');
@@ -9,11 +9,12 @@ const history=await fetch(base+'release-history.json?verify='+Date.now(),{cache:
 await mkdir(out,{recursive:true});const pass=s=>{checks.push(s);console.log('PASS',s);};
 async function make(name){
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-background-timer-throttling','--disable-renderer-backgrounding']});browsers.push(browser);
- const page=await browser.newPage({viewport:{width:1100,height:700},deviceScaleFactor:.3});page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(e.message));
+ const page=await browser.newPage({viewport:{width:1100,height:700},deviceScaleFactor:.3});pages.push(page);page.setDefaultTimeout(120000);page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',name,e.message);});
  await page.addInitScript(name=>{localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));},name);
  await page.goto(base+'?verify='+Date.now());await page.locator('[data-action="play"]').waitFor();assert.equal(await page.evaluate(()=>typeof window.__yolkTest),'undefined');return page;
 }
 async function enter(page){await page.waitForFunction(()=>!document.querySelector('#royale-hud')?.hidden);if(await page.locator('#dialog [data-action="resume"]').isVisible())await page.locator('#dialog [data-action="resume"]').click();}
+const presentation=page=>page.evaluate(()=>({map:document.querySelector('#hud-map')?.textContent,phase:document.querySelector('#royale-flight-title')?.textContent,help:document.querySelector('#royale-flight-help')?.textContent,network:document.querySelector('#hud-network')?.textContent,dialog:document.querySelector('#dialog[open]')?.textContent?.slice(0,250),warmup:document.body.classList.contains('in-spawn-island')}));
 try{
  const host=await make('Connected Host'),guest=await make('Connected Guest');
  assert.match(await host.locator('[data-action="updates"]').innerText(),/55/);await host.locator('[data-action="updates"]').click();assert.match(await host.locator('.release-note').first().innerText(),/Connected Island/);await host.locator('#dialog [data-action="close"]').first().click();pass('Live Quality Update 55 and published revision match main');
@@ -34,7 +35,11 @@ try{
  await writeFile(out+'/compact-layout.json',JSON.stringify(compact,null,2));await guest.setViewportSize({width:1100,height:700});
  await guest.keyboard.press('Digit5');await guest.waitForFunction(()=>document.querySelector('#royale-hotbar [data-royale-slot="5"]').getAttribute('aria-pressed')==='true');await guest.keyboard.press('KeyP');
  pass('Live guest replaces a bot in the filled 32-contestant warmup, with pickaxe and five functional numbered slots');
- await guest.waitForFunction(()=>!document.body.classList.contains('in-spawn-island')&&document.querySelector('#hud-map')?.textContent==='Sunnybreak Island',null,{timeout:240000});
+ // Both complete 3D clients share a software-GPU runner. Observe the real host
+ // timer without accelerating it; permit slower rendering in this environment.
+ const progress=setInterval(()=>Promise.all([presentation(host),presentation(guest)]).then(s=>console.log('LIVE TIMER',JSON.stringify(s))).catch(()=>{}),30000);
+ try{await guest.waitForFunction(()=>!document.body.classList.contains('in-spawn-island')&&document.querySelector('#hud-map')?.textContent==='Sunnybreak Island',null,{timeout:600000});}finally{clearInterval(progress);}
+ pass('Live authoritative countdown completed and transferred the guest to Sunnybreak');
  assert.equal(await guest.locator('#royale-hotbar .royale-item-slots .royale-slot').filter({hasText:'Empty'}).count(),5);
  await guest.waitForFunction(()=>document.querySelector('#royale-flight-title').textContent.includes('Choose your landing spot'));await guest.keyboard.down('Space');await guest.waitForFunction(()=>document.querySelector('#royale-flight-title').textContent==='Freefall');await guest.keyboard.up('Space');
  pass('Real host countdown transfers both browsers to Sunnybreak with reset equipment; non-host Bus exit works');
@@ -42,4 +47,5 @@ try{
  assert.deepEqual(errors,[]);await writeFile(out+'/report.json',JSON.stringify({version,checks,errors},null,2));
  // Capture after the timed interactions, with one software GPU left to render.
  await late.close();await guest.close();await host.setViewportSize({width:620,height:430});await host.screenshot({path:out+'/live-compact.png',timeout:120000});
-}finally{await Promise.all(browsers.map(b=>Promise.race([b.close(),new Promise(resolve=>setTimeout(resolve,5000))])));}
+}catch(error){const state=await Promise.all(pages.filter(p=>!p.isClosed()).map(p=>presentation(p).catch(()=>null)));console.error('LIVE FAILURE',JSON.stringify({state,errors}));await writeFile(out+'/failure.json',JSON.stringify({state,errors,message:error.message},null,2));throw error;}
+finally{await Promise.all(browsers.map(b=>Promise.race([b.close(),new Promise(resolve=>setTimeout(resolve,5000))])));}
