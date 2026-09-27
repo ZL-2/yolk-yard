@@ -2,11 +2,22 @@
 // complete baseline. Encoding happens at flush, after stale snapshots merge.
 const recordKeys=['players','projectiles'];
 function records(value,key='id'){return Object.fromEntries(value.map(row=>[row[key],row]));}
+// Broadcast recipients share immutable state objects. Normalize each once;
+// per-connection baselines and recovery checkpoints remain independent.
+const normalizedStates=new WeakMap(),normalizedCheckpoints=new WeakMap();
 function normalize(message){
- const value=JSON.parse(JSON.stringify(message));
- for(const [key,id]of [['loot','uid'],['chests','id'],['builds','id']]){if(Array.isArray(value.state?.royale?.[key]))value.state.royale[key]=records(value.state.royale[key],id);if(Array.isArray(value.checkpoint?.simulation?.[key]))value.checkpoint.simulation[key]=records(value.checkpoint.simulation[key],id);}
- for(const key of recordKeys)if(Array.isArray(value.state?.[key]))value.state[key]=records(value.state[key]);
- if(Array.isArray(value.checkpoint?.simulation?.players))value.checkpoint.simulation.players=records(value.checkpoint.simulation.players);
+ const {state,checkpoint,...body}=message,value=JSON.parse(JSON.stringify(body));
+ for(const [key,source,cache]of [['state',state,normalizedStates],['checkpoint',checkpoint,normalizedCheckpoints]])if(source){
+  let cached=cache.get(source);
+  if(!cached){cached=JSON.parse(JSON.stringify(source));
+   const world=key==='state'?cached.royale:cached.simulation;
+   for(const [name,id]of [['loot','uid'],['chests','id'],['builds','id']])if(Array.isArray(world?.[name]))world[name]=records(world[name],id);
+   for(const name of recordKeys)if(Array.isArray(cached[name]))cached[name]=records(cached[name]);
+   if(Array.isArray(cached.simulation?.players))cached.simulation.players=records(cached.simulation.players);
+   cache.set(source,cached);
+  }
+  value[key]=cached;
+ }
  return value;
 }
 function patch(previous,next){
@@ -38,6 +49,7 @@ export class SnapshotEncoder {
   // Retain sparse world baselines across movement-only frames. Otherwise the
   // next pickup would retransmit every remaining item after an omitted frame.
   const omitWorld=[];
+  if(next.state?.royale)next.state={...next.state,royale:{...next.state.royale}};
   for(const key of ['loot','chests','builds'])if(next.state?.royale&&!Object.hasOwn(next.state.royale,key)&&this.previous?.state?.royale?.[key]){next.state.royale[key]=this.previous.state.royale[key];omitWorld.push(key);}
   const frame=this.previous?{base:this.seq,seq:this.seq+1,patch:patch(this.previous,next)||{}}:{base:0,seq:1,full:next};
   if(omitWorld.length)frame.omitWorld=omitWorld;

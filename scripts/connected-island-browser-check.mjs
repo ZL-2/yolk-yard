@@ -17,7 +17,7 @@ try{
  await page.locator('[data-bind="primary"][data-bind-slot="0"]').click();await page.keyboard.press('KeyU');
  await page.locator('[data-bind-command="apply"]').click();
  for(const action of ['buildEdit','buildReset','nextSlot'])assert.equal(await page.locator(`[data-bind="${action}"][data-bind-slot="0"]`).innerText(),'Wheel down');
- await page.locator('#dialog [data-action="close"]').click();
+ await page.locator('#dialog [data-action="close"]').first().click();
  for(const action of ['play','play-royale','play-local','confirm-local'])await page.locator(`[data-action="${action}"]`).click();
  await page.waitForFunction(()=>window.__yolkTest?.read().state?.royale?.practice);
  let r=await read();assert.equal(r.state.royale.contestants,32);assert.ok(r.state.royale.queueEnds-r.state.time>30&&r.state.royale.queueEnds-r.state.time<=60);
@@ -54,7 +54,7 @@ try{
  await page.screenshot({path:out+'/ramp-floor.png'});pass('Moving up a real ramp chooses and places the connected upper floor');
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.beginBattle();s.time=s.startedAt+50;}));await page.waitForFunction(()=>window.__yolkTest.read().state.options.map==='sunnybreak');
  for(let i=0;i<9;i++)for(const roof of [false,true]){
-  await page.evaluate(({i,roof})=>window.__yolkTest.fixture(s=>{const poi=s.map.districts[i],b=s.map.buildings.find(b=>b.poi===poi.id),point=s.map.floorLoot.find(p=>p.building===s.map.buildings.indexOf(b)&&p.floor===0&&p.role==='weapon');window.__yolkTest.pose({x:roof?b.x+2:point.x,y:roof?b.baseY+b.floors*4+.18:point.y,z:roof?b.z+2:point.z,flight:'ground',grounded:true,vy:0,fall:null,yaw:roof?.75:0,pitch:roof?-.18:-.2,slot:0});}),{i,roof});
+  await page.evaluate(({i,roof})=>window.__yolkTest.fixture(s=>{const poi=s.map.districts[i],b=s.map.buildings.find(b=>b.poi===poi.id),point=s.map.floorLoot.find(p=>p.building===s.map.buildings.indexOf(b)&&p.floor===0&&p.role==='weapon');window.__yolkTest.pose({x:roof?b.x+2:point.x,y:roof?b.baseY+b.h+.18:point.y,z:roof?b.z+2:point.z,flight:'ground',grounded:true,vy:0,fall:null,yaw:roof?.75:0,pitch:roof?-.18:-.2,slot:0});}),{i,roof});
   await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id==='host').flight==='ground');await page.screenshot({path:`${out}/poi-${i}-${roof?'roof':'interior'}.png`});
  }
  pass('All nine major POIs render from ground-floor interiors and rooftops with the repaired geometry');

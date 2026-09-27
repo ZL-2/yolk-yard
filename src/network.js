@@ -1,4 +1,4 @@
-import {isWarmup,MAX_SPECTATORS,MAX_HUMANS} from './royale-phases.js';
+import {isWarmup,MAX_SPECTATORS,MAX_HUMANS,MAX_CONTESTANTS} from './royale-phases.js';
 import { connectionReport, errorCode, watchConnection } from './connection-report.js';
 import Peer from "peerjs";
 import { RelayPeer, relayURL } from "./relay-peer.js";
@@ -289,7 +289,7 @@ export class Network {
             !s ||
             s.version !== VERSION ||
             !Array.isArray(s.players) ||
-            s.players.length > 24
+            s.players.length > MAX_CONTESTANTS+MAX_SPECTATORS
           )
             return;
           this.lastState = performance.now();
@@ -432,12 +432,15 @@ export class Network {
     let checkpoint;
     if(checkpointDue){this.lastCheckpointSent=performance.now();this.checkpointWorldVersion=worldVersion;checkpoint={simulation:this.callbacks.getCheckpoint?.(),chat:{sequence:this.chatRoom.sequence,enabled:this.chatEnabled,muted:this.chatMuted,members:[...this.chatRoom.members],reports:[...this.chatRoom.reports]},kicked:[...this.kicked]};}
     const recipients=[...this.connections.values()];
+    const broadcasts=new Map();
     const offset=(this.broadcastCursor||0)%Math.max(1,recipients.length);
     this.broadcastCursor=offset+1;
     // Shared-socket backpressure must not repeatedly favor the first seats.
     for (let i=0;i<recipients.length;i++) {
       const conn=recipients[(i+offset)%recipients.length];
       if (!conn.open || (conn.dataChannel?.bufferedAmount || 0) >= 131072) continue;
+      const group=[conn.royaleVersion,conn.buildVersion,conn.lastEventSent].join('|'),cached=broadcasts.get(group);
+      if(cached){Object.assign(conn,cached.cursor);conn.send(cached.message);continue;}
       let outgoing=state;
       if(state.royale){
         const version=state.royale.matchId+':'+state.options.map+':'+state.round+':'+state.royale.lootVersion;
@@ -452,7 +455,8 @@ export class Network {
       const events=outgoing.events.filter(e=>!Number.isFinite(e.id)||e.id>(conn.lastEventSent??-1));
       for(const event of events)if(Number.isFinite(event.id))conn.lastEventSent=Math.max(conn.lastEventSent??-1,event.id);
       outgoing={...outgoing,events};
-      conn.send({type:'state',state:outgoing,...(checkpoint?{checkpoint}:{})});
+      const message={type:'state',state:outgoing,...(checkpoint?{checkpoint}:{})};
+      broadcasts.set(group,{message,cursor:{royaleVersion:conn.royaleVersion,buildVersion:conn.buildVersion,lastEventSent:conn.lastEventSent}});conn.send(message);
     }
   }
   migrationData(){return {simulation:this.callbacks.getCheckpoint?.(),chat:{sequence:this.chatRoom.sequence,enabled:this.chatEnabled,muted:this.chatMuted,members:[...this.chatRoom.members],reports:[...this.chatRoom.reports]},kicked:[...this.kicked]};}
@@ -487,7 +491,7 @@ export class Network {
         this.hostHeartbeat=new HostHeartbeat(this.lastState);
         this.callbacks.onStatus?.('New host connected. Match continues.');
       }else if(msg.type==='state'&&welcomed){
-        const s=msg.state;if(s?.version!==VERSION||!Array.isArray(s.players)||s.players.length>24)return;
+        const s=msg.state;if(s?.version!==VERSION||!Array.isArray(s.players)||s.players.length>MAX_CONTESTANTS+MAX_SPECTATORS)return;
         s.players=s.players.map(p=>({...p,...safeProfile(p)}));s.options=matchOptions(s.options);if(s.royale)s.options.map=isWarmup(s.royale.stage)?'hatchery-atoll':'sunnybreak';s.winner=safeSystemText(s.winner,'Round complete');
         s.events=(s.events||[]).slice(-120).map(e=>{const next={...e};for(const key of ['name','targetName'])if(key in next)next[key]=safeName(next[key]);for(const key of ['text','winner','weapon'])if(key in next)next[key]=safeSystemText(next[key]);return next;});
         this.lastState=performance.now();this.snapshot=s;this.members=s.network?.members||this.members;this.hostId=s.network?.hostId||this.hostId;

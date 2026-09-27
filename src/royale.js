@@ -344,7 +344,7 @@ export class RoyaleSimulation extends Simulation {
  checkpoint(){const data=super.checkpoint();delete data.worldBoxes;
   // Tactical caches can be reacquired after transfer; do not replicate every scan,
   // visited room and navigation node for every bot on every recovery update.
-  for(const p of data.players)if(p.bot){delete p.brain;delete p.botPath;delete p.botIntent;delete p.botStuck;p.botIntentAt=0;}
+  for(const p of data.players)if(p.bot){delete p.brain;delete p.warmupBrain;delete p.botPath;delete p.botIntent;delete p.botStuck;p.botIntentAt=0;}
   return data;
  }
  restore(checkpoint){super.restore(checkpoint);const base=isWarmup(this.stage)?SPAWN_ISLAND:ROYALE_MAP;this.worldBoxes=(base.authored||base.boxes).filter(b=>!b.buildId).map(b=>({...b}));this.map={...base,boxes:[]};rebuildMap(this);this.nav=navigation(base);return this;}

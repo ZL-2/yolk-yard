@@ -6,13 +6,14 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const s=new RoyaleSimulation({capacity:32,bots:31,fill:true,seed:551,difficulty:2});s.addPlayer('host',{name:'Population QA'});s.startRound();
 assert.equal(s.players.size,32);assert.equal(s.queueEnds,60);
 const encoder=new SnapshotEncoder(),decoder=new SnapshotDecoder(),report={capacity:32,stages:[],loot:[],snapshots:0,bytes:0,peakBytes:0},dt=1/60;
-let frames=0,firstBytes=0;
+let frames=0,firstBytes=0,lastEvent=0;
 function run(name,seconds){
  const samples=[],encodeTimes=[],start=s.time;let firing=0;
  for(let frame=0;frame<seconds*60;frame++){
   const now=performance.now();s.tick(dt);samples.push(performance.now()-now);frames++;
   firing=Math.max(firing,[...s.players.values()].filter(p=>p.bot&&p.fireLatch).length);
   if(frames%3===0){const t=performance.now(),state=s.snapshot();
+   state.events=state.events.filter(e=>e.id>lastEvent);lastEvent=s.eventId;
    if(frames%60!==0&&s.lootVersion===run.lootVersion){delete state.royale.loot;delete state.royale.chests;}run.lootVersion=s.lootVersion;
    if(s.buildVersion===run.buildVersion)delete state.royale.builds;run.buildVersion=s.buildVersion;
    const packet=encoder.encode({type:'state',state,...(frames%150===0?{checkpoint:{simulation:s.checkpoint()}}:{})}),bytes=Buffer.byteLength(JSON.stringify(packet));
@@ -28,7 +29,7 @@ function run(name,seconds){
 run('Spawn Island',20);assert.ok(report.stages[0].maxSimultaneousFire<=3);
 s.beginBattle();
 assert.equal(s.alive,32);
-for(const poi of s.map.districts){const buildings=s.map.buildings.filter(b=>b.poi===poi.id),guns=s.loot.filter(i=>i.weapon&&Math.hypot(i.x-poi.x,i.z-poi.z)<poi.radius),chests=s.chests.filter(c=>c.poi===poi.id);assert.ok(chests.length>=3);report.loot.push({poi:poi.name,buildings:buildings.length,nearbyWeapons:guns.length,chests:chests.length});}
+for(const poi of s.map.districts){const buildings=s.map.buildings.filter(b=>b.poi===poi.id),guns=s.loot.filter(i=>i.weapon&&buildings.some(b=>Math.abs(i.x-b.x)<b.w/2+4&&Math.abs(i.z-b.z)<b.d/2+4)),chests=s.chests.filter(c=>c.poi===poi.id);assert.ok(chests.length>=3);assert.ok(guns.length>=buildings.length);report.loot.push({poi:poi.name,buildings:buildings.length,nearbyWeapons:guns.length,chests:chests.length});}
 run('Bus, drop and early loot',80);
 run('Early encounters',30);
 report.initialBytes=firstBytes;report.averageDeltaBytes=Math.round(report.bytes/report.snapshots);report.kibPerSecondPerGuest=+(report.averageDeltaBytes*20/1024).toFixed(1);
