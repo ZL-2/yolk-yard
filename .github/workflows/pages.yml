@@ -157,7 +157,7 @@ jobs:
       - uses: actions/deploy-pages@v4
         id: deployment
   verify-live:
-    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[lobby-duos]')
+    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[lobby-duos]')
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 8

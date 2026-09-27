@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {VERSION} from '../src/data.js';
-const base='https://zl-2.github.io/yolk-yard/',expected=process.env.GITHUB_SHA;
+const base='https://zl-2.github.io/yolk-yard/',expected=(process.env.YOLK_EXPECTED_BUILD||process.env.GITHUB_SHA||'').replace(/^verify-live\//,'');
+assert.match(expected,/^[a-f0-9]{40}$/,'Provide the published game commit to verify');
 let version;
 for(let i=0;i<18;i++){try{const r=await fetch(base+'version.json?t='+Date.now(),{signal:AbortSignal.timeout(10000)});version=await r.json();if(!expected||version.build===expected)break;}catch{}await new Promise(r=>setTimeout(r,5000));}
 assert.equal(version?.build,expected,'Pages must serve this exact release');
