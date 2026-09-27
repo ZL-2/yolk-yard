@@ -1,3 +1,4 @@
+import {lobbyScene} from './lobby-scene.js';
 import {lootModel,gliderModel} from './royale-art.js';
 import {inventoryPreview} from './inventory-previews.js';
 import {adsFov} from './weapon-presentation.js';
@@ -406,7 +407,7 @@ export class View {
   setParty(profiles){
     const key=JSON.stringify(profiles);if(key===this.partyPreviewKey)return;this.partyPreviewKey=key;
     for(const egg of this.partyEggs||[]){this.scene.remove(egg);this.disposeGroup(egg);}this.partyEggs=[];
-    for(const [i,profile]of profiles.slice(0,1).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.1);egg.position.set(4.1+i*2.5,.08,-.7);egg.rotation.y=.25;this.scene.add(egg);this.partyEggs.push(egg);}
+    for(const [i,profile]of profiles.slice(0,1).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.1);egg.position.set(4.1+i*2.5,.08,-.7);egg.rotation.y=Math.PI+.35;this.scene.add(egg);this.partyEggs.push(egg);}
   }
   preview(profile) {
     const signature = JSON.stringify(profile);
@@ -422,7 +423,7 @@ export class View {
     const held=this.menuEgg.userData.held;held.updateMatrix();
     this.menuShoulders=this.menuEgg.userData.arms.userData.limbs.map(l=>l.shoulder.clone().applyMatrix4(held.matrix));
     this.scene.add(this.menuEgg);
-    if(!this.lobbyStage){this.lobbyStage=new THREE.Group();for(const x of [0,4.1]){const pad=new THREE.Mesh(new THREE.CylinderGeometry(1.8,2,.24,48),new THREE.MeshStandardMaterial({color:0x577b72,roughness:.75}));pad.position.set(x,-.04,x?-.7:0);this.lobbyStage.add(pad);const ring=new THREE.Mesh(new THREE.TorusGeometry(1.83,.035,6,48),new THREE.MeshBasicMaterial({color:0xffdf81}));ring.rotation.x=Math.PI/2;ring.position.set(x,.09,x?-.7:0);this.lobbyStage.add(ring);}this.scene.add(this.lobbyStage);}
+    if(!this.lobbyStage){this.lobbyStage=lobbyScene();this.scene.add(this.lobbyStage);}
   }
   aimMenu(clientX,clientY){
     const r=this.canvas.getBoundingClientRect();
@@ -701,7 +702,7 @@ export class View {
         model?.userData.muzzle?.getWorldPosition(new THREE.Vector3()) ||
         new THREE.Vector3(e.origin?.x || 0, e.origin?.y || 0, e.origin?.z || 0);
       if (local) this.lastMuzzleFlash = pos.clone();
-      const flash = new THREE.Mesh(
+      if(!e.echoed){const flash = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.085, 0),
         new THREE.MeshBasicMaterial({
           color: 0xffe3a0,
@@ -722,7 +723,7 @@ export class View {
         max: 0.055,
         ownedMaterial: true,
         ownedGeometry: true,
-      });
+      });}
       for (const shot of e.shots || []) {
         this.shotOffsets.set(shot.id, {
           delta: pos
@@ -738,6 +739,7 @@ export class View {
         ).normalize();
         const end=shot.end?new THREE.Vector3(shot.end.x,shot.end.y,shot.end.z):null;
         const length=end?Math.min(80,end.distanceTo(pos)):.65;
+        if(end)direction.copy(end).sub(pos).normalize();
         const trace = new THREE.Mesh(
           new THREE.CylinderGeometry(0.012, 0.02, length, 5),
           new THREE.MeshBasicMaterial({
@@ -771,6 +773,8 @@ export class View {
     this.clock += dt;
     this.recoil = Math.max(0, this.recoil - dt * 7);
     this.loadMap(state?.options.map || "yard");
+    this.world.visible=playing;
+    if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x97c6c4;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(sky,playing?(map.theme==='royale'?330:72):40,playing?(map.theme==='royale'?1000:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
     if(this.lobbyStage)this.lobbyStage.visible=!playing;
     for(const egg of this.partyEggs||[])egg.visible=!playing;

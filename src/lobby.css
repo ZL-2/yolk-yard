@@ -13,4 +13,5 @@
 .crosshair.accuracy-ready .crosshair-arm,.crosshair.accuracy-ready .center-dot{background:#a9ffdb;box-shadow:0 0 4px #62eabc}.crosshair.pellet-reticle .crosshair-arm{border-radius:3px}.crosshair-arm{transition:transform .055s linear}
 #menu{position:absolute;inset:0}.yard-party button:disabled,.yard-play-card button:disabled{cursor:default}.yard-nav .yard-logo:focus-visible{outline:3px solid #ffdd69}#dialog[data-kind=profile] .name-safety{position:static!important;width:auto;height:auto;clip:auto;white-space:normal}
 .in-duos .chat-hud{top:190px}.in-duos .chat-toggle{top:360px}.in-duos .killfeed{top:400px}
+.yard-party-link{min-height:34px;padding:8px 3px}.yard-nav-tools>button{min-width:40px;min-height:40px}
 @media(max-width:650px){.in-duos .chat-hud{top:165px}.in-duos .chat-toggle{top:285px}.in-duos .killfeed{top:325px}}

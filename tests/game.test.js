@@ -6,7 +6,6 @@ import {
   movePlayer,
   direction,
   rayEgg,
-  isCenterHit,
   wallDistance,
   sanitizeInput,
   muzzleOrigin,

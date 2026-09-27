@@ -709,7 +709,7 @@ function leave(confirm = false,notifyParty=true) {
   earnMatch++;
   buildControls.buildMode=false;buildUI.cancel();
   resultAt=0;$("#round-banner").hidden=true;damageSources.length=0;
-  matchRequest++;autoQueue=false;sound.stopWorld();royaleUI.waypoint=null;royaleUI.root.hidden=true;document.body.classList.remove('in-royale','in-spawn-island');
+  matchRequest++;autoQueue=false;sound.stopWorld();royaleUI.waypoint=null;royaleUI.root.hidden=true;document.body.classList.remove('in-royale','in-spawn-island','in-duos');
   net?.destroy();
   net = null;
   chat.reset();
@@ -737,7 +737,7 @@ function leave(confirm = false,notifyParty=true) {
   void updates.check();
 }
 function scoresHTML(s = state) {
-  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Egg</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.health>0?'Alive':p.place?'Eliminated':'Spectator'}</td></tr>`).join('')}</tbody></table>`;
+  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Egg</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isDuos(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
 
   return `<table class="scores"><thead><tr><th>Egg</th><th>Elims</th><th>Downs</th><th>Score</th></tr></thead><tbody>${[
     ...(s?.players || []),
@@ -835,7 +835,8 @@ function processEvents() {
       sound.death(me ? Math.hypot(me.x-e.x, me.z-e.z) : 0,e);
       const row = document.createElement("div");
       row.className = "kill-line" + (e.player === localId ? " me" : "");
-      row.innerHTML = `${esc(e.name)} <span>${esc(e.weapon)}</span> ${esc(e.targetName)}`;
+      const ally=id=>teammates(state.options,me,state.players.find(p=>p.id===id))?"◆ ":"";
+      row.innerHTML = `${ally(e.player)}${esc(e.name)} <span>${esc(e.weapon)}</span> ${ally(e.target)}${esc(e.targetName)}`;
       row.dataset.expire = String(performance.now() + 5500);
       $("#feed").prepend(row);
       while ($("#feed").children.length > 4) $("#feed").lastChild.remove();
@@ -1022,7 +1023,7 @@ async function launchParty(launch){
 }
 function initializeParty(){
  party=new PartyClient(profile,{
-  status:()=>{if(screen==='menu')renderMenu();},
+  status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'&&screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');},
   change:p=>{if(screen==='menu')renderMenu();if(dialogType==='social')void socialMenu();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing';activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);toast(m.message);if(screen==='menu')renderMenu();}
@@ -1485,7 +1486,7 @@ function frameInput() {
 
   const nextInput = {
     seq: ++seq,
-    shotTime:state?.time,
+    shotTime:sim?state?.time:guestPresentation.poses.targetTime(guestPresentation.time),
     yaw: input.yaw,
     pitch: input.pitch,
     forward: active

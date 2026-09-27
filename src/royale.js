@@ -311,6 +311,7 @@ export class RoyaleSimulation extends Simulation {
    const commands=p.bot?null:this.movementInput(p,dt);
    let input=commands?.input||(p.bot?this.botInput(p):this.inputs.get(p.id));
    if(!input||!p.bot&&this.time-p.lastInput>.4)input={yaw:p.yaw,pitch:p.pitch,slot:p.slot};
+   p.executedShotTime=input.shotTime;
 
    if(p.flight==='transport'){
     p.ack=Math.max(p.ack,...(commands?commands.steps.map(i=>i.seq):[input.seq||0]));

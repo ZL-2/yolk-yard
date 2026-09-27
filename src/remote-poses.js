@@ -9,8 +9,9 @@ export class RemotePoses {
    if(this.samples.length>8)this.samples.shift();
   }
  }
+ targetTime(time){return Math.min(this.samples.at(-1)?.time??time,Math.max(this.samples[0]?.time??time,time-.1));}
  players(state,local,time){
-  const target=time-.1;
+  const target=this.targetTime(time);
   let a=this.samples[0],b=a;
   for(const s of this.samples){b=s;if(s.time>=target)break;a=s;}
   return (state.players||[]).map(p=>{

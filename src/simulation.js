@@ -337,6 +337,7 @@ export class Simulation {
       let input = commands?.input || (p.bot ? this.botInput(p) : this.inputs.get(p.id));
       if (!input || (!p.bot && this.time - p.lastInput > 0.4))
         input = { yaw: p.yaw, pitch: p.pitch, slot: p.slot };
+      p.executedShotTime=input.shotTime;
       if (input.slot !== undefined && input.slot !== p.slot) {
         p.slot = input.slot === 1 ? 1 : 0;
         p.reloadEnd = 0;
@@ -425,7 +426,7 @@ export class Simulation {
     for(const id of this.poseHistory.keys())if(!this.players.has(id))this.poseHistory.delete(id);
   }
   shotPose(target,shooter,w){
-    const requested=this.inputs.get(shooter.id)?.shotTime;
+    const requested=shooter.executedShotTime??this.inputs.get(shooter.id)?.shotTime;
     if(!w.hitscan||shooter.bot||!this.remoteInputs.has(shooter.id)||!Number.isFinite(requested))return target;
     const time=clamp(requested,this.time-.18,this.time),history=this.poseHistory?.get(target.id);
     if(!history?.length)return target;

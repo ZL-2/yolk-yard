@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import WebSocket from 'ws';
 import {startRealtimeServer} from '../server/realtime/index.js';
 import {Network} from '../src/network.js';
+import {Simulation} from '../src/simulation.js';
 import {RoyaleSimulation} from '../src/royale.js';
 import {VERSION,safeProfile} from '../src/data.js';
 import {wonRoyale} from '../src/teams.js';
@@ -9,12 +10,12 @@ const app=await startRealtimeServer({port:0,host:'127.0.0.1'}),url=`ws://127.0.0
 globalThis.window={YOLK_NETWORK:{relay:url+'/game'}};
 globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
 const wait=async(fn)=>{const until=Date.now()+12000;while(!fn()){assert.ok(Date.now()<until,'Party check timed out');await new Promise(r=>setTimeout(r,15));}};
-async function social(name){const c={profile:safeProfile({name}),requests:new Map(),serial:0,invites:[],launches:[]},ws=new globalThis.WebSocket(url+'/social');c.ws=ws;clients.push(c);
- ws.on('open',()=>ws.send(JSON.stringify({type:'hello',version:VERSION,profile:c.profile})));
+async function social(name,token=null){const c={profile:safeProfile({name}),requests:new Map(),serial:0,invites:[],launches:[]},ws=new globalThis.WebSocket(url+'/social');c.ws=ws;clients.push(c);
+ ws.on('open',()=>ws.send(JSON.stringify({type:'hello',version:VERSION,profile:c.profile,token})));
  ws.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='hello'){c.id=m.id;c.token=m.token;}if(m.type==='party')c.party=m.party;if(m.type==='invite')c.invites.push(m.invite);if(m.type==='launch')c.launches.push(m.launch);if(m.type==='reply'){const p=c.requests.get(m.request);if(p){clearTimeout(p.timer);c.requests.delete(m.request);m.error?p.reject(Error(m.error)):p.resolve(m.result);}}});
  c.ask=(type,fields={})=>new Promise((resolve,reject)=>{const request=++c.serial,timer=setTimeout(()=>reject(Error('No party reply')),12000);c.requests.set(request,{resolve,reject,timer});ws.send(JSON.stringify({...fields,type,request}));});await wait(()=>c.party);return c;
 }
-function game(c,sim){const g={sim,state:null,errors:[]};g.net=new Network({onJoin:(id,p,a)=>!!sim?.admitPlayer(id,p,a),onRoster:ids=>sim?.setConnectedHumans(ids),onLeave:id=>sim?.leavePlayer(id),getCheckpoint:()=>sim?.checkpoint(),getChatState:()=>sim?.snapshot()||g.state,onState:s=>{g.state=s;},onError:e=>g.errors.push(e)});games.push(g);return g;}
+function game(c,sim){const g={sim,state:null,errors:[]};g.net=new Network({onJoin:(id,p,a)=>!!sim?.admitPlayer(id,p,a),onInput:(id,input)=>sim?.setInput(id,input,true),onRoster:ids=>sim?.setConnectedHumans?.(ids),onLeave:id=>sim?.leavePlayer(id),getCheckpoint:()=>sim?.checkpoint(),getChatState:()=>sim?.snapshot()||g.state,onState:s=>{g.state=s;},onError:e=>g.errors.push(e)});games.push(g);return g;}
 try{
  const a=await social('Party Leader'),b=await social('Party Teammate'),c=await social('Party Solo');
  await a.ask('invite',{id:b.id});await wait(()=>b.invites.length);await b.ask('decline',{id:b.invites[0].id});assert.notEqual(a.party.id,b.party.id);
@@ -39,4 +40,24 @@ try{
  ga.net.broadcast(sim.snapshot());await wait(()=>gb.state?.phase==='results');assert.ok(wonRoyale(gb.state,gb.net.id));assert.deepEqual(games.flatMap(g=>g.errors),[]);
  await a.ask('returned');await b.ask('leave');await wait(()=>a.party.members.length===1);assert.notEqual(a.party.id,b.party.id);
  console.log('PASS No Fill, shared Bus, friendly fire protection, teammate spectating, team victory/placement, party return and leave');
+ const d=await social('Public Captain'),e=await social('Public Challenger');
+ await d.ask('privacy',{value:'open'});await assert.rejects(d.ask('join',{id:d.party.id}),/unavailable/);
+ await d.ask('select',{mode:'ffa'});await e.ask('select',{mode:'ffa'});await d.ask('queue',{options:{fill:true}});
+ await wait(()=>d.launches.length);const publicLaunch=d.launches[0],arena=new Simulation(publicLaunch.options),owner=arena.addPlayer('host',d.profile);arena.assignTeam(owner,publicLaunch.admission);
+ const gd=game(d,arena);await gd.net.host(publicLaunch.code);gd.net.setVisibility('public');gd.net.broadcast(arena.snapshot());gd.net.publishRoom();await d.ask('host-ready',{id:publicLaunch.id});await d.ask('joined',{id:publicLaunch.id});arena.startRound();gd.net.broadcast(arena.snapshot());gd.net.publishRoom();
+ await wait(()=>app.relay.peers.get(gd.net.peer.id)?.listing?.phase==='playing');
+ await e.ask('queue',{options:{fill:true}});await wait(()=>e.launches.length);assert.equal(e.launches[0].code,publicLaunch.code,'public Arena joins an existing active match');
+ const ge=game(e);await ge.net.join(publicLaunch.code,e.profile,e.launches[0].ticket);await e.ask('joined',{id:e.launches[0].id});
+ for(const p of [...arena.players.values()])if(p.bot)arena.removePlayer(p.id);
+ const challenger=arena.players.get(ge.net.id);arena.map={...arena.map,size:500,boxes:[]};arena.time=10;
+ for(const p of [owner,challenger])Object.assign(p,{weapon:'anchor',x:0,y:0,z:p===owner?0:10,health:100,shieldUntil:0,awaitingEntry:false,spectating:false,grounded:true,ammo:[100,10],reloadEnd:0,nextShot:0,accuracyState:[{spread:0},{}]});
+ ge.net.input({seq:1,yaw:0,pitch:Math.atan2(.9-1.43,10),aim:true,fire:true,slot:0,shotTime:10,damage:9999});
+ await wait(()=>arena.inputs.has(ge.net.id));arena.tick(1/60);assert.equal(owner.health,54,'guest input uses host weapon damage');
+ gd.net.broadcast(arena.snapshot());await wait(()=>ge.state?.players.find(p=>p.id==='host')?.health===54);assert.ok(ge.state.events.some(x=>x.type==='shot'&&x.player===ge.net.id&&x.shots[0].end));
+ ge.net.input({seq:2,fire:false,slot:0});await wait(()=>arena.inputs.get(ge.net.id)?.seq===2);
+ arena.setInput('host',{seq:1,yaw:Math.PI,pitch:Math.atan2(.9-1.43,10),aim:true,fire:true,slot:0});arena.tick(1/60);assert.equal(challenger.health,54);gd.net.broadcast(arena.snapshot());await wait(()=>ge.state?.players.find(p=>p.id===ge.net.id)?.health===54);
+ const token=d.token,identity=d.id;d.ws.close();const resumed=await social('Public Captain',token);assert.equal(resumed.id,identity);assert.equal(resumed.party.id,d.party.id);
+ await resumed.ask('returned');await e.ask('returned');await resumed.ask('queue',{custom:true,options:{fill:true}});await resumed.ask('cancel');assert.equal(app.relay.parties.parties.get(resumed.party.id).state,'idle');
+ console.log('PASS public active Arena matchmaking, authenticated social resume, queue cancellation, and host/non-host confirmed hits without client-supplied damage');
+
 }finally{games.forEach(g=>g.net.destroy());clients.forEach(c=>c.ws.close());await app.close();}

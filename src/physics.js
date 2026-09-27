@@ -287,32 +287,3 @@ export function worldHit(map, o, d, max = 200, radius = 0) {
   const ground=terrainHit(map,o,d,best,radius);if(ground)result=ground;
   return result;
 }
-
-// Distance from the shot ray to the shell center in normalized egg space.
-export function isCenterHit(o, d, p) {
-  const scale=p.bodyScale||1;
-  const a = [(o.x-p.x)/(EGG_HIT.radius*scale), (o.y-p.y-EGG_HIT.center*scale)/(EGG_HIT.height*scale), (o.z-p.z)/(EGG_HIT.radius*scale)];
-  const v = [d.x/(EGG_HIT.radius*scale), d.y/(EGG_HIT.height*scale), d.z/(EGG_HIT.radius*scale)];
-  const t = -a.reduce((s,x,i)=>s+x*v[i],0)/v.reduce((s,x)=>s+x*x,0);
-  return t >= 0 && a.reduce((s,x,i)=>s+(x+t*v[i])**2,0) <= 0.32**2;
-}
-
-// The reference damage curve depends on the incidence angle, not a flat bonus.
-export function shellDamageFactor(hit, direction, egg) {
-  if(egg.bodyScale && egg.bodyScale!==1){const scale=egg.bodyScale;return shellDamageFactor({x:egg.x+(hit.x-egg.x)/scale,y:egg.y+(hit.y-egg.y)/scale,z:egg.z+(hit.z-egg.z)/scale},direction,{...egg,bodyScale:1});}
-  const depth = ((hit.x - egg.x) / EGG_HIT.radius) ** 2
-    + ((hit.y - egg.y - EGG_HIT.center) / EGG_HIT.height) ** 2
-    + ((hit.z - egg.z) / EGG_HIT.radius) ** 2;
-  if (depth < 1 - 1e-7) {
-    // An overlapping spawn still scores the entry surface of its shot line.
-    const back = {x:hit.x-direction.x*2, y:hit.y-direction.y*2, z:hit.z-direction.z*2};
-    const entry = rayEgg(back, direction, egg);
-    if (Number.isFinite(entry)) hit = {x:back.x+direction.x*entry, y:back.y+direction.y*entry, z:back.z+direction.z*entry};
-  }
-  const normal = [(hit.x - egg.x) / EGG_HIT.radius ** 2,
-    (hit.y - egg.y - EGG_HIT.center) / EGG_HIT.height ** 2, (hit.z - egg.z) / EGG_HIT.radius ** 2];
-  const length = Math.hypot(...normal) || 1;
-  const incidence = clamp(-(normal[0] * direction.x + normal[1] * direction.y + normal[2] * direction.z) / length, 0, 1);
-  const base = 0.2 + 0.8 * incidence;
-  return base ** (4 + base ** 4);
-}

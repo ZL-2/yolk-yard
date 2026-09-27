@@ -12,6 +12,21 @@ Before switching, run `YOLK_RELAY_URL=wss://YOUR-HOST/game node scripts/relay-li
 
 Server restarts lose rooms; reconnect recovery covers transient socket/network failures within the same process. No user login is added. Origin checks restrict browser use but are not user authentication. This private-alpha service targets modest player counts; multiple instances require a shared routing/room-owner architecture.
 
+## Lobby parties
+
+The same process owns `/social`, independently of gameplay rooms. Opaque per-tab
+resume tokens authenticate party membership and invitations. Mode, leader,
+readiness, privacy and admission tickets are server-controlled. Party queues
+reserve human seats, replace fill bots and preserve invited Duos. Session profiles
+appear in the Social panel; there is no permanent friend/account database. Invites
+expire after 60 seconds and disconnected identities after 90 seconds. Server
+restarts clear ephemeral parties as well as rooms.
+
+The container includes shared `src` modules for profile moderation and match
+options. `/health` advertises `gameVersion` and party capabilities; verify these
+alongside the game deployment. See `docs/party-combat-update.md` for team and combat
+authority. Run `node scripts/party-duos-check.mjs` for the actual relay flow.
+
 ## Owner analytics
 
 The game contains a hidden entry gesture for the owner dashboard. The gesture is **not** authentication: the owner code is checked server-side, and neither the numeric code nor its hash belongs in the public repository or client JavaScript. To enable access, set `YOLK_OWNER_CODE` in the relay host's private environment to a randomly generated **12–32 digit** value. Do not include it in GitHub, Vite variables or `network-config.js`. No valid code exists when this variable is absent. Login is rate-limited, creates a short-lived token held only in the current browser tab's memory, and the protected summary is never returned without that token.
