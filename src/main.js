@@ -620,7 +620,6 @@ function launchRound(){
   if(sim.startRound()===false){toast('Invite another egg or add a bot before launching.');return false;}
   state=sim.snapshot();net?.broadcast(state);enterGame(true);return true;
 }
-function startLocalMatch() {autoQueue=false;options=matchOptions({...options,session:'offline'});beginSim();launchRound();}
 function enterGame(capture = false) {
   guestFire.reset();
   connectionReport.network.reset();

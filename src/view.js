@@ -170,7 +170,7 @@ export function makeEgg(profile, team = -1, withWeapon = true) {
   }
   return group;
 }
-function label(text, color = "#ffffff", compact = false, critical = false) {
+function label(text, color = "#ffffff", compact = false, critical = false, runs = null) {
   const c = document.createElement("canvas");
   c.width = 512;
   c.height = 96;
@@ -189,7 +189,10 @@ function label(text, color = "#ffffff", compact = false, critical = false) {
     ctx.lineWidth = critical ? 7 : 6;
     ctx.strokeText(text.slice(0, 22), 256, 49, 460);
   }
-  ctx.fillText(text.slice(0, 22), 256, 49, 460);
+  if(runs){
+    ctx.textAlign='left';const width=runs.reduce((n,r)=>n+ctx.measureText(r.text).width,0),scale=Math.min(1,460/Math.max(1,width));ctx.translate(256-width*scale/2,0);ctx.scale(scale,1);let x=0;
+    for(const r of runs){ctx.fillStyle=r.color;ctx.strokeText(r.text,x,49);ctx.fillText(r.text,x,49);x+=ctx.measureText(r.text).width;}
+  }else ctx.fillText(text.slice(0, 22), 256, 49, 460);
   const texture = new THREE.CanvasTexture(c);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(
@@ -585,16 +588,17 @@ export class View {
     if (e.type === "hit" && e.player === localId && Number.isFinite(e.x)) {
       const key=e.shotId!=null?e.player+':'+e.shotId+':'+e.target:null;
       const previous=key&&this.fx.find(f=>f.damageText&&f.shotKey===key&&f.life>0);
-      const total=(previous?.amount||0)+e.amount,critical=!!(e.precision||previous?.critical);
-      const next=label(String(Math.max(1,Math.round(total)))+(critical?'!':''),critical?'#ffcf52':'#ffffff',true,critical);
+      const total=(previous?.amount||0)+e.amount,critical=!!(e.precision||previous?.critical),shield=(previous?.shield||0)+(e.shield?e.amount:0),health=total-shield;
+      const runs=[];if(health>0)runs.push({text:String(Math.max(1,Math.round(health)))+(critical?'!':''),color:critical?'#ffcf52':'#ffffff'});if(shield>0)runs.push({text:(health>0?'  ':'')+'◆'+Math.max(1,Math.round(shield))+(critical?'!':''),color:'#79d9ff'});
+      const next=label('', '#ffffff',true,critical,runs);
       next.material.sizeAttenuation=false;next.material.needsUpdate=true;
       if(previous){
         previous.mesh.material.map?.dispose();previous.mesh.material.dispose();previous.mesh.material=next.material;
-        previous.amount=total;previous.critical=critical;previous.life=previous.max=.9;
+        previous.amount=total;previous.shield=shield;previous.critical=critical;previous.life=previous.max=.9;
       }else{
         const height=88/Math.max(1,this.canvas.clientHeight)/this.camera.projectionMatrix.elements[5];
         next.scale.set(height*512/96,height,1);next.position.set(e.x,e.y,e.z);this.effects.add(next);
-        this.fx.push({mesh:next,life:.9,max:.9,damageText:true,critical,drift:0,shotKey:key,amount:total});
+        this.fx.push({mesh:next,life:.9,max:.9,damageText:true,critical,drift:0,shotKey:key,amount:total,shield});
       }
     }
 
@@ -794,8 +798,8 @@ export class View {
       blaster.quaternion.slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(pose.spin,0,0)),blend);
       updateArms(this.menuEgg.userData.arms,pose.reload,blaster,0,1,{release:pose.release,blend});
       const partyOffset=this.partyEggs?.length?1:0,narrow=this.camera.aspect<.85;
-      this.camera.position.set(5.8+partyOffset,4.3,narrow?19:12.5);
-      this.camera.lookAt(partyOffset, narrow?1:1.8, 0);
+      this.camera.position.set(5.8+partyOffset,4.3,narrow?(partyOffset?22.5:19):12.5);
+      this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):1.8, 0);
       this.camera.fov = narrow?47:48;
       this.camera.updateProjectionMatrix();
     } else if (local) {

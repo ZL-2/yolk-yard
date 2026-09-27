@@ -156,5 +156,24 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v4
         id: deployment
+  verify-live:
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[lobby-duos]')
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/lobby-live-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-lobby
+          path: test-results/live-lobby
 
 # Verified menu release: includes completed keybind capture verification.
