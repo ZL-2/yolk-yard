@@ -1666,6 +1666,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
       migrating:!!net?.migrating,
       screen,
       paused,
+      connection:connectionReport.text(__BUILD_ID__),
       predicted,
       input: { ...input },
       building: {...buildControls},
