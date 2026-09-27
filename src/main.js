@@ -42,6 +42,7 @@ import { MAPS, getMap } from "./maps.js";
 import { movePlayer } from "./physics.js";
 import { Simulation } from "./simulation.js";
 import { Network, cleanCode, formatCode } from "./network.js";
+import {MAX_SPECTATORS} from './royale-phases.js';
 import { directory } from "./directory.js";
 import { View } from "./view.js";
 import { Sound } from "./audio.js";
@@ -523,7 +524,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     "connecting",
   );
   const attempt = new Network(callbacks());
-  attempt.maxConnections=(options.capacity||8)-1+(options.mode==='royale'?8:0);
+  attempt.maxConnections=(options.capacity||8)-1+(options.mode==='royale'?MAX_SPECTATORS:0);
   net = attempt;
   try {
     await attempt.host();

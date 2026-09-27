@@ -1,4 +1,5 @@
 import {lootModel,gliderModel} from './royale-art.js';
+import {inventoryPreview} from './inventory-previews.js';
 import {adsFov} from './weapon-presentation.js';
 import {animatePickaxe} from './pickaxe-animation.js';
 import {buildIsland,RoyaleView} from './royale-view.js';
@@ -27,6 +28,13 @@ const palette = {
   steel: 0x6b8292,
   cream: 0xece5d0,
 };
+function makeRenderer(options){
+  const renderer=new THREE.WebGLRenderer(options);
+  // Driver diagnostic queries synchronously wait for compilation. Keep them in
+  // development; published builds precompile map programs asynchronously.
+  renderer.debug.checkShaderErrors=!!import.meta.env?.DEV;
+  return renderer;
+}
 const materials = new Map(),
   boxGeo = new THREE.BoxGeometry(1, 1, 1),
   sphereGeo = new THREE.SphereGeometry(1, 16, 12);
@@ -197,7 +205,7 @@ export class View {
   constructor(canvas, settings) {
     this.canvas = canvas;
     this.settings = settings;
-    this.renderer = new THREE.WebGLRenderer({
+    this.renderer = makeRenderer({
       canvas,
       antialias: true,
       powerPreference: "high-performance",
@@ -345,6 +353,7 @@ export class View {
   loadMap(id) {
     if (id === this.mapId) return;
     this.mapId = id;
+    this.needsMapCompile=true;
     const map = getMap(id);
     this.disposeGroup(this.world);
     this.scene.background = new THREE.Color(map.sky);
@@ -442,7 +451,7 @@ export class View {
   }
   eggPortrait(profile, size = 440, withWeapon = true) {
     if (!this.portraitRenderer) {
-      this.portraitRenderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
+      this.portraitRenderer = makeRenderer({alpha: true, antialias: true});
 
       this.portraitRenderer.setPixelRatio(1);
     }
@@ -461,13 +470,14 @@ export class View {
     return image;
   }
   weaponPreview(id) {
+    if(!this.generatingPreviews&&inventoryPreview(id))return inventoryPreview(id);
     if (!this.portraits.has(id))
       this.portraits.set(id, weaponPortrait(this.renderer, id));
     return this.portraits.get(id);
   }
   shopPortrait(item,angle=0){
     this.shopPortraits??=new Map();const key=(item.previewKey||item.id)+':'+angle;if(this.shopPortraits.has(key))return this.shopPortraits.get(key);
-    if(!this.portraitRenderer){this.portraitRenderer=new THREE.WebGLRenderer({alpha:true,antialias:true});this.portraitRenderer.setPixelRatio(1);}
+    if(!this.portraitRenderer){this.portraitRenderer=makeRenderer({alpha:true,antialias:true});this.portraitRenderer.setPixelRatio(1);}
     this.portraitRenderer.setSize(320,320);
     const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0x768697,3));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(-3,5,-4);scene.add(light);
     let model;
@@ -495,9 +505,10 @@ export class View {
     return g;
   }
   itemPreview(item) {
+    if(!this.generatingPreviews&&inventoryPreview(item.id))return inventoryPreview(item.id);
     if(item.weapon)return this.weaponPreview(item.id);
     const key='item:'+item.id;if(this.portraits.has(key))return this.portraits.get(key);
-    if(!this.portraitRenderer){this.portraitRenderer=new THREE.WebGLRenderer({alpha:true,antialias:true});this.portraitRenderer.setPixelRatio(1);}
+    if(!this.portraitRenderer){this.portraitRenderer=makeRenderer({alpha:true,antialias:true});this.portraitRenderer.setPixelRatio(1);}
     this.portraitRenderer.setSize(192,144);
     const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0x7d8c82,2.8));
     const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(-3,5,4);scene.add(light);
@@ -1137,6 +1148,12 @@ export class View {
     }
     if(playing&&this.scopeActive&&gun(local).ads?.overlay&&this.aimBlend>.8)this.gunGroup.visible=false;
     this.royaleView.update(state,local,dt,playing);
+    if(this.needsMapCompile){
+      this.needsMapCompile=false;
+      const job=this.renderer.compileAsync(this.scene,this.camera);this.mapCompile=job;
+      job.catch(error=>console.error('Map shader preparation failed',error)).finally(()=>{if(this.mapCompile===job)this.mapCompile=null;});
+    }
+    if(this.mapCompile)return;
     this.renderer.render(this.scene, this.camera);
   }
 }

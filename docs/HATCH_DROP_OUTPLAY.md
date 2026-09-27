@@ -1,6 +1,8 @@
-# Quality Update 53 — Hatch, Drop & Outplay
+# Quality Updates 53–54 — Hatch, Drop & Outplay / Smooth Boarding
 
 This release extends Sunnybreak Reborn (Quality Update 52). It preserves its nine districts, 17 landmarks, modeled blasters, configurable optics, distinct ammunition, authored loot sockets, harvesting, building and maps. Protocol 16 prevents older clients from entering rooms with incompatible phase and inventory rules.
+
+Update 54 follows live profiling: inventory previews are shipped as cached images rendered from the same item models, avoiding synchronous GPU readbacks during play. Run `node scripts/generate-inventory-previews.mjs` when item geometry changes. Map shader preparation uses Three's asynchronous compilation API; production omits synchronous driver diagnostic queries while development retains them. Spectator capacity is four, keeping sixteen contestants and all observers within the deployed relay limit.
 
 ## Match flow and authority
 
@@ -10,7 +12,7 @@ Hatchling Atoll is a separate 128 m practice island with a terminal, stairs and 
 
 The host owns a 30-second countdown and requires at least two contestants (including configured bots). The last five seconds enter `starting`. Contestant admission stays open until the atomic Battle Bus transition. That transition replaces the map, navigation graph, builds, destruction, loot, chests, projectiles, inputs, effects and temporary powers; it resets health, shield, inventory, ammunition and materials. Cosmetics persist. The rematch returns to a fresh Atoll and resets tip dismissal.
 
-After departure, public listings say Spectate. Up to eight late spectators occupy separate seats beyond the sixteen contestants. Their health is zero; they are excluded from collision, damage, pickup, build, harvest, team balance, alive count, placement and victory logic. Forged rejoin/respawn/input commands do not admit them. Existing spectator controls follow living players. Match identity, stage, contestant flags, random state and loot survive host transfer. A departing contestant's existing bot takeover behavior preserves that contestant's life; spectators never create a replacement contestant.
+After departure, public listings say Spectate. Up to four late spectators occupy separate seats beyond the sixteen contestants. Their health is zero; they are excluded from collision, damage, pickup, build, harvest, team balance, alive count, placement and victory logic. Forged rejoin/respawn/input commands do not admit them. Existing spectator controls follow living players. Match identity, stage, contestant flags, random state and loot survive host transfer. A departing contestant's existing bot takeover behavior preserves that contestant's life; spectators never create a replacement contestant.
 
 ## Falls, launches and dropped items
 

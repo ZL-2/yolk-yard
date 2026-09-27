@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+  { number: "44", title: "Smooth Boarding", changes: [
+    "Inventory images are now pre-rendered from the actual item models, removing GPU readback stalls when entering matches and collecting new equipment. Island shaders prepare asynchronously while networking continues.",
+    "Four separate spectator seats now fit safely alongside sixteen contestants on the deployed multiplayer relay. Admission and host recovery share the same capacity rule.",
+    "Includes Hatch, Drop & Outplay: playable Spawn Island, authoritative late-join spectating, shared tactical bot intelligence, landing damage and launch protection, falling loot, Shell Market and Locker improvements, gliding and streak animation, and first-slot pickaxe controls."
+  ] },
   { number: "43", title: "Hatch, Drop & Outplay", changes: [
     "Warm up on playable Hatchling Atoll before the Eggspress. One authoritative countdown moves every contestant to Sunnybreak with fresh health, gear and materials. Practice actions never earn match rewards.",
     "Battle Bus departure closes contestant admission. Active public matches offer Spectate, with eight separate spectator seats, protected win conditions and host-migration continuity.",

@@ -35,6 +35,8 @@ test('late join is spectator-only at capacity; forged entry/input/build/pickup r
  for(const action of ['respawn','rejoin','team-entry-0','inventory-select-1','inventory-drop-1','build-repair'])s.playerAction(guest.id,action);
  s.spawn(guest);s.setInput(guest.id,{seq:4,fire:true,buildMode:true,jump:true},true);s.tick(1/60);assert.equal(guest.health,0);assert.equal(s.builds.length,0);assert.equal(s.takeLoot(guest,s.loot[0]),false);assert.equal(s.loot.length,loot);
  s.leavePlayer(guest.id);assert.equal(s.alive,2);assert.equal(s.players.size,2);
+ for(let i=0;i<4;i++)assert.ok(s.admitPlayer('observer-'+i,{name:'Observer '+i})?.lateSpectator);
+ assert.equal(s.admitPlayer('overflow',{name:'Overflow'}),null);assert.equal(s.alive,2);
 });
 
 test('ordinary landing damage uses the fall apex, respects small jumps, higher landing floors and shields',()=>{
