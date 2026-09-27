@@ -403,6 +403,11 @@ export class View {
     }
 
   }
+  setParty(profiles){
+    const key=JSON.stringify(profiles);if(key===this.partyPreviewKey)return;this.partyPreviewKey=key;
+    for(const egg of this.partyEggs||[]){this.scene.remove(egg);this.disposeGroup(egg);}this.partyEggs=[];
+    for(const [i,profile]of profiles.slice(0,1).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.1);egg.position.set(4.1+i*2.5,.08,-.7);egg.rotation.y=.25;this.scene.add(egg);this.partyEggs.push(egg);}
+  }
   preview(profile) {
     const signature = JSON.stringify(profile);
     if (signature === this.previewSignature) return;
@@ -417,6 +422,7 @@ export class View {
     const held=this.menuEgg.userData.held;held.updateMatrix();
     this.menuShoulders=this.menuEgg.userData.arms.userData.limbs.map(l=>l.shoulder.clone().applyMatrix4(held.matrix));
     this.scene.add(this.menuEgg);
+    if(!this.lobbyStage){this.lobbyStage=new THREE.Group();for(const x of [0,4.1]){const pad=new THREE.Mesh(new THREE.CylinderGeometry(1.8,2,.24,48),new THREE.MeshStandardMaterial({color:0x577b72,roughness:.75}));pad.position.set(x,-.04,x?-.7:0);this.lobbyStage.add(pad);const ring=new THREE.Mesh(new THREE.TorusGeometry(1.83,.035,6,48),new THREE.MeshBasicMaterial({color:0xffdf81}));ring.rotation.x=Math.PI/2;ring.position.set(x,.09,x?-.7:0);this.lobbyStage.add(ring);}this.scene.add(this.lobbyStage);}
   }
   aimMenu(clientX,clientY){
     const r=this.canvas.getBoundingClientRect();
@@ -592,7 +598,7 @@ export class View {
     }
 
     if (e.type === "shot" || e.type === "launch") {
-      if (e.player === localId) this.recoil = Math.min(1.6, this.recoil + 0.85);
+      if (e.player === localId&&!e.echoed) this.recoil = Math.min(1.6, this.recoil + weapon(e.weapon).recoilUp*70);
       const actor = this.models.get(e.player);
       if(e.type==='launch'&&e.popper){
         if(e.player===localId)this.localThrowStart=this.clock;
@@ -730,8 +736,10 @@ export class View {
           shot.vy,
           shot.vz,
         ).normalize();
+        const end=shot.end?new THREE.Vector3(shot.end.x,shot.end.y,shot.end.z):null;
+        const length=end?Math.min(80,end.distanceTo(pos)):.65;
         const trace = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.018, 0.027, 0.65, 7),
+          new THREE.CylinderGeometry(0.012, 0.02, length, 5),
           new THREE.MeshBasicMaterial({
             color: weapon(e.weapon).color,
             transparent: true,
@@ -739,7 +747,7 @@ export class View {
             toneMapped: false,
           }),
         );
-        trace.position.copy(pos);
+        trace.position.copy(pos);if(end)trace.position.addScaledVector(end.clone().sub(pos).normalize(),length/2);
         trace.quaternion.setFromUnitVectors(
           new THREE.Vector3(0, 1, 0),
           direction,
@@ -750,7 +758,7 @@ export class View {
           fresh: true,
           life: 0.04,
           max: 0.04,
-          v: new THREE.Vector3(shot.vx, shot.vy, shot.vz),
+          v: end?new THREE.Vector3():new THREE.Vector3(shot.vx, shot.vy, shot.vz),
           noGravity: true,
           ownedMaterial: true,
           ownedGeometry: true,
@@ -764,6 +772,8 @@ export class View {
     this.recoil = Math.max(0, this.recoil - dt * 7);
     this.loadMap(state?.options.map || "yard");
     if (this.menuEgg) this.menuEgg.visible = !playing;
+    if(this.lobbyStage)this.lobbyStage.visible=!playing;
+    for(const egg of this.partyEggs||[])egg.visible=!playing;
     this.actors.visible = playing;
     this.effects.visible = playing;
     this.gunGroup.visible = playing && local?.health > 0 && (!local.inventory || local.flight==='ground');
@@ -779,9 +789,10 @@ export class View {
       blaster.position.lerp(new THREE.Vector3(0,pose.flight,0),blend);
       blaster.quaternion.slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(pose.spin,0,0)),blend);
       updateArms(this.menuEgg.userData.arms,pose.reload,blaster,0,1,{release:pose.release,blend});
-      this.camera.position.set(7.5, 5.2, 12.5);
-      this.camera.lookAt(0, 1.7, 0);
-      this.camera.fov = 51;
+      const partyOffset=this.partyEggs?.length?1:0,narrow=this.camera.aspect<.85;
+      this.camera.position.set(5.8+partyOffset,4.3,narrow?19:12.5);
+      this.camera.lookAt(partyOffset, narrow?1:1.8, 0);
+      this.camera.fov = narrow?47:48;
       this.camera.updateProjectionMatrix();
     } else if (local) {
       const killer = local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && p.health > 0);
@@ -792,7 +803,7 @@ export class View {
         this.stairEye.y + EYE * (p.bodyScale || 1) + (local.health <= 0 ? 0.8 : 0),
         p.z,
       );
-      this.camera.rotation.set(p.pitch, p.yaw, 0, "YXZ");
+      this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
       if (killer) {
         const back = new THREE.Vector3(Math.sin(p.yaw), 0.35, Math.cos(p.yaw)).normalize();
         const origin = {x:p.x, y:p.y+1.6, z:p.z};
@@ -901,12 +912,12 @@ export class View {
           model.userData.signature = sig;
           const name = label(
             p.name,
-            p.team === 0 && mode(state.options.mode).teams
+            teammates(state.options,p,local)
               ? "#b3f2ff"
               : "#ffffff",
           );
           name.position.y = 2.08;
-          name.visible = !state.royale;
+          name.visible = !state.royale||teammates(state.options,p,local);
           model.add(name);
           this.actors.add(model);
           this.models.set(p.id, model);
@@ -1157,3 +1168,4 @@ export class View {
     this.renderer.render(this.scene, this.camera);
   }
 }
+import {teammates} from './teams.js';

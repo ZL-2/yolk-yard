@@ -113,10 +113,10 @@ export class Network {
       });
     });
   }
-  async host() {
+  async host(reservedCode) {
     this.isHost = true;
     this.id = "host";
-    this.code = roomCode();
+    this.code = reservedCode?cleanCode(reservedCode):roomCode();
     await this.makePeer(PREFIX + this.code);
     this.ready = true;
     this.rejectOpen = null;
@@ -177,6 +177,7 @@ export class Network {
         const result = this.callbacks.onJoin?.(
           conn.peer,
           safe,
+          msg.admission,
         );
         if (result === false) {
           conn.send({ type: "reject", reason: "This room is full." });
@@ -230,7 +231,8 @@ export class Network {
     conn.on("close", close);
     conn.on("error", close);
   }
-  async join(code, profile) {
+  async join(code, profile, ticket) {
+    this.ticket=ticket;
     this.joinProfile=safeProfile(profile);
     this.code = cleanCode(code);
     if (this.code.length !== 8)
@@ -262,6 +264,7 @@ export class Network {
           type: "hello",
           version: VERSION,
           profile: safeProfile(profile),
+          ticket:this.ticket,
         }),
       );
       conn.on("data", (msg) => {
@@ -418,9 +421,9 @@ export class Network {
     const s = this.snapshot;
     const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
     const capacity=s?.royale?Math.min(s.options.capacity,MAX_HUMANS):(s?.options.capacity||8);
-    const listing=this.visibility === "public" && s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Egg",map:s.options.map,mode:s.options.mode,players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase} : null;
+    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Egg",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,public:this.visibility==='public',players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase} : null;
     if(relayURL())(this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer)?.publish?.(listing);
-    else directory.publish(listing);
+    else directory.publish(this.visibility==='public'?listing:null);
   }
   broadcast(state) {
     this.snapshot = state;
@@ -467,7 +470,7 @@ export class Network {
   submitName(profile){
     this.joinProfile=safeProfile(profile);
     if(this.isHost){if(this.nameTaken(profile.name,this.id)){this.callbacks.onNameRequired?.();return;}this.callbacks.onProfile?.(this.id,this.joinProfile);this.callbacks.onNameAccepted?.();}
-    else this.send(this.nameJoining?{type:'hello',version:VERSION,profile:this.joinProfile}:{type:'profile',profile:this.joinProfile});
+    else this.send(this.nameJoining?{type:'hello',version:VERSION,profile:this.joinProfile,ticket:this.ticket}:{type:'profile',profile:this.joinProfile});
   }
   beginMigration(){
     if(this.closed||this.isHost||this.migrating)return;

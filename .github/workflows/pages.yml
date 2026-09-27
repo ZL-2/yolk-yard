@@ -1,7 +1,7 @@
 name: Test and publish Yolk Yard
 on:
   push:
-    branches: [main, match-setup]
+    branches: [main, match-setup, better-together]
     paths-ignore:
       - public/room-test.html
       - public/room-test.js
@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,6 +29,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Verify party service, Duo rules and responsive lobby
+        if: contains(github.event.head_commit.message, '[lobby-duos]')
+        run: |
+          node scripts/party-duos-check.mjs
+          npx playwright install --with-deps chromium
+          node scripts/lobby-duos-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[lobby-duos]')
+        with:
+          name: lobby-duos
+          path: test-results/lobby-duos
       - name: Verify settings categories, controls and responsive layout
         if: contains(github.event.head_commit.message, '[settings-layout]')
         run: |

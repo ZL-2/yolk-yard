@@ -1,4 +1,5 @@
 import {inventoryActionForSlot} from './keybinds.js';
+import {teammates,isDuos} from './teams.js';
 import {getMap} from './maps.js';
 import {buildIcon} from './building-ui.js';
 import {gun} from './data.js';
@@ -23,6 +24,7 @@ export class RoyaleUI{
    <div class="royale-mobile"><button data-touch="sprint" aria-label="Hold to sprint">SPRINT</button><button data-touch="interact" aria-label="Hold to search or pick up">USE / TAKE</button></div>
   </div>`);
   this.root=document.querySelector('#royale-hud');
+  this.root.insertAdjacentHTML('beforeend','<div class="duo-hud" id="duo-hud" hidden></div>');
  }
  dismissFlight(){this.flightDismissed=true;document.getElementById('royale-flight').hidden=true;}
  slotMarkup(p,inventory=false){const slots= (p.inventory||Array(6).fill(null)).map((item,index)=>{
@@ -73,13 +75,16 @@ export class RoyaleUI{
    c.font='800 13px system-ui';c.textAlign='center';c.strokeStyle='#23453b';c.lineWidth=3;c.fillStyle='#fff9e5';for(const poi of map.districts){const [x,z]=point(poi.x,poi.z);c.strokeText(poi.name.toUpperCase(),x,z-35*s);c.fillText(poi.name.toUpperCase(),x,z-35*s);}}
   for(const chest of r.chests||[])if(chest.supply&&!chest.opened){const [x,z]=point(chest.x,chest.z);c.fillStyle='#ffd377';c.beginPath();c.moveTo(x,z-5);c.lineTo(x+5,z);c.lineTo(x,z+5);c.lineTo(x-5,z);c.closePath();c.fill();}
   if(this.waypoint){const[x,z]=point(this.waypoint.x,this.waypoint.z);c.fillStyle='#ffdd77';c.strokeStyle='#493e23';c.lineWidth=2;c.beginPath();c.arc(x,z,full?7:5,0,Math.PI*2);c.fill();c.stroke();}
+  for(const mate of state.players.filter(o=>teammates(state.options,p,o)&&o.contestant&&o.health>0)){const [x,z]=point(mate.x,mate.z);c.fillStyle='#74ffdb';c.strokeStyle='#124641';c.lineWidth=2;c.beginPath();c.arc(x,z,full?7:5,0,Math.PI*2);c.fill();c.stroke();if(full){c.font='bold 12px system-ui';c.fillText(mate.name,x,z-12);}}
   if(p){const[x,z]=point(p.x,p.z);c.save();c.translate(x,z);c.rotate(-p.yaw);c.fillStyle='#fff';c.strokeStyle='#244c5c';c.lineWidth=2;c.beginPath();c.moveTo(0,-8);c.lineTo(5,6);c.lineTo(0,3);c.lineTo(-5,6);c.closePath();c.fill();c.stroke();c.restore();}
   c.font=`800 ${full?18:12}px system-ui`;c.textAlign='center';c.fillStyle='#fff';c.fillText('N',w/2,full?23:16);
  }
  update(state,local,watched,label,paused){
-  const active=!!state?.royale;this.root.hidden=!active;document.body.classList.toggle('in-royale',active);document.body.classList.toggle('in-spawn-island',!!state?.royale?.practice);
+  const active=!!state?.royale;this.root.hidden=!active;document.body.classList.toggle('in-royale',active);document.body.classList.toggle('in-duos',active&&isDuos(state.options));document.body.classList.toggle('in-spawn-island',!!state?.royale?.practice);
   if(!active||!local)return;
   const $=id=>document.getElementById(id),r=state.royale,p=watched||local;
+  const mate=state.players.find(o=>teammates(state.options,local,o)&&o.contestant),duo=$('duo-hud');duo.hidden=!isDuos(state.options);
+  if(!duo.hidden){const markup=mate?`<small>YOUR DUO · ${mate.health>0?Math.round(Math.hypot(mate.x-local.x,mate.z-local.z))+' m':'ELIMINATED'}</small><strong>◆ ${escape(mate.name)}</strong><progress class="shield" value="${mate.shield||0}" max="100" aria-label="Teammate shield"></progress><progress value="${Math.max(0,mate.health)}" max="100" aria-label="Teammate health"></progress><small>${Math.ceil(Math.max(0,mate.health))} HEALTH · ${Math.ceil(mate.shield||0)} SHIELD</small>`:'<small>DUOS · NO TEAMMATE</small>';if(duo.innerHTML!==markup)duo.innerHTML=markup;}
   const matchKey=r.matchId+':'+state.round;if(this.flightMatch!==matchKey){this.flightMatch=matchKey;this.flightDismissed=false;}
   $('royale-flight-close').textContent=label('dismissFlight')+' Close';
   const closest=getMap(state.options.map).districts.reduce((a,b)=>Math.hypot(b.x-p.x,b.z-p.z)<Math.hypot(a.x-p.x,a.z-p.z)?b:a);
@@ -87,6 +92,7 @@ export class RoyaleUI{
   $('royale-compass').textContent=`${['N','NE','E','SE','S','SW','W','NW'][Math.round(heading/45)%8]}  ${Math.round(heading)}°  ·  ${Math.hypot(closest.x-p.x,closest.z-p.z)<62?closest.name:'Sunnybreak Wilds'}${this.waypoint?'   ◆ '+Math.round(Math.hypot(p.x-this.waypoint.x,p.z-this.waypoint.z))+' m':''}`;
   $('royale-alive').textContent=r.alive;$('royale-elims').textContent=local.kills||0;$('royale-phase').textContent=r.practice?'SPAWN ISLAND':r.elapsed<35?'DROP ZONE':`STORM ${r.storm.index+1}`;
   $('royale-alive').textContent=r.practice?r.contestants:r.alive;
+  if(isDuos(state.options)&&!r.practice)$('royale-phase').textContent=`${r.teamsAlive} DUOS · STORM ${r.storm.index+1}`;
   this.drawMap($('royale-mini'),state,p);this.drawMap($('royale-fullmap'),state,p,true);
   $('shield').textContent=Math.ceil(p.shield||0);$('shield-fill').style.width=Math.max(0,Math.min(100,p.shield||0))+'%';$('royale-stamina').textContent=Math.ceil(p.stamina||0);$('royale-stamina-fill').style.width=(p.stamina||0)+'%';
   this.label=label;const key=JSON.stringify([p.inventory,p.slot,[0,1,2,3,4,5].map(i=>label(inventoryActionForSlot(i)))]);if(key!==this.lastKey){$('royale-hotbar').innerHTML=this.slotMarkup(p);this.lastKey=key;}

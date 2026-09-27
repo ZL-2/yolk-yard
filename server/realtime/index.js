@@ -3,17 +3,18 @@ import {pathToFileURL} from 'node:url';
 import {WebSocketServer} from 'ws';
 import {RealtimeRelay} from './relay.js';
 import {OwnerService} from './owner.js';
+import {VERSION} from '../../src/data.js';
 export async function startRealtimeServer({port=Number(process.env.PORT)||3000,host='0.0.0.0',origins=(process.env.ALLOWED_ORIGINS||'https://zl-2.github.io').split(',')}={}){
   const relay=new RealtimeRelay();
   const owner=new OwnerService();await owner.ready;
   const server=createServer((req,res)=>{
     if(req.url?.startsWith('/owner/')){void owner.handle(req,res,{origins,relay});return;}
-    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2'}:{error:'Not found'}));
+    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,features:['parties','duos','party-reservations']}:{error:'Not found'}));
   });
   const sockets=new WebSocketServer({noServer:true,maxPayload:2_000_000,perMessageDeflate:false});
   server.on('upgrade',(req,socket,head)=>{
-    if(req.url!=='/game'||!origins.includes(req.headers.origin)){socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');return;}
-    sockets.handleUpgrade(req,socket,head,ws=>relay.attach(ws));
+    if(!['/game','/social'].includes(req.url)||!origins.includes(req.headers.origin)){socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');return;}
+    sockets.handleUpgrade(req,socket,head,ws=>req.url==='/social'?relay.parties.attach(ws):relay.attach(ws));
   });
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,host,resolve);});
   return {server,relay,owner,async close(){relay.close();for(const ws of sockets.clients)ws.terminate();await new Promise(r=>sockets.close(r));await new Promise(r=>server.close(r));await owner.close();}};

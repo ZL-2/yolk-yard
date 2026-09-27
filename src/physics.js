@@ -223,6 +223,7 @@ export function sanitizeInput(i = {}) {
     jump: !!i.jump,
     fire: !!i.fire,
     aim: !!i.aim,
+    shotTime: Number.isFinite(i.shotTime)?i.shotTime:null,
     reload: !!i.reload,
     popper: !!i.popper,
     slot: Number.isInteger(i.slot) && i.slot>=0 && i.slot<6 ? i.slot : 0,

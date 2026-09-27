@@ -1,4 +1,5 @@
 import {gun,weapon,mode} from './data.js';
+import {falloffAt} from './combat.js';
 import {ITEMS,ammoType,AMMO_CAPS} from './royale-data.js';
 import {dist,candidates,canStand} from './physics.js';
 import {groundAt} from './terrain.js';
@@ -9,7 +10,7 @@ export function selectWeapon(p,target){
  const distance=target?dist(p,target):22;
  if(!p.inventory){const primary=weapon(p.weapon);return p.ammo[1]>0&&(!p.ammo[0]&&(!p.reserve[0]||distance<10)||distance<8&&(primary.optic==='scope'||primary.projectile))?1:0;}
  const options=p.inventory.map((item,slot)=>({item,slot})).filter(({item})=>item?.weapon&&(item.ammo>0||p.bank[ammoType(item.id)]>0));
- const score=({item,slot})=>{const w=weapon(item.id);return (item.ammo>0?15:0)+(slot===p.slot?3:0)+(item.rarity||0)*2+(w.pellets>1?(distance<10?28:-12):w.optic==='scope'?(distance>25?25:-8):15)-(w.projectile&&distance<8?80:0);};
+ const score=({item,slot})=>{const w=weapon(item.id),[near,far]=w.engage;return (item.ammo>0?15:0)+(slot===p.slot?4:0)+(item.rarity||0)*2+falloffAt(w,distance)*22+(distance>=near&&distance<=far?12:-Math.min(20,Math.abs(distance-(near+far)/2)*.3))-(w.projectile&&distance<8?80:0);};
  options.sort((a,b)=>score(b)-score(a));return options[0]?.slot||0;
 }
 export function usefulLoot(p,item){
@@ -64,7 +65,7 @@ export function chooseObjective(sim,p,brain,skill,target){
   if(needs){const anchors=(sim.map.floorLoot||[]).filter(q=>q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35).sort((a,b)=>dist(p,a)-dist(p,b));if(anchors[0])return {kind:'search-room',goal:anchors[0],id:anchors[0].id};}
  }
  if(target)return {kind:'investigate',goal:{x:target.x,y:target.y,z:target.z},id:target.id};
- if(mode(sim.options.mode).teams){const mates=[...sim.players.values()].filter(t=>t!==p&&t.team===p.team&&t.health>0&&t.brain?.target&&dist(p,t)<45);if(mates[0])return {kind:'support',goal:{x:mates[0].x+brain.side*5,y:mates[0].y,z:mates[0].z}};}
+ if(teamMode(sim.options)){const mates=[...sim.players.values()].filter(t=>teammates(sim.options,p,t)&&t.health>0&&dist(p,t)<70);const mate=mates.find(t=>t.brain?.target)||mates.find(t=>dist(p,t)>22);if(mate)return {kind:'support',goal:{x:mate.x+brain.side*5,y:mate.y,z:mate.z}};}
  if(!p.inventory){const pickup=sim.pickups?.filter(i=>sim.time>=i.availableAt&&(i.type==='health'&&p.health<70||i.type==='ammo'&&p.reserve[p.slot]<10)).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(pickup)return {kind:'resupply',goal:pickup};}
  const landmarks=royale?[...(sim.map.districts||[]),...(sim.map.landmarks||[])]:(sim.map.spawns||[[0,0]]).map(([x,z],i)=>({x,z,id:'patrol-'+i}));
  const safeLandmarks=landmarks.filter(q=>!sim.storm?.active||!royale||Math.hypot(q.x-sim.storm.nextX,q.z-sim.storm.nextZ)<sim.storm.nextRadius*.9);
@@ -72,3 +73,4 @@ export function chooseObjective(sim,p,brain,skill,target){
  choices.sort((a,b)=>((brain.visited[a.id||a.name]||-100)+dist(p,a)*.2)-((brain.visited[b.id||b.name]||-100)+dist(p,b)*.2));
  const q=choices[0]||{x:0,z:0};return {kind:royale?'rotate-poi':'patrol',id:q.id||q.name,goal:{x:q.x,y:q.y??groundAt(sim.map,q.x,q.z),z:q.z}};
 }
+import {teammates,teamMode} from './teams.js';

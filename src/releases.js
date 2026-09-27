@@ -1,4 +1,11 @@
 export const RELEASE_NOTES = [
+  { number: "50", title: "Better Together", changes: [
+    "An original Yolk Yard lobby puts customized eggs on center stage, with Play, Locker, Item Shop, Career, Updates, Settings and Social. Public matchmaking is the primary action; Custom Match remains available. The separate offline-bot Play flow has been retired.",
+    "Relay-backed lobby parties support invitations, acceptance, decline, leader controls, privacy, readiness and reconnects. Party members appear together and enter public or custom matches together, with reserved human seats and bot replacement.",
+    "Yolk Royale Duos adds Fill / No Fill, protected teammates, team markers and vitals, bot partners, teammate spectating, shared placement and last-Duo victory. Teams persist through Spawn Island, the Eggspress and host recovery. Existing 32-contestant capacity and the authoritative online countdown are preserved.",
+    "Eleven fictional blasters now use centralized, distinct damage falloff, upper-shell critical hits, rarity scaling, accuracy recovery, bloom, recoil, pellet patterns and build damage. Bots use the same combat rules. Scoped aiming stays stable and your scope sensitivity is preserved.",
+    "Immediate firing feedback pairs with host-confirmed trajectories and damage. Most blasters use authoritative hitscan; Needle bolts and explosive projectiles retain travel. Bounded target-history compensation supports remote hits, and reticles communicate actual spread and first-shot readiness. Refresh to join updated rooms."
+  ] },
   { number: "49", title: "Settings, Your Way", changes: [
     "Settings now use a wide category-tab layout with Video, Audio, Mouse, HUD, Gameplay and Keybinds sections, plus contextual descriptions for the selected option.",
     "Yolk Yard paper-and-ink styling, gold active tabs, independently scrolling options, a persistent footer and a compact mobile layout keep every control easy to reach. Existing automatic saves, resets and keybind Apply / Discard behavior are preserved."
