@@ -6,7 +6,8 @@ import {movePlayer,sanitizeInput} from '../src/physics.js';
 import {RemoteInputBuffer} from '../src/remote-input.js';
 
 for(const Type of [Simulation,RoyaleSimulation])test(Type.name+' prediction matches acknowledgements under burst delivery',()=>{
- const sim=new Type({map:'yard',bots:0,fill:false,capacity:2,seed:12});
+ // Keep this movement fixture on Spawn Island: a full human roster now departs immediately.
+ const sim=new Type({map:'yard',bots:0,fill:false,capacity:4,seed:12});
  const p=sim.addPlayer('guest',{name:'Guest'});sim.addPlayer('host',{name:'Host'});sim.startRound();
  if(Type===Simulation)sim.spawn(p);
  sim.map={size:1000,boxes:[]};
