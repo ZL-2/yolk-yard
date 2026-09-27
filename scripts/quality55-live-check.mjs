@@ -10,7 +10,8 @@ await mkdir(out,{recursive:true});const pass=s=>{checks.push(s);console.log('PAS
 async function make(name){
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-background-timer-throttling','--disable-renderer-backgrounding']});browsers.push(browser);
  const page=await browser.newPage({viewport:name.includes('Guest')?{width:620,height:430}:{width:1100,height:700},deviceScaleFactor:.3});pages.push(page);page.setDefaultTimeout(120000);page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',name,e.message);});
- await page.addInitScript(name=>{localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));},name);
+ page.on('console',m=>{if(/^(RELAY_CLOSE|LONG_TASK)/.test(m.text()))console.log(m.text());});
+ await page.addInitScript(name=>{const Native=window.WebSocket;window.WebSocket=class extends Native{constructor(...args){super(...args);this.addEventListener('close',e=>console.log('RELAY_CLOSE',name,e.code,e.reason));}};new PerformanceObserver(list=>{for(const e of list.getEntries())if(e.duration>2000)console.log('LONG_TASK',name,Math.round(e.duration));}).observe({entryTypes:['longtask']});localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));},name);
  await page.goto(base+'?verify='+Date.now());await page.locator('[data-action="play"]').waitFor();assert.equal(await page.evaluate(()=>typeof window.__yolkTest),'undefined');return page;
 }
 async function enter(page){await page.waitForFunction(()=>!document.querySelector('#royale-hud')?.hidden);if(await page.locator('#dialog [data-action="resume"]').isVisible())await page.locator('#dialog [data-action="resume"]').click();}
