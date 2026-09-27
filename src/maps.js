@@ -333,22 +333,25 @@ export function navigation(map) {
     origin = -map.size + cell / 2;
   const cells = Array.from({ length: n * n }, () => []),
     nodes = [];
+  const buckets=new Map(),bucketSize=8;
+  for(const b of (map.authored||map.boxes)){for(let x=Math.floor((b.x-b.w/2-.5)/bucketSize);x<=Math.floor((b.x+b.w/2+.5)/bucketSize);x++)for(let z=Math.floor((b.z-b.d/2-.5)/bucketSize);z<=Math.floor((b.z+b.d/2+.5)/bucketSize);z++){const key=x+','+z;if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(b);}}
+  const nearby=(x,z)=>buckets.get(Math.floor(x/bucketSize)+','+Math.floor(z/bucketSize))||[];
   for (let z = 0; z < n; z++)
     for (let x = 0; x < n; x++) {
       const px = origin + x * cell,
         pz = origin + z * cell;
-      const overlapping = map.boxes.filter(
+      const overlapping = nearby(px,pz).filter(
         (b) =>
           Math.abs(px - b.x) < b.w / 2 + 0.48 &&
           Math.abs(pz - b.z) < b.d / 2 + 0.48,
       );
       const ground=groundAt(map,px,pz), levels = new Set([ground]);
       for (const b of overlapping)
-        if (Math.abs(px - b.x) < b.w / 2 && Math.abs(pz - b.z) < b.d / 2)
+        if (Math.abs(px - b.x) < b.w / 2 + (map.theme==='royale'?.44:0) && Math.abs(pz - b.z) < b.d / 2 + (map.theme==='royale'?.44:0))
           levels.add(b.y + b.h);
       for (const y of levels) {
         if (
-          y > 8 ||
+          y > (map.navMax||8) ||
           overlapping.some((b) => y + 0.04 < b.y + b.h && y + 1.78 > b.y + 0.01)
         )
           continue;
@@ -377,46 +380,36 @@ export function navigation(map) {
         z = a.cz + dz;
       if (x < 0 || z < 0 || x >= n || z >= n) continue;
       for (const b of cells[z * n + x])
-        if (b.y - a.y <= (a.terrain&&b.terrain ? cell*.8 : .43) && a.y - b.y <= 3.7) a.edges.push(b.id);
+        if(map.theme!=='royale'){if(b.y-a.y<=.43&&a.y-b.y<=3.7)a.edges.push(b.id);}
+        else if (b.y-a.y<=(a.terrain&&b.terrain?cell*.8:cell*.55)&&a.y-b.y<=3.7){
+          let valid=true,previous=a.y;
+          for(let i=1;i<=4;i++){const t=i/4,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,expected=a.y+(b.y-a.y)*t,over=nearby(x,z);let y=groundAt(map,x,z);
+           for(const o of over)if(Math.abs(x-o.x)<o.w/2+.44&&Math.abs(z-o.z)<o.d/2+.44&&o.y+o.h<=expected+.38)y=Math.max(y,o.y+o.h);
+           if((!a.terrain||!b.terrain)&&y-previous>.431||over.some(o=>Math.abs(x-o.x)<o.w/2+.44&&Math.abs(z-o.z)<o.d/2+.44&&y+.04<o.y+o.h&&y+1.76>o.y+.02)){valid=false;break;}previous=y;
+          }
+          if(valid)a.edges.push(b.id);
+        }
     }
-  const nearest = (p) => {
-    let best = nodes[0],
-      distance = Infinity;
-    for (const node of nodes) {
-      const d =
-        (node.x - p.x) ** 2 +
-        (node.z - p.z) ** 2 +
-        4 * (node.y - (p.y || 0)) ** 2;
-      if (d < distance) {
-        distance = d;
-        best = node;
-      }
-    }
-    return best;
+  const nearest=(p)=>{
+   let best=null,distance=Infinity;const cx=Math.floor((p.x-origin)/cell),cz=Math.floor((p.z-origin)/cell);
+   for(let radius=0;radius<12;radius++){
+    for(let dx=-radius;dx<=radius;dx++)for(let dz=-radius;dz<=radius;dz++){if(radius&&Math.abs(dx)!==radius&&Math.abs(dz)!==radius)continue;const x=cx+dx,z=cz+dz;if(x<0||z<0||x>=n||z>=n)continue;
+     for(const node of cells[z*n+x]){const d=(node.x-p.x)**2+(node.z-p.z)**2+4*(node.y-(p.y??groundAt(map,p.x,p.z)))**2;if(d<distance){best=node;distance=d;}}
+    }if(best&&distance<(radius*cell)**2)return best;
+   }return best||nodes[0];
   };
   const nav = {
     path(from, to) {
       const start = nearest(from),
         end = nearest(to);
       if (!start || !end) return [];
-      const parent = new Int32Array(nodes.length).fill(-1),
-        q = [start.id];
-      parent[start.id] = start.id;
-      let best = start.id,
-        bestD = Infinity;
-      for (let i = 0; i < q.length; i++) {
-        const a = nodes[q[i]],
-          d = (a.x - end.x) ** 2 + (a.z - end.z) ** 2 + 4 * (a.y - end.y) ** 2;
-        if (d < bestD) {
-          bestD = d;
-          best = a.id;
-        }
-        if (a.id === end.id) break;
-        for (const k of a.edges)
-          if (parent[k] < 0) {
-            parent[k] = a.id;
-            q.push(k);
-          }
+      const parent=new Int32Array(nodes.length).fill(-1),cost=new Float32Array(nodes.length).fill(Infinity),closed=new Uint8Array(nodes.length),q=[];
+      const heuristic=a=>Math.hypot(a.x-end.x,a.z-end.z)+Math.abs(a.y-end.y)*1.5;
+      const push=(id,score)=>{let i=q.length;q.push({id,score});while(i){const p=(i-1)>>1;if(q[p].score<=score)break;[q[p],q[i]]=[q[i],q[p]];i=p;}};
+      const pop=()=>{const first=q[0],last=q.pop();if(q.length){q[0]=last;let i=0;while(true){let k=i*2+1;if(k>=q.length)break;if(k+1<q.length&&q[k+1].score<q[k].score)k++;if(q[i].score<=q[k].score)break;[q[i],q[k]]=[q[k],q[i]];i=k;}}return first.id;};
+      parent[start.id]=start.id;cost[start.id]=0;push(start.id,heuristic(start));let best=start.id,bestD=Infinity,visited=0;
+      while(q.length&&visited++<24000){const id=pop();if(closed[id])continue;closed[id]=1;const a=nodes[id],d=heuristic(a);if(d<bestD){bestD=d;best=id;}if(id===end.id)break;
+       for(const k of a.edges){const b=nodes[k],next=cost[id]+cell+Math.abs(b.y-a.y)*.8;if(next<cost[k]){cost[k]=next;parent[k]=id;push(k,next+heuristic(b));}}
       }
       const path = [];
       for (let k = best; k !== start.id && parent[k] >= 0; k = parent[k]) {

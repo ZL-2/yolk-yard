@@ -18,6 +18,7 @@ export const CONTROLS = [
   ['interact','Search / pick up (Royale)','KeyF',null],
   ['map','Island map (Royale)','KeyM',null],
   ['inventory','Inventory (Royale)','KeyI',null],
+  ['dismissFlight','Close flight tips (Royale)','KeyL',null],
   ['drop','Drop item (Royale)','KeyX',null],
   ['slot3','Slot 3 (Royale)','Digit3',null],
   ['slot4','Slot 4 (Royale)','Digit4',null],

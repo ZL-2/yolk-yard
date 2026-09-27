@@ -1,9 +1,10 @@
 // Lossless deltas on an ordered connection. Each new connection starts with a
 // complete baseline. Encoding happens at flush, after stale snapshots merge.
 const recordKeys=['players','projectiles'];
-function records(value){return Object.fromEntries(value.map(row=>[row.id,row]));}
+function records(value,key='id'){return Object.fromEntries(value.map(row=>[row[key],row]));}
 function normalize(message){
  const value=JSON.parse(JSON.stringify(message));
+ for(const [key,id]of [['loot','uid'],['chests','id']]){if(Array.isArray(value.state?.royale?.[key]))value.state.royale[key]=records(value.state.royale[key],id);if(Array.isArray(value.checkpoint?.simulation?.[key]))value.checkpoint.simulation[key]=records(value.checkpoint.simulation[key],id);}
  for(const key of recordKeys)if(Array.isArray(value.state?.[key]))value.state[key]=records(value.state[key]);
  if(Array.isArray(value.checkpoint?.simulation?.players))value.checkpoint.simulation.players=records(value.checkpoint.simulation.players);
  return value;
@@ -34,7 +35,12 @@ export class SnapshotEncoder {
   // disappear from the wire. The receiver retains it for host migration.
   const next=normalize(message);
   if(!next.checkpoint&&this.previous?.checkpoint)next.checkpoint=this.previous.checkpoint;
+  // Retain sparse world baselines across movement-only frames. Otherwise the
+  // next pickup would retransmit every remaining item after an omitted frame.
+  const omitWorld=[];
+  for(const key of ['loot','chests'])if(next.state?.royale&&!Object.hasOwn(next.state.royale,key)&&this.previous?.state?.royale?.[key]){next.state.royale[key]=this.previous.state.royale[key];omitWorld.push(key);}
   const frame=this.previous?{base:this.seq,seq:this.seq+1,patch:patch(this.previous,next)||{}}:{base:0,seq:1,full:next};
+  if(omitWorld.length)frame.omitWorld=omitWorld;
   this.previous=next;this.seq=frame.seq;return {type:'snapshot-v1',frame};
  }
 }
@@ -53,6 +59,8 @@ export class SnapshotDecoder {
   if(checkpoint&&(frame.full||Object.hasOwn(frame.patch||{},'checkpoint')))message.checkpoint=structuredClone(checkpoint);
   for(const key of recordKeys)if(message.state?.[key])message.state[key]=Object.values(message.state[key]);
   if(message.checkpoint?.simulation?.players)message.checkpoint.simulation.players=Object.values(message.checkpoint.simulation.players);
+  for(const key of ['loot','chests']){if(message.state?.royale?.[key])message.state.royale[key]=Object.values(message.state.royale[key]);if(message.checkpoint?.simulation?.[key])message.checkpoint.simulation[key]=Object.values(message.checkpoint.simulation[key]);}
+  for(const key of frame.omitWorld||[])if(['loot','chests'].includes(key)&&message.state?.royale)delete message.state.royale[key];
   return message;
  }
 }

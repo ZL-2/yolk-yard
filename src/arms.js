@@ -179,6 +179,7 @@ export function updateArms(rig,progress,blaster=null,recoil=0,draw=1,menu=null) 
     token.visible=progress>.16&&progress<.7;
     token.position.set(...pose.left);token.position.x+=.1;
   }
+  for(const [name,distance] of [['bolt',.13],['pump',.14]]){const moving=blaster?.userData[name];if(!moving)continue;moving.userData.restPosition??=moving.position.clone();moving.position.copy(moving.userData.restPosition);moving.position.z+=progress>=0?Math.sin(Math.PI*clamp((progress-.15)/.7,0,1))*distance:Math.min(1,recoil)*distance*.3;}
   return pose;
 }
 

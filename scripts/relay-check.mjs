@@ -4,7 +4,7 @@ import {Network} from '../src/network.js';
 import {directory} from '../src/directory.js';
 import {Simulation} from '../src/simulation.js';
 import {RoyaleSimulation} from '../src/royale.js';
-import {safeProfile} from '../src/data.js';
+import {safeProfile,VERSION} from '../src/data.js';
 globalThis.window={YOLK_NETWORK:{relay:'ws://127.0.0.1:9002/game'}};
 const server=await startRelay(),nets=[],timers=[];
 const wait=async(fn,ms=12000)=>{const end=Date.now()+ms;while(!fn()){assert.ok(Date.now()<end,'Timed out');await new Promise(r=>setTimeout(r,25));}};
@@ -36,7 +36,7 @@ try{
   host.net.setVisibility('private');await new Promise(r=>setTimeout(r,200));assert.ok(!(await directory.list()).rooms.some(r=>r.code===code));
   host.net.setVisibility('public');host.net.broadcast(host.sim.snapshot());await wait(()=>guest.net.lastCheckpoint?.simulation&&third.net.lastCheckpoint?.simulation&&guest.net.visibility==='public'&&third.net.visibility==='public');
   host.net.destroy();await wait(()=>guest.net.isHost&&!third.net.migrating&&third.net.hostId===guest.net.id);
-  await wait(()=>server.sqlite.prepare('SELECT listing FROM relay_peers WHERE id=?').get('yolk-yard-v14-'+code)?.listing);assert.ok((await directory.list()).rooms.some(r=>r.code===code));
+  await wait(()=>server.sqlite.prepare('SELECT listing FROM relay_peers WHERE id=?').get('yolk-yard-v'+VERSION+'-'+code)?.listing);assert.ok((await directory.list()).rooms.some(r=>r.code===code));
   const late=player('Delta',mode);await late.net.join(code,late.profile);await wait(()=>late.states.length>0);
   // Force a connection renewal while gameplay continues, retaining IDs and links.
   const previousSocket=guest.net.peer.socket;guest.net.peer.message({type:'rotate-request'});

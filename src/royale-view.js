@@ -1,3 +1,6 @@
+import {ROYALE_MAP} from './royale-map.js';
+import {groundAt,terrainColor} from './terrain.js';
+import {roadMesh} from './island-art.js';
 import {updateBuildingView} from './building-view.js';
 import {shopItem} from './shop-catalog.js';
 import {makeShopGlider,makeShopTrail} from './shop-models.js';
@@ -13,7 +16,7 @@ export function bake(group,chunked=false,colored=chunked){
  for(const o of [...group.children])if(o.isMesh&&!o.userData.ownedMaterial&&!o.userData.keepDynamic){
   const key=(colored?'color':o.material.uuid)+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');if(!batches.has(key))batches.set(key,{mat:colored?bakedMaterial:o.material,parts:[],ranges:[],vertices:0});
   const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrix);
-  if(colored){g.deleteAttribute('uv');const colors=new Float32Array(g.attributes.position.count*3),c=o.material.color;for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}
+  if(colored){g.deleteAttribute('uv');if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3),c=o.material.color;for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}}
   const batch=batches.get(key);if(o.userData.objectId)batch.ranges.push({id:o.userData.objectId,start:batch.vertices,count:g.attributes.position.count});batch.vertices+=g.attributes.position.count;batch.parts.push(g);group.remove(o);
   if(o.geometry.type==='CylinderGeometry'&&!o.geometry.userData.shared)o.geometry.dispose();
  }
@@ -25,7 +28,7 @@ function buildTerrain(world,map){
   const positions=[],colors=[],indices=[];
   for(let z=0;z<=32;z++)for(let x=0;x<=32;x++){
    const wx=(cx+x)*t.cell-t.size,wz=(cz+z)*t.cell-t.size,h=t.heights[(cz+z)*t.n+cx+x];positions.push(wx,h,wz);
-   const c=new THREE.Color(h>3?0x95ad79:0x83ad73);c.multiplyScalar(1+Math.sin(wx*.07)*Math.sin(wz*.09)*.045);colors.push(c.r,c.g,c.b);
+   const c=new THREE.Color(terrainColor(map,wx,wz));c.multiplyScalar(1+Math.sin(wx*.07)*Math.sin(wz*.09)*.045);colors.push(c.r,c.g,c.b);
   }
   for(let z=0;z<32;z++)for(let x=0;x<32;x++){const a=z*33+x;indices.push(a,a+33,a+1,a+1,a+33,a+34);}
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
@@ -38,57 +41,30 @@ export function islandLabel(text,size=1){
  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthWrite:false}));sprite.scale.set(24*size,4.5*size,1);return sprite;
 }
 export function buildIsland(world,map,kit){
- const {block,ball,cylinder,palette}=kit,{beam,cone,rock,torus}=artKit(kit);
- block(world,0,-1.6,0,1800,2,1800,0x398aab);
- block(world,0,-.68,0,532,.65,532,0xecd99a);
+ const {block,palette}=kit;
+ const ocean=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800),new THREE.MeshLambertMaterial({color:0x4195ad,transparent:true,opacity:.87}));ocean.rotation.x=-Math.PI/2;ocean.position.y=.5;ocean.userData.ownedMaterial=true;world.add(ocean);
  buildTerrain(world,map);
- for(const p of map.districts){
-  cylinder(world,p.x,.015,p.z,15,.025,p.kind==='dock'?0x85a5a0:p.kind==='camp'?0xacb5a0:p.kind==='farm'?0xb1ba72:0xaac290,48);
-  // Roads connect the center and districts with a narrow warm shoulder.
-  const length=Math.hypot(p.x,p.z);
-  if(length>0){const road=block(world,p.x/2,.15,p.z/2,8,.08,length,0xc6bd99);road.rotation.y=Math.atan2(p.x,p.z);}
- }
+ for(const road of map.roads)world.add(roadMesh(map,road,new THREE.MeshLambertMaterial({color:road.kind==='path'?0xb8aa81:0x7d8987,side:THREE.DoubleSide})));
+ const byBuilding=map.buildings.map(()=>[]),treeBoxes=new Map(),propBoxes=new Map();
  for(const b of map.boxes){
-  if(['landmark','tree','prop'].includes(b.kind))continue;
-  const style=b.building===undefined?null:buildingStyle(map.buildings[b.building]);
-  const mesh=block(world,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,style?(b.color==='stone'?style.roof:style.wall):palette[b.color]||0x79aead);mesh.userData.objectId=b.objectId;
+  if(b.building!==undefined)byBuilding[b.building].push(b);
+  if(b.tree!==undefined)treeBoxes.set(b.tree,b);
+  if(b.prop!==undefined)propBoxes.set(b.prop,b);
+  if(['tree','prop','roof-collider'].includes(b.kind))continue;
+  const s=b.building===undefined?null:buildingStyle(map.buildings[b.building]);
+  const color=s?(b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:b.color==='foundation'?0x8e988a:s.wall):palette[b.color]||0x9cb7aa;
+  const m=block(world,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color);m.userData.objectId=b.objectId;
  }
- for(const b of map.buildings){const start=world.children.length;dressBuilding(world,b,kit);const boxes=map.boxes.filter(o=>o.building===map.buildings.indexOf(b));for(const mesh of world.children.slice(start)){const nearest=[...boxes].sort((a,b)=>Math.hypot(a.x-mesh.position.x,a.y+a.h/2-mesh.position.y,a.z-mesh.position.z)-Math.hypot(b.x-mesh.position.x,b.y+b.h/2-mesh.position.y,b.z-mesh.position.z))[0];if(nearest)mesh.userData.objectId=nearest.objectId;}}
- for(const t of map.trees){const start=world.children.length;treeModel(world,t,kit);const b=map.boxes.find(b=>b.kind==='tree'&&b.x===t.x&&b.z===t.z);for(const m of world.children.slice(start))m.userData.objectId=b?.objectId;}
- for(const p of map.props){const start=world.children.length;propModel(world,p,kit);const b=map.boxes.find(b=>b.kind==='prop'&&b.x===p.x&&b.z===p.z);for(const m of world.children.slice(start))m.userData.objectId=b?.objectId;}
- for(const s of map.shelters){
-  for(let j=0;j<7;j++)block(world,s.x-3.6+j*1.2,3.62,s.z,.96,.13,9.6,j%2?0xefca80:0xf5e6bc);
-  for(const sign of [-1,1])beam(world,[s.x+sign*3.8,2.5,s.z+4],[s.x+sign*2.4,3.35,s.z+4],.1,0x816a51);
+ for(const [i,b] of map.buildings.entries()){
+  const start=world.children.length;dressBuilding(world,b,kit);
+  for(const mesh of world.children.slice(start)){let closest=null,distance=Infinity;for(const o of byBuilding[i]){const d=(o.x-mesh.position.x)**2+(o.y+o.h/2-mesh.position.y)**2+(o.z-mesh.position.z)**2;if(d<distance){distance=d;closest=o;}}if(closest)mesh.userData.objectId=closest.objectId;}
  }
- for(const p of map.districts){
-  if(p.kind==='farm'){
-   for(let i=0;i<6;i++)for(let j=0;j<7;j++){const x=p.x-11+i*4,z=p.z-11+j*3.3;if(Math.hypot(x-p.x,z-p.z)<4)continue;cone(world,x,.6,z,.25,1.2,0xc4b15d);for(const side of [-1,1]){const leaf=rock(world,x+side*.3,.5,z,.5,.13,.15,0x8e9b50);leaf.rotation.z=side*.4;}}
-   for(const dx of [-8,8]){cylinder(world,p.x+dx,7,p.z-36,3,14,0xb8c1ae,20);cone(world,p.x+dx,14.7,p.z-36,3.1,1.4,0x536f76);for(let yy=1;yy<14;yy+=2){const r=torus(world,p.x+dx,yy,p.z-36,3.03,.07,0x7f9793);r.rotation.x=Math.PI/2;}for(let yy=.5;yy<14;yy+=.6)block(world,p.x+dx,yy,p.z-39.06,.65,.08,.1,0xf1d49a);}
-  } else if(p.kind==='dock'){
-   for(let j=0;j<7;j++)for(let k=0;k<12;k++)block(world,p.x-34+j*10,.1,p.z+37+k*1.4,8,.2,1.32,k%2?0xa98b61:0x937c60);
-   for(const dx of [-38,38]){cylinder(world,p.x+dx,12,p.z+15,.8,24,0xedc55a);block(world,p.x+dx,24,p.z+8,2,1.1,22,0xf4cb65);for(let yy=2;yy<23;yy+=3){beam(world,[p.x+dx-.65,yy,p.z+15],[p.x+dx+.65,yy+2.5,p.z+15],.06,0x7b7865);}beam(world,[p.x+dx,25,p.z+15],[p.x+dx,24,p.z-3],.09,0x516f78);beam(world,[p.x+dx,24,p.z-2],[p.x+dx,11,p.z-2],.045,0x516f78);const hook=torus(world,p.x+dx,10.5,p.z-2,.45,.12,0x516f78);}
-  } else if(p.kind==='resort'){
-   cylinder(world,p.x,0.08,p.z,10,.15,0xf6dfa9,48);cylinder(world,p.x,.18,p.z,8,.1,0x65cbd4,48);cylinder(world,p.x,1,p.z,.5,2,0xd5e7d0);
-   for(let j=0;j<16;j++){const a=j*Math.PI/8;const m=block(world,p.x+Math.cos(a)*9,.2,p.z+Math.sin(a)*9,1.4,.12,.5,0xffedc6);m.rotation.y=-a+Math.PI/2;}
-  } else if(p.kind==='factory'){
-   for(const dx of [-8,8]){cylinder(world,p.x+dx,6,p.z-38,4,12,0x8099a2);cone(world,p.x+dx,12.9,p.z-38,4.1,1.8,0xb5bbb0,.35);for(const yy of [1,5,10]){const r=torus(world,p.x+dx,yy,p.z-38,4.05,.12,0xdac587);r.rotation.x=Math.PI/2;}for(let j=0;j<8;j++)block(world,p.x+dx-.7+j*.2,7,p.z-42.04,.12,1.1,.1,j%2?0x3c5866:0xf0cf70);}
-  } else if(p.kind==='camp'){
-   for(let j=0;j<9;j++){const a=j*Math.PI*2/9;rock(world,p.x+Math.cos(a)*11,.8,p.z+Math.sin(a)*11,2,1.5,2,j%2?0xaaa99c:0x8b968b,1);}
-  } else if(p.kind==='town'){
-   // Clock tower is decorative above its collision-matched solid central pedestal.
-   block(world,p.x,3,p.z-6,3.3,6,3.3,0xe9d6a8);cone(world,p.x,7,p.z-6,2.5,2,0x507c7b);
-   for(const dz of [-1.7,1.7]){const dial=cylinder(world,p.x,4.7,p.z-6+dz,.95,.09,0xffebbb,24);dial.rotation.x=Math.PI/2;block(world,p.x,4.95,p.z-6+dz*1.04,.075,.5,.035,0x4b6c70);block(world,p.x+.22,4.7,p.z-6+dz*1.04,.45,.075,.035,0x4b6c70);}
-  }
- }
- // Long shoreline strips and wavelets frame the playable island.
- for(let i=0;i<48;i++){
-  const a=i*Math.PI*2/48,x=Math.cos(a)*390,z=Math.sin(a)*390;
-  block(world,x,-.45,z,20,.02,1.5,0x7ec5d4);
- }
- // Remaining architectural trim and landmark meshes belong to their nearest collision object.
- for(const mesh of world.children)if(mesh.isMesh&&!mesh.userData.objectId&&!mesh.userData.ownedMaterial&&mesh.position.y>.2){let b=null,nearest=Infinity;for(const candidate of map.boxes){const d=(candidate.x-mesh.position.x)**2+(candidate.y+candidate.h/2-mesh.position.y)**2+(candidate.z-mesh.position.z)**2;if(d<nearest){nearest=d;b=candidate;}}if(b&&Math.hypot(b.x-mesh.position.x,b.z-mesh.position.z)<15)mesh.userData.objectId=b.objectId;}
+ for(const [i,t]of map.trees.entries()){const start=world.children.length;treeModel(world,t,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=treeBoxes.get(i)?.objectId;}
+ for(const [i,p]of map.props.entries()){const start=world.children.length;propModel(world,p,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=propBoxes.get(i)?.objectId;}
  bake(world,true);
- for(const p of map.districts){const text=islandLabel(p.name);text.position.set(p.x,15,p.z);world.add(text);}
+ // World names are separate from the small diegetic signs and only visible during the drop.
+ for(const p of map.districts){const label=islandLabel(p.name);label.position.set(p.x,groundAt(map,p.x,p.z)+19,p.z);label.userData.poiLabel=true;world.add(label);}
+ for(const sign of map.signs){const label=islandLabel(sign.text,.16);label.position.set(sign.x,sign.y,sign.z);label.userData.detailLabel=true;label.visible=false;world.add(label);}
 }
 function canopy(kit,color=0xffcf64){const g=gliderModel(kit,color);bake(g,false,true);return g;}
 export class RoyaleView{
@@ -123,7 +99,7 @@ export class RoyaleView{
  createStorm(){
   const material=new THREE.MeshBasicMaterial({color:0x9461e9,transparent:true,opacity:.19,side:THREE.DoubleSide,depthWrite:false});
   this.wall=new THREE.Mesh(new THREE.CylinderGeometry(1,1,200,160,1,true),material);this.wall.position.y=90;this.wall.userData.ownedMaterial=true;this.root.add(this.wall);
-  this.ring=new THREE.Mesh(new THREE.TorusGeometry(1,.005,4,160),new THREE.MeshBasicMaterial({color:0xc9a5ff}));this.ring.rotation.x=Math.PI/2;this.ring.userData.ownedMaterial=true;this.root.add(this.ring);
+  this.ring=new THREE.LineLoop(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(160*3),3)),new THREE.LineBasicMaterial({color:0xc9a5ff}));this.ring.frustumCulled=false;this.ring.userData.ownedMaterial=true;this.root.add(this.ring);
  }
  itemModel(item,ground=true){const g=lootModel(item,this.kit,{ground});bake(g,false,true);return g;}
  chestModel(supply=false){const g=chestModel(this.kit,supply);bake(g.userData.lid,false,true);bake(g,false,true);return g;}
@@ -135,23 +111,25 @@ export class RoyaleView{
   if(this.round!==roundKey){for(const group of [this.chests,this.loot,this.gliders,this.pads]){for(const mesh of group.values()){this.root.remove(mesh);this.view.disposeGroup(mesh);}group.clear();}this.round=roundKey;}
   this.transport.visible=r.elapsed<=r.route.duration+5;
   const pos=transportAt(r.route,r.elapsed);this.transport.position.set(pos.x,pos.y+Math.sin(t)*.18,pos.z);this.transport.rotation.y=pos.yaw;this.transport.rotation.z=Math.sin(t*.4)*.015;this.rotors.forEach(m=>m.rotation.y+=dt*18);
-  this.wall.visible=this.ring.visible=r.storm.active;this.wall.position.set(r.storm.x,85,r.storm.z);this.wall.scale.set(Math.max(.01,r.storm.radius),1,Math.max(.01,r.storm.radius));this.wall.material.opacity=.17+Math.sin(t*.5)*.035;this.ring.position.set(r.storm.x,.15,r.storm.z);this.ring.scale.setScalar(Math.max(.01,r.storm.radius));
+  this.wall.visible=this.ring.visible=r.storm.active;this.wall.position.set(r.storm.x,85,r.storm.z);this.wall.scale.set(Math.max(.01,r.storm.radius),1,Math.max(.01,r.storm.radius));this.wall.material.opacity=.17+Math.sin(t*.5)*.035;if(r.storm.active&&(!this.nextRingUpdate||t>this.nextRingUpdate)){const a=this.ring.geometry.attributes.position;for(let i=0;i<a.count;i++){const angle=i/a.count*Math.PI*2,x=r.storm.x+Math.cos(angle)*r.storm.radius,z=r.storm.z+Math.sin(angle)*r.storm.radius;a.setXYZ(i,x,groundAt(ROYALE_MAP,x,z)+.14,z);}a.needsUpdate=true;this.nextRingUpdate=t+.15;}
   const observer=local?.spectating?state.players.find(p=>p.id===this.view.spectateTarget)||local:local;
+  for(const mesh of this.view.world?.children||[])if(mesh.userData.poiLabel||mesh.userData.detailLabel)mesh.visible=!!observer&&(mesh.userData.poiLabel?observer.flight!=='ground'&&observer.health>0:Math.hypot(mesh.position.x-observer.x,mesh.position.z-observer.z)<35);
   const seen=new Set();
   for(const item of r.loot){
    seen.add(item.uid);let mesh=this.loot.get(item.uid);
    const close=observer&&Math.hypot(item.x-observer.x,item.z-observer.z)<(this.view.settings.quality==='low'?45:70);
    if(!mesh&&close){mesh=this.itemModel(item);this.loot.set(item.uid,mesh);this.root.add(mesh);}
-   if(mesh){mesh.visible=!!close;mesh.position.set(item.x,item.y+.7+Math.sin(t*2+item.uid)*.1,item.z);mesh.rotation.y=t*.65+item.uid;}
+   if(mesh){mesh.visible=!!close;mesh.position.set(item.x,item.y+.24+Math.sin(t*1.65+item.uid)*.055,item.z);mesh.rotation.y=Math.sin(t*.55+item.uid)*.16;if(item.spawnFrom&&state.time-item.spawnAt<.6){const age=Math.max(0,(state.time-item.spawnAt)/.6),ease=1-(1-age)**3;mesh.position.x=THREE.MathUtils.lerp(item.spawnFrom.x,item.x,ease);mesh.position.z=THREE.MathUtils.lerp(item.spawnFrom.z,item.z,ease);mesh.position.y=THREE.MathUtils.lerp(item.spawnFrom.y,item.y+.24,ease)+Math.sin(age*Math.PI)*.6;}}
   }
   for(const [id,m]of this.loot)if(!seen.has(id)){this.root.remove(m);this.view.disposeGroup(m);this.loot.delete(id);}
   for(const chest of r.chests){
-   let mesh=this.chests.get(chest.id);if(!mesh){mesh=this.chestModel(chest.supply);this.chests.set(chest.id,mesh);this.root.add(mesh);if(chest.supply){const rig=new THREE.Group(),c=canopy(kit,0x99dad9);c.position.y=1.5;rig.add(c);for(const x of [-.6,.6])for(const z of [-.4,.4])artKit(kit).beam(rig,[x,1.2,z],[Math.sign(x)*.72,3.7,.1],.018,0xf5ead2);bake(rig,false,true);mesh.add(rig);mesh.userData.canopy=rig;}}
+   const close=!!observer&&(Math.hypot(chest.x-observer.x,chest.z-observer.z)<(this.view.settings.quality==='low'?70:100)||chest.supply);
+   let mesh=this.chests.get(chest.id);if(!mesh&&!close)continue;if(!mesh){mesh=this.chestModel(chest.supply);this.chests.set(chest.id,mesh);this.root.add(mesh);if(chest.supply){const rig=new THREE.Group(),c=canopy(kit,0x99dad9);c.position.y=1.5;rig.add(c);for(const x of [-.6,.6])for(const z of [-.4,.4])artKit(kit).beam(rig,[x,1.2,z],[Math.sign(x)*.72,3.7,.1],.018,0xf5ead2);bake(rig,false,true);mesh.add(rig);mesh.userData.canopy=rig;}}
    const fall=chest.landAt?Math.max(0,(chest.landAt-state.time)*4):0;mesh.position.set(chest.x,chest.y+fall,chest.z);
    if(mesh.userData.canopy)mesh.userData.canopy.visible=fall>0;
    mesh.userData.lid.rotation.x+=((chest.opened?-1.7:0)-mesh.userData.lid.rotation.x)*Math.min(1,dt*8);
 
-   mesh.visible=!!observer&&(Math.hypot(chest.x-observer.x,chest.z-observer.z)<(this.view.settings.quality==='low'?70:100)||chest.supply);
+   mesh.visible=close;
   }
   for(const p of state.players){
    let mesh=this.gliders.get(p.id);const style=(p.glider||'')+':'+(p.trail||'');
@@ -162,7 +140,7 @@ export class RoyaleView{
   const padIds=new Set();for(const p of r.pads){padIds.add(p.id);let mesh=this.pads.get(p.id);if(!mesh){mesh=launchpadModel(kit);bake(mesh);this.root.add(mesh);this.pads.set(p.id,mesh);}mesh.position.set(p.x,p.y,p.z);mesh.scale.setScalar(1+Math.sin(t*3)*.035);}
   for(const [id,m]of this.pads)if(!padIds.has(id)){this.root.remove(m);this.view.disposeGroup(m);this.pads.delete(id);}
   for(let i=this.fx.length-1;i>=0;i--){const fx=this.fx[i];fx.age+=dt;fx.mesh.scale.setScalar(1+fx.age*9);fx.mesh.material.opacity=Math.max(0,.8-fx.age);if(fx.age>.8){this.root.remove(fx.mesh);fx.mesh.geometry.dispose();fx.mesh.material.dispose();this.fx.splice(i,1);}}
-  if(this.view.waypoint){if(!this.marker){this.marker=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,90,8),new THREE.MeshBasicMaterial({color:0xffe59c,transparent:true,opacity:.5,depthWrite:false}));this.marker.userData.ownedMaterial=true;this.root.add(this.marker);}this.marker.visible=true;this.marker.position.set(this.view.waypoint.x,45,this.view.waypoint.z);}else if(this.marker)this.marker.visible=false;
+  if(this.view.waypoint){if(!this.marker){this.marker=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,90,8),new THREE.MeshBasicMaterial({color:0xffe59c,transparent:true,opacity:.5,depthWrite:false}));this.marker.userData.ownedMaterial=true;this.root.add(this.marker);}this.marker.visible=true;this.marker.position.set(this.view.waypoint.x,groundAt(ROYALE_MAP,this.view.waypoint.x,this.view.waypoint.z)+45,this.view.waypoint.z);}else if(this.marker)this.marker.visible=false;
  }
  event(e){
   if(!this.root.visible)return;

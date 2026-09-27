@@ -42,7 +42,7 @@ test('Royale sprint equals arena movement and walk is slower without diagonal ad
  assert.ok(travel(true,false)<travel(true,true));for(const w of WEAPONS)assert.equal(w.speed,ROYALE_MOVEMENT.sprint);
 });
 test('dense world has distinct biomes, open loot anchors and real terrain relief',()=>{
- assert.equal(map.buildings.length,92);assert.equal(map.trees.length,560);assert.ok(map.props.length>150);assert.ok(map.chests.length>120);assert.ok(map.floorLoot.length>300);
+ assert.ok(map.buildings.length>=60);assert.ok(map.buildings.reduce((n,b)=>n+b.floors,0)>=100);assert.equal(map.trees.length,640);assert.ok(map.props.length>150);assert.ok(map.chests.length>120);assert.ok(map.floorLoot.length>300);
  assert.equal(new Set(map.trees.map(t=>t.kind)).size,5);assert.equal(new Set(map.buildings.map(b=>b.kind)).size,8);assert.ok(map.terrain.max>=7);
  for(const p of [...map.chests,...map.floorLoot]){
   assert.ok(p.y>=groundAt(map,p.x,p.z)-.01);
@@ -50,14 +50,14 @@ test('dense world has distinct biomes, open loot anchors and real terrain relief
  }
 });
 test('terrain height is identical for walking, glider landing and swept projectiles',()=>{
- const bare={...map,boxes:[]},x=-213,z=220,h=groundAt(map,x,z);assert.ok(h>5);
+ const bare={...map,boxes:[]},x=-110,z=105,h=groundAt(map,x,z);assert.ok(h>5);
  const hit=worldHit(bare,{x,y:h+10,z},{x:0,y:-1,z:0},20);assert.ok(Math.abs(hit.point.y-h)<.003);assert.ok(hit.normal.y>.7);
  const p={x,y:h,z,yaw:0,pitch:0,health:100,crown:null,weapon:'sprinter',grounded:true,vy:0,flight:'ground',inventory:[],stamina:100};
  for(let i=0;i<120;i++){movePlayer(p,{forward:1},bare,1/60);assert.ok(Math.abs(p.y-groundAt(bare,p.x,p.z))<.01);}
  p.y+=12;p.flight='glide';p.grounded=false;for(let i=0;i<180;i++)movePlayer(p,{},bare,1/60);
  assert.equal(p.flight,'ground');assert.ok(Math.abs(p.y-groundAt(bare,p.x,p.z))<.01);
- const origin={x:x-35,y:2,z};assert.ok(wallDistance(bare,origin,{x:1,y:0,z:0},70)<70,'hill stops a horizontal shot');
- assert.equal(terrainHit(bare,{x,y:20,z},{x:1,y:0,z:0},70),null);
+ const origin={x:x-35,y:h-3,z};assert.ok(wallDistance(bare,origin,{x:1,y:0,z:0},70)<70,'hill stops a horizontal shot');
+ assert.equal(terrainHit(bare,{x,y:map.terrain.max+10,z},{x:1,y:0,z:0},70),null);
 });
 const mats=new Map(),kit={mat:c=>{if(!mats.has(c))mats.set(c,new THREE.MeshLambertMaterial({color:c}));return mats.get(c);}};
 for(const [name,make]of Object.entries({block:(w,h,d)=>new THREE.BoxGeometry(w,h,d),ball:(w,h,d)=>new THREE.SphereGeometry(1,8,6).scale(w,h,d),cylinder:(r,h,c,s=12)=>new THREE.CylinderGeometry(r,r,h,s)}))kit[name]=(g,x,y,z,...v)=>{const c=name==='cylinder'?v[2]:v[3],geometry=make(...v);const m=new THREE.Mesh(geometry,kit.mat(c));m.position.set(x,y,z);g.add(m);return m;};
@@ -65,7 +65,7 @@ test('all loot, architecture, foliage and animated prop families have finite det
  const models=[...ROYALE_GUN_IDS.map(id=>lootModel({id,weapon:true,rarity:2},kit)),...Object.keys(ITEMS).map(id=>lootModel({id},kit)),lootModel({id:'heavy',ammoType:'heavy'},kit),chestModel(kit),chestModel(kit,true),gliderModel(kit),launchpadModel(kit)];
  for(const kind of new Set(map.trees.map(t=>t.kind))){const g=new THREE.Group();treeModel(g,map.trees.find(t=>t.kind===kind),kit);models.push(g);}
  for(const kind of new Set(map.buildings.map(t=>t.kind))){const g=new THREE.Group();dressBuilding(g,map.buildings.find(t=>t.kind===kind),kit);models.push(g);}
- for(const model of models){let parts=0;model.traverse(o=>{if(o.isMesh){parts++;assert.ok(o.geometry.getAttribute('position').array.every(Number.isFinite));}});assert.ok(parts>=3,model.name);const box=new THREE.Box3().setFromObject(model);assert.ok([box.min.x,box.max.y,box.max.z].every(Number.isFinite));}
+ for(const model of models){let parts=0;model.traverse(o=>{if(o.isMesh){parts++;assert.ok(o.geometry.getAttribute('position').array.every(Number.isFinite));}});assert.ok(parts>=2,model.name); /* Baked pickups use one model plus ring. */const box=new THREE.Box3().setFromObject(model);assert.ok([box.min.x,box.max.y,box.max.z].every(Number.isFinite));}
  const chest=models.find(g=>g.userData.lid);assert.equal(chest.userData.glow,undefined);assert.ok(chest.scale.x<1);chest.userData.lid.rotation.x=-1.7;
  const wrap=new THREE.Box3().setFromObject(lootModel({id:'bandage'},kit,{ground:false})),medkit=new THREE.Box3().setFromObject(lootModel({id:'medkit'},kit,{ground:false}));assert.notDeepEqual(wrap.getSize(new THREE.Vector3()).toArray(),medkit.getSize(new THREE.Vector3()).toArray());
  for(const model of models){bake(model,false,true);assert.ok(model.children.length>0);model.traverse(o=>{if(o.isMesh)assert.ok(o.geometry);});}

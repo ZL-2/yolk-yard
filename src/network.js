@@ -423,9 +423,12 @@ export class Network {
     this.snapshot = state;
     if (performance.now() - (this.lastPublish || 0) > 2000) { this.lastPublish = performance.now(); this.publishRoom(); }
     state = {...state, visibility:this.visibility,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,network:{hostId:this.id,members:this.members,chatSequence:this.chatRoom.sequence}};
-    const checkpointDue=performance.now()-(this.lastCheckpointSent||0)>3000;
+    const worldVersion=state.royale?`${state.royale.matchId}:${state.round}:${state.royale.lootVersion}:${state.royale.buildVersion}`:null;
+    // Commit ownership changes with their recovery state: host departure must
+    // never restore a chest or pickup from before its last accepted transaction.
+    const checkpointDue=performance.now()-(this.lastCheckpointSent||0)>3000||worldVersion!==this.checkpointWorldVersion;
     let checkpoint;
-    if(checkpointDue){this.lastCheckpointSent=performance.now();checkpoint={simulation:this.callbacks.getCheckpoint?.(),chat:{sequence:this.chatRoom.sequence,enabled:this.chatEnabled,muted:this.chatMuted,members:[...this.chatRoom.members],reports:[...this.chatRoom.reports]},kicked:[...this.kicked]};}
+    if(checkpointDue){this.lastCheckpointSent=performance.now();this.checkpointWorldVersion=worldVersion;checkpoint={simulation:this.callbacks.getCheckpoint?.(),chat:{sequence:this.chatRoom.sequence,enabled:this.chatEnabled,muted:this.chatMuted,members:[...this.chatRoom.members],reports:[...this.chatRoom.reports]},kicked:[...this.kicked]};}
     const recipients=[...this.connections.values()];
     const offset=(this.broadcastCursor||0)%Math.max(1,recipients.length);
     this.broadcastCursor=offset+1;

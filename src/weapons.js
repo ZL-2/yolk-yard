@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { weapon } from "./data.js";
+import {OPTICS} from './weapon-presentation.js';
 import {applyWrap} from './shop-models.js';
 
 // The same authored model is used in the player's hands, on other eggs, and in previews.
@@ -60,7 +61,7 @@ function tube(g, x, y, z, r, length, c, open = false) {
     g,
     cached(
       `tube:${r}:${length}:${open}`,
-      () => new THREE.CylinderGeometry(r, r, length, 24, 1, open),
+      () => new THREE.CylinderGeometry(r, r, length, 12, 1, open),
     ),
     color(c, true),
     [x, y, z],
@@ -68,10 +69,13 @@ function tube(g, x, y, z, r, length, c, open = false) {
   m.rotation.x = Math.PI / 2;
   return m;
 }
+function taper(g,x,y,z,back,front,length,c){
+ const m=part(g,cached(`taper:${back}:${front}:${length}`,()=>new THREE.CylinderGeometry(back,front,length,12)),color(c,true),[x,y,z]);m.rotation.x=Math.PI/2;return m;
+}
 function ring(g, x, y, z, r, t, c) {
   return part(
     g,
-    cached(`ring:${r}:${t}`, () => new THREE.TorusGeometry(r, t, 8, 32)),
+    cached(`ring:${r}:${t}`, () => new THREE.TorusGeometry(r, t, 5, 16)),
     color(c, true),
     [x, y, z],
   );
@@ -131,7 +135,8 @@ function vents(g, z, count, width = 0.25, spacing = 0.07) {
       box(g, x, 0.018, z - i * spacing, 0.008, 0.065, 0.028, black, 0.003);
 }
 function optic(g, kind, frontZ = -0.7) {
-  const sightY = 0.285;
+  const config=OPTICS[g.userData.weaponId];
+  const sightY = config?config.radius+.15:0.285;
   if (kind === "iron") {
     box(g, 0, 0.109, 0.15, 0.18, 0.035, 0.09, dark, 0.007);
     for (const x of [-0.066, 0.066])
@@ -142,12 +147,17 @@ function optic(g, kind, frontZ = -0.7) {
     return;
   }
   if (kind === "scope" || kind === "prism") {
-    const radius = kind === "scope" ? 0.137 : 0.115;
+    const radius = config?.radius || .125;
+    const length=config?.length||.54,objective=config?.objective||radius;
     for (const z of [-0.1, 0.15]) {
       box(g, 0, 0.17, z, 0.12, 0.14, 0.075, dark);
       ring(g, 0, sightY, z, radius + 0.009, 0.018, steel);
     }
-    tube(g, 0, sightY, 0.02, radius, 0.54, dark, true);
+    tube(g, 0, sightY, .02, radius, length, dark, true);
+    taper(g,0,sightY,-length/2, radius,objective,.14,dark);
+    ring(g,0,sightY,-length/2-.075,objective,.018,steel);
+    tube(g,0,sightY,-length/2-.08,objective-.016,.01,0x3d8997);
+    ring(g,0,sightY,.26,radius+.016,.028,black);
     ring(g, 0, sightY, 0.302, radius, 0.026, black);
     ring(g, 0, sightY, 0.328, radius + 0.012, 0.015, steel);
     ring(g, 0, sightY, -0.27, radius, 0.027, dark);
@@ -219,207 +229,83 @@ export function makeBlaster(id,wrap='') {
     g = new THREE.Group(),
     c = w.color;
   g.name = `${w.name} blaster`;
-  if (id === 'comet') {
-    // A toy-like energy projector: open horseshoe emitter, turbine and luminous fins.
-    box(g,0,0,.05,.31,.29,.55,c,.07);grip(g,.17);stock(g,0x506986,.33);
-    tube(g,0,0,-.48,.17,.45,0x536681);tube(g,0,0,-.72,.10,.06,0xaff5f2);
-    for(const z of [-.3,-.46,-.62])ring(g,0,0,z,.185,.025,0x8de5e7);
-    for(const x of [-.2,.2]){box(g,x,0,-.47,.08,.22,.56,c,.035);box(g,x,.02,-.79,.09,.15,.17,0xdbe9d1,.025);}
-    g.userData.reloadPart=box(g,0,-.24,-.05,.21,.25,.27,0x80d9e2,.055);
-    for(let j=0;j<3;j++)box(g,0,-.19-j*.06,-.196,.13,.025,.013,0xdcffed,.005);
-    optic(g,'reflex');
-  } else if (id === 'doubleyolk') {
-    // Compact over-under oval muzzles and a scalloped break-action body.
-    box(g,0,.01,.05,.35,.37,.4,c,.07);grip(g,.17);stock(g,0x92704b,.28);
-    for(const y of [-.095,.095]){tube(g,0,y,-.48,.105,.78,0x6a7380);ring(g,0,y,-.887,.106,.026,0xf7d488);tube(g,0,y,-.902,.067,.018,black);}
-    box(g,0,-.21,-.43,.24,.1,.36,0x92704b,.04);
-    for(const x of [-.19,.19]){box(g,x,.02,.03,.06,.2,.32,0xf4ce7e,.035);for(let j=0;j<3;j++)box(g,x*1.13,.02,-.06+j*.08,.016,.09,.024,c,.005);}
-    optic(g,'iron');
-  } else if (id === 'peeper') {
-    // Small precision scout with a raised scope, skeleton stock and fluted nose.
-    plate(g,[[.29,-.13],[-.34,-.11],[-.48,.04],[-.3,.14],[.27,.12]],.25,c);
-    grip(g,.13);box(g,0,.04,.46,.11,.11,.42,0x776d69,.025);box(g,0,-.12,.63,.24,.4,.09,c,.04);
-    tube(g,0,0,-.57,.068,.51,0x626e77);tube(g,0,0,-.91,.078,.21,c);ring(g,0,0,-1.028,.077,.018,0xf7dd99);
-    for(const z of [-.37,-.46,-.55,-.64])ring(g,0,0,z,.078,.012,0xe3bd75);
-    g.userData.reloadPart=box(g,0,-.22,-.12,.18,.2,.23,0x596976,.035);
-    tube(g,.17,.055,.1,.045,.11,0xe5bc76);box(g,.22,.04,.15,.08,.09,.09,0x4a5a65,.025);
-    optic(g,'scope');
-  } else if (id === "pip") {
-    box(g, 0, 0.02, -0.04, 0.19, 0.17, 0.54, c);
-    box(g, 0, -0.05, 0.01, 0.17, 0.13, 0.36, dark);
-    grip(g, 0.12);
-    tube(g, 0, 0.015, -0.34, 0.05, 0.18, steel);
-    ring(g, 0, 0.015, -0.435, 0.05, 0.012, c);
-    for (let i = 0; i < 5; i++)
-      box(g, 0.101, 0.04, 0.07 + i * 0.025, 0.009, 0.085, 0.009, dark, 0.002);
-    g.userData.reloadPart = box(g, 0, -.405, .12, .13, .13, .14, steel);
-    optic(g, "iron", -0.24);
-  } else if (id === "scatter") {
-    box(g, 0, 0, 0.08, 0.3, 0.23, 0.46, c);
-    grip(g, 0.17);
-    stock(g, c, 0.31);
-    for (const x of [-0.09, 0.09]) {
-      tube(g, x, 0, -0.44, 0.075, 0.84, steel);
-      ring(g, x, 0, -0.88, 0.078, 0.022, dark);
-      tube(g, x, 0, -0.898, 0.05, 0.016, black);
-    }
-    box(g, 0, -0.065, -0.48, 0.28, 0.19, 0.32, c);
-    for (let i = 0; i < 6; i++)
-      box(g, 0, -0.072, -0.34 - i * 0.05, 0.297, 0.19, 0.019, dark, 0.005);
-    for (let i = 0; i < 3; i++)
-      tube(g, 0.19, -0.02, -0.02 + i * 0.085, 0.034, 0.065, cream);
-    optic(g, "iron");
-  } else if (id === "needle") {
-    plate(
-      g,
-      [
-        [0.45, -0.08],
-        [0.27, -0.15],
-        [-0.32, -0.07],
-        [-0.42, 0.05],
-        [-0.24, 0.12],
-        [0.4, 0.12],
-      ],
-      0.22,
-      c,
-    );
-    grip(g, 0.13);
-    stock(g, c, 0.39);
-    tube(g, 0, 0, -0.66, 0.044, 0.82, steel);
-    tube(g, 0, 0, -0.96, 0.062, 0.23, dark);
-    ring(g, 0, 0, -1.087, 0.058, 0.012, c);
-    g.userData.reloadPart = box(g, 0, -0.23, -0.15, 0.14, 0.27, 0.16, dark);
-    vents(g, -0.23, 4, 0.225, 0.055);
-    for (const x of [-0.1, 0.1]) {
-      const leg = box(g, x, -0.18, -0.56, 0.038, 0.3, 0.04, steel, 0.008, true);
-      leg.rotation.z = x > 0 ? -0.3 : 0.3;
-    }
-    tube(g, 0.16, 0.035, 0.13, 0.035, 0.1, steel);
-    box(g, 0.19, 0.01, 0.16, 0.06, 0.07, 0.07, dark);
-    optic(g, "scope");
-  } else if (id === "thumper") {
-    // Closed breech and compact barrel: no open rear tube facing the camera.
-    box(g, 0, -0.025, 0.055, 0.29, 0.27, 0.39, c, 0.045);
-    tube(g, 0, 0, -0.35, 0.15, 0.69, c);
-    for (const z of [-0.08, -0.5, -0.69])
-      ring(g, 0, 0, z, 0.151, 0.018, dark);
-    tube(g, 0, 0, -0.702, 0.12, 0.017, black);
-    ring(g, 0, 0, -0.723, 0.129, 0.014, steel);
-    grip(g, 0.17);
-    stock(g, c, 0.29);
-    box(g, 0, -0.16, -0.3, 0.19, 0.11, 0.3, dark);
-    for (const x of [-0.151, 0.151])
-      box(g, x, 0, -0.3, 0.018, 0.038, 0.3, 0xa3efe7, 0.006);
-    optic(g, "reflex");
-  } else if (id === "zipper") {
-    plate(
-      g,
-      [
-        [0.24, -0.1],
-        [-0.33, -0.1],
-        [-0.48, 0.04],
-        [-0.29, 0.13],
-        [0.18, 0.15],
-        [0.31, 0.07],
-      ],
-      0.25,
-      c,
-    );
-    grip(g, 0.13);
-    g.userData.reloadPart = box(g, 0, -0.22, -0.16, 0.14, 0.34, 0.16, dark);
-    for (const x of [-0.095, 0.095])
-      box(g, x, 0.035, 0.46, 0.035, 0.075, 0.42, steel, 0.01, true);
-    box(g, 0, -0.025, 0.66, 0.2, 0.23, 0.055, dark);
-    tube(g, 0, 0, -0.53, 0.067, 0.24, steel);
-    ring(g, 0, 0, -0.668, 0.068, 0.02, dark);
-    vents(g, -0.14, 4, 0.263);
-    optic(g, "reflex");
-  } else if (id === "anchor") {
-    box(g, 0, 0, 0.03, 0.34, 0.27, 0.6, c);
-    grip(g, 0.2);
-    stock(g, c, 0.37);
-    tube(g, 0, 0, -0.48, 0.13, 0.52, dark);
-    tube(g, 0, 0, -0.8, 0.065, 0.22, steel);
-    ring(g, 0, 0, -0.93, 0.077, 0.023, c);
-    for (let i = 0; i < 5; i++)
-      ring(g, 0, 0, -0.27 - i * 0.085, 0.132, 0.015, steel);
-    g.userData.reloadPart = box(g, 0, -0.26, -0.045, 0.34, 0.31, 0.32, dark);
-
-    for (let i = 0; i < 5; i++)
-      box(
-        g,
-        -0.2 - i * 0.018,
-        -0.055 - i * 0.023,
-        0.04,
-        0.065,
-        0.034,
-        0.075,
-        cream,
-        0.008,
-        true,
-      );
-    for (const x of [-0.12, 0.12]) {
-      const leg = box(
-        g,
-        x,
-        -0.19,
-        -0.59,
-        0.044,
-        0.34,
-        0.04,
-        steel,
-        0.008,
-        true,
-      );
-      leg.rotation.z = x > 0 ? -0.3 : 0.3;
-    }
-    optic(g, "reflex");
-  } else if (id === "duet") {
-    plate(
-      g,
-      [
-        [0.58, -0.13],
-        [-0.33, -0.11],
-        [-0.46, 0.035],
-        [-0.23, 0.15],
-        [0.47, 0.15],
-        [0.61, 0.03],
-      ],
-      0.27,
-      c,
-    );
-    grip(g, -0.03);
-    g.userData.reloadPart = box(g, 0, -0.25, 0.35, 0.16, 0.27, 0.18, dark);
-    box(g, 0, -0.025, 0.61, 0.28, 0.28, 0.055, dark);
-    box(g, 0, -0.07, -0.4, 0.23, 0.17, 0.24, steel);
-    tube(g, 0, 0, -0.68, 0.052, 0.42, dark);
-    ring(g, 0, 0, -0.9, 0.068, 0.018, c);
-    vents(g, -0.11, 4, 0.285, 0.065);
-    optic(g, "prism");
-  } else {
-    plate(
-      g,
-      [
-        [0.32, -0.09],
-        [-0.3, -0.11],
-        [-0.44, 0.04],
-        [-0.25, 0.15],
-        [0.29, 0.14],
-      ],
-      0.25,
-      c,
-    );
-    grip(g, 0.13);
-    stock(g, c, 0.35);
-    const mag = box(g, 0, -0.24, -0.1, 0.15, 0.32, 0.2, dark);
-    mag.rotation.x = 0.13;
-    g.userData.reloadPart = mag;
-    box(g, 0, 0.015, -0.43, 0.23, 0.19, 0.32, steel);
-    vents(g, -0.32, 5, 0.24, 0.045);
-    tube(g, 0, 0, -0.72, 0.052, 0.3, dark);
-    ring(g, 0, 0, -0.895, 0.063, 0.02, c);
-    optic(g, "reflex");
+  g.userData.weaponId=id;
+  const wood=0x896044;
+  const receiver=(length=.58,width=.25)=>{plate(g,[[.31,-.11],[-length+.31,-.11],[-length+.24,.03],[-length+.35,.145],[.25,.145],[.34,.06]],width,c);tube(g,0,.075,.03,.072,.4,dark);};
+  const magazine=(z,h=.3,curved=false)=>{const m=curved?plate(g,[[z+.09,-.1],[z-.09,-.1],[z-.12,-.26],[z-.19,-.42],[z-.025,-.46],[z+.07,-.27]],.145,dark):box(g,0,-.13-h/2,z,.16,h,.19,dark,.025);g.userData.reloadPart=m;return m;};
+  const rail=(z,length)=>{box(g,0,.164,z,.135,.035,length,dark,.008);for(let i=0;i<Math.floor(length/.055);i++)box(g,0,.19,z-length/2+i*.055,.16,.025,.024,steel,.004);};
+  const muzzleModel=(z,r=.06)=>{tube(g,0,0,z+.045,r,.09,dark);ring(g,0,0,z,r,.014,steel);tube(g,0,0,z-.004,r*.68,.01,black);};
+  const bolt=(x=.17,z=.14)=>{const b=new THREE.Group();b.position.set(x,.045,z);const handle=tube(b,.03,0,0,.022,.13,steel);handle.rotation.set(0,0,Math.PI/2);box(b,.08,-.025,0,.07,.08,.065,black,.027);g.add(b);g.userData.bolt=b;};
+  if(id==='pip'){
+    // Tapered pistol slide, separate frame, recessed ejection port and serrations.
+    plate(g,[[.23,-.03],[-.33,-.03],[-.34,.065],[-.28,.13],[.19,.13],[.25,.07]],.2,c);
+    plate(g,[[.22,-.08],[-.26,-.08],[-.29,-.04],[.16,.02],[.24,-.03]],.17,dark);grip(g,.12);
+    box(g,.103,.07,-.08,.012,.047,.1,black,.008);
+    for(const side of [-1,1])for(let i=0;i<6;i++)box(g,side*.107,.042,.065+i*.024,.008,.092,.01,steel,.003);
+    tube(g,0,.015,-.345,.043,.2,steel);muzzleModel(-.445,.052);
+    g.userData.reloadPart=box(g,0,-.4,.12,.13,.15,.14,steel);optic(g,'iron',-.255);
+  }else if(id==='scatter'){
+    // A classic side-by-side break-action silhouette with walnut fore-end.
+    plate(g,[[.32,-.1],[-.24,-.12],[-.29,.05],[-.17,.135],[.26,.14]],.31,c);grip(g,.17);stock(g,wood,.31);
+    for(const x of [-.085,.085]){tube(g,x,.015,-.47,.075,.84,steel);ring(g,x,.015,-.9,.078,.014,dark);tube(g,x,.015,-.905,.055,.009,black);}
+    plate(g,[[-.22,-.05],[-.68,-.06],[-.7,-.13],[-.57,-.2],[-.3,-.21]],.255,wood);
+    for(let j=0;j<7;j++)box(g,0,-.185,-.28-j*.047,.255,.024,.021,0x67442f,.006);
+    box(g,0,.14,.16,.035,.035,.17,steel,.012);optic(g,'iron',-.78);
+  }else if(id==='doubleyolk'){
+    // Tubular magazine below the barrel, ribbed pump and ventilated heat shield.
+    receiver(.6,.28);grip(g,.17);stock(g,dark,.31);
+    tube(g,0,.018,-.48,.078,.83,steel);tube(g,0,-.105,-.46,.058,.66,dark);muzzleModel(-.9,.08);
+    const pump=new THREE.Group();pump.position.set(0,-.115,-.46);box(pump,0,0,0,.255,.19,.32,c,.06);
+    for(let i=0;i<7;i++)box(pump,0,0,-.14+i*.047,.268,.195,.019,black,.006);g.add(pump);g.userData.pump=pump;
+    for(const side of [-1,1])for(let i=0;i<4;i++)box(g,side*.084,.062,-.23-i*.085,.02,.065,.04,black,.008);
+    optic(g,'iron',-.78);
+  }else if(id==='needle'||id==='peeper'||id==='anchor'){
+    receiver(id==='anchor'?.65:.6,id==='anchor'?.28:.235);grip(g,id==='anchor'?.2:.13);
+    if(id==='peeper'){for(const x of [-.065,.065])box(g,x,.015,.48,.04,.075,.39,steel,.009);box(g,0,-.06,.67,.21,.31,.07,c,.028);box(g,0,.15,.44,.16,.07,.26,dark);}
+    else {stock(g,id==='needle'?0x55717a:c,.36);box(g,0,.18,.58,.19,.11,.25,dark,.035);}
+    const end=id==='anchor'?-.94:-1.1;
+    plate(g,[[-.16,-.07],[-.61,-.05],[-.66,-.14],[-.22,-.17]],.22,id==='peeper'?wood:dark);
+    taper(g,0,0,(end-.29)/2,.07,.037,-end-.29,steel);muzzleModel(end,id==='needle'?.07:.065);
+    if(id==='needle'){for(const x of [-.095,.095]){const leg=box(g,x,-.21,-.6,.03,.29,.04,steel,.01);leg.rotation.z=x>0?-.45:.45;}for(let i=0;i<4;i++)box(g,0,.018,-.92+i*.045,.09,.035,.019,black,.004);}
+    if(id==='anchor'){tube(g,0,.067,-.54,.021,.39,dark);vents(g,-.29,5,.235,.056);rail(-.02,.49);}
+    magazine(-.15,id==='anchor'?.29:.23);bolt();optic(g,'scope');
+  }else if(id==='zipper'){
+    // Compact roller-style rounded receiver, telescoping stock and curved stick magazine.
+    tube(g,0,.055,-.07,.115,.5,c);box(g,0,-.05,.04,.23,.1,.4,dark,.03);grip(g,.13);
+    for(const x of [-.1,.1])box(g,x,.045,.45,.027,.045,.44,steel,.01);box(g,0,-.055,.66,.2,.25,.055,dark,.018);
+    taper(g,0,.01,-.365,.12,.075,.21,dark);tube(g,0,0,-.55,.049,.24,steel);muzzleModel(-.68,.065);
+    magazine(-.14,.32,true);vents(g,-.29,4,.2,.04);rail(.025,.25);optic(g,'reflex');bolt(.14,-.19);
+  }else if(id==='thumper'){
+    // Shoulder-fired capsule launcher: bulbous chamber, reinforced breech and muzzle flare.
+    grip(g,.17);stock(g,dark,.3);taper(g,0,0,-.23,.17,.135,.67,c);
+    taper(g,0,0,-.64,.14,.21,.17,steel);ring(g,0,0,-.735,.205,.023,dark);tube(g,0,0,-.744,.17,.01,black);
+    for(const z of [-.05,-.36,-.54])ring(g,0,0,z,.168,.026,black);
+    box(g,0,-.2,-.3,.19,.14,.33,dark,.045);box(g,.18,.02,-.11,.06,.14,.17,steel,.026);
+    for(const x of [-.175,.175])box(g,x,.025,-.33,.015,.035,.32,0xabc8ba,.01);rail(.02,.24);optic(g,'reflex');
+  }else if(id==='duet'){
+    // Bullpup: rear magazine and carry rail distinguish it from the assault carbine.
+    plate(g,[[.61,-.12],[-.35,-.13],[-.48,.025],[-.32,.14],[.55,.15],[.65,.05]],.265,c);grip(g,-.03);magazine(.35,.27);
+    box(g,0,-.005,.66,.29,.29,.06,dark,.026);box(g,0,-.08,-.42,.235,.16,.27,dark,.04);
+    tube(g,0,0,-.69,.05,.43,steel);muzzleModel(-.92,.065);vents(g,-.15,5,.278,.052);rail(.05,.49);optic(g,'prism');
+    box(g,.142,.025,.34,.014,.062,.15,black,.006);bolt(.155,-.12);
+  }else if(id==='comet'){
+    // Original egg-energy projector, curved coil housing and visible ceramic emitter.
+    plate(g,[[.28,-.12],[-.29,-.13],[-.39,0],[-.27,.16],[.24,.18],[.36,.06]],.29,c);grip(g,.13);stock(g,0x55688e,.34);
+    taper(g,0,0,-.48,.15,.1,.43,steel);tube(g,0,0,-.74,.085,.3,0xb5eee7);muzzleModel(-.9,.103);
+    for(const z of [-.32,-.43,-.54,-.65])ring(g,0,0,z,.158,.023,0x79d8d6);
+    for(const x of [-.175,.175]){plate(g,[[-.24,-.06],[-.72,-.09],[-.82,.015],[-.63,.08],[-.26,.12]],.048,c,x);}
+    g.userData.reloadPart=box(g,0,-.24,-.1,.19,.27,.22,0x91d2e1,.055);rail(.055,.28);optic(g,'reflex');
+  }else{
+    // Stamped assault receiver, sloped gas block and curved magazine.
+    receiver(.63,.255);grip(g,.13);stock(g,wood,.35);magazine(-.1,.32,true);
+    plate(g,[[-.29,-.08],[-.62,-.08],[-.65,.065],[-.31,.09]],.235,wood);
+    for(const side of [-1,1])for(let i=0;i<4;i++)box(g,side*.124,-.01,-.35-i*.06,.01,.055,.034,dark,.009);
+    tube(g,0,0,-.74,.044,.3,steel);tube(g,0,.078,-.55,.023,.29,dark);muzzleModel(-.9,.063);
+    rail(.04,.4);bolt(.15,.12);optic(g,'reflex');
   }
+  // Recessed trigger within an oval guard (visual geometry, no extra interaction).
+  const trigger=box(g,0,-.13,id==='duet'?-.14:.018,.022,.1,.024,steel,.008);trigger.rotation.x=-.25;
+  const guard=ring(g,0,-.17,id==='duet'?-.16:-.018,.105,.012,dark);guard.rotation.y=Math.PI/2;guard.scale.set(.78,1,1);
   if (id === "scatter" || id === "doubleyolk" || id === "thumper") {
     const token = tube(g, 0, 0, 0, id === "thumper" ? .085 : .05, id === "thumper" ? .28 : .15, c);
     token.visible = false;
@@ -542,4 +428,15 @@ export function weaponPortrait(renderer, id) {
   target.dispose();
   disposeBlaster(model);
   return result;
+}
+
+// Ground pickups do not need moving magazines/bolts. Merge once, reuse one draw call per gun.
+const groundModels=new Map(),groundMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.5,metalness:.35});
+export function makeGroundBlaster(id){
+ if(!groundModels.has(id)){
+  const model=makeBlaster(id),parts=[];model.updateMatrixWorld(true);
+  model.traverse(o=>{if(!o.isMesh||!o.visible||o===model.userData.reloadToken)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrixWorld);g.deleteAttribute('uv');const c=o.material.color,colors=new Float32Array(g.attributes.position.count*3);for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));parts.push(g);});
+  const g=mergeGeometries(parts);g.userData.shared=true;g.computeBoundingSphere();parts.forEach(p=>p.dispose());disposeBlaster(model);groundModels.set(id,g);
+ }
+ return new THREE.Mesh(groundModels.get(id),groundMaterial);
 }

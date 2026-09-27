@@ -1,7 +1,8 @@
 import { safeName } from './moderation.js';
+import {OPTICS} from './weapon-presentation.js';
 import {cosmeticProfile} from './shop-catalog.js';
 // The rebuilt island and movement model must not mix with older clients.
-export const VERSION = 14;
+export const VERSION = 15;
 export const WEAPONS = [
   {
     id: "sprinter",
@@ -277,6 +278,7 @@ export const ROYALE_WEAPONS = [
  {...WEAPONS[1],id:'doubleyolk',name:'Double Yolk',role:'TACTICAL',desc:'A quick cycling tactical scatter blaster.',damage:7,pellets:10,magazine:6,reserve:48,interval:.5,reload:2.4,reloadEmpty:2.7,range:22,color:0xec99c5},
  {...WEAPONS[0],id:'comet',name:'Comet',role:'ENERGY',desc:'A precise energy carbine with luminous rounds.',damage:27,magazine:24,reserve:240,interval:.14,reload:2.1,reloadEmpty:2.4,spread:.013,range:95,color:0x8bafff},
 ];
+for(const w of [...WEAPONS,...ROYALE_WEAPONS])if(OPTICS[w.id]){w.ads={...OPTICS[w.id]};w.magnification=w.ads.magnification;w.sightY=w.ads.radius+.15;}
 const royaleStats = new Map();
 export const MODES = [
  {id:"royale",name:"Yolk Royale",short:"ROYALE",description:"Drop in, loot up, outrun the storm. Last egg standing.",limit:1,teams:false},

@@ -2,7 +2,11 @@
 
 Original design dated 21 September 2026; the update below supersedes the historical design where behavior changed. A complete solo, no-building battle royale inside Yolk Yard, with original art, island, item names, transport and sound. The familiar loop is airborne insertion → loot → rotate with the storm → survive → spectate → rematch.
 
-## Update 26: current rules
+## Update 42: Sunnybreak Reborn
+
+The current island, loot authority and presentation are documented in [SUNNYBREAK_REBORN.md](SUNNYBREAK_REBORN.md). This supersedes the historical maps and transport descriptions below.
+
+## Update 26: historical rules
 
 - Public is the default. Capacity counts the whole roster. A human replaces an available bot, inheriting its current life and inventory; a full human roster rejects additional joins. Bot fill replaces departures without granting another life.
 - Hosts transfer in human join order on departure or connection loss. Half-second checkpoints preserve the round, storm, inventory and chat controls; the new host reclaims the original room code. Duplicate human names require an unused replacement name.

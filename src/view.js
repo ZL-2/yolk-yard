@@ -1,3 +1,4 @@
+import {adsFov} from './weapon-presentation.js';
 import {animatePickaxe} from './pickaxe-animation.js';
 import {buildIsland,RoyaleView} from './royale-view.js';
 import {shopItem} from './shop-catalog.js';
@@ -542,7 +543,7 @@ export class View {
     if (this.opticLens) {
       this.opticLens.material.map = this.scopeTarget.texture;
       this.opticLens.material.color.setHex(0xffffff);
-      const radius = id === "needle" ? 0.125 : 0.103;
+      const radius = gun(p).ads?.radius-.012 || .103;
       const reticle = new THREE.Mesh(
         new THREE.CircleGeometry(radius, 48),
         new THREE.MeshBasicMaterial({
@@ -795,13 +796,9 @@ export class View {
         scoped = w.optic === "scope" || w.optic === "prism";
       const aiming = !!(aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
       if(!Number.isFinite(this.aimBlend))this.aimBlend=0;
-      this.aimBlend += (Number(aiming) - this.aimBlend) * Math.min(1, dt * 14);
-      const fov = aiming
-        ? scoped
-          ? Math.min(this.settings.fov, 76)
-          : w.zoom
-        : this.settings.fov;
-      this.camera.fov += (fov - this.camera.fov) * Math.min(1, dt * 13);
+      this.aimBlend += (Number(aiming) - this.aimBlend) * Math.min(1, dt * (w.ads?.transition||14));
+      const fov=aiming?adsFov(w,this.settings.fov):this.settings.fov;
+      this.camera.fov+=(fov-this.camera.fov)*Math.min(1,dt*(w.ads?.transition||13));
       this.camera.updateProjectionMatrix();
       const bob =
         Math.sin(this.clock * 11) *
@@ -866,6 +863,9 @@ export class View {
     if (state) {
       const seen = new Set();
       for (const p of state.players) {
+        // Transport passengers share one simulation position; the airship
+        // represents them until exit instead of rendering sixteen overlapping eggs.
+        if(state.royale&&p.flight==='transport')continue;
         if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.75)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
         seen.add(p.id);
         const sig =
@@ -1107,14 +1107,14 @@ export class View {
     }
     if (this.opticLens) {
       const texture =
-        playing && this.scopeActive ? this.scopeTarget.texture : null;
+        playing && this.scopeActive && !gun(local).ads?.overlay ? this.scopeTarget.texture : null;
       if (this.opticLens.material.map !== texture) {
         this.opticLens.material.map = texture;
         this.opticLens.material.color.setHex(texture ? 0xffffff : 0x427c86);
         this.opticLens.material.needsUpdate = true;
       }
     }
-    if (playing && this.scopeActive && this.opticLens) {
+    if (playing && this.scopeActive && this.opticLens && !gun(local).ads?.overlay) {
       this.scopeCamera.position.copy(this.camera.position);
       this.scopeCamera.quaternion.copy(this.camera.quaternion);
       const aperture = gun(local).id === "needle" ? 0.125 : 0.103;
@@ -1133,6 +1133,7 @@ export class View {
       this.renderer.setRenderTarget(null);
       this.gunGroup.visible = true;
     }
+    if(playing&&this.scopeActive&&gun(local).ads?.overlay&&this.aimBlend>.8)this.gunGroup.visible=false;
     this.royaleView.update(state,local,dt,playing);
     this.renderer.render(this.scene, this.camera);
   }

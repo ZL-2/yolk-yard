@@ -1796,3 +1796,14 @@ body.in-royale .match-center{display:none}
 .harvest-gain{display:flex;align-items:center;gap:5px}.harvest-gain svg{width:29px;height:29px;fill:#e8f4ff33;stroke:#fff;stroke-width:1.8}
 @media(max-width:750px){.build-edit{top:48%;min-width:240px}.build-edit .edit-prompts{gap:4px}.build-edit .edit-prompts button{padding:8px}.build-target{top:30%}}
 .manual-editing .build-target{top:32%}.manual-editing .build-target span{font-size:11px}
+
+/* Scope aperture and reticle are aligned to the magnified main camera. */
+.scope[data-overlay] {background:radial-gradient(circle at center,transparent 0 36vh,#172a35 36.15vh 36.7vh,#050b10f5 36.85vh);z-index:3;}
+.scope[data-overlay]::before {content:"";position:absolute;left:50%;top:50%;width:72vh;height:72vh;transform:translate(-50%,-50%);border-radius:50%;background:linear-gradient(transparent calc(50% - .6px),#111b20 calc(50% - .6px) calc(50% + .6px),transparent calc(50% + .6px)),linear-gradient(90deg,transparent calc(50% - .6px),#111b20 calc(50% - .6px) calc(50% + .6px),transparent calc(50% + .6px));}
+.scope[data-reticle="mil-dot"]::after {content:"·  ·  ·  ·  ·";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:900 25px/1 monospace;color:#15202a;letter-spacing:10px;}
+.scope[data-reticle="chevron"]::after {content:"⌃";position:absolute;left:50%;top:50%;transform:translate(-50%,-42%);font:900 30px/1 monospace;color:#da5c46;}
+#scope-label {bottom:12%;font-size:12px;}
+.flight-close {position:absolute;top:8px;right:10px;padding:5px 9px!important;font-size:12px!important;min-height:28px!important;background:#173345cc!important;border:1px solid #ffffff44!important;color:white!important;}
+.royale-flight {padding-top:40px!important;}
+.royale-flight .flight-close{display:block!important}
+@media (orientation:portrait){.scope[data-overlay]{background:radial-gradient(circle at center,transparent 0 36vmin,#172a35 36.15vmin 36.7vmin,#050b10f5 36.85vmin)}.scope[data-overlay]::before{width:72vmin;height:72vmin}#scope-label{top:calc(50% + 36vmin + 8px);bottom:auto}}

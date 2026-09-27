@@ -1,6 +1,8 @@
+import {dressIslandBuilding,islandProp} from './island-art.js';
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
-import {makeBlaster} from './weapons.js';
+import {GROUND_DISPLAY,AMMO_VISUALS} from './weapon-presentation.js';
+import {makeBlaster,makeGroundBlaster} from './weapons.js';
 import {ITEMS,RARITIES} from './royale-data.js';
 
 // Shared primitives stay inexpensive even in the island's dense groves.
@@ -29,6 +31,7 @@ export const DISTRICT_STYLES={
 };
 export function buildingStyle(b){const s=DISTRICT_STYLES[b.kind];return {...s,wall:s.walls[b.index%s.walls.length]};}
 export function dressBuilding(g,b,raw){
+ if(b.floors)return dressIslandBuilding(g,b,raw);
  const k=artKit(raw),{block:box,cylinder,beam,rock}=k,s=buildingStyle(b),{x,z,w,d,h}=b;
  // Structural corner posts, foundation courses and a broad, unobstructed entrance.
  for(const dx of [-w/2,w/2]){
@@ -117,6 +120,7 @@ export function treeModel(g,t,raw){
  }
 }
 export function propModel(g,p,raw){
+ if(islandProp(g,p,raw))return;
  const {block:box,cone,rock,cylinder,torus,beam}=artKit(raw),{x,y=0,z,w,d,h,kind}=p;
  if(kind==='rock'){
   const m=rock(g,x,y+h*.45,z,w*.5,h*.55,d*.5,0x929789,1);m.rotation.y=(p.seed||0)*2.4;
@@ -194,11 +198,23 @@ export function lootModel(item,raw,{ground=true}={}){
  if(item.id==='blueprint'){rounded(g,0,.3,0,1.2,.85,.035,0x247bad,.02);for(let i=0;i<7;i++)box(g,-.55+i*.18,.3,.025,.012,.8,.015,0x80d7ed);for(let i=0;i<5;i++)box(g,0,-.05+i*.18,.025,1.1,.012,.015,0x80d7ed);const pencil=cylinder(g,.7,.2,.03,.024,.7,0xf2d261,8);pencil.rotation.z=-.2;}
  else if(item.id==='pickaxe'){cylinder(g,0,0,0,.075,1.65,0x956944,12);for(let i=0;i<8;i++)torus(g,0,-.65+i*.07,0,.081,.018,0x263e57).rotation.x=Math.PI/2;rounded(g,0,.68,0,1.15,.25,.19,0x7cb7cc,.07);const tip=cone(g,.72,.52,0,.13,.55,0xb5e4ec);tip.rotation.z=-1.05;rounded(g,-.63,.68,0,.28,.38,.23,0xd9b365,.03);}
  else if(item.resource){for(let i=0;i<3;i++)rounded(g,(i-1)*.23,.05+i*.08,0,.55,.18,.4,item.resource==='wood'?0xba8852:item.resource==='brick'?0xbc705c:0x799ba8,.03);}
- else if(item.weapon){const blaster=makeBlaster(item.id);blaster.rotation.z=Math.PI/2;blaster.scale.setScalar(.85);g.add(blaster);}
+ else if(item.weapon){const blaster=ground?makeGroundBlaster(item.id):makeBlaster(item.id),pose=GROUND_DISPLAY[item.id];blaster.rotation.set(pose.pitch,pose.yaw,0);blaster.scale.setScalar(pose.scale);blaster.position.y=pose.lift;g.add(blaster);g.userData.display=pose;}
  else if(item.ammoType){
-  rounded(g,0,.12,0,.65,.42,.46,0x778b68,.06);box(g,0,.35,0,.7,.06,.5,0xc3a26b);
-  for(let j=0;j<4;j++){cylinder(g,(j-1.5)*.14,.44,0,.045,.19,0xefc96f,8);cone(g,(j-1.5)*.14,.56,0,.046,.08,0xf9e9b6);}
-  box(g,0,.16,.24,.38,.16,.02,0xe9d5a6);
+  const v=AMMO_VISUALS[item.ammoType]||AMMO_VISUALS.medium;
+  g.userData.ammoType=item.ammoType;
+  // Open clips expose the actual cartridge shape instead of hiding it in identical boxes.
+  for(let j=0;j<v.count;j++){
+   const x=(j%4-1.5)*(v.radius*2.6),z=Math.floor(j/4)*v.radius*3,yy=.1;
+   cylinder(g,x,yy+v.height*.36,z,v.radius,v.height*.72,v.color,10);
+   cylinder(g,x,yy+.025,z,v.radius*1.11,.05,0xe2b85c,10);
+   if(item.ammoType==='shells'){cylinder(g,x,yy+v.height*.76,z,v.radius*.94,.025,0x682f2c,10);cylinder(g,x,yy+.085,z,v.radius*1.01,.11,0xe1b85e,10);}
+   else if(item.ammoType==='rockets'){
+    cone(g,x,yy+v.height*.83,z,v.radius,.32,0xd3b783);
+    for(let k=0;k<4;k++){const a=k*Math.PI/2,m=box(g,x+Math.cos(a)*.14,yy+.11,z+Math.sin(a)*.14,.23,.22,.027,0x44595c);m.rotation.y=-a;}
+    cylinder(g,x,yy+.64,z,v.radius*1.02,.065,0xd7a055,10);
+   }else{cone(g,x,yy+v.height*.88,z,v.radius*.82,v.height*.27,item.ammoType==='heavy'?0x806154:0xdcdac4);}
+  }
+  if(item.ammoType!=='rockets'){rounded(g,0,.14,.03,.86,.095,.31,0x425d65,.02);box(g,0,.14,-.14,.26,.085,.016,v.color);}
  }else if(item.id==='mini'||item.id==='flask'){
   const big=item.id==='flask',r=big?.28:.19;
   cylinder(g,0,.15,0,r,big?.58:.43,0x77c7d5,16);cone(g,0,big?.49:.4,0,r,.14,0xb4e6df,.52);
@@ -232,6 +248,6 @@ export function lootModel(item,raw,{ground=true}={}){
   const r=torus(g,-.08,.72,0,.12,.025,0xc9d4cf);r.rotation.y=Math.PI/2;
   rounded(g,.17,.57,0,.32,.055,.13,0xd6b466,.012);const lever=rounded(g,.30,.38,0,.055,.38,.13,0xd6b466,.012);lever.rotation.z=-.18;
  }else rock(g,0,.2,0,.3,.35,.3,c,1);
- if(ground){const ring=new THREE.Mesh(geo('loot-ring',()=>new THREE.RingGeometry(.4,.51,32)),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.y=-.28;ring.userData.ownedMaterial=true;g.add(ring);}
+ if(ground){const ring=new THREE.Mesh(geo('loot-ring',()=>new THREE.RingGeometry(.4,.51,32)),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.y=.025;ring.userData.ownedMaterial=true;g.add(ring);}
  return g;
 }

@@ -1,17 +1,18 @@
-import {inventory,resetBuilding,rebuildMap,buildingTick,editBuilding,damageObject,MATERIALS,constructionTick,toggleDoor} from './building.js';
+import {seedIslandLoot,rollChest,rollItem,placeLoot,supportBelow} from './royale-loot.js';
+import {inventory,resetBuilding,rebuildMap,buildingTick,editBuilding,damageObject,constructionTick,toggleDoor} from './building.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {botInput as tacticalBotInput} from './bots.js';
 import {beginEquip} from './equip.js';
 import {Simulation} from './simulation.js';
 import {gun,weapon,clamp,safeProfile,randomAppearance,nameKey} from './data.js';
 import {movePlayer,dist,direction,wallDistance,EYE,canStand} from './physics.js';
-import {surfaceAt} from './maps.js';
+import {surfaceAt,navigation} from './maps.js';
 import {groundAt} from './terrain.js';
-import {ITEMS,ROYALE_GUN_IDS,ammoType,AMMO_CAPS,randomRarity,makeStorm,stormAt,makeFlight,transportAt} from './royale-data.js';
+import {ITEMS,ammoType,AMMO_CAPS,makeStorm,stormAt,makeFlight,transportAt} from './royale-data.js';
 
 export class RoyaleSimulation extends Simulation {
  constructor(options={}){
-  super({...options,mode:'royale'});this.map={...ROYALE_MAP,boxes:(ROYALE_MAP.authored||ROYALE_MAP.boxes).map(b=>({...b}))};resetBuilding(this);this.matchId=globalThis.crypto.randomUUID();this.maxPlayers=this.options.capacity;
+  super({...options,mode:'royale'});this.map={...ROYALE_MAP,boxes:(ROYALE_MAP.authored||ROYALE_MAP.boxes).map(b=>({...b}))};resetBuilding(this);this.nav=navigation(ROYALE_MAP);this.matchId=globalThis.crypto.randomUUID();this.maxPlayers=this.options.capacity;
   this.loot=[];this.chests=[];this.pads=[];this.lootId=0;this.lootVersion=0;this.startedAt=0;this.elapsed=0;this.alive=0;this.placements=[];this.supplyAt=135;this.queueEnds=0;
  }
  addPlayer(id,profile,bot=false){
@@ -53,36 +54,18 @@ export class RoyaleSimulation extends Simulation {
   const seats=[...this.players.values()].sort((a,b)=>Number(a.bot)-Number(b.bot));
   for(const [index,p] of seats.entries()){
    const contestant=index<this.options.capacity;
-   Object.assign(p,{health:contestant?100:0,shield:0,stamina:100,sprintRest:0,exhausted:false,sprinting:false,flight:contestant?'transport':'out',flightLatch:false,grounded:false,eliminated:!contestant,spectating:!contestant,awaitingEntry:false,spawnRequested:false,place:0,eliminatedAt:null,kills:0,deaths:0,points:0,streak:0,slot:5,materials:{wood:0,brick:0,metal:0},building:false,swingAt:-100,nextBuild:0,nextHarvest:0,poppers:0,reloadEnd:0,burstLeft:0,nextShot:0,fireLatch:false,shieldUntil:0,lastDamage:-100,respawnAt:0,killerId:null,crown:null,inventory:inventory(),ammo:Array(6).fill(0),reserve:Array(6).fill(0),accuracyState:Array.from({length:6},()=>({})),bank:{light:0,medium:0,shells:0,heavy:0,rockets:0},use:null,chestId:null,chestProgress:0,interactLatch:false,dropLatch:false,useLatch:false,botThink:0,botPath:[],brain:null,botDrop:4+this.random()*27,botLand:landingSpots[Math.floor(index*landingSpots.length/this.options.capacity)%landingSpots.length]});
+   Object.assign(p,{health:contestant?100:0,shield:0,stamina:100,sprintRest:0,exhausted:false,sprinting:false,flight:contestant?'transport':'out',flightLatch:false,grounded:false,eliminated:!contestant,spectating:!contestant,awaitingEntry:false,spawnRequested:false,place:0,eliminatedAt:null,kills:0,deaths:0,points:0,streak:0,slot:5,materials:{wood:0,brick:0,metal:0},building:false,swingAt:-100,nextBuild:0,nextHarvest:0,poppers:0,reloadEnd:0,burstLeft:0,nextShot:0,fireLatch:false,shieldUntil:0,lastDamage:-100,respawnAt:0,killerId:null,crown:null,inventory:inventory(),ammo:Array(6).fill(0),reserve:Array(6).fill(0),accuracyState:Array.from({length:6},()=>({})),bank:{light:0,medium:0,shells:0,heavy:0,rockets:0},use:null,chestId:null,chestProgress:0,interactLatch:false,dropLatch:false,useLatch:false,botThink:0,botPath:[],botIntent:null,botIntentAt:0,brain:null,botDrop:4+this.random()*27,botLand:landingSpots[Math.floor(index*landingSpots.length/this.options.capacity)%landingSpots.length]});
    Object.assign(p,transportAt(this.route,0));p.pitch=0;p.vy=0;
   }
   this.alive=seats.filter(p=>p.health>0).length;
-  this.chests=this.map.chests.map((c,i)=>({...c,id:'chest-'+i,opened:false,supply:false}));
-  for(const [i,point] of this.map.floorLoot.entries()){
-   if(i%3===0)this.dropWeapon(point,this.randomGun(),randomRarity(this.random()));
-   else this.dropLoot(point,{id:Object.keys(ITEMS)[Math.floor(this.random()*Object.keys(ITEMS).length)],count:1,rarity:1});
-   if(i%3===0)this.dropAmmo({...point,x:point.x+1.3},ammoType(this.loot.at(-1).id),28);
-  }
+  seedIslandLoot(this);
   this.emit('round',{round:this.round});this.emit('royale-cue',{cue:'transport-horn'});return true;
  }
- randomGun(){return ROYALE_GUN_IDS[Math.floor(this.random()*ROYALE_GUN_IDS.length)];}
- dropLoot(point,item){
-  // Covers every authored floor spawn + chest, supply drops and all death drops.
-  // Rendering remains distance-limited and unchanged world loot is not re-sent.
-  if(this.loot.length>=1400)return null;
-  let spot=null,best=-Infinity;
-  for(let i=0;i<80;i++){
-   const a=i*2.399963,r=i===0?0:1.8+Math.sqrt(i)*.55;
-   const x=point.x+Math.cos(a)*r,z=point.z+Math.sin(a)*r;
-   const y=surfaceAt(this.map,x,z),candidate={x,y,z};
-   if(Math.abs(y-(point.y||0))>1.1||!canStand(this.map,candidate,.4))continue;
-   const d=Math.hypot(x-point.x,z-point.z)||1;
-   if(wallDistance(this.map,{x:point.x,y:(point.y||0)+.65,z:point.z},{x:(x-point.x)/d,y:0,z:(z-point.z)/d},d)<d-.1)continue;
-   const separation=Math.min(5,...this.loot.filter(o=>Math.abs(o.y-y)<1.5).map(o=>Math.hypot(o.x-x,o.z-z)));
-   if(separation>=2.15){spot=candidate;break;}
-   if(separation>best){best=separation;spot=candidate;}
-  }
-  spot??={x:point.x,y:Math.max(point.y||0,groundAt(this.map,point.x,point.z)),z:point.z};
+ randomGun(){return rollItem(this.random,'ground','weapon').id;}
+ dropLoot(point,item,avoid=[]){
+  if(this.loot.length>=2400)return null;
+  const supported={...point,y:supportBelow(this.map,point.x,point.z,point.y??groundAt(this.map,point.x,point.z))};
+  const spot=placeLoot(this.map,supported,avoid.length?[...this.loot,...avoid]:this.loot);if(!spot)return null;
   const drop={...item,uid:++this.lootId,...spot};this.loot.push(drop);this.lootVersion++;return drop;
  }
  dropWeapon(point,id,rarity=0,ammo=weapon(id).magazine){return this.dropLoot(point,{id,weapon:true,rarity,count:1,ammo});}
@@ -100,17 +83,17 @@ export class RoyaleSimulation extends Simulation {
  dropSlot(p,index=p.slot){
   const item=p.inventory[index];if(!item||index===5)return;
   // Drop at the feet: this always remains on the same reachable collision surface.
-  this.dropLoot(p,item);p.inventory[index]=null;p.reloadEnd=0;p.burstLeft=0;p.use=null;this.syncInventory(p);
+  if(!this.dropLoot(p,item))return false;p.inventory[index]=null;p.reloadEnd=0;p.burstLeft=0;p.use=null;this.syncInventory(p);
   this.emit('royale-cue',{player:p.id,cue:'item-drop',x:p.x,y:p.y,z:p.z});
  }
  takeLoot(p,item){
-  if(!this.loot.includes(item)||!this.accessible(p,item)||p.health<=0||p.flight!=='ground')return false;
+  if(!item||!this.loot.includes(item)||!this.accessible(p,item)||p.health<=0||p.flight!=='ground')return false;
   if(item.resource){const add=Math.min(item.count,999-p.materials[item.resource]);if(add<=0)return false;p.materials[item.resource]+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;return true;}
   if(item.ammoType){const add=Math.min(item.count,AMMO_CAPS[item.ammoType]-p.bank[item.ammoType]);if(add<=0)return false;p.bank[item.ammoType]+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'ammo-pickup'});return true;}
   let slot=!item.weapon?p.inventory.findIndex(i=>i?.id===item.id&&i.count<(ITEMS[i.id]?.stack||1)):-1;
   if(slot>=0){const add=Math.min(item.count,ITEMS[item.id].stack-p.inventory[slot].count);p.inventory[slot].count+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;}
   else {
-   slot=p.inventory.findIndex(i=>!i);if(slot<0){slot=p.slot===5?0:p.slot;this.dropSlot(p,slot);}
+   slot=p.inventory.findIndex(i=>!i);if(slot<0){slot=p.slot===5?0:p.slot;if(this.dropSlot(p,slot)===false)return false;}
    const {uid,x,y,z,...entry}=item;p.inventory[slot]={...entry};this.removeLoot(item);
    if(!p.inventory[p.slot] || p.inventory.filter(i=>i&&!i.pickaxe).length===1)p.slot=slot;
    beginEquip(p,this.time,true);
@@ -118,14 +101,11 @@ export class RoyaleSimulation extends Simulation {
   p.use=null;p.reloadEnd=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'pickup-'+(item.rarity||0),item:item.id});return true;
  }
  openChest(p,chest){
-  if(chest.opened||!this.accessible(p,chest,3.3))return false;
+  if(!this.chests.includes(chest)||p.health<=0||p.flight!=='ground'||chest.opened||!this.accessible(p,chest,3.3))return false;
   chest.opened=true;this.lootVersion++;
-  const id=this.randomGun(),rarity=randomRarity(this.random(),chest.supply?2:0);
-  const point=(dx,dz)=>({x:chest.x+dx,z:chest.z+dz,y:chest.y-groundAt(this.map,chest.x,chest.z)<.15?groundAt(this.map,chest.x+dx,chest.z+dz):chest.y});
-  this.dropWeapon(point(-1,1.4),id,rarity);
-  this.dropAmmo(point(1,1.4),ammoType(id),ammoType(id)==='rockets'?4:ammoType(id)==='heavy'?12:36);
-  const list=['mini','flask','medkit','splash','impulse','launchpad'];
-  this.dropLoot(point(0,2.2),{id:list[Math.floor(this.random()*list.length)],count:chest.supply?2:1,rarity:1});
+  const contents=chest.contents||rollChest(this.random,chest.supply?'supply':chest.source||'chest');
+  for(const item of contents){const drop=this.dropLoot(chest,item,[chest]);if(drop){drop.spawnAt=this.time;drop.spawnFrom={x:chest.x,y:chest.y+.65,z:chest.z};}}
+  delete chest.contents;
   this.emit('royale-cue',{cue:'chest-open',player:p.id,x:chest.x,y:chest.y,z:chest.z});return true;
  }
  interact(p,input,dt){
@@ -226,7 +206,7 @@ export class RoyaleSimulation extends Simulation {
    const from=Number(change[2]),to=Number(change[3]);
    if(change[1]==='select'){p.slot=from;beginEquip(p,this.time,true);}
    else if(change[1]==='drop')this.dropSlot(p,from);
-   else if(change[1]==='drop-one'){const item=p.inventory[from];if(item&&!item.weapon&&item.count>1){this.dropLoot(p,{...item,count:1});item.count--;}else this.dropSlot(p,from);}
+   else if(change[1]==='drop-one'){const item=p.inventory[from];if(item&&!item.weapon&&item.count>1){if(this.dropLoot(p,{...item,count:1}))item.count--;}else this.dropSlot(p,from);}
    else if(change[1]==='split'){const item=p.inventory[from],empty=p.inventory.findIndex(i=>!i);if(item&&!item.weapon&&item.count>1&&empty>=0){const count=Math.floor(item.count/2);item.count-=count;p.inventory[empty]={...item,count};}}
    else if(Number.isInteger(to)&&to>=0&&to<5){[p.inventory[from],p.inventory[to]]=[p.inventory[to],p.inventory[from]];if(p.slot===from)p.slot=to;else if(p.slot===to)p.slot=from;beginEquip(p,this.time,true);}
    this.cancelUse(p);p.reloadEnd=0;p.burstLeft=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'weapon-swap'});return;
@@ -240,7 +220,7 @@ export class RoyaleSimulation extends Simulation {
   const oldIndex=this.storm.index,oldClosing=this.storm.closing;
   this.storm=stormAt(this.stormSteps,this.elapsed);
   if(oldIndex!==this.storm.index||oldClosing!==this.storm.closing)this.emit('royale-cue',{cue:this.storm.closing?'storm-closing':'storm-reveal'});
-  if(this.elapsed>this.supplyAt){this.supplyAt+=130;const angle=this.random()*Math.PI*2,r=Math.max(0,this.storm.radius-20)*this.random();const x=clamp(this.storm.x+Math.cos(angle)*r,-210,210),z=clamp(this.storm.z+Math.sin(angle)*r,-210,210);this.chests.push({id:'supply-'+this.lootId++,x,z,y:surfaceAt(this.map,x,z),opened:false,supply:true,landAt:this.time+18});this.lootVersion++;this.emit('royale-cue',{cue:'supply-incoming'});}
+  if(this.elapsed>this.supplyAt){this.supplyAt+=130;const angle=this.random()*Math.PI*2,r=Math.max(0,this.storm.radius-20)*this.random();const x=clamp(this.storm.x+Math.cos(angle)*r,-210,210),z=clamp(this.storm.z+Math.sin(angle)*r,-210,210);const spot=placeLoot(this.map,{x,z,y:surfaceAt(this.map,x,z)})||placeLoot(this.map,{x,z,y:groundAt(this.map,x,z)});if(spot)this.chests.push({id:'supply-'+this.lootId++,...spot,opened:false,supply:true,landAt:this.time+18,contents:rollChest(this.random,'supply')});this.lootVersion++;this.emit('royale-cue',{cue:'supply-incoming'});}
   for(const p of this.players.values()){
    if(p.health<=0||p.spectating)continue;
    const commands=p.bot?null:this.movementInput(p,dt);
@@ -303,6 +283,10 @@ export class RoyaleSimulation extends Simulation {
   this.emit('finish',{winner:this.winner});this.emit('royale-cue',{cue:'victory'});
  }
  botInput(p){
+  if(p.flight==='ground'&&p.botIntent&&this.time<(p.botIntentAt||0))return {...p.botIntent};
+  const intent=this.thinkBot(p);if(p.flight==='ground'){p.botIntent={...intent};p.botIntentAt=this.time+.085;}return intent;
+ }
+ thinkBot(p){
   const input={yaw:p.yaw,pitch:0,forward:0,strafe:0,slot:p.slot,swapSlot:-1};
   if(p.flight==='transport'){input.jump=this.elapsed>=p.botDrop;return input;}
   let goal=p.botLand;
@@ -320,21 +304,23 @@ export class RoyaleSimulation extends Simulation {
   const danger=this.storm.active&&Math.hypot(p.x-this.storm.nextX,p.z-this.storm.nextZ)>this.storm.nextRadius*.82;
   const targets=[...this.players.values()].filter(e=>e!==p&&e.health>0&&!e.spectating&&e.flight==='ground').sort((a,b)=>dist(p,a)-dist(p,b));
   const enemy=targets[0],weaponSlot=p.inventory.findIndex(i=>i?.weapon&&(i.ammo>0||p.bank[ammoType(i.id)]>0));
-  const items=this.loot.filter(i=>(i.y<=p.y+.5)&&(needGun?i.weapon:i.ammoType||(!i.weapon&&p.inventory.slice(0,5).filter(Boolean).length<5))).sort((a,b)=>dist(p,a)-dist(p,b));
+  const items=this.loot.filter(i=>(Math.abs(i.y-p.y)<18)&&(needGun?i.weapon:i.ammoType?(p.bank[i.ammoType]<AMMO_CAPS[i.ammoType]&&p.inventory.some(w=>w?.weapon&&ammoType(w.id)===i.ammoType)):(!i.weapon&&p.inventory.slice(0,5).filter(Boolean).length<5))).sort((a,b)=>dist(p,a)-dist(p,b));
   const chest=this.chests.filter(c=>!c.opened&&(!c.landAt||c.landAt<this.time)).sort((a,b)=>dist(p,a)-dist(p,b))[0];
-  if(danger)goal={x:this.storm.nextX,z:this.storm.nextZ};
+  if(danger)goal={x:this.storm.nextX,y:groundAt(this.map,this.storm.nextX,this.storm.nextZ),z:this.storm.nextZ};
   else if(items[0]&&dist(p,items[0])<(needGun?180:35))goal=items[0];
   else if(needGun&&chest)goal=chest;
   else if(enemy)goal=enemy;
   else goal={x:this.storm.nextX,z:this.storm.nextZ};
   if(p.botThink<=this.time){p.botPath=this.nav.path(p,goal);p.botThink=this.time+.8+this.random()*.3;}
-  while(p.botPath?.length&&dist(p,p.botPath[0])<1.05)p.botPath.shift();
+  while(p.botPath?.length&&dist(p,p.botPath[0])<.58)p.botPath.shift();
   const toward={x:goal.x-p.x,y:0,z:goal.z-p.z},glen=Math.hypot(toward.x,toward.z)||1;
   const clear=wallDistance(this.map,{x:p.x,y:p.y+.7,z:p.z},{x:toward.x/glen,y:0,z:toward.z/glen},glen)>=glen-.1;
-  let step=clear?goal:p.botPath?.[0]||goal;
+  let step=clear&&Math.abs((goal.y??groundAt(this.map,goal.x,goal.z))-p.y)<.6?goal:p.botPath?.[0]||goal;
   let dx=step.x-p.x,dz=step.z-p.z,len=Math.hypot(dx,dz)||1;
-  input.yaw=Math.atan2(-dx,-dz);input.forward=len>.5?1:0;input.sprint=(danger||len>12)&&!needGun;
-  input.jump=!!p.botPath?.[0]&&p.botPath[0].y>p.y+.35;
+  input.yaw=Math.atan2(-dx,-dz);input.forward=len>.25?1:0;input.sprint=(danger||len>12)&&!needGun;
+  input.jump=!!p.botPath?.[0]&&p.botPath[0].y>p.y+.75;
+  if(!p.botStuck||this.time>p.botStuck.at+1.5){const stuck=p.botStuck&&Math.hypot(p.x-p.botStuck.x,p.z-p.botStuck.z)<.5&&len>2;p.botStuck={x:p.x,z:p.z,at:this.time};if(stuck){p.botThink=0;p.botDetour=this.time+.8;}}
+  if(p.botDetour>this.time){input.strafe=p.botSeed%2<1?1:-1;input.jump=true;}
   if(chest&&this.accessible(p,chest,3.3))input.interact=true;
   else if(items[0]&&this.accessible(p,items[0]))input.interact=!p.interactLatch;
   if(weaponSlot>=0)input.slot=weaponSlot;
@@ -352,11 +338,11 @@ export class RoyaleSimulation extends Simulation {
  damageWorld(box,amount){damageObject(this,box,amount);}
  explode(b){if(!b.popper&&(b.travelled||0)<weapon(b.weapon).minRange)return;super.explode(b);const radius=b.popper?3:weapon(b.weapon).splashRadius;const seen=new Set();for(const box of [...this.map.boxes]){const id=box.buildId||box.objectId;if(seen.has(id))continue;const d=Math.hypot(Math.max(0,Math.abs(b.x-box.x)-box.w/2),Math.max(0,box.y-b.y,b.y-box.y-box.h),Math.max(0,Math.abs(b.z-box.z)-box.d/2));if(d<radius){seen.add(id);damageObject(this,box,150*(1-d/(radius*1.2)));}}}
  checkpoint(){const data=super.checkpoint();delete data.worldBoxes;return data;}
- restore(checkpoint){super.restore(checkpoint);this.worldBoxes=(ROYALE_MAP.authored||ROYALE_MAP.boxes).filter(b=>!b.buildId).map(b=>({...b}));this.map={...ROYALE_MAP,boxes:[]};rebuildMap(this);return this;}
+ restore(checkpoint){super.restore(checkpoint);this.worldBoxes=(ROYALE_MAP.authored||ROYALE_MAP.boxes).filter(b=>!b.buildId).map(b=>({...b}));this.map={...ROYALE_MAP,boxes:[]};rebuildMap(this);this.nav=navigation(ROYALE_MAP);return this;}
  snapshot(){
   const state=super.snapshot();
   state.players=state.players.map(p=>{const source=this.players.get(p.id);return {...p,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestProgress:source.chestProgress||0};});
-  state.royale={round:this.round,builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,loot:this.loot.map(i=>({...i})),chests:this.chests.map(c=>({...c})),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds};
+  state.royale={round:this.round,builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,loot:this.loot.map(i=>({...i})),chests:this.chests.map(({contents,...c})=>({...c})),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds};
   return state;
  }
 }

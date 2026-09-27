@@ -5,11 +5,11 @@ import {makeStorm,stormAt,queueCandidates,AMMO_CAPS} from '../src/royale-data.js
 import {rng,gun,weapon} from '../src/data.js';
 import {movePlayer,sanitizeInput} from '../src/physics.js';
 import {ROYALE_MAP} from '../src/royale-map.js';
-const make=(options={})=>{const s=new RoyaleSimulation({capacity:4,bots:0,seed:21,...options});s.addPlayer('host',{name:'Host'});s.addPlayer('guest',{name:'Guest'});s.startRound();return s;};
+const make=(options={})=>{const s=new RoyaleSimulation({capacity:4,bots:0,seed:21,...options});s.addPlayer('host',{name:'Host'});s.addPlayer('guest',{name:'Guest'});s.startRound();s.map={...s.map,terrain:null,boxes:s.map.boxes.filter(b=>Math.abs(b.x-70)>30||Math.abs(b.z)>55)};return s;};
 const ground=(p,x=70,z=0)=>Object.assign(p,{x,y:0,z,flight:'ground',grounded:true,shieldUntil:0});
 const advance=(s,seconds)=>{for(let i=0;i<seconds*60;i++)s.tick(1/60);};
 test('the expanded island can open every chest without the old loot cap swallowing rewards',()=>{
- const s=make(),p=s.players.get('host'),initial=s.loot.length;
+ const s=make();s.map={...ROYALE_MAP,boxes:ROYALE_MAP.boxes};const p=s.players.get('host'),initial=s.loot.length;
  for(const chest of s.chests){ground(p,chest.x,chest.z);p.y=chest.y;assert.equal(s.openChest(p,chest),true,chest.id);}
  assert.equal(s.loot.length,initial+s.chests.length*3);
  assert.ok(s.loot.length>700);
@@ -32,7 +32,7 @@ test('host serializes chest and floor-loot ownership and validates range and cov
  s.loot=[];const chest={id:'test',x:70,y:0,z:1,opened:false};s.chests=[chest];assert.equal(s.openChest(p,chest),true);const count=s.loot.length;assert.equal(s.openChest(q,chest),false);assert.equal(s.loot.length,count);
  const item=s.dropWeapon(p,'comet',3);assert.equal(s.takeLoot(p,item),true);assert.equal(s.takeLoot(q,item),false);assert.equal(p.inventory[0].id,'comet');
  const far=s.dropWeapon({x:100,y:0,z:0},'needle');assert.equal(s.takeLoot(p,far),false);
- const b=ROYALE_MAP.buildings[0];ground(p,b.x-6.8,b.z);const behind=s.dropWeapon({x:b.x-5.2,y:0,z:b.z},'pip');assert.equal(s.takeLoot(p,behind),false);
+ const b=ROYALE_MAP.buildings[0];ground(p,b.x-b.w/2-.9,b.z);p.y=b.baseY;const behind=s.dropWeapon({x:b.x-b.w/2+1,y:b.baseY,z:b.z},'pip');assert.equal(s.takeLoot(p,behind),false);
 });
 test('five slots swap and drop without duplicating magazines or reserve ammo',()=>{
  const s=make(),p=ground(s.players.get('host'));s.loot=[];
@@ -88,7 +88,7 @@ test('public queue prioritizes populated waiting Royale rooms and excludes full 
  assert.deepEqual(queueCandidates(rooms).map(r=>r.code),['AAAA2222','BBBB2222']);
 });
 test('a full seeded bot round loots, fights, rotates and terminates with a valid result',{timeout:120000},()=>{
- const s=make({capacity:16,bots:15,fill:true,storm:'quick',seed:83});for(const p of s.players.values())p.bot=true;
+ const s=make({capacity:16,bots:15,fill:true,storm:'quick',seed:83});s.map={...ROYALE_MAP,boxes:ROYALE_MAP.boxes};for(const p of s.players.values())p.bot=true;
  let armed=0;const start=performance.now();for(let i=0;i<60*470&&s.phase==='playing';i++){s.tick(1/60);if(i%300===0)armed=Math.max(armed,[...s.players.values()].filter(p=>p.inventory.some(i=>i?.weapon)).length);}
  assert.equal(s.phase,'results');assert.ok(armed>=8,`Only ${armed} bots found weapons`);assert.ok(s.placements.length>=15);assert.ok(s.elapsed<470);console.log(`Royale: ${s.elapsed.toFixed(1)}s simulated in ${(performance.now()-start).toFixed(0)}ms; ${armed} armed contestants.`);
 });

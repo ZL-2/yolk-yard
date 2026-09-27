@@ -948,7 +948,9 @@ function hud() {
   $("#hit-marker").hidden = !settings.hitMarkers || p.health <= 0 || paused || performance.now() >= hitUntil;
   const scoped =
     aiming && (gun(p).optic === "scope" || gun(p).optic === "prism");
-  $("#scope").style.display = scoped ? "block" : "none";
+  $("#scope").style.display = scoped && view.aimBlend>.8 ? "block" : "none";
+  $("#scope").dataset.reticle=gun(p).ads?.reticle||"mil-dot";
+  $("#scope").dataset.overlay=gun(p).ads?.overlay||"precision";
   $("#scope-label").textContent = scoped
     ? `${gun(p).name.toUpperCase()} / OPTIC ${gun(p).magnification||2.5}×`
     : "";
@@ -1036,6 +1038,7 @@ const actions = {
  'royale-map':royaleMap,
  'royale-inventory':royaleInventory,
  'royale-clear-marker':()=>{royaleUI.waypoint=null;},
+ 'royale-close-flight':()=>royaleUI.dismissFlight(),
  'royale-jump':()=>{if(paused)resume(false);queuedActions.add('jump');sound.unlock();},
  'royale-drop':()=>inventoryAction('drop'),
  'royale-drop-one':()=>inventoryAction('drop-one'),
@@ -1212,6 +1215,7 @@ function pressControl(code) {
   if (settings.keybinds.swap.includes(code)) {input.slot = state?.royale ? (input.slot+1)%6 : 1-input.slot;buildControls.buildMode=false;}
   for(const [action,step] of [['nextSlot',1],['previousSlot',-1]])if(settings.keybinds[action].includes(code)){const count=state?.royale?6:2;input.slot=(input.slot+step+count)%count;buildControls.buildMode=false;}
   if(state?.royale){
+    if(settings.keybinds.dismissFlight.includes(code)){royaleUI.dismissFlight();return;}
     if(settings.keybinds.pickaxe.includes(code)){input.slot=5;buildControls.buildMode=false;buildUI.cancel();}
     for(const [key,piece] of [['buildWall','wall'],['buildFloor','floor'],['buildStairs','stairs'],['buildRoof','roof']])if(settings.keybinds[key].includes(code)){buildUI.choose(piece);}
     for(const [key,action] of [['buildToggle','toggle'],['buildRotate','rotate'],['buildMaterial','material']])if(settings.keybinds[key].includes(code))buildUI.action(action);
@@ -1313,7 +1317,7 @@ document.addEventListener("mouseup", (e) => {
 function aimSensitivity() {
   const p=state?.players.find(p=>p.id===localId);
   const aiming = !buildControls.editing && (actionDown("aim") || touch.aim)&&(!p?.inventory||!!p.inventory[p.slot]?.weapon);
-  return aiming ? settings.scopeSensitivity : 1;
+  return aiming ? settings.scopeSensitivity*(gun(p).ads?.sensitivity||1) : 1;
 }
 let menuMousePoint=null;
 document.addEventListener("mousemove", (e) => {
@@ -1620,6 +1624,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
         active: view?.scopeActive,
         aimBlend: view?.aimBlend,
         lens: !!view?.opticLens,
+        fov: view?.camera.fov,
       },
       triangles: view?.renderer.info.render.triangles,
       presentation: view?.diagnostics(),
