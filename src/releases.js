@@ -1,4 +1,8 @@
 export const RELEASE_NOTES = [
+  { number: "48", title: "Six Slots, Full Width", changes: [
+    "The Battle Royale inventory now reserves one dedicated pickaxe column and the remaining width for five equal item slots.",
+    "Equipment cards no longer collapse into narrow strips at laptop or responsive panel sizes; empty and occupied slots keep identical dimensions."
+  ] },
   { number: "47", title: "Ready for Departure", changes: [
     "Play Offline With Bots uses its own explicit session setting and a full ten-second Spawn Island countdown. Online matches retain sixty seconds, even when only one human is playing with bots.",
     "Online public and custom matches depart immediately when every configured contestant seat contains a connected human. Bots, spectators, stale records and duplicate connections never satisfy the threshold; the existing 32-contestant and 16-human limits are preserved.",

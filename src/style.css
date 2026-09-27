@@ -1809,9 +1809,12 @@ body.in-royale .match-center{display:none}
 @media (orientation:portrait){.scope[data-overlay]{background:radial-gradient(circle at center,transparent 0 36vmin,#172a35 36.15vmin 36.7vmin,#050b10f5 36.85vmin)}.scope[data-overlay]::before{width:72vmin;height:72vmin}#scope-label{top:calc(50% + 36vmin + 8px);bottom:auto}}
 
 /* Dedicated tool + one evenly spaced five-item group. Data indices stay 0..5. */
-.in-royale .royale-hotbar,.royale-inventory-grid{display:flex;gap:12px;align-items:stretch;}
+.in-royale .royale-hotbar{display:flex;gap:12px;align-items:stretch;}
 .royale-item-slots{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;flex:5;min-width:0;}
-.royale-inventory-grid>[data-royale-slot="0"]{flex:1;min-width:0;}
+#dialog[data-kind="royale-inventory"] .royale-inventory-grid{display:grid;grid-template-columns:minmax(82px,1fr) minmax(0,5fr)!important;gap:12px;width:100%;align-items:stretch;}
+#dialog[data-kind="royale-inventory"] .royale-item-slots{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;width:100%;min-width:0;}
+#dialog[data-kind="royale-inventory"] .royale-item-slots .royale-slot{width:100%;min-width:0;}
+#dialog[data-kind="royale-inventory"] .royale-inventory-grid>[data-royale-slot="0"]{width:100%;min-width:0;}
 .in-royale .royale-hotbar>[data-royale-slot="0"]{flex:none;}
 .in-royale .royale-hotbar .royale-slot{width:64px;margin:0;}
 .royale-slot kbd{max-width:95%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;}
