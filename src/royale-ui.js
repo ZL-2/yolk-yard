@@ -1,3 +1,4 @@
+import {inventoryActionForSlot} from './keybinds.js';
 import {getMap} from './maps.js';
 import {buildIcon} from './building-ui.js';
 import {gun} from './data.js';
@@ -11,7 +12,7 @@ export class RoyaleUI{
   this.preview=preview;this.waypoint=null;this.lastKey='';
   document.querySelector('#hud').insertAdjacentHTML('beforeend',`<div id="royale-hud" hidden>
    <div class="royale-compass" id="royale-compass"></div>
-   <div class="royale-map-stack"><button class="royale-minimap" data-action="royale-map" aria-label="Open island map"><canvas id="royale-mini" width="260" height="260"></canvas><span id="royale-phase">STORM 1</span></button><div class="royale-map-stats" aria-label="Battle Royale standings"><span><b id="royale-alive">16</b> ALIVE</span><span><b id="royale-elims">0</b> ELIMS</span></div></div>
+   <div class="royale-map-stack"><button class="royale-minimap" data-action="royale-map" aria-label="Open island map"><canvas id="royale-mini" width="260" height="260"></canvas><span id="royale-phase">STORM 1</span></button><div class="royale-map-stats" aria-label="Battle Royale standings"><span><b id="royale-alive">32</b> ALIVE</span><span><b id="royale-elims">0</b> ELIMS</span></div></div>
    <div class="royale-storm-warning" id="royale-storm-warning" role="status"></div>
    <div class="royale-flight" id="royale-flight"><button class="flight-close" data-action="royale-close-flight" id="royale-flight-close" aria-label="Close flight tips">L Close</button><span class="eyebrow">EGGSPRESS AIRLINES</span><strong id="royale-flight-title"></strong><p id="royale-flight-help"></p><button data-action="royale-jump" class="primary" id="royale-flight-button">JUMP</button></div>
    <div class="royale-prompt" id="royale-prompt" role="status"></div>
@@ -24,21 +25,21 @@ export class RoyaleUI{
   this.root=document.querySelector('#royale-hud');
  }
  dismissFlight(){this.flightDismissed=true;document.getElementById('royale-flight').hidden=true;}
- slotMarkup(p,inventory=false){return (p.inventory||Array(6).fill(null)).map((item,index)=>{
+ slotMarkup(p,inventory=false){const slots= (p.inventory||Array(6).fill(null)).map((item,index)=>{
   const info=itemInfo(item),rarity=RARITIES[item?.rarity||0];
-  return `<button class="royale-slot ${index===p.slot?'selected':''}" data-royale-slot="${index}" ${inventory&&!item?.pickaxe?'draggable="true"':''} style="--rarity:${item?info.color:'#58636c'}" aria-label="Slot ${index+1}: ${escape(info.name)}" aria-pressed="${index===p.slot}"><kbd>${index+1}</kbd>${item?`<img src="${this.preview(item)}" alt="${escape(info.name)}" draggable="false">`:'<span class="empty-slot-mark">＋</span>'}<span class="slot-name">${escape(info.name)}</span>${item?`<b>${item.pickaxe?'∞':item.weapon?item.ammo:item.count+'×'}</b>`:''}${inventory&&item?`<small>${item.weapon?rarity.name:'Utility'}${item.weapon?' · '+'★'.repeat((item.rarity||0)+1):''}</small>`:''}</button>`;
- }).join('');}
+  return `<button class="royale-slot ${index===p.slot?'selected':''}" data-royale-slot="${index}" ${inventory&&!item?.pickaxe?'draggable="true"':''} style="--rarity:${item?info.color:'#58636c'}" aria-label="${index===0?'Pickaxe':'Slot '+index}: ${escape(info.name)}" aria-pressed="${index===p.slot}"><kbd>${escape(this.label?.(inventoryActionForSlot(index))||(index===0?'Pickaxe':index))}</kbd>${item?`<img src="${this.preview(item)}" alt="${escape(info.name)}" draggable="false">`:'<span class="empty-slot-mark">＋</span>'}<span class="slot-name">${escape(info.name)}</span>${item?`<b>${item.pickaxe?'∞':item.weapon?item.ammo:item.count+'×'}</b>`:''}${inventory&&item?`<small>${item.weapon?rarity.name:'Utility'}${item.weapon?' · '+'★'.repeat((item.rarity||0)+1):''}</small>`:''}</button>`;
+ });return slots[0]+'<div class="royale-item-slots">'+slots.slice(1).join('')+'</div>';}
  mapHTML(){return `<p class="hint">Choose a landing spot or plan your next rotation. Click the island to mark a waypoint.</p><canvas id="royale-fullmap" class="royale-fullmap" width="720" height="720" aria-label="Sunnybreak island map"></canvas><div class="map-legend"><span>● You</span><span>◯ Safe area</span><span>◌ Next circle</span><span>◆ Supply</span><span>◇ Landmark</span></div><div class="split-actions"><button data-action="royale-clear-marker">Clear marker</button><button class="primary" data-action="resume">RETURN TO GAME</button></div>`;}
  ammoHTML(p){return Object.entries(p.materials||{}).map(([id,count])=>`<div class="inventory-ammo resource-count">${buildIcon(id)}<span>${id}</span><b>${count}</b></div>`).join('')+Object.entries(p.bank||{}).map(([id,count])=>`<div class="inventory-ammo"><img src="${this.preview({id,ammoType:id})}" alt=""><span>${escape(id)}</span><b>${count}</b></div>`).join('');}
  inspectHTML(p){
-  const item=p.inventory[p.slot],info=itemInfo(item);if(item?.pickaxe)return '<div class="inspect-empty"><h3>PICKAXE</h3>Harvest wood, brick and metal. Permanent first slot. Cannot be dropped or replaced.</div>';if(!item)return '<div class="inspect-empty">Select an item to inspect it.</div>';
+  const item=p.inventory[p.slot],info=itemInfo(item);if(item?.pickaxe)return '<div class="inspect-empty"><h3>PICKAXE</h3>Harvest wood, brick and metal. Dedicated pickaxe slot. Cannot be dropped or replaced.</div>';if(!item)return '<div class="inspect-empty">Select an item to inspect it.</div>';
   const rarity=RARITIES[item.rarity||0],w=item.weapon?gun(p):null,def=ITEMS[item.id];
   return `<div class="inspect-heading" style="--rarity:${info.color}"><span>${item.weapon?rarity.name+' · '+info.role:'UTILITY'}</span><h3>${escape(info.name)}</h3><img src="${this.preview(item)}" alt="${escape(info.name)}"></div><p>${escape(w?.desc||({heal:'Restores shell health.',shield:'Restores shield protection.',splash:'Restores nearby shell health and shields.',popper:'A throwable grenade with a short fuse.',impulse:'Launches you into the air.',launchpad:'Place a reusable launch pad.'}[def?.kind]))}</p>${w?`<dl class="weapon-stats"><div><dt>Damage</dt><dd>${(w.damage*w.pellets*(w.burst||1)).toFixed(0)}${w.pellets>1?' total pellets':w.burst?' per burst':''}</dd></div><div><dt>Fire rate</dt><dd>${(1/w.interval).toFixed(1)} / s</dd></div><div><dt>Magazine</dt><dd>${w.magazine}</dd></div><div><dt>Reload</dt><dd>${w.reload.toFixed(2)} s</dd></div><div><dt>Ammo</dt><dd>${ammoType(item.id)}</dd></div><div><dt>Reserve</dt><dd>${p.bank[ammoType(item.id)]||0}</dd></div></dl>`:`<dl class="weapon-stats"><div><dt>Use time</dt><dd>${def?.duration||0}s</dd></div><div><dt>Stack</dt><dd>${item.count} / ${def?.stack||1}</dd></div>${def?.amount?`<div><dt>Restores</dt><dd>${def.amount}</dd></div>`:''}</dl>`}`;
  }
  inventoryHTML(p){return `<div class="inventory-content"><section class="inventory-ammo-section"><h3>RESOURCES & AMMO</h3><div class="ammo-bank">${this.ammoHTML(p)}</div></section><section class="inventory-inspect" id="inventory-inspect" ${this.inspect?'':'hidden'}>${this.inspectHTML(p)}</section><section class="inventory-equipment"><div class="inventory-section-title"><h3>EQUIPMENT</h3><span>Drag to reorder</span></div><div class="royale-inventory-grid">${this.slotMarkup(p,true)}</div><p id="inventory-selected-name">${escape(itemInfo(p.inventory[p.slot]).name)}</p></section></div><footer class="inventory-actions"><button data-action="royale-split">SPLIT</button><button data-action="royale-drop-one">DROP ONE</button><button data-action="royale-drop">DROP STACK</button><button data-action="royale-inspect" aria-pressed="${!!this.inspect}">INSPECT</button><button data-action="resume">BACK</button></footer>`;}
  updateInventory(p){
   const grid=document.querySelector('.royale-inventory-grid');if(!grid||!p||this.dragging)return;
-  const key=JSON.stringify([p.inventory,p.slot,p.bank,p.materials,this.inspect]);
+  const key=JSON.stringify([p.inventory,p.slot,p.bank,p.materials,this.inspect,[0,1,2,3,4,5].map(i=>this.label?.(inventoryActionForSlot(i)))]);
   if(this.inventoryKey===key)return;this.inventoryKey=key;grid.innerHTML=this.slotMarkup(p,true);
   document.querySelector('.ammo-bank').innerHTML=this.ammoHTML(p);
   const inspect=document.querySelector('#inventory-inspect');inspect.hidden=!this.inspect;inspect.innerHTML=this.inspectHTML(p);
@@ -88,13 +89,13 @@ export class RoyaleUI{
   $('royale-alive').textContent=r.practice?r.contestants:r.alive;
   this.drawMap($('royale-mini'),state,p);this.drawMap($('royale-fullmap'),state,p,true);
   $('shield').textContent=Math.ceil(p.shield||0);$('shield-fill').style.width=Math.max(0,Math.min(100,p.shield||0))+'%';$('royale-stamina').textContent=Math.ceil(p.stamina||0);$('royale-stamina-fill').style.width=(p.stamina||0)+'%';
-  const key=JSON.stringify([p.inventory,p.slot]);if(key!==this.lastKey){$('royale-hotbar').innerHTML=this.slotMarkup(p);this.lastKey=key;}
+  this.label=label;const key=JSON.stringify([p.inventory,p.slot,[0,1,2,3,4,5].map(i=>label(inventoryActionForSlot(i)))]);if(key!==this.lastKey){$('royale-hotbar').innerHTML=this.slotMarkup(p);this.lastKey=key;}
   this.updateInventory(local);
   const warmup=r.practice;
   $('royale-flight-close').hidden=warmup;
   const flight=['transport','dive','glide','launch'].includes(local.flight)&&local.health>0;
   $('royale-flight').hidden=(!flight&&!warmup)||(!warmup&&!!this.flightDismissed);$('royale-flight').classList.toggle('airborne',local.flight!=='transport');
-  $('royale-flight-title').textContent=local.flight==='transport'?`${r.elapsed<3?'Doors open in '+Math.ceil(3-r.elapsed):'Choose your landing spot'}${r.elapsed>=3?' · '+Math.ceil(35-r.elapsed)+'s':''}`:local.flight==='dive'?'Freefall':'Shell glider deployed';
+  $('royale-flight-title').textContent=local.flight==='transport'?`${r.elapsed<3?'Doors open in '+Math.ceil(3-r.elapsed):'Choose your landing spot'}${r.elapsed>=3?' · '+Math.ceil(r.route.duration-r.elapsed)+'s':''}`:local.flight==='dive'?'Freefall':'Shell glider deployed';
   $('royale-flight-help').textContent=local.flight==='transport'?'Open the map to mark a district. Leave the Eggspress when you are ready.':local.flight==='dive'?`${label('forward')} to steer · ${label('jump')} to deploy glider`:`${label('jump')} to dive again at altitude. Your glider opens automatically near the ground.`;
   $('royale-flight-button').hidden=['glide','launch'].includes(local.flight);$('royale-flight-button').disabled=local.flight==='transport'&&r.elapsed<3;$('royale-flight-button').textContent=local.flight==='transport'?`JUMP · ${label('jump')}`:`DEPLOY GLIDER · ${label('jump')}`;
   if(warmup){$('royale-flight-title').textContent=`HATCHLING ATOLL · ${r.contestants}/${state.options.capacity} eggs`;$('royale-flight-help').textContent=`${r.contestants<2?'Waiting for another egg':'Eggspress departs in '+Math.max(0,Math.ceil(r.queueEnds-state.time))+'s'} · Practice equipment resets at departure`;$('royale-flight-button').hidden=true;}

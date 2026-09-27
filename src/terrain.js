@@ -29,7 +29,10 @@ export function createTerrain(buildings=[],districts=[],shelters=[]){
  const pads=[...buildings,...shelters];
  for(let iz=0;iz<n;iz++)for(let ix=0;ix<n;ix++){
   const x=ix*cell-size,z=iz*cell-size;let h=naturalHeight(x,z);
-  for(const p of pads){const distance=Math.max(Math.abs(x-p.x)-(p.w||8)/2,Math.abs(z-p.z)-(p.d||8)/2);if(distance<9){const flat=1-smooth((distance-2)/7);h=h*(1-flat)+(p.baseY??naturalHeight(p.x,p.z))*flat;}}
+  // A neighboring pad must never tilt the floor of a closer building.
+  let nearest=null,nearestDistance=Infinity;
+  for(const p of pads){const distance=Math.max(Math.abs(x-p.x)-(p.w||8)/2,Math.abs(z-p.z)-(p.d||8)/2);if(distance<nearestDistance){nearest=p;nearestDistance=distance;}}
+  if(nearest&&nearestDistance<9){const flat=1-smooth((nearestDistance-2)/7),level=(nearest.baseY??naturalHeight(nearest.x,nearest.z))-.2;h=h*(1-flat)+level*flat;}
   heights[iz*n+ix]=h;max=Math.max(max,h);
  }
  return {size,cell,n,heights,max};

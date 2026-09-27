@@ -2,7 +2,6 @@ import {glidePose} from './glide-pose.js';
 import {lootHeight} from './loot-motion.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {groundAt,terrainColor} from './terrain.js';
-import {roadMesh} from './island-art.js';
 import {updateBuildingView} from './building-view.js';
 import {shopItem} from './shop-catalog.js';
 import {makeShopGlider,makeShopTrail} from './shop-models.js';
@@ -24,16 +23,30 @@ export function bake(group,chunked=false,colored=chunked){
  }
  for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);}
 }
+// Roads are the terrain's own triangles, not floating intersecting ribbons.
+// One surface also makes intersections a union instead of duplicate road meshes.
+function roadColor(map,x,z){
+ if(map.buildings.some(b=>Math.abs(x-b.x)<b.w/2+.4&&Math.abs(z-b.z)<b.d/2+.4))return null;
+ for(const road of map.roads)for(let i=1;i<road.points.length;i++){
+  const [ax,az]=road.points[i-1],[bx,bz]=road.points[i],dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));
+  if(Math.hypot(x-ax-t*dx,z-az-t*dz)<=road.width/2)return road.kind==='path'?0xb8aa81:0x7d8987;
+ }
+ return null;
+}
 function buildTerrain(world,map){
  const t=map.terrain,material=new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true});
  for(let cz=0;cz<t.n-1;cz+=32)for(let cx=0;cx<t.n-1;cx+=32){
-  const positions=[],colors=[],indices=[];
-  for(let z=0;z<=32;z++)for(let x=0;x<=32;x++){
-   const wx=(cx+x)*t.cell-t.size,wz=(cz+z)*t.cell-t.size,h=t.heights[(cz+z)*t.n+cx+x];positions.push(wx,h,wz);
-   const c=new THREE.Color(terrainColor(map,wx,wz));c.multiplyScalar(1+Math.sin(wx*.07)*Math.sin(wz*.09)*.045);colors.push(c.r,c.g,c.b);
+  const positions=[],colors=[];
+  for(let z=cz;z<Math.min(cz+32,t.n-1);z++)for(let x=cx;x<Math.min(cx+32,t.n-1);x++){
+   const points=[[x,z],[x,z+1],[x+1,z],[x+1,z+1]].map(([ix,iz])=>[ix*t.cell-t.size,t.heights[iz*t.n+ix],iz*t.cell-t.size]);
+   for(const triangle of [[0,1,2],[2,1,3]]){
+    const wx=triangle.reduce((n,i)=>n+points[i][0],0)/3,wz=triangle.reduce((n,i)=>n+points[i][2],0)/3;
+    const road=roadColor(map,wx,wz),c=new THREE.Color(road??terrainColor(map,wx,wz));
+    if(road==null)c.multiplyScalar(1+Math.sin(wx*.07)*Math.sin(wz*.09)*.045);
+    for(const i of triangle){positions.push(...points[i]);colors.push(c.r,c.g,c.b);}
+   }
   }
-  for(let z=0;z<32;z++)for(let x=0;x<32;x++){const a=z*33+x;indices.push(a,a+33,a+1,a+1,a+33,a+34);}
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.computeVertexNormals();geometry.computeBoundingSphere();
   const m=new THREE.Mesh(geometry,material);m.receiveShadow=true;m.userData.ownedMaterial=true;world.add(m);
  }
 }
@@ -46,7 +59,6 @@ export function buildIsland(world,map,kit){
  const {block,palette}=kit;
  const ocean=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800),new THREE.MeshLambertMaterial({color:0x4195ad,transparent:true,opacity:.87}));ocean.rotation.x=-Math.PI/2;ocean.position.y=.5;ocean.userData.ownedMaterial=true;world.add(ocean);
  buildTerrain(world,map);
- for(const road of map.roads)world.add(roadMesh(map,road,new THREE.MeshLambertMaterial({color:road.kind==='path'?0xb8aa81:0x7d8987,side:THREE.DoubleSide})));
  const byBuilding=map.buildings.map(()=>[]),treeBoxes=new Map(),propBoxes=new Map();
  for(const b of map.boxes){
   if(b.building!==undefined)byBuilding[b.building].push(b);
@@ -99,8 +111,17 @@ export class RoyaleView{
   bake(g,false,true);
  }
  createStorm(){
-  const material=new THREE.MeshBasicMaterial({color:0x9461e9,transparent:true,opacity:.19,side:THREE.DoubleSide,depthWrite:false});
-  this.wall=new THREE.Mesh(new THREE.CylinderGeometry(1,1,200,160,1,true),material);this.wall.position.y=90;this.wall.userData.ownedMaterial=true;this.root.add(this.wall);
+  const material=new THREE.ShaderMaterial({
+   uniforms:{time:{value:0},outside:{value:0}},transparent:true,side:THREE.DoubleSide,depthWrite:false,forceSinglePass:true,
+   vertexShader:`varying vec2 stormUv;void main(){stormUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+   fragmentShader:`uniform float time;uniform float outside;varying vec2 stormUv;
+    void main(){float bands=pow(.5+.5*sin(stormUv.y*110.0-time*1.8+sin(stormUv.x*70.0+time*.3)),5.0);
+    float veins=pow(.5+.5*sin(stormUv.x*360.0+sin(stormUv.y*22.0+time)*2.0),18.0);
+    vec3 color=mix(vec3(.31,.31,.94),vec3(.57,.20,.84),outside);
+    color=mix(color,vec3(.54,.84,1.0),bands*.65+veins*.22);
+    gl_FragColor=vec4(color,.27+outside*.06+bands*.12+veins*.09);}`
+  });
+  this.wall=new THREE.Mesh(new THREE.CylinderGeometry(1,1,240,256,1,true),material);this.wall.position.y=90;this.wall.userData.ownedMaterial=true;this.root.add(this.wall);
   this.ring=new THREE.LineLoop(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(160*3),3)),new THREE.LineBasicMaterial({color:0xc9a5ff}));this.ring.frustumCulled=false;this.ring.userData.ownedMaterial=true;this.root.add(this.ring);
  }
  itemModel(item,ground=true){const g=lootModel(item,this.kit,{ground});bake(g,false,true);return g;}
@@ -113,7 +134,7 @@ export class RoyaleView{
   if(this.round!==roundKey){for(const group of [this.chests,this.loot,this.gliders,this.pads]){for(const mesh of group.values()){this.root.remove(mesh);this.view.disposeGroup(mesh);}group.clear();}this.round=roundKey;this.flightPoses.clear();}
   this.transport.visible=!r.practice&&r.elapsed<=r.route.duration+5;
   const pos=transportAt(r.route,r.elapsed);this.transport.position.set(pos.x,pos.y+Math.sin(t)*.18,pos.z);this.transport.rotation.y=pos.yaw;this.transport.rotation.z=Math.sin(t*.4)*.015;this.rotors.forEach(m=>m.rotation.y+=dt*18);
-  this.wall.visible=this.ring.visible=r.storm.active;this.wall.position.set(r.storm.x,85,r.storm.z);this.wall.scale.set(Math.max(.01,r.storm.radius),1,Math.max(.01,r.storm.radius));this.wall.material.opacity=.17+Math.sin(t*.5)*.035;if(r.storm.active&&(!this.nextRingUpdate||t>this.nextRingUpdate)){const a=this.ring.geometry.attributes.position;for(let i=0;i<a.count;i++){const angle=i/a.count*Math.PI*2,x=r.storm.x+Math.cos(angle)*r.storm.radius,z=r.storm.z+Math.sin(angle)*r.storm.radius;a.setXYZ(i,x,groundAt(ROYALE_MAP,x,z)+.14,z);}a.needsUpdate=true;this.nextRingUpdate=t+.15;}
+  this.wall.visible=this.ring.visible=r.storm.active;this.wall.position.set(r.storm.x,110,r.storm.z);this.wall.scale.set(Math.max(.01,r.storm.radius),1,Math.max(.01,r.storm.radius));this.wall.material.uniforms.time.value=t;this.wall.material.uniforms.outside.value=local&&Math.hypot(local.x-r.storm.x,local.z-r.storm.z)>r.storm.radius?1:0;if(r.storm.active&&(!this.nextRingUpdate||t>this.nextRingUpdate)){const a=this.ring.geometry.attributes.position;for(let i=0;i<a.count;i++){const angle=i/a.count*Math.PI*2,x=r.storm.x+Math.cos(angle)*r.storm.radius,z=r.storm.z+Math.sin(angle)*r.storm.radius;a.setXYZ(i,x,groundAt(ROYALE_MAP,x,z)+.14,z);}a.needsUpdate=true;this.nextRingUpdate=t+.15;}
   const observer=local?.spectating?state.players.find(p=>p.id===this.view.spectateTarget)||local:local;
   for(const mesh of this.view.world?.children||[])if(mesh.userData.poiLabel||mesh.userData.detailLabel)mesh.visible=!!observer&&(mesh.userData.poiLabel?observer.flight!=='ground'&&observer.health>0:Math.hypot(mesh.position.x-observer.x,mesh.position.z-observer.z)<35);
   const seen=new Set();

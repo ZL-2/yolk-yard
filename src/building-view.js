@@ -1,6 +1,7 @@
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
-import {MATERIALS,pieceBoxes,placement,validPlacement,aimedObject} from './building.js';
+import {MATERIALS,pieceBoxes,solvePlacement,aimedObject} from './building.js';
+import {selectMaterial} from './building-rules.js';
 import {editPlanePoint} from './building-shapes.js';
 export function buildMesh(piece,kit,preview=false){
  const g=new THREE.Group(),color=preview?0x57caff:MATERIALS[piece.material].color;
@@ -32,7 +33,10 @@ export function updateBuildingView(rv,state,p){
  const aimed=p?.slot===0?aimedObject(rv.view.buildMap,p,5):null,weak=r.worldDamage?.[aimed?.box.objectId]?.weakpoint;rv.weakpoint.visible=!!weak;if(weak){rv.weakpoint.position.set(weak.x,weak.y,weak.z);rv.weakpoint.quaternion.copy(rv.view.camera.quaternion);}
  const controls=rv.view.buildControls;updateEditView(rv,controls);
  const active=p?.health>0&&p.flight==='ground'&&controls?.buildMode&&!controls.editing;
- const proposal=active?placement({...p,yaw:controls.yaw??p.yaw,pitch:controls.pitch??p.pitch,buildFacing:controls.buildFacing},controls.buildType,controls.buildRotation,controls.buildMaterial):null;
+ if(active)controls.buildMaterial=selectMaterial(p.materials,controls.buildMaterial)||controls.buildMaterial;
+ const solved=active?solvePlacement({...p,yaw:controls.yaw??p.yaw,pitch:controls.pitch??p.pitch,buildFacing:controls.buildFacing},controls.buildType,controls.buildRotation,controls.buildMaterial,rv.view.buildMap,r.builds||[],state.players,controls.buildAnchor):null;
+ const proposal=solved?.piece;
+ if(proposal)controls.buildAnchor=[proposal.x,proposal.y,proposal.z,proposal.rotation].join(',');
  const previewKey=proposal?JSON.stringify(proposal):'';
  if(rv.previewKey!==previewKey){
   rv.previewKey=previewKey;
@@ -40,10 +44,10 @@ export function updateBuildingView(rv,state,p){
   if(proposal){rv.previewBuild=buildMesh(proposal,rv.kit,true);rv.root.add(rv.previewBuild);}
  }
  if(proposal){
-  const validationKey=JSON.stringify([previewKey,rv.view.buildMap.buildKey,p.materials,state.players.filter(o=>Math.hypot(o.x-proposal.x,o.z-proposal.z)<7).map(o=>[o.x,o.y,o.z,o.health])]);
+  const validationKey=JSON.stringify([previewKey,solved.reason,rv.view.buildMap.buildKey,p.materials,state.players.filter(o=>Math.hypot(o.x-proposal.x,o.z-proposal.z)<7).map(o=>[o.x,o.y,o.z,o.health])]);
   if(validationKey!==rv.previewValidationKey){
    rv.previewValidationKey=validationKey;
-   const reason=validPlacement(proposal,rv.view.buildMap,r.builds||[],state.players),valid=!reason&&(p.materials?.[proposal.material]||0)>=10;
+   const reason=solved.reason,valid=!reason&&(p.materials?.[proposal.material]||0)>=10;
    rv.previewBuild.traverse(m=>{if(m.isMesh)m.material.color.setHex(valid?0x61cfff:0xff556d);});controls.reason=reason||(!valid?'Not enough materials':'');
   }
  }

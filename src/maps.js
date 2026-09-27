@@ -409,7 +409,9 @@ export function navigation(map) {
       const push=(id,score)=>{let i=q.length;q.push({id,score});while(i){const p=(i-1)>>1;if(q[p].score<=score)break;[q[p],q[i]]=[q[i],q[p]];i=p;}};
       const pop=()=>{const first=q[0],last=q.pop();if(q.length){q[0]=last;let i=0;while(true){let k=i*2+1;if(k>=q.length)break;if(k+1<q.length&&q[k+1].score<q[k].score)k++;if(q[i].score<=q[k].score)break;[q[i],q[k]]=[q[k],q[i]];i=k;}}return first.id;};
       parent[start.id]=start.id;cost[start.id]=0;push(start.id,heuristic(start));let best=start.id,bestD=Infinity,visited=0;
-      while(q.length&&visited++<24000){const id=pop();if(closed[id])continue;closed[id]=1;const a=nodes[id],d=heuristic(a);if(d<bestD){bestD=d;best=id;}if(id===end.id)break;
+      // A partial route is useful immediately and will be extended on the next
+      // scheduled search. Unreachable indoor targets cannot stall a host frame.
+      while(q.length&&visited++<4000){const id=pop();if(closed[id])continue;closed[id]=1;const a=nodes[id],d=heuristic(a);if(d<bestD){bestD=d;best=id;}if(id===end.id)break;
        for(const k of a.edges){const b=nodes[k],next=cost[id]+cell+Math.abs(b.y-a.y)*.8;if(next<cost[k]){cost[k]=next;parent[k]=id;push(k,next+heuristic(b));}}
       }
       const path = [];

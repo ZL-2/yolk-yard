@@ -2,7 +2,7 @@ import { safeName } from './moderation.js';
 import {OPTICS} from './weapon-presentation.js';
 import {cosmeticProfile} from './shop-catalog.js';
 // The rebuilt island and movement model must not mix with older clients.
-export const VERSION = 16;
+export const VERSION = 17;
 export const WEAPONS = [
   {
     id: "sprinter",

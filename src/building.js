@@ -1,6 +1,6 @@
-import {direction,rayBox,rayEgg,EYE,wallDistance,worldHit,invalidateCollision} from './physics.js';
+import {direction,rayBox,rayEgg,EYE,wallDistance,worldHit,invalidateCollision,candidates} from './physics.js';
 import {groundAt} from './terrain.js';
-import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,harvestDefinition,buildStats,snappedFacing,canEdit} from './building-rules.js';
+import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
 import {PIECES,pieceBoxes,validEdit,editRay,wallPattern} from './building-shapes.js';
 export {MATERIALS,GRID,COST,CAP,PIECES,pieceBoxes};
 export const pickaxe=()=>({id:'pickaxe',pickaxe:true,count:1,rarity:0});
@@ -22,21 +22,82 @@ export function placement(p,type,rotation=0,material='wood'){
 }
 const bounds=p=>{const bs=pieceBoxes(p);return {minX:Math.min(...bs.map(b=>b.x-b.w/2)),maxX:Math.max(...bs.map(b=>b.x+b.w/2)),minY:p.y,maxY:Math.max(...bs.map(b=>b.y+b.h)),minZ:Math.min(...bs.map(b=>b.z-b.d/2)),maxZ:Math.max(...bs.map(b=>b.z+b.d/2))};};
 const touching=(a,b)=>a.minX<=b.maxX+.2&&a.maxX>=b.minX-.2&&a.minY<=b.maxY+.2&&a.maxY>=b.minY-.2&&a.minZ<=b.maxZ+.2&&a.maxZ>=b.minZ-.2;
+// Props declare whether they block a build. Small dressing and pickups do not.
+export const blocksBuilding=b=>b.buildBlocking!==false&&!b.decorative&&!(b.kind==='prop'&&b.w*b.d*b.h<3);
+function supportSamples(b){return [[b.x,b.z],[b.x-b.w/2+.04,b.z-b.d/2+.04],[b.x+b.w/2-.04,b.z-b.d/2+.04],[b.x-b.w/2+.04,b.z+b.d/2-.04],[b.x+b.w/2-.04,b.z+b.d/2-.04]];}
 function anchored(p,map){
- const bs=pieceBoxes(p);return bs.some(b=>b.y<=groundAt(map,b.x,b.z)+.25)||map.boxes.some(b=>!b.buildId&&bs.some(a=>Math.abs(a.y-(b.y+b.h))<.24&&Math.abs(a.x-b.x)<(a.w+b.w)/2&&Math.abs(a.z-b.z)<(a.d+b.d)/2));
+ const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,5)];
+ return bs.some(b=>supportSamples(b).some(([x,z])=>Math.abs(b.y-groundAt(map,x,z))<.32))||near.some(b=>!b.buildId&&blocksBuilding(b)&&bs.some(a=>Math.abs(a.y-(b.y+b.h))<.24&&Math.abs(a.x-b.x)<(a.w+b.w)/2&&Math.abs(a.z-b.z)<(a.d+b.d)/2));
 }
 export function validPlacement(p,map,builds,players=[]){
  if(![p.x,p.y,p.z,p.rotation].every(Number.isFinite)||p.y<0)return 'Invalid coordinates';
- if(!PIECES.includes(p.type)||!MATERIALS[p.material]||Math.abs(p.x)>map.size-4||Math.abs(p.z)>map.size-4||p.y>100)return 'Outside build area';
+ if(!PIECES.includes(p.type)||!MATERIALS[p.material]||Math.abs(p.x)>map.size-3||Math.abs(p.z)>map.size-3||p.y>100)return 'Outside build area';
  if(builds.length>=600)return 'Build limit reached';
- if(builds.some(b=>b.type===p.type&&b.x===p.x&&b.y===p.y&&b.z===p.z&&(p.type!=='wall'||b.rotation%2===p.rotation%2)))return 'Already built';
- const bs=pieceBoxes(p);
+ if(builds.some(b=>b.type===p.type&&b.x===p.x&&Math.abs(b.y-p.y)<.2&&b.z===p.z&&(p.type!=='wall'||b.rotation%2===p.rotation%2)))return 'Already built';
+ const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,4)].filter(o=>!o.buildId&&blocksBuilding(o));
  for(const b of bs){
-  if(players.some(o=>o.health>0&&o.y<b.y+b.h-.04&&o.y+1.75>b.y+.04&&Math.abs(o.x-b.x)<b.w/2+.45&&Math.abs(o.z-b.z)<b.d/2+.45))return 'Player in the way';
-  if(map.boxes.some(o=>!o.buildId&&Math.abs(o.x-b.x)<(o.w+b.w)/2-.08&&Math.abs(o.z-b.z)<(o.d+b.d)/2-.08&&b.y<o.y+o.h-.08&&b.y+b.h>o.y+.08))return 'Blocked';
+  if(players.some(o=>o.health>0&&!o.spectating&&!(['floor','stairs'].includes(p.type)&&o.grounded&&b.y>=o.y&&b.y-o.y<=.43)&&o.y<b.y+b.h-.05&&o.y+1.75>b.y+.05&&Math.abs(o.x-b.x)<b.w/2+.42&&Math.abs(o.z-b.z)<b.d/2+.42))return 'Player in the way';
+  if(near.some(o=>Math.abs(o.x-b.x)<(o.w+b.w)/2-.06&&Math.abs(o.z-b.z)<(o.d+b.d)/2-.06&&b.y<o.y+o.h-.06&&b.y+b.h>o.y+.06))return 'Blocked';
  }
+ // Buried floor/roof surfaces are not usable. Walls and ramps can root in a slope.
+ const terrain=bs.map(b=>groundAt(map,b.x,b.z)-b.y);
+ if(p.type==='floor'&&Math.max(...terrain)>.13||p.type==='roof'&&Math.min(...terrain)>.15||['wall','stairs'].includes(p.type)&&Math.min(...terrain)>1)return 'Inside terrain';
  if(!anchored(p,map)&&!builds.some(b=>touching(bounds(p),bounds(b))))return 'Needs support';
  return '';
+}
+const cellKey=p=>[p.x,p.y,p.z,p.rotation].join(',');
+// One deterministic solver for host and preview. Enumerate local grid attachments,
+// rank intent before validation, and never search behind a major solid wall.
+export function solvePlacement(p,type,rotation,material,map,builds=[],players=[],preferred=null){
+ const base=placement(p,type,rotation,material),forward=direction(p.yaw,0),ray=direction(p.yaw,p.pitch),eye={x:p.x,y:p.y+EYE,z:p.z};
+ const hit=worldHit(map,eye,ray,9),aim=hit?.point||{x:p.x+ray.x*5,y:eye.y+ray.y*5,z:p.z+ray.z*5};
+ const aimed=builds.find(b=>b.id===hit?.box?.buildId&&b.type===type);
+ if(aimed&&!(type==='stairs'&&Math.abs(p.x-aimed.x)<2.6&&Math.abs(p.z-aimed.z)<2.6&&p.y>aimed.y+.7&&p.pitch>-.45)){
+  const point=hit.point,inside=type==='wall'?(Math.abs((aimed.rotation%2?point.z-aimed.z:point.x-aimed.x))<1.65&&point.y>aimed.y+.25&&point.y<aimed.y+3.7):(Math.abs(point.x-aimed.x)<1.65&&Math.abs(point.z-aimed.z)<1.65);
+  if(inside)return {piece:{...aimed,material},reason:'Already built'};
+ }
+ const nearBuilds=builds.filter(b=>Math.hypot(b.x-p.x,b.z-p.z)<12&&Math.abs(b.y-p.y)<9);
+ const nearWorld=[...candidates(map,p,null,0,10)].filter(b=>!b.buildId&&blocksBuilding(b));
+ const options=new Map(),offsetX=type==='wall'&&base.rotation%2?2:0,offsetZ=type==='wall'&&!(base.rotation%2)?2:0;
+ const add=(x,y,z,connected=false)=>{
+  x=Math.round((x-offsetX)/GRID)*GRID+offsetX;z=Math.round((z-offsetZ)/GRID)*GRID+offsetZ;y=Math.round(Math.max(0,y)*1000)/1000;
+  const dx=x-p.x,dz=z-p.z,along=dx*forward.x+dz*forward.z,side=Math.abs(dx*forward.z-dz*forward.x);
+  if(Math.hypot(dx,dz)>9||along< -2.1||Math.abs(y-p.y)>6)return;
+  const piece={...base,x,y,z},key=cellKey(piece);
+  const aimY=type==='wall'?y+1.5:type==='stairs'?y+2:y;
+  const score=Math.hypot(x-aim.x,z-aim.z)*.65+Math.abs(aimY-aim.y)*.65+side*.45+Math.abs(along-4)*.15-(connected?1.2:0);
+  if(!options.has(key)||options.get(key).score>score)options.set(key,{piece,score});
+ };
+ const cx=Math.round((p.x+forward.x*3-offsetX)/GRID)*GRID+offsetX,cz=Math.round((p.z+forward.z*3-offsetZ)/GRID)*GRID+offsetZ;
+ for(let ix=-1;ix<=1;ix++)for(let iz=-1;iz<=1;iz++){
+  const x=cx+ix*GRID,z=cz+iz*GRID;
+  const ys=type==='wall'?[groundAt(map,x,z)]:[Math.max(...[[-1.9,-1.9],[-1.9,1.9],[1.9,-1.9],[1.9,1.9],[0,0]].map(([dx,dz])=>groundAt(map,x+dx,z+dz)))];
+  for(const box of nearWorld)if(Math.abs(box.x-x)<box.w/2+2&&Math.abs(box.z-z)<box.d/2+2&&Math.abs(box.y+box.h-p.y)<5)ys.push(box.y+box.h);
+  for(const y of ys)add(x,y,z);
+ }
+ for(const b of nearBuilds){
+  for(const y of [b.y,b.y+GRID])for(const [dx,dz]of [[0,0],[-4,0],[4,0],[0,-4],[0,4],[-2,0],[2,0],[0,-2],[0,2]])add(b.x+dx,y,b.z+dz,true);
+  // The top edge of a ramp is an explicit attachment, even while climbing it.
+  if(b.type==='stairs'){
+   const d=direction(b.rotation*Math.PI/2,0),top={x:b.x+d.x*GRID,y:b.y+GRID,z:b.z+d.z*GRID};
+   add(top.x,top.y,top.z,true);
+   const q=options.get(cellKey({...base,x:Math.round((top.x-offsetX)/GRID)*GRID+offsetX,y:top.y,z:Math.round((top.z-offsetZ)/GRID)*GRID+offsetZ}));
+   if(q&&Math.abs(p.x-b.x)<2.6&&Math.abs(p.z-b.z)<2.6&&p.y>b.y+.8&&forward.x*d.x+forward.z*d.z>.6&&p.pitch>-.65)q.score-=3;
+  }
+ }
+ const ranked=[...options.values()].sort((a,b)=>a.score-b.score||cellKey(a.piece).localeCompare(cellKey(b.piece)));
+ let best=null,firstReason='Needs support';
+ for(const option of ranked){
+  if(best&&option.score>best.score+.5)break;
+  const reason=validPlacement(option.piece,map,builds,players);
+  if(!best&&option===ranked[0])firstReason=reason;
+  if(reason)continue;
+  // Test the sight line to the near face; tiny props never veto a connection.
+  const q=option.piece,tx=q.x-eye.x,ty=q.y+(type==='wall'?1.4:type==='stairs'?2:.15)-eye.y,tz=q.z-eye.z,len=Math.hypot(tx,ty,tz)||1;
+  if(nearWorld.some(b=>rayBox(eye,{x:tx/len,y:ty/len,z:tz/len},b)<len-2.2))continue;
+  if(!best||preferred&&cellKey(q)===preferred)best=option;
+ }
+ return {piece:best?.piece||ranked[0]?.piece||base,reason:best?'':firstReason||'Blocked'};
 }
 export function aimedObject(map,p,range=5){
  const hit=worldHit(map,{x:p.x,y:p.y+EYE,z:p.z},direction(p.yaw,p.pitch),range);
@@ -84,15 +145,19 @@ export function swingPickaxe(sim,p){
 export function buildingTick(sim,p,input){
  const wasBuilding=p.building;
  p.buildFacing=snappedFacing(p.yaw,wasBuilding?p.buildFacing:undefined);
- p.building=!!input.buildMode;p.buildType=input.buildType||'wall';p.buildMaterial=input.buildMaterial||'wood';p.buildRotation=Number.isInteger(input.buildRotation)?((input.buildRotation%4)+4)%4:0;
+ p.building=!!input.buildMode;p.buildType=input.buildType||'wall';
+ const requested=MATERIALS[input.buildMaterial]?input.buildMaterial:'wood';
+ if(requested!==p.buildRequested||!p.buildMaterial){p.buildMaterial=requested;p.buildRequested=requested;}
+ p.buildMaterial=selectMaterial(p.materials,p.buildMaterial)||p.buildMaterial;p.buildRotation=Number.isInteger(input.buildRotation)?((input.buildRotation%4)+4)%4:0;
  if(input.editing){p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;return true;}
  if(p.building){
   p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;
   if(input.fire&&sim.time>=(p.nextBuild||0)){
    p.nextBuild=sim.time+.15;
    const mat=p.buildMaterial;
-   const build=placement(p,p.buildType,p.buildRotation,mat),reason=validPlacement(build,sim.map,sim.builds,[...sim.players.values()]);
-   if(!reason&&p.materials[mat]>=COST){const def=MATERIALS[mat];p.materials[mat]-=COST;sim.builds.push({...build,id:'build-'+(++sim.buildId),owner:p.id,team:p.team,teamMode:sim.options.mode==='teams',health:def.start,maxHealth:def.health,constructionRemaining:def.health-def.start,constructionTick:sim.time+.5,revision:0,created:sim.time,lastDamage:-100});sim.buildVersion++;rebuildMap(sim);sim.emit('royale-cue',{cue:'build-place',player:p.id,x:build.x,y:build.y,z:build.z});}
+   const {piece:build,reason}=solvePlacement(p,p.buildType,p.buildRotation,mat,sim.map,sim.builds,[...sim.players.values()],input.buildAnchor);
+   p.buildReason=reason;
+   if(!reason&&p.materials[mat]>=COST){const def=MATERIALS[mat];p.materials[mat]-=COST;sim.builds.push({...build,id:'build-'+(++sim.buildId),owner:p.id,team:p.team,teamMode:sim.options.mode==='teams',health:def.start,maxHealth:def.health,constructionRemaining:def.health-def.start,constructionTick:sim.time+.5,revision:0,created:sim.time,lastDamage:-100});p.buildMaterial=selectMaterial(p.materials,mat)||mat;sim.buildVersion++;rebuildMap(sim);sim.emit('royale-cue',{cue:'build-place',player:p.id,x:build.x,y:build.y,z:build.z});}
   }
   return true;
  }

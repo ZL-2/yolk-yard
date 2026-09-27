@@ -1,6 +1,6 @@
 import {CONTROLS,normalizeBindings,assignBinding,bindingLabel} from './keybinds.js';
 export class KeybindEditor {
- constructor(root,bindings,onApply){this.root=root;this.saved=normalizeBindings(bindings);this.draft=normalizeBindings(bindings);this.onApply=onApply;this.capture=null;this.query='';this.message='Choose a slot, then press a key, mouse button or scroll direction. Esc cancels capture. Delete clears. An occupied input moves to its new action.';this.render();}
+ constructor(root,bindings,onApply){this.root=root;this.saved=normalizeBindings(bindings);this.draft=normalizeBindings(bindings);this.onApply=onApply;this.capture=null;this.query='';this.message='Choose a slot, then press a key, mouse button or scroll direction. Esc cancels capture. Delete clears. Occupied inputs move to their new action. Wheel edit, reset and item scrolling may share a direction; editing takes priority on an eligible build.';this.render();}
  get dirty(){return JSON.stringify(this.saved)!==JSON.stringify(this.draft);}
  render(){
   const focus=this.root.ownerDocument.activeElement;

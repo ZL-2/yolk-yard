@@ -1,5 +1,5 @@
 import {MATERIALS,PIECES,aimedObject,targetBuild} from './building.js';
-import {canEdit,harvestDefinition,EDIT_RANGE} from './building-rules.js';
+import {canEdit,harvestDefinition,EDIT_RANGE,selectMaterial} from './building-rules.js';
 import {editRay,validEdit,wallPattern} from './building-shapes.js';
 import {direction,EYE} from './physics.js';
 const paths={wood:'M8 4 24 8 24 24 8 28 2 23 2 9ZM8 4V28M2 9 8 13 24 8M8 19 24 14',brick:'M2 10 20 4 30 10 12 17ZM2 10V22L12 28 30 21V10M12 17V28M20 14V24',metal:'M5 5H27V12H21V23H27V29H5V23H11V12H5Z',wall:'M3 4H29V29H3ZM3 12H29M3 21H29M12 4V12M21 12V21M12 21V29',floor:'M2 18 17 7 31 15 16 28ZM9 12 24 22M9 24 24 11',stairs:'M2 29V23H9V17H16V11H23V5H30V29Z',roof:'M2 24 16 5 30 24 16 30ZM16 5V30'};
@@ -24,6 +24,11 @@ export class BuildingUI{
  }
  result(event){if(!this.edit||event.buildId!==this.edit.id)return;this.pending=false;if(event.ok)this.cancel();else{this.error=event.reason;this.renderEdit();}}
  cancel(){if(this.edit)this.controls.suppressBuildFire=true;this.edit=null;this.root.classList.remove('manual-editing');this.pending=false;this.down=false;this.controls.editing=false;this.controls.editDraft=null;this.root.querySelector('.build-edit').hidden=true;}
+ eligible(state,p,map){
+  if(!p||p.health<=0||p.flight!=='ground')return false;
+  const b=targetBuild(map,state.royale.builds,{...p,yaw:this.controls.yaw??p.yaw,pitch:this.controls.pitch??p.pitch});
+  return canEdit(b,p);
+ }
  beginEdit(state,p,map){if(!p||p.health<=0||p.flight!=='ground')return false;const pose={...p,yaw:this.controls.yaw??p.yaw,pitch:this.controls.pitch??p.pitch},b=targetBuild(map,state.royale.builds,pose);if(!canEdit(b,p))return false;
   this.edit={...b,path:[...(b.path||[])]};this.pending=false;this.error='';this.down=false;this.root.classList.add('manual-editing');this.controls.editing=true;this.controls.editTarget=b.id;this.renderEdit();return true;
  }
@@ -56,6 +61,7 @@ export class BuildingUI{
  update(state,p,map,label){
   const gain=this.root.querySelector('.harvest-gain'),harvest=p.lastHarvest;gain.innerHTML=harvest&&state.time-harvest.time<1.3?buildIcon(harvest.material)+' +'+harvest.amount:'';
   const c=this.controls;
+  if(c.buildMode)c.buildMaterial=selectMaterial(p.materials,c.buildMaterial)||c.buildMaterial;
   for(const m of Object.keys(MATERIALS)){this.root.querySelector('#material-'+m).textContent=p.materials?.[m]||0;this.root.querySelector(`[data-material="${m}"]`).classList.toggle('selected',c.buildMaterial===m);}
   for(const type of PIECES)this.root.querySelector(`[data-piece="${type}"]`).classList.toggle('selected',c.buildMode&&c.buildType===type);
   for(const [type,key]of [['wall','buildWall'],['floor','buildFloor'],['stairs','buildStairs'],['roof','buildRoof']])this.root.querySelector(`[data-piece="${type}"] kbd`).textContent=label(key);
@@ -66,7 +72,7 @@ export class BuildingUI{
   if(hit||b){const max=health?.maxHealth??def?.health??0,hp=health?.health??max;target.innerHTML=`<b>${b?b.material.toUpperCase()+' '+b.type.toUpperCase():hit.box.material.toUpperCase()}</b><div><i style="width:${Math.max(0,hp/max*100)}%"></i></div><span>${Math.ceil(hp)} / ${max} HP${current?.constructionRemaining>0?' · CONSTRUCTING':''}${canEdit(b,p)?' · '+label('buildEdit')+' EDIT · '+label('buildRepair')+' REPAIR':''}${b&&wallPattern(b.mask)?.door!=null?' · '+label('interact')+' '+(b.doorOpen?'CLOSE':'OPEN'):''}</span>`;}
   if(this.edit){
    this.root.querySelector('[data-build-control="confirm"]').textContent=label('buildEdit')+' CONFIRM';
-   this.root.querySelector('[data-build-control="reset"]').textContent=label('aim')+' RESET';
+   this.root.querySelector('[data-build-control="reset"]').textContent=label('buildReset')+' RESET';
    this.root.querySelector('[data-build-control="cancel"]').textContent='ESC CANCEL';
    if(!current||p.health<=0||!canEdit(current,p)||Math.hypot(current.x-p.x,current.y-p.y,current.z-p.z)>EDIT_RANGE+GRID_MARGIN)this.cancel();
   }

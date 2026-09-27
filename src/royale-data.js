@@ -17,11 +17,12 @@ export const ITEMS={
  launchpad:{name:'Launch Nest',kind:'launchpad',duration:.6,stack:2,color:'#f9ca65',icon:'↟'},
 };
 export const itemInfo=item=>!item?{name:'Empty slot',color:'#7c8a98',icon:''}:item.pickaxe?{name:'Pickaxe',color:'#7aaddb',icon:''}:item.weapon?{...weapon(item.id),color:RARITIES[item.rarity||0].color,icon:'',name:weapon(item.id).name}:ITEMS[item.id]||{name:item.id,color:'#d6caa5',icon:'▥'};
+// 32 contestants / 512 m island. Opening loot time grows; later stages tighten.
 export const STORM_STEPS=[
- {radius:205,wait:65,close:55,dps:1},{radius:150,wait:40,close:45,dps:2},
- {radius:102,wait:30,close:40,dps:3},{radius:65,wait:25,close:35,dps:5},
- {radius:38,wait:20,close:30,dps:7},{radius:18,wait:15,close:25,dps:9},
- {radius:6,wait:10,close:20,dps:12},{radius:0,wait:5,close:20,dps:20},
+ {radius:225,wait:105,close:65,dps:1},{radius:160,wait:35,close:50,dps:2},
+ {radius:108,wait:25,close:40,dps:3},{radius:68,wait:20,close:30,dps:5},
+ {radius:40,wait:15,close:25,dps:7},{radius:20,wait:12,close:20,dps:9},
+ {radius:7,wait:8,close:18,dps:12},{radius:0,wait:5,close:18,dps:20},
 ];
 export function makeStorm(random,speed='normal'){
  let x=0,z=0,radius=365,at=35;

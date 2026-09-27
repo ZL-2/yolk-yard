@@ -38,7 +38,7 @@ export function dressIslandBuilding(g,b,raw){
   for(let j=0;j<4;j++){const zz=z-d*.3+j*d*.2,cap=box(g,x+w*.16,y+h+2.9,zz,w*.6,.13,d*.22,s.roof);cap.rotation.x=-.36;box(g,x+w*.16,y+h+2.6,zz-d*.105,w*.6,.6,.06,0x8baeb5);}
   for(const zz of [-d*.4,d*.4])cylinder(g,x+w*.38,y+h+2.8,z+zz,.48,5.6,0xa0b6b4,12);
  }else{
-  for(const side of [-1,1])box(g,x+side*w/2,y+h+.68,z,.35,.12,d+.2,s.trim);
+  for(const side of [-1,1])box(g,x+side*w/2,y+h+.71,z,.35,.12,d+.2,s.trim);
   if(['lab','office','apartment','refinery'].includes(type)){box(g,x+w*.3,y+h+.6,z-d*.33,2,1.2,1.6,0x758e94);for(let i=0;i<5;i++)box(g,x+w*.3,y+h+.3+i*.14,z-d*.33+.82,1.7,.045,.02,0x384e5a);}
  }
  if(type==='bakery'){

@@ -20,14 +20,17 @@ export function localRoute(sim,p,goal){
  }
  const route=[];for(let i=best;i>0;i=queue[i].parent){const{x,y,z}=queue[i];route.push({x,y,z});}return route.reverse();
 }
+function pathBudget(sim){
+ if(sim.botPathTick!==sim.time){sim.botPathTick=sim.time;sim.botPathBudget=1;}
+ if(sim.botPathBudget<=0)return false;sim.botPathBudget--;return true;
+}
 export function navigate(sim,p,brain,goal,skill){
  if(!goal)return {mx:0,mz:0,jump:false};
  const now=sim.time,arrived=dist(p,goal)<1.3;
  if(arrived){if(brain.task?.id)brain.visited[brain.task.id]=now;brain.decision=Math.min(brain.decision,now+.2);}
  const revision=sim.navigationRevision||0,movedGoal=!brain.pathGoal||dist(goal,brain.pathGoal)>4;
  if((movedGoal||now>(brain.pathAt||0)||revision!==brain.navRevision)&&!arrived){
-  if(sim.botPathTick!==now){sim.botPathTick=now;sim.botPathBudget=2;}
-  if(sim.botPathBudget>0){sim.botPathBudget--;brain.navRevision=revision;brain.pathGoal={...goal};brain.pathAt=now+1.8+sim.random()*.7;p.botPath=clear(sim,p,goal)?[]:sim.nav.path(p,goal);}
+  if(pathBudget(sim)){brain.navRevision=revision;brain.pathGoal={...goal};brain.pathAt=now+1.8+sim.random()*.7;p.botPath=clear(sim,p,goal)?[]:sim.nav.path(p,goal);}
  }
  while(p.botPath?.length&&dist(p,p.botPath[0])<.65)p.botPath.shift();
  const direct=clear(sim,p,goal),step=direct?goal:p.botPath?.[0]||goal;
@@ -44,7 +47,7 @@ export function navigate(sim,p,brain,goal,skill){
  }
  if(now>=brain.checkAt){
   const stuck=Math.hypot(p.x-brain.lastX,p.z-brain.lastZ)<.4&&!arrived;
-  if(stuck){brain.failures=(brain.failures||0)+1;p.botPath=localRoute(sim,p,goal);brain.pathAt=now+2;brain.side*=-1;if(brain.failures>=3){if(brain.task?.id)brain.visited[brain.task.id]=now;brain.decision=0;brain.task=null;brain.failures=0;}}
+  if(stuck&&pathBudget(sim)){brain.failures=(brain.failures||0)+1;p.botPath=localRoute(sim,p,goal);brain.pathAt=now+2;brain.side*=-1;if(brain.failures>=3){if(brain.task?.id)brain.visited[brain.task.id]=now;brain.decision=0;brain.task=null;brain.failures=0;}}
   else brain.failures=0;
   brain.lastX=p.x;brain.lastZ=p.z;brain.checkAt=now+Math.max(.7,skill.decision*.6);
  }

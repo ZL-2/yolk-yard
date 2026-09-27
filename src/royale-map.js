@@ -45,7 +45,7 @@ const yAt=(x,z)=>groundAt(surface,x,z);
 function prop(kind,x,z,w=2,d=1.5,h=1.4,y=yAt(x,z),extra={}){
  const material=['truck','car','tank','container','lamp','barrels','console','generator','pump','radio','silo','crane','telescope','dome','beacon','drill','solar'].includes(kind)?'metal':['rock','planter'].includes(kind)?'brick':'wood';
  const p={kind,x,z,w,d,h,y,material,...extra};props.push(p);
- if(!extra.decorative)box(x,z,w,d,h,material==='metal'?'steel':material==='wood'?'crate':'stone',y,'prop',{material,prop:props.length-1});
+ if(!extra.decorative)box(x,z,w,d,h,material==='metal'?'steel':material==='wood'?'crate':'stone',y,'prop',{material,prop:props.length-1,buildBlocking:!['bush','lamp','bench','fence','bollard','crop','campfire'].includes(kind)});
  return p;
 }
 function anchor(b,x,z,level,role='mixed',room='room',chest=false){
@@ -71,16 +71,16 @@ for(const [bi,b] of buildings.entries()){
   }
   for(const side of [-1,1]){
    for(let q=0;q<3;q++){
-    const mid=-d/2+(q+.5)*d/3,len=d/3,opening=Math.min(2.4,len-1.2);
+    const sideLength=d-.35,mid=-sideLength/2+(q+.5)*sideLength/3,len=sideLength/3,opening=Math.min(2.4,len-1.2);
     wall(side*w/2,mid,.35,len,.9,y);wall(side*w/2,mid,.35,len,1.1,y+3.1);
     for(const end of [-1,1])wall(side*w/2,mid+end*(opening/2+(len-opening)/4),.35,(len-opening)/2,2.2,y+.9);
    }
   }
   // Open-tread stairs leave a return corridor linking every floor and the roof.
-  const sx=-w/2+2.1,run=d-4,steps=12,sign=1;
-  for(let k=0;k<steps;k++){const zz=sign*(-run/2+(k+.5)*run/steps);wall(sx,zz,3.25,run/steps+.02,.26,y+(k+1)*.35-.26,'stair','step');}
-  const topZ=sign*(run/2+1.05);wall(sx,topZ,3.6,2.1,.24,y+4.2-.24,'floor');
-  const endZ=-sign*(run/2+1.05);wall(sx,endZ,3.6,2.1,.24,y+4.2-.24,'floor');
+  const sx=-w/2+1.8,run=d-4,steps=12,sign=1;
+  for(let k=0;k<steps;k++){const zz=sign*(-run/2+(k+.5)*run/steps);wall(sx,zz,3.25,run/steps,.26,y+(k+1)*.35-.26,'stair','step');}
+  const topZ=sign*(run/2+1);wall(sx,topZ,3.6,2,.24,y+4.2-.24,'floor');
+  const endZ=-sign*(run/2+1);wall(sx,endZ,3.6,2,.24,y+4.2-.24,'floor');
   wall(1.8,0,w-3.6,d,.24,y+4.2-.24,'floor');
   navLinks.push({building:bi,from:{x:x+sx,y:baseY+y,z:z-sign*(run/2+.7)},to:{x:x+sx,y:baseY+y+4.2,z:z+sign*(run/2+.7)}});
   // Right-hand rooms retain a central 3m passage between their doorways.
@@ -174,4 +174,4 @@ for(let i=0;i<650;i++){
 // Material assignments and stable IDs are shared by harvesting, destruction and rendering.
 for(const [i,b]of boxes.entries())b.objectId='world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
-export const ROYALE_MAP={id:'sunnybreak',revision:2,name:'Sunnybreak Island',tag:'SUNNYBREAK REBORN • 512 × 512',description:'Rivers, ridgelines and nine distinct districts.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,material:'brick'};
+export const ROYALE_MAP={id:'sunnybreak',revision:3,name:'Sunnybreak Island',tag:'SUNNYBREAK REBORN • 512 × 512',description:'Rivers, ridgelines and nine distinct districts.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,material:'brick'};

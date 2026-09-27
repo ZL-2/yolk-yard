@@ -1,3 +1,4 @@
+import {isWarmup} from './royale-phases.js';
 import {gun,weapon,mode,clamp} from './data.js';
 import {dist} from './physics.js';
 import {BOT_SKILL,skillFor,wrapAngle} from './bot-config.js';
@@ -15,7 +16,26 @@ function combatGoal(sim,p,brain,target,w,skill){
  const shift=sim.random()<.32?0:2+sim.random()*3;
  return {x:p.x-dz/l*brain.side*shift,y:p.y,z:p.z+dx/l*brain.side*shift};
 }
+// Atoll behavior has its own schedule and never enters match combat objectives.
+export function warmupInput(sim,p){
+ const bots=[...sim.players.values()].filter(o=>o.bot),index=bots.indexOf(p),cycle=Math.floor(sim.time/7);
+ const practicing=(index+cycle*3)%Math.max(1,bots.length)<Math.min(3,Math.ceil(bots.length/10));
+ const brain=p.warmupBrain??={...newBrain(sim,p),until:0};
+ if(sim.time>=brain.until){
+  brain.until=sim.time+3+sim.random()*5;brain.idle=sim.random()<.3;
+  const points=sim.map.spawns,point=points[Math.floor(sim.random()*points.length)];brain.goal={x:point[0],y:p.y,z:point[1]};
+  brain.jump=sim.random()<.3;brain.jumpAt=sim.time+.5+sim.random()*2;
+ }
+ const practice=practicing&&sim.time%7>1&&sim.time%7<3.2;
+ const goal=practice?{x:31,y:4,z:6}:brain.goal,dx=goal.x-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz),yaw=Math.atan2(-dx,-dz);
+ const move=!practice&&!brain.idle&&d>1.5?navigate(sim,p,brain,goal,skillFor(sim)):{mx:0,mz:0,jump:false};
+ const burst=practice&&sim.time%1.1<.32&&d>5&&d<42&&seesPoint(sim,p,{x:goal.x-dx/(d||1)*1.3,y:goal.y,z:goal.z-dz/(d||1)*1.3});
+ return {yaw:practice?yaw:Math.hypot(move.mx,move.mz)>.1?Math.atan2(-move.mx,-move.mz):p.yaw,pitch:0,slot:practice?1:0,
+  forward:Math.hypot(move.mx,move.mz)>.1?1:0,strafe:0,fire:burst,reload:practice&&p.ammo[1]===0,
+  jump:move.jump||brain.jump&&Math.abs(sim.time-brain.jumpAt)<.15,swapSlot:-1};
+}
 export function botInput(sim,p){
+ if(isWarmup(sim.stage))return warmupInput(sim,p);
  const skill=skillFor(sim),now=sim.time,r=sim.random,brain=p.brain?.memory?p.brain:(p.brain={...newBrain(sim,p),...p.brain});
  observe(sim,p,brain,skill);const target=selectThreat(sim,p,brain,skill);
  const visible=!!target?.visible&&now-target.seenAt<skill.perception+.08&&seesPoint(sim,p,target);

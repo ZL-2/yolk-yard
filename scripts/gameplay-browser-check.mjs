@@ -16,8 +16,8 @@ try{
  await page.waitForFunction(()=>document.body.classList.contains('in-spawn-island'));
  const start=await page.evaluate(()=>{const s=window.__yolkTest.read();return s.state.players.find(p=>p.id==='host');});assert.equal(start.inventory[0].id,'pickaxe');
  await page.keyboard.down('KeyW');await page.waitForFunction(({x,z})=>{const p=window.__yolkTest.read().state.players.find(p=>p.id==='host');return Math.hypot(p.x-x,p.z-z)>1;},start);await page.keyboard.up('KeyW');
- await page.keyboard.press('Digit2');await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id==='host').slot===1);
- await page.keyboard.press('Digit1');await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id==='host').slot===0);
+ await page.keyboard.press('Digit1');await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id==='host').slot===1);
+ await page.keyboard.press('KeyP');await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id==='host').slot===0);
  await page.screenshot({path:`${out}/spawn-island.png`});pass('Playable Spawn Island, practice equipment, visible countdown and first-slot pickaxe');
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.queueEnds=s.time+.2;}));
  await page.waitForFunction(()=>window.__yolkTest.read().state.royale.stage==='battle-bus');

@@ -1,4 +1,4 @@
-import {isWarmup,MAX_SPECTATORS} from './royale-phases.js';
+import {isWarmup,MAX_SPECTATORS,MAX_HUMANS} from './royale-phases.js';
 import { connectionReport, errorCode, watchConnection } from './connection-report.js';
 import Peer from "peerjs";
 import { RelayPeer, relayURL } from "./relay-peer.js";
@@ -415,14 +415,14 @@ export class Network {
   publishRoom() {
     const s = this.snapshot;
     const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
-    const capacity=s?.options.capacity||8;
-    const listing=this.visibility === "public" && s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Egg",map:s.options.map,mode:s.options.mode,players:s.royale&&!s.royale.accepting?s.players.filter(p=>p.contestant).length:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase} : null;
+    const capacity=s?.royale?Math.min(s.options.capacity,MAX_HUMANS):(s?.options.capacity||8);
+    const listing=this.visibility === "public" && s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Egg",map:s.options.map,mode:s.options.mode,players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase} : null;
     if(relayURL())(this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer)?.publish?.(listing);
     else directory.publish(listing);
   }
   broadcast(state) {
     this.snapshot = state;
-    this.maxConnections=(state.options.capacity||8)-1+(state.royale?MAX_SPECTATORS:0);
+    this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+(state.royale?MAX_SPECTATORS:0);
     if (performance.now() - (this.lastPublish || 0) > 2000) { this.lastPublish = performance.now(); this.publishRoom(); }
     state = {...state, visibility:this.visibility,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,network:{hostId:this.id,members:this.members,chatSequence:this.chatRoom.sequence}};
     const worldVersion=state.royale?`${state.royale.matchId}:${state.round}:${state.royale.lootVersion}:${state.royale.buildVersion}`:null;
@@ -512,7 +512,7 @@ export class Network {
     const checkpoint=this.lastCheckpoint;
     this.chatRoom.sequence=Math.max(checkpoint.chat?.sequence||0,this.snapshot?.network?.chatSequence||0);this.chatRoom.enabled=this.chatEnabled=checkpoint.chat?.enabled!==false;
     this.chatMuted=checkpoint.chat?.muted||[];this.chatRoom.muted=new Set(this.chatMuted);this.chatRoom.members=new Map(checkpoint.chat?.members||[]);this.chatRoom.reports=new Set(checkpoint.chat?.reports||[]);this.kicked=new Set(checkpoint.kicked||[]);
-    this.maxConnections=(checkpoint.simulation.options.capacity||8)-1+(checkpoint.simulation.options.mode==='royale'?MAX_SPECTATORS:0);
+    this.maxConnections=(checkpoint.simulation.options.mode==='royale'?Math.min(checkpoint.simulation.options.capacity,MAX_HUMANS):8)-1+(checkpoint.simulation.options.mode==='royale'?MAX_SPECTATORS:0);
     this.callbacks.onHost?.(checkpoint.simulation,[...this.failedHosts]);
     this.lastPublish=0;this.lastCheckpointSent=0;this.claimRoomAddress();
     this.callbacks.onStatus?.('You are now the host. The match continues.');

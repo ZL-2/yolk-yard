@@ -38,12 +38,19 @@ export function rayBox(o, d, b, max = Infinity) {
 // Spatial buckets keep large-island collision proportional to nearby cover.
 const collisionIndex = new WeakMap();
 export function invalidateCollision(map){collisionIndex.delete(map);}
-export function candidates(map,o,d=null,max=0,radius=0){
+export function candidates(map,o,d=null,max=0,radius=RADIUS){
  if(map.theme!=='royale')return map.boxes;
  let grid=collisionIndex.get(map);
  if(!grid){grid=new Map();for(const b of map.boxes){for(let x=Math.floor((b.x-b.w/2)/16);x<=Math.floor((b.x+b.w/2)/16);x++)for(let z=Math.floor((b.z-b.d/2)/16);z<=Math.floor((b.z+b.d/2)/16);z++){const k=x+','+z;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(b);}}collisionIndex.set(map,grid);}
- const found=new Set(),length=d?Math.min(Number.isFinite(max)?max:1600,1600):0,steps=Math.max(1,Math.ceil(length*Math.hypot(d?.x||0,d?.z||0)/12)),reach=Math.max(1,Math.ceil(radius/16));
- for(let i=0;i<=steps;i++){const f=length*i/steps,x=Math.floor((o.x+(d?.x||0)*f)/16),z=Math.floor((o.z+(d?.z||0)*f)/16);for(let dx=-reach;dx<=reach;dx++)for(let dz=-reach;dz<=reach;dz++)for(const b of grid.get((x+dx)+','+(z+dz))||[])found.add(b);}
+ const found=new Set(),visited=new Set(),length=d?Math.min(Number.isFinite(max)?max:1600,1600):0,steps=Math.max(1,Math.ceil(length*Math.hypot(d?.x||0,d?.z||0)/16));
+ // Query the swept segment's actual buckets, including the full player/bolt
+ // radius. Nine whole neighboring buckets per point used to dominate bot cost.
+ for(let i=0;i<steps;i++){
+  const from=length*i/steps,to=length*(i+1)/steps,ax=o.x+(d?.x||0)*from,az=o.z+(d?.z||0)*from,bx=o.x+(d?.x||0)*to,bz=o.z+(d?.z||0)*to;
+  for(let x=Math.floor((Math.min(ax,bx)-radius)/16);x<=Math.floor((Math.max(ax,bx)+radius)/16);x++)for(let z=Math.floor((Math.min(az,bz)-radius)/16);z<=Math.floor((Math.max(az,bz)+radius)/16);z++){
+   const key=x+','+z;if(visited.has(key))continue;visited.add(key);for(const b of grid.get(key)||[])found.add(b);
+  }
+ }
  return found;
 }
 export function wallDistance(map, o, d, max = 200) {
@@ -219,7 +226,7 @@ export function sanitizeInput(i = {}) {
     reload: !!i.reload,
     popper: !!i.popper,
     slot: Number.isInteger(i.slot) && i.slot>=0 && i.slot<6 ? i.slot : 0,
-    editing:!!i.editing, buildMode: !!i.buildMode, buildType: ["wall","floor","stairs","roof"].includes(i.buildType)?i.buildType:"wall", buildMaterial:["wood","brick","metal"].includes(i.buildMaterial)?i.buildMaterial:"wood", buildRotation:Number.isInteger(i.buildRotation)?((i.buildRotation%4)+4)%4:0,
+    buildAnchor:typeof i.buildAnchor==='string'&&/^[0-9.,-]{1,80}$/.test(i.buildAnchor)?i.buildAnchor:null, editing:!!i.editing, buildMode: !!i.buildMode, buildType: ["wall","floor","stairs","roof"].includes(i.buildType)?i.buildType:"wall", buildMaterial:["wood","brick","metal"].includes(i.buildMaterial)?i.buildMaterial:"wood", buildRotation:Number.isInteger(i.buildRotation)?((i.buildRotation%4)+4)%4:0,
     sprint: !!i.sprint, interact: !!i.interact, drop: !!i.drop,
     swapSlot: Number.isInteger(i.swapSlot) && i.swapSlot>=1 && i.swapSlot<6 ? i.swapSlot : -1,
   };

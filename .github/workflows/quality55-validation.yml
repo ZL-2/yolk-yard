@@ -1,0 +1,28 @@
+name: Connected Island gameplay verification
+on:
+  push:
+    branches: [quality55-validation]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Connected gameplay browser checks
+        run: node scripts/connected-island-browser-check.mjs
+      - name: Population CPU and network budget
+        run: node scripts/royale-population-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: connected-island-evidence
+          path: test-results
+          retention-days: 7

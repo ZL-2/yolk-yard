@@ -45,3 +45,10 @@ export function snappedFacing(yaw,previous){
  return ((Math.round(angle/turn)%4)+4)%4;
 }
 export const canEdit=(piece,player)=>!!piece&&!!player&&(piece.owner===player.id||(piece.team!=null&&piece.team===player.team&&piece.teamMode===true));
+
+// Preserve a usable choice. Only walk forward around the material order when needed.
+export function selectMaterial(bank,selected='wood',cost=COST){
+ const order=Object.keys(MATERIALS),start=Math.max(0,order.indexOf(selected));
+ for(let i=0;i<order.length;i++){const material=order[(start+i)%order.length];if((bank?.[material]||0)>=cost)return material;}
+ return null;
+}

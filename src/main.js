@@ -24,7 +24,7 @@ import {EggWallet,MatchEarnings,ownedLoadout} from './egg-wallet.js';
 import {KeybindEditor} from "./keybind-editor.js";
 import {touchPair,touchRotation} from './menu-pose.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
-import { CONTROLS, normalizeBindings, bindingDown, bindingLabel } from "./keybinds.js";
+import { CONTROLS, normalizeBindings, bindingDown, bindingLabel, wheelIntent } from "./keybinds.js";
 import { RELEASES, RELEASE } from "./releases.js";
 import { UpdateWatcher } from "./updates.js";
 import {
@@ -42,7 +42,7 @@ import { MAPS, getMap } from "./maps.js";
 import { movePlayer } from "./physics.js";
 import { Simulation } from "./simulation.js";
 import { Network, cleanCode, formatCode } from "./network.js";
-import {MAX_SPECTATORS} from './royale-phases.js';
+import {MAX_SPECTATORS,MAX_HUMANS,MAX_CONTESTANTS,WARMUP_SECONDS} from './royale-phases.js';
 import { directory } from "./directory.js";
 import { View } from "./view.js";
 import { Sound } from "./audio.js";
@@ -269,7 +269,7 @@ function settingsMenu() {
       )
       .join(
         "",
-      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>Low · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Aim binding resets. Edit confirms; Esc cancels.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
+      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>Low · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
     "settings",
   );
   bindingEditor=new KeybindEditor(dialog.querySelector(".keybind-list"),settings.keybinds,bindings=>{settings.keybinds=bindings;keys.clear();queuedActions.clear();input.fire=input.aim=false;save("yolk-settings",settings);});
@@ -321,7 +321,7 @@ function setupMenu(editing = false, draft = null) {
   const nextRound = editing && state.phase === "results";
   const select = (id,label,items,value) => `<label>${label}<select class="field" id="setup-${id}">${items.map(([key,text])=>`<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
   modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Create Match",
-    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("bots","BOTS",Array.from({length:o.mode==='royale'?16:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"]],o.capacity||16)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?'Last egg standing wins. Two contestants minimum. All loot is found on Sunnybreak.':'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Join Spawn Island before departure; after the Battle Bus leaves, new arrivals spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>`, "setup");
+    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?'Last egg standing wins. Two contestants minimum. All loot is found on Sunnybreak.':'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Join during the 60-second warmup; arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>`, "setup");
   if(editing && !net) $("#setup-visibility").disabled=true;
   const royale=o.mode==='royale';
   for(const key of ['minutes','scoreLimit']){$(`#setup-${key}`).closest('label').hidden=royale;$(`#setup-${key}`).disabled=royale;}
@@ -329,7 +329,7 @@ function setupMenu(editing = false, draft = null) {
   $('#setup-map').disabled=royale;
   $('#setup-mode').onchange=e=>{
     const visibility=$('#setup-visibility').value;
-    const next={...matchOptions({...o,...getOptions(),mode:e.target.value,map:e.target.value==='royale'?'sunnybreak':'yard',bots:e.target.value==='royale'?15:0,scoreLimit:mode(e.target.value).limit}),visibility};
+    const next={...matchOptions({...o,...getOptions(),mode:e.target.value,map:e.target.value==='royale'?'sunnybreak':'yard',bots:e.target.value==='royale'?MAX_CONTESTANTS-1:0,scoreLimit:mode(e.target.value).limit}),visibility};
     if(editing){options=next;setupMenu(editing,next);}else{options=next;setupMenu(false);}
   };
 
@@ -348,8 +348,8 @@ function saveMatchSettings(start = false) {
     const old=sim;sim=next.mode==='royale'?new RoyaleSimulation(next):new Simulation(next);
     for(const p of old.players.values())if(!p.bot)sim.addPlayer(p.id,p);sim.round=old.round;sim.phase=old.phase;
   }else if(!sim.configure(next))return;
-  if(net)net.maxConnections=(next.capacity||8)-1+(next.mode==='royale'?MAX_SPECTATORS:0);
-  if(autoQueue&&next.mode==='royale'&&!start)sim.queueEnds=sim.time+30;
+  if(net)net.maxConnections=(next.mode==='royale'?Math.min(next.capacity,MAX_HUMANS):8)-1+(next.mode==='royale'?MAX_SPECTATORS:0);
+  if(autoQueue&&next.mode==='royale'&&!start)sim.queueEnds=sim.time+WARMUP_SECONDS;
   options=sim.options;
   net?.setVisibility($("#setup-visibility").value);
   state=sim.snapshot();
@@ -524,7 +524,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     "connecting",
   );
   const attempt = new Network(callbacks());
-  attempt.maxConnections=(options.capacity||8)-1+(options.mode==='royale'?MAX_SPECTATORS:0);
+  attempt.maxConnections=(options.mode==='royale'?Math.min(options.capacity,MAX_HUMANS):8)-1+(options.mode==='royale'?MAX_SPECTATORS:0);
   net = attempt;
   try {
     await attempt.host();
@@ -985,7 +985,7 @@ let playMode = 'royale';
 function playMenu(selected = playMode) {
  playMode = selected;
  const selectedMode = mode(selected), royale = selected === 'royale';
- modal('Play', `<div class="play-discover"><div class="eyebrow">CHOOSE YOUR EXPERIENCE</div><div class="play-mode-grid">${MODES.map(m=>`<button class="play-mode-card play-${m.id} ${m.id===selected?'selected':''}" data-action="play-${m.id}" aria-pressed="${m.id===selected}"><span class="mode-art" aria-hidden="true">${m.id==='royale'?'◈':m.id==='ffa'?'◎':'◆ ◆'}</span><span class="eyebrow">${m.id==='royale'?'16 CONTESTANTS · ONE LIFE':'8 PLAYERS · RESPAWNS'}</span><strong>${m.name}</strong><span>${m.description}</span></button>`).join('')}</div><section class="play-selection"><div><div class="eyebrow">SELECTED MODE</div><h3>${selectedMode.name}</h3><p>${royale?'Harvest. Build. Survive the storm.':'Choose your loadout and jump into the arena.'}</p><span class="play-fill">BOT FILL ON · Empty seats fill automatically</span></div><div class="play-options"><button class="primary" data-action="${royale?'royale-queue':'public-rooms'}">${royale?'FIND PUBLIC MATCH':'BROWSE PUBLIC MATCHES'}</button><button class="secondary" data-action="play-custom">CUSTOM MATCH</button><button class="plain" data-action="play-local">PLAY WITH BOTS</button></div></section><div class="play-footer"><button class="plain" data-action="public-rooms">Browse all matches</button><button class="plain" data-action="join">Join with room code</button></div></div>`, 'play');
+ modal('Play', `<div class="play-discover"><div class="eyebrow">CHOOSE YOUR EXPERIENCE</div><div class="play-mode-grid">${MODES.map(m=>`<button class="play-mode-card play-${m.id} ${m.id===selected?'selected':''}" data-action="play-${m.id}" aria-pressed="${m.id===selected}"><span class="mode-art" aria-hidden="true">${m.id==='royale'?'◈':m.id==='ffa'?'◎':'◆ ◆'}</span><span class="eyebrow">${m.id==='royale'?'32 CONTESTANTS · ONE LIFE':'8 PLAYERS · RESPAWNS'}</span><strong>${m.name}</strong><span>${m.description}</span></button>`).join('')}</div><section class="play-selection"><div><div class="eyebrow">SELECTED MODE</div><h3>${selectedMode.name}</h3><p>${royale?'Harvest. Build. Survive the storm.':'Choose your loadout and jump into the arena.'}</p><span class="play-fill">BOT FILL ON · Empty seats fill automatically</span></div><div class="play-options"><button class="primary" data-action="${royale?'royale-queue':'public-rooms'}">${royale?'FIND PUBLIC MATCH':'BROWSE PUBLIC MATCHES'}</button><button class="secondary" data-action="play-custom">CUSTOM MATCH</button><button class="plain" data-action="play-local">PLAY WITH BOTS</button></div></section><div class="play-footer"><button class="plain" data-action="public-rooms">Browse all matches</button><button class="plain" data-action="join">Join with room code</button></div></div>`, 'play');
 }
 function botDifficultyMenu(selected = playMode) {
  playMode = selected;
@@ -994,10 +994,10 @@ function botDifficultyMenu(selected = playMode) {
 function startChosenBotMatch() {
  const difficulty=Number($('#local-difficulty')?.value);
  if(!Number.isInteger(difficulty)||difficulty<1||difficulty>BOT_DIFFICULTIES.length)return;
- options=matchOptions({mode:playMode,bots:playMode==='royale'?15:7,fill:true,difficulty});
+ options=matchOptions({mode:playMode,bots:playMode==='royale'?MAX_CONTESTANTS-1:7,fill:true,difficulty});
  startLocalMatch();
 }
-function royaleHome(){modal('Yolk Royale',`<div class="royale-brief"><div class="eyebrow">SUNNYBREAK ISLAND</div><h3>One island. One surviving egg.</h3><p>Board the Eggspress, choose your drop, and carry five items plus your permanent pickaxe. Harvest wood, brick and metal, then build and edit walls, floors, stairs and roofs. Find shields, healing, shock eggs and launch nests. Keep moving as the storm closes.</p><p class="hint">Solo · 16 contestants · Nine districts · One life</p></div><button class="primary" data-action="royale-queue">FIND PUBLIC MATCH</button><button class="secondary" data-action="royale-custom">CREATE PUBLIC / PRIVATE MATCH</button><button class="plain" data-action="royale-local">PLAY LOCAL WITH BOTS</button><p class="hint">Warm up on Hatchling Atoll while the 30-second countdown runs. Practice gear resets at departure. Join before the Battle Bus; after departure, spectate living contestants. Hosting transfers automatically if the host leaves.</p>`,'royale-home');}
+function royaleHome(){modal('Yolk Royale',`<div class="royale-brief"><div class="eyebrow">SUNNYBREAK ISLAND</div><h3>One island. One surviving egg.</h3><p>Board the Eggspress, choose your drop, and carry five items plus your permanent pickaxe. Harvest wood, brick and metal, then build and edit walls, floors, stairs and roofs. Find shields, healing, shock eggs and launch nests. Keep moving as the storm closes.</p><p class="hint">Solo · 32 contestants · Nine districts · One life</p></div><button class="primary" data-action="royale-queue">FIND PUBLIC MATCH</button><button class="secondary" data-action="royale-custom">CREATE PUBLIC / PRIVATE MATCH</button><button class="plain" data-action="royale-local">PLAY LOCAL WITH BOTS</button><p class="hint">Warm up on Hatchling Atoll while the 60-second countdown runs. Practice gear resets at departure. Join before the Battle Bus; after departure, spectate living contestants. Hosting transfers automatically if the host leaves.</p>`,'royale-home');}
 async function quickRoyale(){
  if(state)leave(false);
  const request=++matchRequest;modal('Finding your flight','<div class="spinner"></div><p>Finding a waiting Yolk Royale match…</p><button data-action="cancel-connect">Cancel</button>','matchmaking');
@@ -1012,7 +1012,7 @@ async function quickRoyale(){
      if(pass===0){await new Promise(resolve=>setTimeout(resolve,400+Math.random()*600));rooms=(await directory.list()).rooms;}
    }
    if(request!==matchRequest)return;
-   await createRoom({mode:'royale',bots:15,capacity:16,fill:true},'public',true);
+   await createRoom({mode:'royale',bots:MAX_CONTESTANTS-1,capacity:MAX_CONTESTANTS,fill:true},'public',true);
  }catch(e){if(request===matchRequest)modal('Matchmaking unavailable',`<p class="error-box">${esc(e.message)}</p>${connectionButton}<button class="primary" data-action="royale-local">PLAY LOCAL WITH BOTS</button><button data-action="royale-queue">Try again</button>`,'error');}
 }
 function royaleMap(){if(!state?.royale)return;modal('Sunnybreak Island',royaleUI.mapHTML(),'royale-map');royaleUI.drawMap($('#royale-fullmap'),state,state.players.find(p=>p.id===localId),true);}
@@ -1209,9 +1209,22 @@ document.addEventListener("pointerlockchange", () => {
     pauseMenu();
 });
 function pressControl(code) {
+  if(code.startsWith('Wheel')&&state?.royale){
+    const p=state.players.find(p=>p.id===localId),pose=predicted?{...p,...predicted}:p;
+    const eligible=!!p&&p.health>0&&p.flight==='ground'&&buildUI.eligible(state,pose,view.buildMap);
+    const intent=wheelIntent(settings.keybinds,code,{royale:true,editing:!!buildUI.edit,eligible});
+    if(intent!=='scroll'){
+      if(intent==='reset-confirm'){
+        if(!buildUI.edit)buildUI.beginEdit(state,pose,view.buildMap);
+        buildUI.action('reset');buildUI.action('confirm');
+      }else if(intent==='edit')buildUI.beginEdit(state,pose,view.buildMap);
+      else if(intent!=='consume')buildUI.action(intent);
+      return;
+    }
+  }
   if(buildUI.edit){
     if(settings.keybinds.buildEdit.includes(code)){buildUI.action('confirm');return;}
-    if(settings.keybinds.aim.includes(code)){buildUI.action('reset');return;}
+    if(settings.keybinds.buildReset.includes(code)){buildUI.action('reset');return;}
     if(settings.keybinds.fire.includes(code)){keys.add(code);return;}
   }
 
@@ -1220,8 +1233,8 @@ function pressControl(code) {
   for (const action of ['jump', 'fire', 'reload', 'popper', 'interact']) {
     if (settings.keybinds[action].includes(code)) queuedActions.add(action);
   }
-  if (settings.keybinds.primary.includes(code)) input.slot = 0;
-  if (settings.keybinds.sidearm.includes(code)) input.slot = 1;
+  if (settings.keybinds.primary.includes(code)) input.slot = state?.royale ? 1 : 0;
+  if (settings.keybinds.sidearm.includes(code)) input.slot = state?.royale ? 2 : 1;
   if (settings.keybinds.swap.includes(code)) {input.slot = state?.royale ? (input.slot+1)%6 : 1-input.slot;buildControls.buildMode=false;}
   for(const [action,step] of [['nextSlot',1],['previousSlot',-1]])if(settings.keybinds[action].includes(code)){const count=state?.royale?6:2;input.slot=(input.slot+step+count)%count;buildControls.buildMode=false;}
   if(state?.royale){
@@ -1231,8 +1244,8 @@ function pressControl(code) {
     for(const [key,action] of [['buildToggle','toggle'],['buildRotate','rotate'],['buildMaterial','material']])if(settings.keybinds[key].includes(code))buildUI.action(action);
     if(settings.keybinds.buildEdit.includes(code)){if(buildUI.edit)buildUI.action('confirm');else{const p=state.players.find(p=>p.id===localId);buildUI.beginEdit(state,predicted?{...p,...predicted}:p,view.buildMap);}}
     if(settings.keybinds.buildRepair.includes(code)){if(sim)sim.playerAction(localId,'build-repair');else net?.send({type:'player-action',action:'build-repair'});}
-    if(['primary','sidearm','slot3','slot4','slot5','slot6'].some(k=>settings.keybinds[k].includes(code))){buildControls.buildMode=false;buildUI.cancel();}
-    for(let i=3;i<=6;i++)if(settings.keybinds['slot'+i].includes(code))input.slot=i-1;
+    if(['primary','sidearm','slot3','slot4','slot5'].some(k=>settings.keybinds[k].includes(code))){buildControls.buildMode=false;buildUI.cancel();}
+    for(let i=3;i<=5;i++)if(settings.keybinds['slot'+i].includes(code))input.slot=i;
     if(settings.keybinds.map.includes(code))royaleMap();
     if(settings.keybinds.inventory.includes(code))royaleInventory();
     if(settings.keybinds.drop.includes(code))inventoryAction('drop');
@@ -1476,7 +1489,7 @@ function frameInput() {
       (actionDown("popper") ||
         touch.popper ||
         queuedActions.has("popper")),
-    buildMode:active&&buildControls.buildMode,buildType:buildControls.buildType,buildMaterial:buildControls.buildMaterial,buildRotation:buildControls.buildRotation,editing:buildControls.editing,
+    buildMode:active&&buildControls.buildMode,buildType:buildControls.buildType,buildMaterial:buildControls.buildMaterial,buildRotation:buildControls.buildRotation,buildAnchor:buildControls.buildAnchor,editing:buildControls.editing,
     slot: input.slot,
     sprint:active&&(actionDown('sprint')||touch.sprint),
     interact:active&&(actionDown('interact')||touch.interact||queuedActions.has('interact')),
@@ -1628,6 +1641,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
       predicted,
       input: { ...input },
       building: {...buildControls},
+      stormVisual: view?.royaleView ? {radius:view.royaleView.wall.scale.x,x:view.royaleView.wall.position.x,z:view.royaleView.wall.position.z,visible:view.royaleView.wall.visible,outside:view.royaleView.wall.material.uniforms.outside.value} : null,
       camera: view?.camera.rotation.toArray(),
       drawCalls: view?.renderer.info.render.calls,
       scope: {
