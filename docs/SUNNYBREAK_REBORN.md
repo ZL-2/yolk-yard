@@ -1,4 +1,4 @@
-# Quality Update 42 — Sunnybreak Reborn
+# Quality Update 52 — Sunnybreak Reborn
 
 The 512 × 512 island is rebuilt in the existing Royale mode. It retains the egg world, sixteen-player capacity, host simulation, building/editing, harvesting, inventory, storm and spectator systems. Network protocol 15 separates this terrain and snapshot format from older clients.
 
@@ -55,3 +55,14 @@ Focused checks live in:
 - `scripts/royale-art-check.mjs`: all nine districts, weapon/item gallery and transport using production factories.
 
 Browser screenshots and reports are written to ignored `test-results/` paths. Synthetic local checks do not claim a sixteen-player internet hardware/FPS benchmark.
+
+
+## Published verification
+
+The published release history assigns **52** to Sunnybreak Reborn. Source release-note numbers are development fallbacks; production continues the existing published sequence.
+
+- Deployed game build: `e1a8be4f7369451057da8d0d27d5551c349616f6`.
+- [Deployment and 183 passing tests, 16-player relay checks, multiplayer soak, and production relay verification](https://github.com/ZL-2/yolk-yard/actions/runs/36285973920).
+- [Passing live-site and equipment browser checks](https://github.com/ZL-2/yolk-yard/actions/runs/36286570979): exact live release/build, transport entry, L dismissal without menu or pointer-lock changes, full map, chest pickup, four optics, eleven weapons switching/firing, and rematch reset.
+
+The equipment-only browser path waits for the search key to release and approaches the actual spawned reward before testing pickup. This accommodates the chest's spread of rewards and keeps the interaction test independent of which item happens to be closest.
