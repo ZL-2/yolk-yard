@@ -342,13 +342,13 @@ function saveMatchSettings(start = false) {
   if (!sim || state?.phase === "playing") return;
   const next=getOptions();
   if(!next)return;
-  const humans=[...sim.players.values()].filter(p=>!p.bot).length;
+  const humans=[...sim.players.values()].filter(p=>!p.bot&&(next.mode!=='royale'||!p.lateSpectator)).length;
   if(humans>(next.mode==='royale'?next.capacity:8)){toast('Choose enough contestant seats for everyone in this room.');return;}
   if((sim.options.mode==='royale')!==(next.mode==='royale')){
     const old=sim;sim=next.mode==='royale'?new RoyaleSimulation(next):new Simulation(next);
     for(const p of old.players.values())if(!p.bot)sim.addPlayer(p.id,p);sim.round=old.round;sim.phase=old.phase;
   }else if(!sim.configure(next))return;
-  if(net)net.maxConnections=(next.capacity||8)-1;
+  if(net)net.maxConnections=(next.capacity||8)-1+(next.mode==='royale'?MAX_SPECTATORS:0);
   if(autoQueue&&next.mode==='royale'&&!start)sim.queueEnds=sim.time+30;
   options=sim.options;
   net?.setVisibility($("#setup-visibility").value);
