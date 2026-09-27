@@ -23,7 +23,8 @@ async function make(name){
 }
 async function enter(p){
  await p.locator('#royale-hud').waitFor();
- await p.waitForFunction(()=>document.pointerLockElement||document.querySelector('#dialog[open] [data-action="resume"]'));
+ await p.waitForFunction(()=>document.pointerLockElement||document.querySelector('#dialog[open] [data-action="resume"]')||document.querySelector('#spectate-panel')?.hidden===false);
+ if(await p.locator('#spectate-panel').isVisible())return;
  if(await p.locator('#dialog [data-action="resume"]').isVisible())await p.locator('#dialog [data-action="resume"]').click();
  await p.waitForFunction(()=>!!document.pointerLockElement);
 }
@@ -53,7 +54,7 @@ try{
   await page.screenshot({path:out+'/live-glider.png',timeout:15000}).catch(()=>console.log('Optional glider screenshot unavailable'));
   await page.context().browser().close();page=await make('Release Observer');await page.locator('[data-action="play"]').click();await page.locator('[data-action="join"]').click();await page.locator('#join-code').fill(code);await page.locator('[data-action="join-room"]').click();await enter(page);
   await page.locator('#spectate-panel').waitFor();assert.equal(await page.locator('[data-action="rejoin"]').isVisible(),false);assert.equal(await page.locator('#spawn-button').isVisible(),false);assert.equal(await page.evaluate(()=>document.body.classList.contains('in-spawn-island')),false);
-  await page.locator('[data-action="spectate-next"]').click();pass('Late arrival is spectator-only with living-target switching and no spawn/rejoin control');
+  const before=await page.locator('#spectate-info').innerText();await page.locator('[data-action="spectate-next"]').click();await page.waitForFunction(before=>document.querySelector('#spectate-info').textContent!==before,before);pass('Late arrival is spectator-only with living-target switching and no spawn/rejoin control');
  }
  assert.deepEqual(errors,[]);ok=true;
 }catch(error){console.error(error);errors.push(error.message);if(page)await page.screenshot({path:out+'/'+role+'-failure.png',timeout:5000}).catch(()=>{});}
