@@ -29,8 +29,8 @@ try{
  console.log('Exited bus');await page.waitForFunction(()=>!window.__yolkTest.read().state.players.find(p=>p.id==='host').flightLatch);console.log('Deploying glider');
  await page.keyboard.down('Space');await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id==='host').flight==='glide');await page.keyboard.up('Space');
  await page.screenshot({path:`${out}/gliding.png`});pass('Battle Bus exit, glider deployment and dismissed tips remain connected');
- await page.evaluate(async()=>{const {groundAt}=await import('/src/terrain.js');window.__yolkTest.fixture(s=>{const p=s.players.get('host');Object.assign(p,{x:-86,z:-75,y:groundAt(s.map,-86,-75),flight:'ground',grounded:true,vy:0,fall:null,slot:1});p.inventory[1]={id:'impulse',count:2,rarity:2};s.syncInventory(p);s.beginUse(p);});});
- await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id==='host').fall?.source==='shockwave');
+ await page.evaluate(async()=>{const {groundAt}=await import('/src/terrain.js');window.__yolkTest.fixture(s=>{const p=s.players.get('host');p.inventory[1]={id:'impulse',count:2,rarity:2};window.__yolkTest.pose({x:-86,z:-75,y:groundAt(s.map,-86,-75),flight:'ground',grounded:true,vy:0,fall:null,slot:1});s.syncInventory(p);});});
+ await page.mouse.down();await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id==='host').fall?.source==='shockwave');await page.mouse.up();
  const shock=await page.evaluate(()=>window.__yolkTest.read().state.players.find(p=>p.id==='host'));assert.equal(shock.flight,'ground');assert.equal(shock.fall.immune,true);pass('Actual Shock Egg use launches with temporary immunity and no automatic glider');
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.phase='results';s.stage='finished';}));await page.waitForFunction(()=>window.__yolkTest.read().state.phase==='results');
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.startRound();}));await page.waitForFunction(()=>window.__yolkTest.read().state.royale.practice);pass('New match restores Spawn Island and a fresh temporary inventory');
@@ -45,4 +45,4 @@ try{
  await page.screenshot({path:`${out}/streak.png`});
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.time+=19;}));await page.waitForFunction(()=>document.querySelector('#streak-announcement').hidden);pass('Actual fifth elimination shows earned upgrade; countdown expires in the gameplay HUD');
  assert.deepEqual(errors,[]);await writeFile(`${out}/checks.json`,JSON.stringify({checks,errors},null,2));
-}catch(error){console.error(error);throw error;}finally{await Promise.race([browser.close(),new Promise(resolve=>setTimeout(resolve,5000))]);await vite.close();}
+}catch(error){console.error(error);await page.screenshot({path:out+'/failure.png'}).catch(()=>{});console.error('Last state',await page.evaluate(()=>{const r=window.__yolkTest?.read();return {screen:r?.screen,paused:r?.paused,phase:r?.state?.phase,stage:r?.state?.royale?.stage,p:r?.state?.players.find(p=>p.id==='host')};}).catch(()=>null));throw error;}finally{await Promise.race([browser.close(),new Promise(resolve=>setTimeout(resolve,5000))]);await vite.close();}

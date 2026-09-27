@@ -9,7 +9,9 @@ export class StreakUI{
   for(const [key,name]of [['damageUntil','Egg Breaker'],['eggsUntil','Double Eggs'],['miniUntil','Mini Egg']])if(p[key]>state.time)active.push({name,text:clock(p[key]-state.time)});
   if(p.streakArmor>0)active.push({name:'Hard Boiled',text:Math.ceil(p.streakArmor)+' shield'});
   if(p.health>100)active.push({name:'Overheal',text:Math.ceil(p.health)+' HP'});
-  const age=this.message?state.time-this.message.time:100,large=age>=0&&age<3.6,fade=age>=3.6&&age<4.1&&!active.length;
+  if(this.activeCount&&!active.length)this.fadeAt=state.time;
+  this.activeCount=active.length;
+  const age=this.message?state.time-this.message.time:100,large=age>=0&&age<3.6,fade=!large&&!active.length&&(age>=3.6&&age<4.1||state.time-(this.fadeAt??-100)<.4);
   this.root.hidden=!large&&!fade&&!active.length;
   this.root.classList.toggle('compact',!large);this.root.classList.toggle('leaving',fade);
   const key=JSON.stringify([large,active,large?this.message.id:null]);if(key===this.key)return;this.key=key;
