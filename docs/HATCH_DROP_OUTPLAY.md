@@ -30,7 +30,7 @@ The central launch policy records immunity, redeploy permission, forced glider a
 
 The same perception, objective and navigation modules run in Royale, FFA and Team Scramble. Local bot play uses its selected underlying mode. The host runs AI; clients receive normal actor snapshots.
 
-- **Perception:** forward field of view plus collision line of sight, gunfire/build/impact events, nearby moving footsteps, approximate incoming-fire bearings and short-range team callouts. Observations copy last known positions and velocity. Confidence decays; search memory expires. Hidden actors are not tracked through walls. Bots never fire at an invisible remembered target.
+- **Perception:** forward field of view plus collision line of sight, gunfire/build/impact events, approximate incoming-fire bearings and short-range team callouts. Observations copy last known positions and velocity. Confidence decays; search memory expires. Hidden actors are not tracked through walls. Bots never fire at an invisible remembered target.
 - **Threats:** visibility, confidence, recent damage, distance, observed vulnerability and target commitment influence selection. Damage interrupts strategy. Commitment avoids frame-by-frame target switching; large new threats can override it.
 - **Objectives:** fight, seek cover, retreat, investigate, support, resupply or patrol in arenas. Royale adds real ground/chest looting, useful ammunition, rarity/category upgrades, healing, shield, material harvesting, defensive building and mobility use. Useful loadouts reduce looting priority. Authored rooms guide searches; actual hidden loot rolls are not revealed.
 - **Storm:** travel-time estimates and a safety margin trigger rotations before damage starts. Escaping the storm overrides distant fights. Safe POIs and landmarks provide purposeful later-game searches.
@@ -44,7 +44,7 @@ The same perception, objective and navigation modules run in Royale, FFA and Tea
 | Advanced | 0.28 s | 1.1 s | 11 s | Stronger positioning, prediction and earlier rotations |
 | Impossible | 0.18 s | 0.75 s | 14 s | Fast, fallible execution with the same information and resources |
 
-`bot-config.js` also centralizes hearing, sight, aim error, burst timing, turn speed, cover preference, building chance, retreat threshold and storm margin. No difficulty gains extra health, ammo, materials, perfect accuracy or global enemy coordinates. Chest selection within a short radius represents local container discovery; bots do not read unopened contents. Team callouts carry an observation, not a live enemy feed.
+`bot-config.js` also centralizes hearing, sight, aim error, burst timing, turn speed, cover preference, building chance, retreat threshold and storm margin. No difficulty gains extra health, ammo, materials, perfect accuracy or global enemy coordinates. Chests are discovered by sight or within the same twelve-unit hum radius players hear; bots do not read unopened contents. Footstep perception has an explicit capability switch and stays disabled because movement audio is intentionally silent in the current game. Team callouts carry an observation, not a live enemy feed.
 
 Visual perception runs every 0.13–0.28 seconds; strategy runs less frequently. Royale bot inputs are cached for 85 ms. At most two full path queries run in a simulation tick; recovery searches have fixed distance and node budgets. No static map geometry or procedural glide pose adds recurring network traffic.
 

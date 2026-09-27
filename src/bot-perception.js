@@ -1,6 +1,6 @@
 import {mode} from './data.js';
 import {wallDistance,dist,EYE} from './physics.js';
-import {wrapAngle} from './bot-config.js';
+import {wrapAngle,BOT_WORLD_SENSES} from './bot-config.js';
 export const hostile=(sim,p,t)=>t!==p&&t.health>0&&!t.spectating&&t.flight!=='transport'&&(!mode(sim.options.mode).teams||t.team!==p.team);
 export function seesPoint(sim,p,t){const o={x:p.x,y:p.y+EYE,z:p.z},d={x:t.x-o.x,y:t.y+.9-o.y,z:t.z-o.z},len=Math.hypot(d.x,d.y,d.z)||1;return wallDistance(sim.map,o,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.08;}
 export function newBrain(sim,p){return {memory:{},eventId:Math.max(0,sim.eventId-32),perceiveAt:0,decision:0,aimAt:0,nextBurst:0,burstUntil:0,turnAt:sim.time,checkAt:sim.time+1,lastX:p.x,lastZ:p.z,side:sim.random()<.5?-1:1,visited:{},lootMemory:{},objective:'survey',target:null,targetUntil:0};}
@@ -31,7 +31,7 @@ export function observe(sim,p,brain,skill){
   if(!hostile(sim,p,enemy))continue;const d=dist(p,enemy),angle=wrapAngle(Math.atan2(p.x-enemy.x,p.z-enemy.z)-p.yaw);
   if(d<skill.vision&&Math.abs(angle)<skill.fov&&seesPoint(sim,p,enemy)){
    const previous=brain.memory[enemy.id];brain.memory[enemy.id]={id:enemy.id,x:enemy.x,y:enemy.y,z:enemy.z,vx:enemy.vx||0,vz:enemy.vz||0,vy:enemy.vy||0,bodyScale:enemy.bodyScale||1,visible:true,seenAt:sim.time,updated:sim.time,confidence:1,health:enemy.health,damage:(previous?.damage||0)*.8,kind:'visual'};
-  }else if(d<skill.steps&&enemy.moving&&sim.time>(brain.footstepAt?.[enemy.id]||0)){
+  }else if(BOT_WORLD_SENSES.footsteps&&d<skill.steps&&enemy.moving&&sim.time>(brain.footstepAt?.[enemy.id]||0)){
    brain.footstepAt??={};brain.footstepAt[enemy.id]=sim.time+.7;hear(sim,p,brain,enemy.id,enemy,'footstep');
   }
  }

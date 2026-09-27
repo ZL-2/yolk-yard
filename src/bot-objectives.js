@@ -4,6 +4,7 @@ import {dist,candidates,canStand} from './physics.js';
 import {groundAt} from './terrain.js';
 import {seesPoint} from './bot-perception.js';
 import {isWarmup} from './royale-phases.js';
+import {BOT_WORLD_SENSES} from './bot-config.js';
 export function selectWeapon(p,target){
  const distance=target?dist(p,target):22;
  if(!p.inventory){const primary=weapon(p.weapon);return p.ammo[1]>0&&(!p.ammo[0]&&(!p.reserve[0]||distance<10)||distance<8&&(primary.optic==='scope'||primary.projectile))?1:0;}
@@ -58,7 +59,7 @@ export function chooseObjective(sim,p,brain,skill,target){
   for(const item of sim.loot){const known=brain.lootMemory[item.uid];if(!known||sim.time-known.at>35)continue;const value=usefulLoot(p,item)/(1+dist(p,item)*.055);if(value>bestValue){bestValue=value;best=item;}}
   if(best)return {kind:'loot',goal:{x:best.x,y:best.y,z:best.z},uid:best.uid};
   const weapons=p.inventory.filter(i=>i?.weapon),needs=weapons.length<2||!weapons.some(i=>i.ammo+p.bank[ammoType(i.id)]>10)||p.shield<35;
-  if(needs){const chest=sim.chests.filter(c=>!c.opened&&(!c.landAt||c.landAt<=sim.time)&&dist(p,c)<20).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(chest)return {kind:'chest',goal:{x:chest.x,y:chest.y,z:chest.z},id:chest.id};}
+  if(needs){const chest=sim.chests.filter(c=>!c.opened&&(!c.landAt||c.landAt<=sim.time)&&dist(p,c)<20&&(dist(p,c)<BOT_WORLD_SENSES.chestHumRadius||seesPoint(sim,p,c))).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(chest)return {kind:'chest',goal:{x:chest.x,y:chest.y,z:chest.z},id:chest.id};}
   if(!underFire&&p.materials.wood<40&&weapons.length){const tree=[...candidates(sim.map,p,null,0,15)].filter(b=>b.kind==='tree'&&dist(p,b)<15&&seesPoint(sim,p,b)).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(tree)return {kind:'harvest',goal:{x:tree.x,y:tree.y,z:tree.z}};}
   if(needs){const anchors=(sim.map.floorLoot||[]).filter(q=>q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35).sort((a,b)=>dist(p,a)-dist(p,b));if(anchors[0])return {kind:'search-room',goal:anchors[0],id:anchors[0].id};}
  }

@@ -855,9 +855,9 @@ export class View {
         if(this.localArms){this.localArms.rotation.x=local.use ? -.35+Math.sin(this.clock*6)*.06 : 0;}
         this.gunGroup.rotation.z+=local.sprinting?.35:0;
         if(local.use){this.gunGroup.position.y+=.08+Math.sin(this.clock*8)*.015;this.gunGroup.rotation.x=-.3;}
-        if(local.flight==='transport'){
+        if(p.flight==='transport'){
           this.camera.position.set(p.x+Math.sin(p.yaw)*24,p.y+16,p.z+Math.cos(p.yaw)*24);this.camera.lookAt(p.x,p.y+3,p.z);this.camera.fov=80;this.camera.updateProjectionMatrix();
-        }else if(local.health>0&&local.flight!=='ground'){
+        }else if(p.health>0&&p.flight!=='ground'){
           this.camera.position.set(p.x+Math.sin(p.yaw)*6,p.y+3.5,p.z+Math.cos(p.yaw)*6);this.camera.rotation.set(Math.min(p.pitch,-.18),p.yaw,0,'YXZ');
         }
       }
