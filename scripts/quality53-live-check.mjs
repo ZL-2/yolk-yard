@@ -5,7 +5,7 @@ const base='https://zl-2.github.io/yolk-yard/',out='test-results/quality53-live'
 const ref=await fetch('https://api.github.com/repos/ZL-2/yolk-yard/git/ref/heads/main',{headers:{'User-Agent':'Yolk-Pages-verification'}}).then(r=>r.json());
 assert.ok(ref.object?.sha,'Could not resolve deployed source revision');
 const expected=process.env.YOLK_EXPECT_BUILD||ref.object.sha;
-const version=await fetch(base+'version.json?verify='+Date.now(),{cache:'no-store'}).then(r=>r.json());
+let version;for(let i=0;i<36;i++){version=await fetch(base+'version.json?verify='+Date.now(),{cache:'no-store'}).then(r=>r.json());if(version.build===expected&&version.release==='54')break;console.log('Waiting for Pages publication',version.release);await new Promise(resolve=>setTimeout(resolve,10000));}
 assert.equal(version.build,expected);assert.equal(version.release,process.env.YOLK_EXPECT_RELEASE||'54');
 const history=await fetch(base+'release-history.json?verify='+Date.now(),{cache:'no-store'}).then(r=>r.json());
 assert.equal(history.releases[0].title,'Smooth Boarding');
