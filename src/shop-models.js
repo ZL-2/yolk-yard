@@ -39,14 +39,6 @@ export function makeShopBack(id){
  if(k===5){const shell=part(g,new THREE.SphereGeometry(.3,16,10),a,0,0,.1);shell.scale.set(1,1.1,.5);for(let j=-2;j<=2;j++)box(g,c,j*.09,0,.25,.025,.4,.035);}
  return g;
 }
-export function addShopOutfit(group,profile){
- const item=shopItem(profile.outfit);if(!item)return;
- const a=item.accent,k=item.shape%4;
- if(k===0){const halo=ring(group,a,0,1.72,0,.44);halo.rotation.x=Math.PI/2;}
- if(k===1){for(const x of [-.43,.43])box(group,a,x,.9,0,.15,.28,.28);}
- if(k===2){for(const x of [-.32,.32])box(group,a,x,1.26,-.24,.065,.19,.08);}
- if(k===3){const gem=part(group,new THREE.OctahedronGeometry(.105),a,0,.65,-.45,true);gem.scale.y=1.3;}
-}
 export function makeShopGlider(id){
  const item=shopItem(id),g=new THREE.Group();if(item?.slot!=='glider')return g;
  const c=item.color,a=item.accent,k=item.shape%4;

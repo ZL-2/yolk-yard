@@ -16,7 +16,7 @@ export const RELEASE_NOTES = [
     "number": "50",
     "title": "Better Together",
     "changes": [
-      "An original Ravelfront lobby puts customized Marks on center stage, with Play, Locker, Item Shop, Career, Updates, Settings and Social. Public matchmaking is the primary action; Custom Match remains available. The separate offline-bot Play flow has been retired.",
+      "An original Ravelfront lobby puts customized operators on center stage, with Play, Locker, Item Shop, Career, Updates, Settings and Social. Public matchmaking is the primary action; Custom Match remains available. The separate offline-bot Play flow has been retired.",
       "Relay-backed lobby parties support invitations, acceptance, decline, leader controls, privacy, readiness and reconnects. Party members appear together and enter public or custom matches together, with reserved human seats and bot replacement.",
       "Frontier Royale Duos adds Fill / No Fill, protected teammates, team markers and vitals, bot partners, teammate spectating, shared placement and last-Duo victory. Teams persist through Spawn Island, the Kestrel and host recovery. Existing 32-contestant capacity and the authoritative online countdown are preserved.",
       "Eleven fictional blasters now use centralized, distinct damage falloff, head critical hits, rarity scaling, accuracy recovery, bloom, recoil, pellet patterns and build damage. Bots use the same combat rules. Scoped aiming stays stable and your scope sensitivity is preserved.",
@@ -249,7 +249,7 @@ export const RELEASE_NOTES = [
   },
   {
     "number": "22",
-    "title": "Good Marks, safer conversations",
+    "title": "Clear comms, safer conversations",
     "changes": [
       "Room, team and spectator chat with quick messages, desktop shortcuts and touch controls.",
       "Always-on filtering for chat and player names, including disguised language, common personal details and real-name/location detection.",

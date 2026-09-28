@@ -1,9 +1,9 @@
 // Visual/optic tuning only. Combat damage, magazines and projectile balance live in data.js.
 export const OPTICS = {
- needle:{radius:.185,objective:.218,length:.66,magnification:4.5,sensitivity:.72,transition:10,overlay:'precision',reticle:'mil-dot'},
- anchor:{radius:.166,objective:.195,length:.59,magnification:3.25,sensitivity:.84,transition:12,overlay:'precision',reticle:'chevron'},
- peeper:{radius:.174,objective:.202,length:.62,magnification:3.5,sensitivity:.8,transition:12,overlay:'precision',reticle:'mil-dot'},
- duet:{radius:.125,objective:.145,length:.43,magnification:1.8,sensitivity:1,transition:15,overlay:'prism',reticle:'chevron'},
+ needle:{radius:.065,objective:.078,length:.56,magnification:4.5,sensitivity:.72,transition:10,overlay:'precision',reticle:'mil-dot'},
+ anchor:{radius:.054,objective:.067,length:.49,magnification:3.25,sensitivity:.84,transition:12,overlay:'precision',reticle:'chevron'},
+ peeper:{radius:.060,objective:.072,length:.52,magnification:3.5,sensitivity:.8,transition:12,overlay:'precision',reticle:'mil-dot'},
+ duet:{radius:.050,objective:.060,length:.38,magnification:1.8,sensitivity:1,transition:15,overlay:'prism',reticle:'chevron'},
 };
 export function adsFov(w,base){return w.ads?.fov??(w.ads?2*Math.atan(Math.tan(base*Math.PI/360)/w.ads.magnification)*180/Math.PI:w.zoom);}
 export const GROUND_DISPLAY = {

@@ -655,7 +655,7 @@ function enterGame(capture = false) {
   }
   dialog.close();
   dialogType = "";
-  // Join the match as an inactive egg; only the entry button requests a spawn.
+  // Join the match as an inactive operator; only the entry button requests a spawn.
   resume(state.options.mode==='royale');
 
 }
@@ -893,7 +893,7 @@ function hud() {
   $("#score-blue").textContent = m.teams ? state.scores[0] : "";
   $("#score-coral").textContent = m.teams ? state.scores[1] : "";
   $("#objective").textContent =
-    m.id==='royale'&&state.royale.practice?`SPAWN ISLAND · ${state.royale.contestants} MARKS` : m.id==='royale' ? `${state.royale.alive} ALIVE · ${p.kills} ELIMS · ${p.place?'#'+p.place:'LAST OPERATOR STANDING'}` :
+    m.id==='royale'&&state.royale.practice?`SPAWN ISLAND · ${state.royale.contestants} CONTESTANTS` : m.id==='royale' ? `${state.royale.alive} ALIVE · ${p.kills} ELIMS · ${p.place?'#'+p.place:'LAST OPERATOR STANDING'}` :
     `FIRST TO ${state.options.scoreLimit} ELIMINATIONS`;
   const vitals=state.royale&&watched?watched:p;
   $("#shield").textContent = Math.ceil(vitals.shield || 0);

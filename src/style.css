@@ -1403,7 +1403,7 @@ body.in-game {
   }
 }
 
-/* Keep the followed egg visible above the compact spectator card. */
+/* Keep the followed operator visible above the compact spectator card. */
 .respawn { top: auto; bottom: 100px; transform: translateX(-50%); padding: 12px 20px; width: min(540px, 92vw); min-width: 0; }
 .respawn h2 { font-size: 1.25rem; margin: 3px 0 6px; }
 .respawn .plain { margin-top: 6px; }

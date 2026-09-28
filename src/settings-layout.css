@@ -1,4 +1,4 @@
-/* Wide category workspace, using the Yard's paper, ink and yolk palette. */
+/* Wide category workspace; the frontier color system is applied in ravelfront.css. */
 #dialog[data-kind="settings"]{width:min(1180px,96vw);max-width:96vw;height:min(840px,94dvh);max-height:94dvh;padding:24px 28px;overflow:hidden;display:flex;flex-direction:column;background:var(--cream);color:var(--ink)}
 #dialog[data-kind="settings"]:not([open]){display:none}
 #dialog[data-kind="settings"] .dialog-head{flex:none;margin:0 0 14px;padding-bottom:12px;border-bottom:2px solid var(--ink)}

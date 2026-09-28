@@ -1,6 +1,6 @@
 // Host and prediction share motion state; only the host applies landing damage.
 // Classic BR reference: damage begins above 3 build stories, lethal at 6.
-// Epic does not publish the intermediate curve. This quadratic is Yolk's tuning.
+// Epic does not publish the intermediate curve. This quadratic is Ravelfront's tuning.
 export const FALL_RULES=Object.freeze({story:4,safe:12,lethal:24,firstDamage:10});
 export const LAUNCH_RULES=Object.freeze({
  normal:{immune:false,redeploy:false,forceGlider:false},

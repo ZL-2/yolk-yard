@@ -1,4 +1,4 @@
-// Classic Battle Royale reference and deliberate Yolk adaptations: docs/BUILDING_REFERENCE.md.
+// Classic Battle Royale reference and original Ravelfront adaptations: docs/BUILDING_REFERENCE.md.
 // Keep balance in this file; geometry and authority never duplicate these numbers.
 export const MATERIALS={
  wood:{name:'Wood',health:150,start:90,seconds:4,tick:.5,gain:8,color:0xba8852,damageColor:0xffc681},

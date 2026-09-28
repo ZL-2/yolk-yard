@@ -53,7 +53,7 @@ export class RoyaleSimulation extends Simulation {
  }
  spawn(p){if(!p.inventory){p.health=100;p.grounded=true;return;}if(isWarmup(this.stage))this.spawnWarmup(p);}
  spawnWarmup(p){
-  const {point,region}=distributedSpawn([...this.players.values()].filter(o=>o!==p),this.random);p.spawnRegion=region;p.spawnHome={x:point[0],z:point[1]};p.warmupBrain=null;
+  const {point,region}=distributedSpawn([...this.players.values()].filter(o=>o!==p),this.random);p.activity=newActivity(this.time);p.afkRemoved=false;p.spawnRegion=region;p.spawnHome={x:point[0],z:point[1]};p.warmupBrain=null;
   Object.assign(p,{x:point[0],z:point[1],y:groundAt(SPAWN_ISLAND,...point),vy:0,grounded:true,flight:'ground',health:100,shield:0,stamina:100,slot:0,spectating:false,contestant:true,lateSpectator:false,awaitingEntry:false,kills:0,points:0,streak:0,materials:{wood:500,brick:500,metal:500},inventory:inventory(),use:null,brain:null});
   p.inventory[1]={id:'sprinter',weapon:true,count:1,rarity:0,ammo:weapon('sprinter').magazine};
   p.inventory[2]={id:'scatter',weapon:true,count:1,rarity:0,ammo:weapon('scatter').magazine};

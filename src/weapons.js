@@ -289,7 +289,7 @@ export function makeBlaster(id,wrap='') {
     tube(g,0,0,-.69,.05,.43,steel);muzzleModel(-.92,.065);vents(g,-.15,5,.278,.052);rail(.05,.49);optic(g,'prism');
     box(g,.142,.025,.34,.014,.062,.15,black,.006);bolt(.155,-.12);
   }else if(id==='comet'){
-    // Original egg-energy projector, curved coil housing and visible ceramic emitter.
+    // Original induction projector, curved coil housing and visible ceramic emitter.
     plate(g,[[.28,-.12],[-.29,-.13],[-.39,0],[-.27,.16],[.24,.18],[.36,.06]],.29,c);grip(g,.13);stock(g,0x55688e,.34);
     taper(g,0,0,-.48,.15,.1,.43,steel);tube(g,0,0,-.74,.085,.3,0xb5eee7);muzzleModel(-.9,.103);
     for(const z of [-.32,-.43,-.54,-.65])ring(g,0,0,z,.158,.023,0x79d8d6);

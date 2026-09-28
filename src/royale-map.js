@@ -36,7 +36,7 @@ const landmarkPlan=[
  ['Watchline Tower',-207,-24,'tower','camp',2],['Last Stop Fuel',-93,-99,'station','factory',1],['Driftwood Cabin',-202,157,'cabin','park',1],
  ['Old Mill',-19,101,'mill','farm',2],['Tideglass Beacon',207,88,'tower','dock',3],['Mossy Relay',-106,99,'radio','camp',2],
  ['Kestrel Depot',-9,211,'station','town',1],['North Pump',61,-218,'station','factory',1],['Copper Camp',73,-65,'cabin','camp',1],
- ['Orchard Rest',-204,-102,'cabin','farm',1],['Cracked Cargo',205,-117,'warehouse','dock',1],['Field Kitchen',-89,-204,'cabin','farm',1],
+ ['Orchard Rest',-204,-102,'cabin','farm',1],['Drydock Salvage',205,-117,'warehouse','dock',1],['Field Kitchen',-89,-204,'cabin','farm',1],
  ['Hush Hollow',-28,47,'cabin','park',1],['Driftwood Shed',113,214,'shed','dock',1],
 ];
 for(const [name,x,z,type,kind,floors] of landmarkPlan){const p={id:'landmark-'+landmarks.length,name,x,z,kind,risk:'low'};landmarks.push(p);addBuilding(p,[0,0,type==='tower'?12:14,16,floors,type],landmarks.length);}

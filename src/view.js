@@ -6,7 +6,7 @@ import {adsFov} from './weapon-presentation.js';
 import {animatePickaxe} from './pickaxe-animation.js';
 import {buildIsland,RoyaleView} from './royale-view.js';
 import {shopItem} from './shop-catalog.js';
-import {addShopOutfit,makeShopBack,makeShopPickaxe,makeShopGlider,makeShopTrail} from './shop-models.js';
+import {makeShopBack,makeShopPickaxe,makeShopGlider,makeShopTrail} from './shop-models.js';
 import {stairCamera} from './stair-camera.js';
 import {MenuPose} from './menu-pose.js';
 import * as THREE from "three";
@@ -464,7 +464,7 @@ export class View {
   }
   setWeapon(p,draw) {
     const id = gun(p).id;
-    const appearance=JSON.stringify([armAppearance(p),p.wrap]);
+    const appearance=JSON.stringify([armAppearance(p),p.wrap,p.outfit]);
     if (id === this.localWeapon && appearance === this.armStyle) return;
     this.clearOutgoing(this);
     if(this.localModel && this.localWeapon!==id && draw.holster<1 && this.gunGroup.visible){
@@ -727,7 +727,7 @@ export class View {
       this.stairEye=stairCamera(this.stairEye,p,dt,`${state.round}:${p.id}:${local.health>0}`);
       this.camera.position.set(
         p.x,
-        this.stairEye.y + EYE * (p.bodyScale || 1) + (local.health <= 0 ? 0.8 : 0),
+        this.stairEye.y + EYE + (local.health <= 0 ? 0.8 : 0),
         p.z,
       );
       this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
@@ -763,7 +763,7 @@ export class View {
       const front = -VIEWMODEL.z + w.muzzle * VIEWMODEL.scale;
       const wall = wallDistance(
         getMap(state.options.map),
-        { x: p.x, y: p.y + EYE * (p.bodyScale || 1), z: p.z },
+        { x: p.x, y: p.y + EYE, z: p.z },
         direction(p.yaw, p.pitch),
         front,
       );
@@ -815,7 +815,7 @@ export class View {
       const seen = new Set();
       for (const p of state.players) {
         // Transport passengers share one simulation position; the airship
-        // represents them until exit instead of rendering sixteen overlapping Marks.
+        // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;
         if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.75)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
         seen.add(p.id);
@@ -877,7 +877,7 @@ export class View {
           if(harvesting&&model.userData.shopTool)animatePickaxe(model.userData.shopTool,model.userData.arms,p.pickaxe,state.time-(p.swingAt??-100));
           const throwT=(this.clock-(model.userData.throwStart??-Infinity))/.78;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1)throwArms(model.userData.arms,throwT);
-          model.userData.held.visible=draw.visible;
+          model.userData.held.visible=draw.visible&&p.health>0;
           model.userData.held.rotation.set(p.pitch + hands.rotation[0] + recoil * .045 + draw.rotation[0], hands.rotation[1]+draw.rotation[1], hands.rotation[2]+draw.rotation[2]);
           model.userData.held.position.set(VIEWMODEL.x+draw.position[0],EYE+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1){

@@ -20,7 +20,8 @@ export class ProgressionService{
   let m=this.matches.get(key);
   if(!m){if(s.phase!=='playing')return;m={id:randomUUID(),key,room,started:now,last:now,event:-1,players:new Map(),eliminations:[],hits:new Map(),custom:peer.rewardPublic!==true,mode:s.mode==='royale'?'royale':['ffa','teams'].includes(s.mode)?s.mode:'arena',difficulty:Math.max(1,Math.min(4,s.difficulty||1)),hostIdentity:peer.progressId};this.matches.set(key,m);}
   if(m.finished||now-m.last<.35)return;
-  const dt=Math.min(1.5,Math.max(0,now-m.last));m.last=now;m.state=s;
+  const recovered=now-m.last>5,dt=Math.min(1.5,Math.max(0,now-m.last));m.last=now;m.state=s;
+  if(recovered)for(const p of m.players.values())p.activity.last=now;
   const seen=new Set(),connected=new Map([...this.relay.peers.values()].filter(p=>p.ws).map(p=>[p.id,p]));
   for(const raw of s.players){if(typeof raw.id!=='string'||seen.has(raw.id)||raw.lateSpectator)continue;seen.add(raw.id);
    const isHost=raw.id===s.hostId,remote=isHost?peer:connected.get(raw.id),bot=raw.bot===true&&/^bot-\d+$/.test(raw.id);
@@ -30,13 +31,14 @@ export class ProgressionService{
    p.peer=remote;p.raw={...raw,x:bounded(raw.x),y:bounded(raw.y),z:bounded(raw.z)};p.afkRemoved||=!!raw.afkRemoved;
    p.controlled=!bot&&!p.afkRemoved&&!raw.awaitingEntry&&!raw.spectating&&raw.health>0&&raw.flight!=='transport'&&remote?.ws;
    if(!p.controlled){p.activity.last=now;p.activity.x=raw.x;p.activity.z=raw.z;continue;}
+   p.activity.elapsed=(p.activity.elapsed||0)+dt;
    if(isHost)observeInput(p.activity,s.input||{},now);
    // Movement must agree with recent authenticated input. Host telemetry cannot
    // turn a silent guest into an active opponent and increase population value.
    if(isHost||now-(p.inputAt||0)<2)observeMotion(p.activity,p.raw,dt,now);
   }
-  for(const e of s.events||[]){if(!Number.isInteger(e.id)||e.id<=m.event)continue;m.event=Math.max(m.event,e.id);const p=m.players.get(e.player),target=m.players.get(e.target);if(!p||p.afkRemoved)continue;
-   if(e.type==='hit'&&target&&target!==p){p.activity.damage+=Math.max(0,Math.min(100,e.amount||0));const hits=m.hits.get(target.id)||new Map();hits.set(p.id,now);m.hits.set(target.id,hits);}
+  for(const e of s.events||[]){if(!Number.isInteger(e.id)||e.id<=m.event)continue;m.event=Math.max(m.event,e.id);const p=m.players.get(e.player),target=m.players.get(e.target);if(e.type==='afk-removed'&&p){p.afkRemoved=true;p.controlled=false;continue;}if(!p||p.afkRemoved)continue;
+   if(e.type==='hit'&&target&&target!==p){p.activity.damage+=Math.max(0,Math.min(100,e.amount||0));if(p.controlled)meaningfulActivity(p.activity,'damage',target.id,now);const hits=m.hits.get(target.id)||new Map();hits.set(p.id,now);m.hits.set(target.id,hits);}
    if(e.type==='elimination'&&target&&target!==p&&now-(target.lastEliminated||-999)>2){target.lastEliminated=now;p.kills++;m.eliminations.push({attacker:p.id,target:target.id,time:now});for(const [id,t]of m.hits.get(target.id)||[])if(id!==p.id&&now-t<12){const helper=m.players.get(id);if(helper)helper.assists++;}m.hits.delete(target.id);}
    if(p.controlled&&['shot','launch','build-place','harvest','pickup','royale-cue'].includes(e.type)){const accepted=meaningfulActivity(p.activity,e.type,`${e.cue||e.weapon||''}:${Math.round(p.raw.x/3)},${Math.round(p.raw.z/3)}`,now);if(accepted&&['build-place','harvest','pickup'].includes(e.type))p.activity.contributions++;}
   }
@@ -47,7 +49,7 @@ export class ProgressionService{
   for(const p of all){if(p.bot)continue;const account=this.account(p.identity);account.earned=account.earned.filter(e=>now-e.time<3600);account.pairs=account.pairs.filter(e=>now-e.time<3600);account.encounters=(account.encounters||[]).filter(e=>now-e.time<3600);
    // Team membership is evaluated independently of skin/team colors.
    const enemy=all.filter(o=>o!==p&&!((m.state.teamSize===2||m.mode==='teams')&&o.raw?.team===p.raw?.team));
-   const kills=m.eliminations.filter(e=>e.attacker===p.id).map(e=>{const victim=m.players.get(e.target),repeat=account.pairs.filter(x=>x.target===victim.identity).length;account.pairs.push({target:victim.identity,time:now});return {bot:victim.bot,difficulty:victim.difficulty,repeat,...(!victim.bot&&!participation({...victim.activity,elapsed,afkRemoved:victim.afkRemoved})?{repeat:9}:{})};});
+   const kills=m.eliminations.filter(e=>e.attacker===p.id).map(e=>{const victim=m.players.get(e.target),repeat=account.pairs.filter(x=>x.target===victim.identity).length;account.pairs.push({target:victim.identity,time:now});return {bot:victim.bot,difficulty:victim.difficulty,repeat,...(!victim.bot&&!participation({...victim.activity,elapsed:victim.activity.elapsed??elapsed,afkRemoved:victim.afkRemoved})?{repeat:9}:{})};});
    const ranked=all.filter(o=>!o.raw?.lateSpectator).sort((a,b)=>b.kills-a.kills||(a.raw?.deaths||0)-(b.raw?.deaths||0));
    const place=m.mode==='royale'?p.raw?.place:ranked.indexOf(p)+1;
    const won=m.mode==='royale'?place===1:m.mode==='teams'?(m.state.scores?.[p.raw?.team]||0)>(m.state.scores?.[1-p.raw?.team]||0):place===1&&p.kills>0;

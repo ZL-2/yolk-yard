@@ -1,5 +1,6 @@
 import * as T from 'three';
-import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {mergeGeometries,mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {shopItem} from './shop-catalog.js';
 
 // One anatomical bind pose and skeleton contract for every cosmetic. Distances
@@ -29,6 +30,7 @@ function template(profile){
   g.setAttribute('color',new T.BufferAttribute(rgb,3));g.setAttribute('skinIndex',new T.Uint16BufferAttribute(index,4));g.setAttribute('skinWeight',new T.Float32BufferAttribute(weights,4));parts.push(g);
  }
  function ellipsoid(x,y,z,rx,ry,rz,color,bone,detail=12){const g=new T.SphereGeometry(1,detail,Math.max(6,detail-4));g.scale(rx,ry,rz);g.translate(x,y,z);add(g,color,bone);}
+ function panel(x,y,z,w,h,d,color,bone){const g=mergeVertices(new RoundedBoxGeometry(w,h,d,1,Math.min(w,h,d)*.22));g.translate(x,y,z);add(g,color,bone);}
  function rings(rows,color,bone,next=null){const pos=[],uv=[],ind=[],sides=16;
   for(let j=0;j<rows.length;j++){const [y,rx,rz,cx=0,cz=0]=rows[j];for(let i=0;i<=sides;i++){const a=i/sides*Math.PI*2;pos.push(cx+Math.cos(a)*rx,y,cz+Math.sin(a)*rz);uv.push(i/sides,j/(rows.length-1));if(j<rows.length-1&&i<sides){const k=j*(sides+1)+i;ind.push(k,k+sides+1,k+1,k+1,k+sides+1,k+sides+2);}}}
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(ind);g.computeVertexNormals();add(g,color,bone,next,next?(p,i)=>T.MathUtils.smoothstep(p.getY(i),rows[0][0],rows.at(-1)[0])*.8:null);
@@ -41,11 +43,14 @@ function template(profile){
  rings([[1.02,.161,.105],[1.06,.174,.12],[1.19,.203,.144],[1.34,.23,.15],[1.41,.22,.125],[1.435,.17,.095]],style%3===2?colors.cloth:colors.armor,'spine','chest');
  // Shoulder straps, segmented carrier panels and fitted collar.
  for(const s of [-1,1]){
-  ellipsoid(s*.12,1.30,-.145,.069,.092,.019,colors.armor,'chest');
-  ellipsoid(s*.083,1.13,-.132,.066,.045,.029,colors.cloth,'spine');
+  panel(s*.098,1.30,-.145,.158,.188,.030,colors.armor,'chest');
+  panel(s*.099,1.365,-.166,.125,.012,.008,colors.cloth,'chest');
+  panel(s*.080,1.12,-.145,.127,.108,.043,colors.cloth,'spine');
+  panel(s*.08,1.16,-.170,.109,.023,.008,colors.armor,'spine');
   ellipsoid(s*.18,1.397,-.095,.037,.073,.033,colors.trim,'chest');
   ellipsoid(s*.265,1.42,.0,.081,.075,.086,colors.cloth,`arm${s<0?'L':'R'}`);
  }
+ panel(0,.997,-.11,.29,.038,.015,colors.dark,'hips');panel(0,.997,-.125,.042,.032,.012,colors.trim,'hips');
  rings([[1.425,.088,.073],[1.465,.088,.073],[1.48,.07,.064]],colors.dark,'neck');
  ellipsoid(0,1.515,0,.064,.082,.062,colors.skin,'neck');
  // Sculpted cranium: jaw narrows below cheeks, recessed temples, defined brow.
@@ -68,6 +73,7 @@ function template(profile){
  if(style%6===4)ellipsoid(0,1.617,-.093,.08,.04,.035,colors.cloth,'head');
  for(const side of [-1,1]){const s=side<0?'L':'R';
   limb('arm'+s,'forearm'+s,[[0,.062],[.12,.074],[.4,.07],[.75,.049],[1,.045]],colors.cloth,'arm'+s,'forearm'+s);
+  ellipsoid(side*.39,1.14,.012,.047,.048,.048,colors.cloth,'forearm'+s);
   limb('forearm'+s,'hand'+s,[[0,.046],[.2,.055],[.5,.052],[.8,.037],[1,.031]],style%3===0?skin:colors.cloth,'forearm'+s,'hand'+s);
   ellipsoid(side*.405,1.065,-.028,.043,.058,.025,colors.armor,'forearm'+s);
   ellipsoid(side*.44,.86,0,.042,.057,.027,colors.dark,'hand'+s);
@@ -75,7 +81,7 @@ function template(profile){
   limb('thigh'+s,'shin'+s,[[0,.094],[.13,.103],[.4,.094],[.8,.07],[1,.059]],colors.cloth,'thigh'+s,'shin'+s);
   limb('shin'+s,'foot'+s,[[0,.059],[.2,.066],[.45,.057],[.8,.04],[1,.04]],colors.cloth,'shin'+s,'foot'+s);
   ellipsoid(side*.12,.495,-.065,.057,.072,.025,colors.armor,'shin'+s);
-  ellipsoid(side*.21,.78,.006,.027,.078,.077,colors.armor,'thigh'+s);
+  panel(side*.202,.78,.006,.044,.146,.127,colors.cloth,'thigh'+s);
   ellipsoid(side*.12,.145,.004,.05,.099,.059,colors.dark,'foot'+s);
   ellipsoid(side*.12,.055,-.065,.055,.054,.125,colors.dark,'foot'+s);
   ellipsoid(side*.12,.024,-.065,.059,.022,.13,colors.sole,'foot'+s);

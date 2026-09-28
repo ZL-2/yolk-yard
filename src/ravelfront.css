@@ -11,3 +11,19 @@ button,input,select,dialog,.panel,.card{border-radius:5px!important}button{font-
 .locker-operator{display:grid;grid-template-columns:minmax(220px,1.15fr) minmax(180px,1fr);min-height:420px;margin:0 0 24px;background:radial-gradient(ellipse at 27% 52%,#466872,#143342 64%);color:#e6f3f1;border:1px solid #578087;border-radius:6px;overflow:hidden}.locker-operator-view{position:relative;touch-action:pan-y;cursor:grab}.locker-operator-view img{width:100%;height:410px;object-fit:contain;display:block}.locker-operator-copy{display:flex;flex-direction:column;justify-content:center;padding:22px}.locker-operator-copy h3{font-size:30px;line-height:1.08;color:#eff8f5;margin:12px 0}.locker-operator-copy .eyebrow{color:#65d4c4}.locker-operator-copy p{font-size:14px;color:#bfd8db;line-height:1.6}.locker-turn{display:flex;gap:10px;margin-top:18px}.locker-turn button{background:#3c646f;color:#e7f7f2;padding:12px 18px}.locker-operator-copy small{margin-top:14px;color:#bed8da}.locker-slots img{object-fit:contain}.afk-warning{position:fixed;top:18%;left:50%;transform:translateX(-50%);z-index:120;max-width:90vw;padding:14px 22px;background:#34271cec;border:1px solid #efb24f;border-radius:5px;color:#ffe6b5;font-size:16px;text-align:center;pointer-events:none}.afk-warning[hidden]{display:none}
 #round-banner{background:linear-gradient(110deg,#103b4ae8,#285f61e8)!important;border-color:#5ed4c6!important;color:#f3d89e!important}.boot{background:#102c3b;color:#67d6c6;letter-spacing:.16em;font-family:'Trebuchet MS',sans-serif;font-size:17px}
 @media(max-width:760px){.locker-operator{grid-template-columns:1fr}.locker-operator-view img{height:330px}.locker-operator-copy{padding:16px}.locker-operator-copy h3{font-size:24px}.yard-logo{font-size:17px;padding-left:7px}.yard-season h1{font-size:28px}.yard-nav{gap:10px}.yard-nav nav button{font-size:12px}.currency-label{display:none}}
+/* Outfitter surfaces use the same field-equipment visual language as the lobby. */
+#dialog[data-kind="egg-shop"]{--ink:#193640;--muted:#526d74;--paper:#f2f7f5;--line:#b5cccd;background:#e9f0ef;border-color:#759da3;border-radius:6px}
+#dialog[data-kind="egg-shop"] .dialog-head{background:#102c3a;border-bottom:2px solid #5bcbbd;color:#eef8f5}
+#dialog[data-kind="egg-shop"] .dialog-head h2{color:#eef8f5;letter-spacing:.02em}
+#dialog[data-kind="egg-shop"] .close-btn{background:#254653;border-color:#54757d;color:#e9f4f2}
+#egg-shop .shop-bar button{background:#254652;border-color:#456a74;color:#e6f4f0}
+#egg-shop .shop-bar button.active{border-color:#5ed1c1}
+#egg-shop button:not(.primary):hover{background:#cee5e0;color:#183942}
+.egg-balance{background:#102c3b;color:#e6f5f1;border-color:#557c84;border-radius:4px}
+.shop-feature{border-color:#527e82;border-radius:5px}.shop-feature:before{width:140px;height:240px;right:8%;top:10%;border-radius:0;transform:skewY(-18deg);background:#58c5b94a;box-shadow:18px 16px 0 #d1a04c40;clip-path:polygon(0 0,100% 18%,100% 100%,0 80%)}
+.shop-feature p{color:#cbe1df}.shop-feature img{transform:none;filter:drop-shadow(0 8px 8px #071e3055)}
+.shop-card,.shop-detail,.shop-preview,.locker-loadout,.shop-confirm,.shop-empty,.earn-grid article,.earn-example{border-radius:5px!important}
+.shop-card-tag{border-radius:3px;background:color-mix(in srgb,var(--rarity) 35%,#e2ecec);color:#1d3c47}
+.shop-card-info strong,.shop-detail h3,.shop-price,.shop-collection-count{color:#214751}
+.locker-loadout{background:#dce8e7;border-color:#acc5c7}.locker-slots small{color:#49696c}
+.shop-earn>h3{color:#193d48}.earn-grid article,.earn-example{background:#f3f8f6;border-color:#b3ccca}
