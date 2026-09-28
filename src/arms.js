@@ -110,7 +110,7 @@ function armGeometry() {
 }
 export function makeArms(id, profile={}, firstPerson=true) {
   const group=new THREE.Group();group.name='Operator arms';
-  const appearance=armAppearance(profile),material=new THREE.MeshStandardMaterial({color:shopItem(profile.outfit)?.color||'#334952',roughness:.82});
+  const appearance=armAppearance(profile),material=new THREE.MeshStandardMaterial({color:shopItem(profile.outfit)?.color||profile.color||'#334952',roughness:.82});
   const mesh=(geo)=>{const m=new THREE.Mesh(geo,material);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
   const limbs=[-1,1].map(side=>{
     const hand=firstPerson?mesh(handGeometry(side)):new THREE.Group();if(!firstPerson)group.add(hand);hand.material=new THREE.MeshStandardMaterial({color:'#17262e',roughness:.9});hand.userData.ownedMaterial=true;hand.name=side<0?'Support hand':'Grip hand';

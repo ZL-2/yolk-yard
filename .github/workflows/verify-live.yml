@@ -1,4 +1,4 @@
-name: Verify published Yolk Yard
+name: Verify published Ravelfront
 on:
   push:
     branches: ['verify-live/**']

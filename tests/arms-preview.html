@@ -3,12 +3,12 @@ import * as THREE from 'three';
 import {makeArms,updateArms} from '../src/arms.js';
 import {makeBlaster} from '../src/weapons.js';
 import {makeEgg} from '../src/view.js';
-import {WEAPONS} from '../src/data.js';
+import {WEAPONS,ROYALE_WEAPONS} from '../src/data.js';
 import {DRAW_POSES,beginEquip,equipPose} from '../src/equip.js';
 import {VIEWMODEL} from '../src/physics.js';
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(800,560);
 window.checks=[];
-for(const w of WEAPONS) for(const kind of ['Idle','Reload','Aim','Other player','Draw']) {
+for(const w of [...WEAPONS,...ROYALE_WEAPONS]) for(const kind of ['Idle','Reload','Aim','Other player','Draw']) {
  const scene=new THREE.Scene();scene.background=new THREE.Color('#c9d6d6');
  scene.add(new THREE.HemisphereLight(0xffffff,0x657785,2.6));
  const light=new THREE.DirectionalLight(0xffffff,2.4);light.position.set(-2,4,3);scene.add(light);
