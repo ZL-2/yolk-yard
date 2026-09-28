@@ -1,4 +1,6 @@
-# Quality Update 52 — Sunnybreak Reborn
+> Historical technical notes. Current identity, humanoid combat, economy and timing are specified in [Ravelfront](RAVELFRONT.md).
+
+# Quality Update 52 — Ravel Coast Reborn
 
 The 512 × 512 island is rebuilt in the existing Royale mode. It retains the egg world, sixteen-player capacity, host simulation, building/editing, harvesting, inventory, storm and spectator systems. Network protocol 15 separates this terrain and snapshot format from older clients.
 
@@ -6,12 +8,12 @@ The 512 × 512 island is rebuilt in the existing Royale mode. It retains the egg
 
 | POI | Identity and combat routes |
 | --- | --- |
-| Shellside Borough | Three-storey apartments, shops, bakery and clock plaza; balconies, alleys and roof access |
+| Relay Borough | Three-storey apartments, shops, bakery and clock plaza; balconies, alleys and roof access |
 | Cornflake Commons | Barns, silos, stable, crop field, farmhouse, orchard and greenhouse |
 | Albumen Observatory | Ridge campus, telescope dome, research rooms, solar arrays and radio mast |
 | Sunny Docks | Freight warehouses, containers, cranes and three piers over a tidal inlet |
 | Whisker Woods | Pine forest, lodges, cabins and a central campfire |
-| Yolkworks Quarry | Excavation bowl, refinery, tanks, drill and exposed quarry rotations |
+| Ironwake Quarry | Excavation bowl, refinery, tanks, drill and exposed quarry rotations |
 | Toast Terraces | Hillside villas, hotel, pergolas, balconies and garages |
 | Hatchery Heights | Raised hatchery campus, egg incubator and greenhouse structures |
 | Crater Conservatory | Lake, crystal outcrops, lodges and research garden structures |
@@ -35,7 +37,7 @@ Light, medium and heavy cartridges, red shotgun shells and finned rockets have s
 | Optic | Magnification | Per-optic sensitivity | Reticle |
 | --- | --- | --- | --- |
 | Needle | 4.5× | 0.72 | Mil-dot |
-| Peeper | 3.5× | 0.80 | Mil-dot |
+| Sentry | 3.5× | 0.80 | Mil-dot |
 | Anchor | 3.25× | 0.84 | Chevron |
 | Duet | 1.8× | 1.00 | Chevron |
 
@@ -59,7 +61,7 @@ Browser screenshots and reports are written to ignored `test-results/` paths. Sy
 
 ## Published verification
 
-The published release history assigns **52** to Sunnybreak Reborn. Source release-note numbers are development fallbacks; production continues the existing published sequence.
+The published release history assigns **52** to Ravel Coast Reborn. Source release-note numbers are development fallbacks; production continues the existing published sequence.
 
 - Deployed game build: `e1a8be4f7369451057da8d0d27d5551c349616f6`.
 - [Deployment and 183 passing tests, 16-player relay checks, multiplayer soak, and production relay verification](https://github.com/ZL-2/yolk-yard/actions/runs/36285973920).

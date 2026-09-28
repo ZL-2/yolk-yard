@@ -25,8 +25,10 @@ import "./style.css";
 import "./lobby.css";
 import './settings-layout.css';
 import './egg-shop.css';
+import './ravelfront.css';
 import {EggShop} from './egg-shop.js';
-import {EggWallet,MatchEarnings,ownedLoadout} from './egg-wallet.js';
+import {rewardFrame} from './rewards.js';
+import {EggWallet,ownedLoadout} from './egg-wallet.js';
 import {KeybindEditor} from "./keybind-editor.js";
 import {touchPair,touchRotation} from './menu-pose.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
@@ -102,7 +104,8 @@ settings.fov = clamp(Number(settings.fov) || 85, 65, 110);
 settings.volume = clamp(Number(settings.volume) || 0, 0, 1);
 let stats = read("yolk-stats", { matches: 0, kills: 0, wins: 0 }),
   options = matchOptions({map:"yard", mode:"ffa", fill:true});
-const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},stats.eggs||0),matchEarnings=new MatchEarnings();
+const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},stats.eggs||0),matchEarnings={total:0,status:'Match verification pending'};
+let lastProgress=0,progressMatch='';
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
 let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
 let view,
@@ -156,7 +159,7 @@ const touch = {
   popper: false,
 };
 $("#app").innerHTML =
-  `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">SHELL HEALTH DEPLETED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Freshly hatched</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
+  `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">OPERATOR ELIMINATED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Field ready</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
 const dialog = $("#dialog");
 const ownerConsole=new OwnerConsole({wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 startAnonymousVisits(()=>screen==='game'?(state?.royale?'royale':state?.options?.mode==='teams'?'teams':'ffa'):screen==='lobby'?'lobby':'menu');
@@ -196,7 +199,7 @@ function remember() {
   else net?.profile(profile);
 }
 function titleBar() {
-  return `<div class="topbar"><button class="brand" type="button" aria-label="Yolk Yard">YOLK<br><span>YARD</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
+  return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
 function renderMenu() {
   $("#menu").innerHTML=lobbyMarkup({profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance});
@@ -277,14 +280,14 @@ function loadoutMenu() {
 }
 let customTab = "shell";
 function customizeMenu(tab='shop') {
-  modal('Egg Shop','<div id="egg-shop"></div>','egg-shop');
+  modal('Outfitter','<div id="egg-shop"></div>','egg-shop');
   eggShop??=new EggShop({wallet:eggWallet,view,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
   eggShop.tab=tab;eggShop.category='all';eggShop.page=0;eggShop.open($('#egg-shop'));
 }
 function helpMenu() {
   modal(
     "How to play",
-    `<p>Move, aim, and tag the other eggs. Arena modes allow respawns. Yolk Royale gives each contestant one life: in Duos, watch your teammate after elimination and share your team’s final placement.</p><p>Upper-shell hits receive a critical bonus on most blasters. The reticle shows your current spread; a mint reticle marks a settled first shot. ADS improves accuracy, while each blaster has its own recoil, range and recovery. Scopes keep precise aiming stable. Explosive blasters have no critical bonus.</p><table class="controls-table">${[
+    `<p>Move, aim, and tag the other operators. Arena modes allow respawns. Frontier Royale gives each contestant one life: in Duos, watch your teammate after elimination and share your team’s final placement.</p><p>Head hits receive a critical bonus on most blasters. The reticle shows your current spread; a mint reticle marks a settled first shot. ADS improves accuracy, while each blaster has its own recoil, range and recovery. Scopes keep precise aiming stable. Explosive blasters have no critical bonus.</p><table class="controls-table">${[
       ...CONTROLS.map(([id, label]) => [controlLabel(id), label]),
       ["Mouse", "Look"],
       ["Escape", "Menu"],
@@ -292,7 +295,7 @@ function helpMenu() {
       .map(([a, b]) => `<tr><td><kbd>${a}</kbd></td><td>${b}</td></tr>`)
       .join(
         "",
-      )}</table><p>Collect white crosses for health, gold boxes for ammo, and purple eggs for poppers. Blue and coral are teammates in team modes; friendly fire is off.</p><p class="hint">Mac: click inside the arena to capture your mouse. Escape releases it. Touch devices use a left joystick, drag-to-look area, and action buttons.</p>`,
+      )}</table><p>Collect white crosses for health, gold boxes for ammo, and grenade canisters. Blue and coral are teammates in team modes; friendly fire is off.</p><p class="hint">Mac: click inside the arena to capture your mouse. Escape releases it. Touch devices use a left joystick, drag-to-look area, and action buttons.</p>`,
     "help",
   );
 }
@@ -306,7 +309,7 @@ function setupMenu(editing = false, draft = null) {
   const nextRound = editing && state.phase === "results";
   const select = (id,label,items,value) => `<label>${label}<select class="field" id="setup-${id}">${items.map(([key,text])=>`<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
   modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Create Match",
-    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last egg standing wins. Two contestants minimum.'} All loot is found on Sunnybreak.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Spawn Island waits up to 60 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
+    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
   if(editing && !net) $("#setup-visibility").disabled=true;
   const royale=o.mode==='royale';
   if(!editing)$('#setup-mode').disabled=true;
@@ -420,13 +423,26 @@ function roundIntro(){
   const p=state.players.find(p=>p.id===localId),ranked=state.players.filter(p=>!p.spectating||p.place).sort((a,b)=>b.kills-a.kills||a.deaths-b.deaths||b.points-a.points);
   const place=state.royale?p?.place:p?1+ranked.filter(other=>other.kills>p.kills||other.kills===p.kills&&other.deaths<p.deaths).length:0;
   const win=state.royale?wonRoyale(state,localId):mode(state.options.mode).teams?state.scores[p?.team]>state.scores[1-p?.team]:place===1;
-  const title=state.royale?(win?'VICTORY YOLK ROYALE':place?'YOU PLACED #'+place:'ROUND COMPLETE'):mode(state.options.mode).teams?(state.scores[0]===state.scores[1]?'TEAM DRAW':win?'TEAM VICTORY':'ROUND COMPLETE'):'YOU PLACED #'+place;
-  const banner=$('#round-banner');banner.className=win?'victory':'placement';banner.innerHTML=`<span>${state.royale?(isDuos(state.options)?'LAST DUO STANDING':'LAST EGG STANDING'):mode(state.options.mode).name.toUpperCase()}</span><strong>${esc(title)}</strong><p>${!state.royale&&place?'YOUR PLACE #'+place+' · ':''}${p?.kills||0} ELIMINATIONS</p>`;banner.hidden=false;
+  const title=state.royale?(win?'FRONTIER SECURED':place?'YOU PLACED #'+place:'ROUND COMPLETE'):mode(state.options.mode).teams?(state.scores[0]===state.scores[1]?'TEAM DRAW':win?'TEAM VICTORY':'ROUND COMPLETE'):'YOU PLACED #'+place;
+  const banner=$('#round-banner');banner.className=win?'victory':'placement';banner.innerHTML=`<span>${state.royale?(isDuos(state.options)?'LAST DUO STANDING':'LAST OPERATOR STANDING'):mode(state.options.mode).name.toUpperCase()}</span><strong>${esc(title)}</strong><p>${!state.royale&&place?'YOUR PLACE #'+place+' · ':''}${p?.kills||0} ELIMINATIONS</p>`;banner.hidden=false;
   if(!state.royale)sound.cue(win?'victory':'round-start');
   resultAt=performance.now()+4200;
 }
 function callbacks() {
   return {
+    onProgress:(type,event)=>{
+      if(type==='reward'){
+        const r=event.receipt;if(!r||eggWallet.value.receipts.includes(r.id))return;
+        void eggWallet.awardVerified(r).then(({applied})=>{
+          if(!applied)return;
+          matchEarnings.total=r.amount;matchEarnings.status=r.reason;
+          if(r.eligible){stats.matches++;stats.kills+=r.kills;stats.wins+=Number(r.won);stats.assists=(stats.assists||0)+r.assists;stats.modes??={};const m=stats.modes[r.mode]??={matches:0,wins:0,kills:0,assists:0,placements:[]};m.matches++;m.wins+=Number(r.won);m.kills+=r.kills;m.assists+=r.assists;if(r.mode==='royale')m.placements=[...m.placements,r.place].slice(-100);}
+          stats.eggs=eggWallet.value.earned;save('yolk-stats',stats);if(r.amount)toast('+'+r.amount+' Marks · '+r.label);if(dialogType==='results')resultsMenu();
+        }).catch(e=>toast(e.message));
+      }else if(type==='afk'&&event.remaining<=0){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');}
+      else if(type==='afk-enforce'&&sim){const p=sim.players.get(event.player);if(p){p.afkRemoved=true;p.health=0;p.spectating=true;p.contestant=false;sim.emit('afk-removed',{player:p.id});}}
+      else if(type==='afk'&&state){const p=state.players.find(p=>p.id===localId);if(p)p.afkRemaining=event.remaining;}
+    },
     getChatState: () => sim ? sim.snapshot() : state,
     onChat: message => chat.receive(message),
     onChatStatus: result => chat.feedback(result),
@@ -603,8 +619,8 @@ function renderLobby() {
     o = state?.options || options;
   const queueEnds = state?.royale?.queueEnds || 0;
   const queueText = queueEnds
-    ? `EGGSPRESS DEPARTS IN ${Math.max(0, Math.ceil(queueEnds - state.time))}s`
-    : "Drop in together. Last egg standing wins.";
+    ? `KESTREL DEPARTS IN ${Math.max(0, Math.ceil(queueEnds - state.time))}s`
+    : "Drop in together. Last operator standing wins.";
   const key = JSON.stringify([net?.code, net?.visibility, net?.isHost, localId, o, !!queueEnds, roster.map(p => [p.id,p.name,p.team,p.weapon,p.bot])]);
   const queue = $("#royale-queue");
   if (queue) queue.textContent = queueText;
@@ -612,12 +628,12 @@ function renderLobby() {
   const scrollTop = $("#lobby .lobby-panel")?.scrollTop || 0;
   lobbyRenderKey = key;
   $("#lobby").innerHTML =
-    `${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility === "public" ? "PUBLIC" : "PRIVATE"} ROOM</div><h2 style="margin-top:8px">${o.mode==='royale'?'Next stop: Sunnybreak.':'The gang’s all here.'}</h2>${o.mode==='royale'?`<p class="royale-queue" id="royale-queue">${queueText}</p>`:''}<div class="room-code">${formatCode(net?.code || "--------")}</div><div class="split-actions"><button class="plain" data-action="copy-code">Copy code</button><button class="plain" data-action="copy-link">Copy invite link</button></div><div class="lobby-meta"><strong>${getMap(o.map).name}</strong><span>·</span><span>${mode(o.mode).name}</span></div><div class="roster">${roster.map((p) => `<div class="roster-row"><b><span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>${esc(p.name)}${p.id === localId ? " (you)" : ""}</b><span>${p.bot ? "BOT" : weapon(p.weapon).name}</span>${net?.isHost && p.id !== localId && !p.bot ? `<button data-kick="${esc(p.id)}">Remove</button>` : ""}</div>`).join("")}</div><p class="hint" style="margin-bottom:18px">${net?.isHost ? `${o.bots} bots will fill available spots. The next player takes over if the host disconnects.` : "Waiting for the host to start. You can choose your loadout while you wait."}</p><p class="hint">${ruleSummary(o)}</p>${net?.isHost ? '<button class="secondary" data-action="match-settings">EDIT MATCH SETTINGS</button>' : ""}${visibilityButton()}<button class="plain" data-action="chat-controls">Player controls & quick chat</button><div class="room-bottom">${net?.isHost ? '<button class="primary" data-action="start-match">START MATCH</button>' : '<button class="primary" data-action="loadout">Choose loadout</button>'}<button class="plain" data-action="leave">Leave</button></div></section>`;
+    `${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility === "public" ? "PUBLIC" : "PRIVATE"} ROOM</div><h2 style="margin-top:8px">${o.mode==='royale'?'Next stop: Ravel Coast.':'The gang’s all here.'}</h2>${o.mode==='royale'?`<p class="royale-queue" id="royale-queue">${queueText}</p>`:''}<div class="room-code">${formatCode(net?.code || "--------")}</div><div class="split-actions"><button class="plain" data-action="copy-code">Copy code</button><button class="plain" data-action="copy-link">Copy invite link</button></div><div class="lobby-meta"><strong>${getMap(o.map).name}</strong><span>·</span><span>${mode(o.mode).name}</span></div><div class="roster">${roster.map((p) => `<div class="roster-row"><b><span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>${esc(p.name)}${p.id === localId ? " (you)" : ""}</b><span>${p.bot ? "BOT" : weapon(p.weapon).name}</span>${net?.isHost && p.id !== localId && !p.bot ? `<button data-kick="${esc(p.id)}">Remove</button>` : ""}</div>`).join("")}</div><p class="hint" style="margin-bottom:18px">${net?.isHost ? `${o.bots} bots will fill available spots. The next player takes over if the host disconnects.` : "Waiting for the host to start. You can choose your loadout while you wait."}</p><p class="hint">${ruleSummary(o)}</p>${net?.isHost ? '<button class="secondary" data-action="match-settings">EDIT MATCH SETTINGS</button>' : ""}${visibilityButton()}<button class="plain" data-action="chat-controls">Player controls & quick chat</button><div class="room-bottom">${net?.isHost ? '<button class="primary" data-action="start-match">START MATCH</button>' : '<button class="primary" data-action="loadout">Choose loadout</button>'}<button class="plain" data-action="leave">Leave</button></div></section>`;
   $("#lobby .lobby-panel").scrollTop = scrollTop;
 }
 function launchRound(){
   buildControls.buildMode=false;buildUI.cancel();
-  if(sim.startRound()===false){toast('Invite another egg or add a bot before launching.');return false;}
+  if(sim.startRound()===false){toast('Invite another operator or add a bot before launching.');return false;}
   state=sim.snapshot();net?.broadcast(state);enterGame(true);return true;
 }
 function enterGame(capture = false) {
@@ -695,7 +711,7 @@ function playerAction(action) {
 }
 function pauseMenu() {
   if(screen!=='game')return;
-  if(state?.royale){modal('Take a breather',`<p>${net?'The match keeps running while this menu is open.':'The local match is paused.'} One life per round. Eliminated eggs spectate the survivors.</p><button class="primary" data-action="resume">RESUME</button><div class="split-actions"><button data-action="royale-map">Island map</button><button data-action="royale-inventory">Inventory</button><button data-action="settings">Settings</button></div>${net?'<button class="plain" data-action="chat-controls">Player controls & quick chat</button>':''}${visibilityButton()}<button class="secondary" data-action="leave-confirm">Leave match</button>`,'pause');return;}
+  if(state?.royale){modal('Take a breather',`<p>${net?'The match keeps running while this menu is open.':'The local match is paused.'} One life per round. Eliminated players spectate the survivors.</p><button class="primary" data-action="resume">RESUME</button><div class="split-actions"><button data-action="royale-map">Island map</button><button data-action="royale-inventory">Inventory</button><button data-action="settings">Settings</button></div>${net?'<button class="plain" data-action="chat-controls">Player controls & quick chat</button>':''}${visibilityButton()}<button class="secondary" data-action="leave-confirm">Leave match</button>`,'pause');return;}
 
   modal(
     "Take a breather",
@@ -736,9 +752,9 @@ function leave(confirm = false,notifyParty=true) {
   void updates.check();
 }
 function scoresHTML(s = state) {
-  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Egg</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isDuos(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
+  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Operator</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isDuos(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
 
-  return `<table class="scores"><thead><tr><th>Egg</th><th>Elims</th><th>Downs</th><th>Score</th></tr></thead><tbody>${[
+  return `<table class="scores"><thead><tr><th>Operator</th><th>Elims</th><th>Downs</th><th>Score</th></tr></thead><tbody>${[
     ...(s?.players || []),
   ]
     .sort((a, b) => b.points - a.points || b.kills - a.kills)
@@ -750,22 +766,10 @@ function scoresHTML(s = state) {
 }
 function resultsMenu() {
   const p = state.players.find((p) => p.id === localId);
-  if (roundSaved !== state.round && p && (!state.royale || p.place>0)) {
-    roundSaved = state.round;
-    stats.matches++;
-    stats.kills += p.kills;
-    stats.eggs = eggWallet.value.earned;
-    if (
-      state.royale ? wonRoyale(state,p.id) : mode(state.options.mode).teams
-        ? state.scores[p.team] > state.scores[1 - p.team]
-        : state.winner === p.name + " wins"
-    )
-      stats.wins++;
-    save("yolk-stats", stats);
-  }
+
   modal(
-    state.royale ? wonRoyale(state,localId) ? "VICTORY YOLK!" : "Round complete" : "That’s a wrap.",
-    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">◒ ${matchEarnings.total||0} eggs earned this round · Wallet: ${eggWallet.value.balance} eggs</p>${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${sim || net?.isHost ? '<button class="primary" data-action="rematch">PLAY AGAIN</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">Find public match</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
+    state.royale ? wonRoyale(state,localId) ? "FRONTIER SECURED!" : "Round complete" : "That’s a wrap.",
+    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${sim || net?.isHost ? '<button class="primary" data-action="rematch">PLAY AGAIN</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">Find public match</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
     "results",
   );
 }
@@ -793,6 +797,7 @@ function processEvents() {
     if (state.time - e.time > 1.6) continue;
     const echoed=!sim&&e.player===localId&&guestFire.confirm(e,performance.now()/1000);
     if(echoed)e.echoed=true;
+    if(e.type==='afk-removed'){if(e.player===localId){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');return;}if(net?.isHost)net.kick(e.player);}
     view.event(e, localId);
     const me = state.players.find((p) => p.id === localId);
     sound.event(e,me,state);
@@ -824,7 +829,7 @@ function processEvents() {
         e.kind === "ammo"
           ? "Ammo restocked"
           : e.kind === "health"
-            ? "Shell health restored"
+            ? "Health restored"
             : "Popper collected",
       );
     }
@@ -869,6 +874,8 @@ function hud() {
   if (screen !== "game" || !state) return;
   const p = state.players.find((p) => p.id === localId);
   if (!p) return;
+  let afk=document.querySelector('#afk-warning');if(!afk){afk=document.createElement('div');afk.id='afk-warning';afk.className='afk-warning';afk.setAttribute('role','alert');document.body.append(afk);}
+  afk.hidden=!(p.afkRemaining<=12&&p.health>0&&!p.spectating);afk.textContent=`You are about to be removed for inactivity. ${p.afkRemaining}s remaining.`;
   const m = mode(state.options.mode);
   const watched=p.spectating?state.players.find(k=>k.id===spectateTarget):null;
   if(state?.royale){const me=state.players.find(p=>p.id===localId);if(me)buildUI.update(state,me,view.buildMap,controlLabel);}
@@ -886,7 +893,7 @@ function hud() {
   $("#score-blue").textContent = m.teams ? state.scores[0] : "";
   $("#score-coral").textContent = m.teams ? state.scores[1] : "";
   $("#objective").textContent =
-    m.id==='royale'&&state.royale.practice?`SPAWN ISLAND · ${state.royale.contestants} EGGS` : m.id==='royale' ? `${state.royale.alive} ALIVE · ${p.kills} ELIMS · ${p.place?'#'+p.place:'LAST EGG STANDING'}` :
+    m.id==='royale'&&state.royale.practice?`SPAWN ISLAND · ${state.royale.contestants} MARKS` : m.id==='royale' ? `${state.royale.alive} ALIVE · ${p.kills} ELIMS · ${p.place?'#'+p.place:'LAST OPERATOR STANDING'}` :
     `FIRST TO ${state.options.scoreLimit} ELIMINATIONS`;
   const vitals=state.royale&&watched?watched:p;
   $("#shield").textContent = Math.ceil(vitals.shield || 0);
@@ -898,7 +905,7 @@ function hud() {
       ? "Spawn shield · firing ends it"
       : p.streak > 1
           ? p.streak + " elimination streak"
-          : "Freshly hatched";
+          : "Field ready";
   streakUI.update(state,p);
   let bonusPanel=$('#streak-bonuses');
   if(!bonusPanel){bonusPanel=document.createElement('div');bonusPanel.id='streak-bonuses';bonusPanel.hidden=true;$('#streak').after(bonusPanel);}
@@ -918,21 +925,21 @@ function hud() {
     p.health <= 0 && !p.spectating && state.phase === "playing" ? "block" : "none";
   const killer = p.health <= 0 && state.players.find(k => k.id === p.killerId);
   $("#spectator-stats").textContent = killer
-    ? `${killer.health > 0 ? "Spectating" : "Eliminated"} ${killer.name} · Shell health ${Math.ceil(killer.health)} · ${gun(killer).name} · ${killer.kills} K / ${killer.deaths} D · ${Math.floor(killer.points)} pts`
+    ? `${killer.health > 0 ? "Spectating" : "Eliminated"} ${killer.name} · Health ${Math.ceil(killer.health)} · ${gun(killer).name} · ${killer.kills} K / ${killer.deaths} D · ${Math.floor(killer.points)} pts`
     : "";
   const watching = !!p.spectating && state.phase === "playing";
   $("#spectate-panel").hidden = !watching;
   $("#hud").classList.toggle("spectating", watching);
   const target = state.players.find(k => k.id === spectateTarget);
   $("#spectate-info").textContent = target && watching
-    ? `${target.name} · Shell health ${Math.ceil(target.health)} · ${state.royale?itemInfo(target.inventory?.[target.slot]).name:gun(target).name} · ${target.kills} K / ${target.deaths} D`
+    ? `${target.name} · Health ${Math.ceil(target.health)} · ${state.royale?itemInfo(target.inventory?.[target.slot]).name:gun(target).name} · ${target.kills} K / ${target.deaths} D`
     : "Waiting for a player to spawn…";
   const delay = Math.max(0, Math.ceil(p.respawnAt - state.time));
-  $("#spawn-heading").textContent = p.awaitingEntry ? "READY TO HATCH" : "SHELL HEALTH DEPLETED";
+  $("#spawn-heading").textContent = p.awaitingEntry ? "OPERATOR READY" : "OPERATOR ELIMINATED";
   $("#spawn-status").textContent = p.spawnRequested
     ? (delay ? `Entering in ${delay}…` : "Entering the yard…")
     : delay ? `Respawn available in ${delay}` : "Ready when you are";
-  $("#spawn-button").textContent = p.awaitingEntry ? "Enter the Yard" : "Respawn";
+  $("#spawn-button").textContent = p.awaitingEntry ? "DEPLOY" : "Respawn";
   $("#spawn-button").disabled = !!p.spawnRequested || delay > 0;
   if (p.health > 0) spawnIntentUntil = 0;
   if (p.health <= 0 && !p.spawnRequested && performance.now() > spawnIntentUntil && document.pointerLockElement)
@@ -1028,7 +1035,7 @@ function initializeParty(){
   cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing';activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);toast(m.message);if(screen==='menu')renderMenu();}
  });
 }
-function royaleMap(){if(!state?.royale)return;modal('Sunnybreak Island',royaleUI.mapHTML(),'royale-map');royaleUI.drawMap($('#royale-fullmap'),state,state.players.find(p=>p.id===localId),true);}
+function royaleMap(){if(!state?.royale)return;modal('Ravel Coast',royaleUI.mapHTML(),'royale-map');royaleUI.drawMap($('#royale-fullmap'),state,state.players.find(p=>p.id===localId),true);}
 function royaleInventory(){if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);royaleUI.inventoryKey='';modal('INVENTORY',royaleUI.inventoryHTML(p),'royale-inventory');royaleUI.updateInventory(p);}
 function inventoryAction(action,index,from){
  const p=state?.players.find(p=>p.id===localId);if(!state?.royale||!p||p.health<=0)return;
@@ -1049,7 +1056,7 @@ const actions = {
  'locker':()=>customizeMenu('locker'),
  'item-shop':()=>customizeMenu('shop'),
  'social':socialMenu,
- 'career':()=>modal('Career',`<div class="account-stats"><span>Matches <b>${stats.matches}</b></span><span>Eliminations <b>${stats.kills}</b></span><span>Wins <b>${stats.wins}</b></span></div><p>Stats and earned Eggs are saved on this device.</p><button class="primary" data-action="close">DONE</button>`),
+ 'career':()=>modal('Career',`<div class="account-stats"><span>Matches <b>${stats.matches}</b></span><span>Eliminations <b>${stats.kills}</b></span><span>Wins <b>${stats.wins}</b></span><span>Assists <b>${stats.assists||0}</b></span></div><p>Verified online matches contribute to progression. Spawn Island and practice do not count. Existing career history is preserved.</p><div class="career-modes">${Object.entries(stats.modes||{}).map(([id,m])=>`<p><b>${id==='royale'?'Frontier Royale':id==='teams'?'Team Scramble':'Free for All'}</b> · ${m.matches} matches · ${m.wins} wins · ${m.kills} eliminations${m.placements.length?' · Best placement #'+Math.min(...m.placements.filter(n=>n>0)):''}</p>`).join('')}</div><p>Stats and Marks are saved on this device.</p><button class="primary" data-action="close">DONE</button>`),
  'find-public':()=>queueParty(),
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
  'duo-fill':()=>partyRequest('select',{...party.party.selection,duoFill:true}),
@@ -1141,8 +1148,8 @@ const actions = {
   },
   about: () =>
     modal(
-      "Made for a good scramble",
-      `<p>Yolk Yard is an original, independent egg arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. This game is not affiliated with Shell Shockers or Blue Wizard Digital.</p><p style="margin-top:14px">Settings and match totals stay in this browser. The Social panel lists connected browser-session nicknames. Party invitations, membership and readiness are held by the relay; reconnect tokens stay in this tab, invitations expire after one minute, and disconnected parties expire after 90 seconds. There is no permanent friend list. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 2.0 · All gameplay code is included in the project.</p>`,
+      "Welcome to the frontier",
+      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. The Social panel lists connected browser-session nicknames. Party invitations, membership and readiness are held by the relay; reconnect tokens stay in this tab, invitations expire after one minute, and disconnected parties expire after 90 seconds. There is no permanent friend list. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.0 · All gameplay code is included in the project.</p>`,
       "about",
     ),
 };
@@ -1583,12 +1590,14 @@ function loop(now) {
     renderLobby();
     lobbyClock = 0;
   }
-  processEvents();
+  processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
-  if(me&&screen==='game'){
-    const won=state.royale?wonRoyale(state,localId):mode(state.options.mode).teams?state.scores[me.team]>state.scores[1-me.team]:state.winner===me.name+' wins';
-    matchEarnings.sample({key:earnMatch+':'+(state.royale?.matchId||net?.code||'local')+':'+state.round,dt,eligible:!state.royale?.practice,active:!state.royale?.practice&&state.phase==='playing'&&me.health>0&&!me.spectating&&!paused&&!document.hidden&&now-lastEarnAction<10000,kills:me.kills,doubleEggs:me.eggsUntil>state.time,finished:state.phase==='results'||!!state.royale&&me.place>0&&me.health<=0,won,place:state.royale?me.place:0},(id,amount,label)=>{void eggWallet.award(id,amount,label).then(()=>{toast('+'+amount+' eggs · '+label);}).catch(error=>toast(error.message));});
+  if(net?.isHost&&state&&now-lastProgress>=750){
+    lastProgress=now;(net.aliasPeer?.id?net.aliasPeer:net.peer)?.control?.({type:'progress',state:rewardFrame(state,localId,input)});
   }
+  const currentProgress=(state?.royale?.matchId||net?.code||'local')+':'+state?.round;
+  if(currentProgress!==progressMatch){progressMatch=currentProgress;matchEarnings.total=0;matchEarnings.status=net?'Match verification pending':'Practice · No currency rewards';}
+
   if (me?.spectating && !state.players.some(p => p.id === spectateTarget && p.health > 0 && !p.spectating))
     switchSpectator(1);
   view.spectateTarget = me?.spectating ? spectateTarget : null;

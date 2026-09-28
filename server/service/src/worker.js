@@ -23,7 +23,7 @@ export default {
       if(request.headers.get('Upgrade')?.toLowerCase()!=='websocket') return new Response('WebSocket required',{status:426,headers});
       return roomSocket(request,env);
     }
-    if (url.pathname !== '/probe') return new Response('Yolk Yard connection check. Open the server check from the game.',{headers:{...headers,'Content-Type':'text/plain'}});
+    if (url.pathname !== '/probe') return new Response('Ravelfront connection check. Open the server check from the game.',{headers:{...headers,'Content-Type':'text/plain'}});
     if (!allowed) return new Response('Origin required',{status:403,headers});
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return new Response('WebSocket required',{status:426,headers});
     const pair = new WebSocketPair();

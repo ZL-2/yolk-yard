@@ -61,7 +61,7 @@ export class RelaySession {
    const r=m.room;let listing=null;
    if(r){
     if(this.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!Number.isInteger(r.players)||r.players<1||r.players>20)throw Error('Invalid listing');
-    listing=JSON.stringify({code:r.code,version:r.version,host:String(r.host||'Egg').slice(0,32),map:String(r.map||'').slice(0,24),mode:String(r.mode||'').slice(0,24),players:r.players,capacity:Math.max(2,Math.min(20,Number(r.capacity)||8)),phase:r.phase});
+    listing=JSON.stringify({code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:String(r.mode||'').slice(0,24),players:r.players,capacity:Math.max(2,Math.min(20,Number(r.capacity)||8)),phase:r.phase});
    }
    await q(this.db,'UPDATE relay_peers SET listing=?,listed_at=? WHERE id=? AND token=?',listing,Date.now(),this.id,this.token).run();return;
   }

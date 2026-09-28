@@ -63,16 +63,16 @@ test('smooth arm surfaces remain finite through reloads and reuse their buffers'
  }
 });
 
-test('arm materials match shell colors and every finish, with reset-safe appearance keys',async()=>{
+test('human gloves and uniforms retain reset-safe appearance keys, with reset-safe appearance keys',async()=>{
  const {armAppearance}=await import('../src/arms.js');
  const {patternedShell}=await import('../src/cosmetics.js');
  for(let finish=0;finish<4;finish++){
   const profile={color:'#3d8ce8',accent:'#fff6da',pattern:0,finish};
   const rig=makeArms('sprinter',profile),shell=patternedShell(profile);
   for(const limb of rig.userData.limbs){
-   assert.equal(limb.hand.material.color.getHex(),shell.color.getHex());
-   assert.equal(limb.hand.material.roughness,shell.roughness);
-   assert.equal(limb.arm.material.metalness,shell.metalness);
+   assert.equal(limb.hand.material.color.getHex(),0x17262e);
+   assert.equal(limb.hand.material.roughness,.9);
+   assert.equal(limb.arm.material.metalness,0);
   }
   assert.deepEqual(rig.userData.appearance,profile);
  }

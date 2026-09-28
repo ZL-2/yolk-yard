@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id);
 let socket,heartbeat,watchdog,lastReceived=0,active=false,role='',start=0,baseSent=0,baseReceived=0,baseline=false;
 const result={connection:'Not connected',discovery:'Not checked',join:'Not joined',sent:0,received:0,duration:0};
-function report(){ $('report').value=['Yolk Yard shared room test v1',new Date().toISOString(),...Object.entries(result).map(([k,v])=>`${k}: ${v}`)].join('\n'); }
+function report(){ $('report').value=['Ravelfront shared room test v1',new Date().toISOString(),...Object.entries(result).map(([k,v])=>`${k}: ${v}`)].join('\n'); }
 function status(text){$('status').textContent=text;report();}
 function send(data){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(data));}
 function lobby(){active=false;role='';baseline=false;$('setup').hidden=false;$('room').hidden=true;}

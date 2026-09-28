@@ -1,8 +1,10 @@
-# Yolk Royale — implementation design
+> Historical technical notes. Current identity, humanoid combat, economy and timing are specified in [Ravelfront](RAVELFRONT.md).
 
-Original design dated 21 September 2026; the update below supersedes the historical design where behavior changed. A complete solo, no-building battle royale inside Yolk Yard, with original art, island, item names, transport and sound. The familiar loop is airborne insertion → loot → rotate with the storm → survive → spectate → rematch.
+# Frontier Royale — implementation design
 
-## Update 42: Sunnybreak Reborn
+Original design dated 21 September 2026; the update below supersedes the historical design where behavior changed. A complete solo, no-building battle royale inside Ravelfront, with original art, island, item names, transport and sound. The familiar loop is airborne insertion → loot → rotate with the storm → survive → spectate → rematch.
+
+## Update 42: Ravel Coast Reborn
 
 The current island, loot authority and presentation are documented in [SUNNYBREAK_REBORN.md](SUNNYBREAK_REBORN.md). This supersedes the historical maps and transport descriptions below.
 
@@ -12,8 +14,8 @@ The current island, loot authority and presentation are documented in [SUNNYBREA
 - Hosts transfer in human join order on departure or connection loss. Half-second checkpoints preserve the round, storm, inventory and chat controls; the new host reclaims the original room code. Duplicate human names require an unused replacement name.
 - Royale has no match timer. The storm closes to zero and continues damaging contestants until one remains. Countdown ticks play only in the final five seconds. Combat and object sounds have finite audible radii.
 - The right-side inventory has five image-based rarity slots, drag reordering, ammunition counts, split/drop actions and inspection. Screen chat uses Enter to type; preferences and player controls live in Pause. A victory/placement banner precedes results, and the kill feed stays visible during Royale.
-- Easy, Normal, Hard and Impossible tune reaction, aim, movement, cover and utility choices. Bots commit to item use and popper throws before switching back to weapons. New players start with a plain egg; bot appearances are randomized.
-- Loot spreads into reachable, separated positions. Chests are smaller without the protruding glow sphere. Only suitable houses get stairs, connected to their landing. Shell health and directional red damage feedback identify incoming hits.
+- Easy, Normal, Hard and Impossible tune reaction, aim, movement, cover and utility choices. Bots commit to item use and popper throws before switching back to weapons. New players start with a field operator; bot appearances are randomized.
+- Loot spreads into reachable, separated positions. Chests are smaller without the protruding glow sphere. Only suitable houses get stairs, connected to their landing. Health and directional red damage feedback identify incoming hits.
 
 ## Historical initial design
 
@@ -21,8 +23,8 @@ The current island, loot authority and presentation are documented in [SUNNYBREA
 
 - Dedicated Battle Royale entry on the home screen, plus Battle Royale in Create Match. Existing arena modes retain their rules and loadouts.
 - Up to 16 contestants. Public quick play fills empty contestant seats with bots; private rooms choose 0–15 bots and 2–16 contestant capacity. At least two contestants are required to launch. Bot difficulty is configurable.
-- All contestants start with 100 shell health, zero shield, five empty slots, no reserve ammunition, and a reusable glider. Lobby loadouts never become starting equipment.
-- One life, no automatic healing, no respawns, no joining a running round as a contestant. Last living egg wins. Storm damage bypasses shield. Simultaneous final eliminations resolve as a draw, not an arbitrary winner.
+- All contestants start with 100 health, zero shield, five empty slots, no reserve ammunition, and a reusable glider. Lobby loadouts never become starting equipment.
+- One life, no automatic healing, no respawns, no joining a running round as a contestant. Last living operator wins. Storm damage bypasses shield. Simultaneous final eliminations resolve as a draw, not an arbitrary winner.
 - Player state: lobby → transport → dive → glide → grounded → eliminated/spectating. Launch pads can return grounded players to glide. A fresh rematch resets inventory, storm, chest state, drops, placements and stamina.
 - Round state: waiting lobby → flight (35 seconds, exits enabled after 3 seconds) → survival with eight storm steps → results. The host owns all state transitions. All players on board are automatically dropped at the route end.
 
@@ -37,13 +39,13 @@ The current island, loot authority and presentation are documented in [SUNNYBREA
 - The current deployment uses GitHub Pages + PeerJS/WebRTC and a host browser, not dedicated servers. Host departure ends the room with an explanation; no false reconnect or host migration promise. Signaling failure offers an explicit local match. There is no account gate, ranked queue, paid infrastructure, or claim of 100-player capacity.
 - Protocol version changes isolate older clients. Existing update detection refreshes the lobby while allowing current games to finish.
 
-## Island: Sunnybreak, 512 × 512 world units
+## Island: Ravel Coast, 512 × 512 world units
 
 Approximately 41 times the ground area of The Yard. North is negative Z. Sea surrounds a walkable island. Main roads connect districts; small cover and cabins break long exposed crossings. Buildings use collision-matched walls, open doors, roof decks and accessible stairs. No decorative wall may block a doorway without collision.
 
 | District | Center X/Z | Role / landmarks |
 | --- | --- | --- |
-| Shellside Square | 0 / 0 | Central plaza, market awnings, clock tower, highest contest density |
+| Relay Square | 0 / 0 | Central plaza, market awnings, clock tower, highest contest density |
 | Cornflake Fields | -145 / -140 | Farm barns, crop rows, silos, hay cover |
 | Sunny Docks | 150 / 135 | Cargo stacks, warehouses, cranes, waterfront |
 | Scramble Springs | 145 / -135 | Pools, bright cabins, fountain, quick rotations |
@@ -51,7 +53,7 @@ Approximately 41 times the ground area of The Yard. North is negative Z. Sea sur
 | Perch Park | 0 / -185 | Orchard groves and picnic shelters |
 | Toast Town | 0 / 175 | Small street of colorful houses and rooftop cover |
 | Hatchery Heights | -190 / 0 | Raised hatchery platform, stairs, glasshouse shapes |
-| Yolkworks | 190 / 0 | Factory yard, pipes, cooling towers |
+| Ironwake | 190 / 0 | Factory yard, pipes, cooling towers |
 
 - Distributed guaranteed chest and floor-loot anchors: every major district has multiple weapons and consumables. At least one weapon + ammo + utility/heal comes from every chest.
 - Seeded loot and flight direction change every round. Loot uses authored reachable anchors; chests are never buried inside collision geometry.
@@ -59,8 +61,8 @@ Approximately 41 times the ground area of The Yard. North is negative Z. Sea sur
 
 ## Flight and movement
 
-- Eggspress: a gold yolk balloon lifting a teal egg-carton gondola, animated rotors, suspension cables and a trailing pennant. A seeded route crosses the island; route and current transport position appear on both maps.
-- Space / Jump exits after the short ready period. In freefall, WASD steers and diving descends quickly. Space deploys the shell glider; gliding trades vertical speed for travel. Automatically deploy at 24 units above the collision surface. Once low, the glider cannot be cut; land safely on roofs or ground.
+- Kestrel: a gold yolk balloon lifting a teal cargo gondola, animated rotors, suspension cables and a trailing pennant. A seeded route crosses the island; route and current transport position appear on both maps.
+- Space / Jump exits after the short ready period. In freefall, WASD steers and diving descends quickly. Space deploys the field glider; gliding trades vertical speed for travel. Automatically deploy at 24 units above the collision surface. Once low, the glider cannot be cut; land safely on roofs or ground.
 - Ground movement: existing aim/collision/jump behavior. Shift sprints with a 100-point stamina bar, drains 22/sec, regenerates 18/sec after 1.3 sec without sprinting, and requires 20 stamina after exhaustion. Cannot sprint while aiming, firing or consuming. Sprint cancels healing. No fall damage during insertion or a launch-pad glide.
 - Shift's old secondary aim binding is migrated so sprint and aim cannot conflict. Controls expose remappable interact, sprint, map, inventory, drop, and slots 3–5 in addition to existing bindings. Right click remains aim.
 - Desktop wheel cycles five slots, 1–5 selects, F interacts, X drops, M opens map, I opens inventory. Mobile has equivalent touch actions and a tappable hotbar.
@@ -71,7 +73,7 @@ Approximately 41 times the ground area of The Yard. North is negative Z. Sea sur
 - Pickup puts equipment in an empty slot or adds to a matching stack. A full inventory replaces the selected slot, dropping the old item. X drops the selected stack. Inventory panel permits select, swap and drop. No inventory operation duplicates ammunition.
 - Ammo is shared by type (light, medium, shells, heavy, rockets), capped, and collected automatically at short range. Loaded rounds remain with a dropped weapon; reserve ammunition drops separately on elimination. Reload atomically moves reserve into the selected magazine; switching or using an item cancels the reload.
 - Five rarity levels: common, uncommon, rare, epic, legendary; readable color plus text and stars. Rarity modestly changes damage/reload. Arena weapon statistics remain unchanged. Royale gun ranges are adjusted for the larger island without making rifles instantaneous hitscan.
-- Base arsenal includes seven primaries and Pip. Additional Royale-only weapons: Peeper precision repeater, Double Yolk tactical scatter, and Comet energy carbine, using original procedural models and their own weapon data.
+- Base arsenal includes seven primaries and Pip. Additional Royale-only weapons: Sentry precision repeater, Double Ravelfront tactical scatter, and Comet energy carbine, using original procedural models and their own weapon data.
 - Other items: Bandage (small capped heal), Medkit (full heal), Mini Shield (25, capped at 50), Shield Flask (50, capped at 100), Splash Egg (nearby health then shield), Popper stack (timed projectile), Impulse Egg (mobility burst), Launch Nest (places reusable launch pad).
 - Item use shows progress and a matching hand animation. Moving too fast, changing slot, dropping or taking damage interrupts timed use without consuming the item. Item is consumed only on successful completion. Full health/shield refuses use.
 - F holds a chest open for 0.8 seconds; releasing, moving away, damage or obstruction resets progress. An opened chest stays open. Ground items bob/rotate and carry rarity auras. The pickup prompt names the item, rarity and replacement rule.
@@ -89,7 +91,7 @@ Approximately 41 times the ground area of The Yard. North is negative Z. Sea sur
 - Elimination drops all equipment and reserves once, records placement as current alive count, credits eligible attacker, interrupts use/reload and locks the player out of combat.
 - Start spectating the eliminator if still alive, otherwise the next living contestant. Previous/Next cycles only living contestants; automatically switch when a target leaves or is eliminated. Follow camera respects collision; show target health/shield, inventory, eliminations and alive count. No free-camera advantage for living players.
 - No Respawn/Rejoin/Loadout button is offered in a running Royale round. Spectators may leave, view map, adjust settings, or wait for results. Host can still host after elimination.
-- Winner animation, Victory Yolk banner, placement, eliminations and round results. Rematch returns through editable setup for the host and resets all state for guests; public Quick Play is available from results as a separate fresh queue.
+- Winner animation, Victory Ravelfront banner, placement, eliminations and round results. Rematch returns through editable setup for the host and resets all state for guests; public Quick Play is available from results as a separate fresh queue.
 
 ## Animation and feedback coverage
 
@@ -127,7 +129,7 @@ User requested extensive sound coverage for every game part. Original Web Audio 
 - Airborne motion uses world collision and launch impulses rise physically before gliding. Decorative solid landmarks have authored collision footprints.
 - Original sound inventory: 79 named cues, eleven blaster palettes and five environment loops.
 
-## Sunnybreak refresh (release 25)
+## Ravel Coast refresh (release 25)
 
 The subsequent user-requested refresh supersedes the original movement and sound choices: walking is 5.0 units/sec, sprinting is 7.4 (arena movement speed), footsteps and hover cues are removed, and the remaining bank contains 73 cues. Seven sliders have individual resets plus reset-all. I/M and customized panel bindings toggle their panel closed or switch between map and inventory.
 

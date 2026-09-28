@@ -4,7 +4,7 @@ const protocol='yolk-connection-probe-v1';
 const el=id=>document.getElementById(id);
 let running=false,cleanup=()=>{};
 function report(){
- el('report').value=['Yolk Yard server connection check v1','Time: '+new Date().toISOString(),'Endpoint: '+endpoint,
+ el('report').value=['Ravelfront server connection check v1','Time: '+new Date().toISOString(),'Endpoint: '+endpoint,
  'HTTPS: '+el('https').textContent,'WebSocket: '+el('socket').textContent,'Replies: '+el('replies').textContent,
  'Result: '+el('summary').textContent].join('\n');
 }

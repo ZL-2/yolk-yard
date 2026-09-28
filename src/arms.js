@@ -1,3 +1,4 @@
+import {shopItem} from './shop-catalog.js';
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {gun, clamp} from './data.js';
@@ -8,7 +9,7 @@ export function armAppearance(value={}) {
   return {color:p.color||'#fff6da',pattern:p.pattern||0,accent:p.accent||'#f9b74a',finish:p.finish||0};
 }
 
-// Authored cartoon poses in blaster-local coordinates. The camera and other
+// Weapon-category grip poses in blaster-local coordinates. The camera and other
 // players use the same timeline, driven by the host's reload clock.
 export const ARM_POSES = {
   sprinter: {right:[.095,-.24,.13], left:[-.10,-.14,-.43], socket:[-.10,-.33,-.10], drop:[-.42,-.39,-.18], tilt:[-.18,0,-.32]},
@@ -108,16 +109,16 @@ function armGeometry() {
   g.setIndex(indices);return g;
 }
 export function makeArms(id, profile={}, firstPerson=true) {
-  const group=new THREE.Group();group.name='Animated egg arms';
-  const appearance=armAppearance(profile),material=patternedShell(appearance);
+  const group=new THREE.Group();group.name='Operator arms';
+  const appearance=armAppearance(profile),material=new THREE.MeshStandardMaterial({color:shopItem(profile.outfit)?.color||'#334952',roughness:.82});
   const mesh=(geo)=>{const m=new THREE.Mesh(geo,material);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
   const limbs=[-1,1].map(side=>{
-    const hand=mesh(handGeometry(side));hand.name=side<0?'Support hand':'Grip hand';
-    const arm=mesh(armGeometry());arm.name='Smooth tapered arm';arm.frustumCulled=false;
+    const hand=firstPerson?mesh(handGeometry(side)):new THREE.Group();if(!firstPerson)group.add(hand);hand.material=new THREE.MeshStandardMaterial({color:'#17262e',roughness:.9});hand.userData.ownedMaterial=true;hand.name=side<0?'Support hand':'Grip hand';
+    const arm=firstPerson?mesh(armGeometry()):new THREE.Group();arm.name='Smooth tapered arm';arm.frustumCulled=false;
     const shoulder=new THREE.Vector3(side<0?-.72:.38,firstPerson?-.72:-.4,firstPerson?.42:.9);
     return {side,hand,arm,shoulder,lastWrist:new THREE.Vector3(Infinity,Infinity,Infinity)};
   });
-  limbs[0].hand.userData.ownedMaterial=true;
+  limbs[0].arm.userData.ownedMaterial=true;
   group.userData={id,limbs,appearance,progress:-1};
   group.userData.throwProp=makeThrowProp(limbs.find(l=>l.side>0).hand);
   updateArms(group,-1);
@@ -128,6 +129,7 @@ export function makeArms(id, profile={}, firstPerson=true) {
 const wrist=new THREE.Vector3(),control=new THREE.Vector3(),center=new THREE.Vector3(),tangent=new THREE.Vector3();
 const normal=new THREE.Vector3(),binormal=new THREE.Vector3(),radial=new THREE.Vector3(),axis=new THREE.Vector3(1,0,0);
 function shapeArm(limb) {
+  if(!limb.arm.geometry)return;
   wrist.set(limb.side*.035,-.105,.025).applyQuaternion(limb.hand.quaternion).add(limb.hand.position);
   if(limb.lastWrist.distanceToSquared(wrist)<1e-12)return;
   limb.lastWrist.copy(wrist);
@@ -183,7 +185,7 @@ export function updateArms(rig,progress,blaster=null,recoil=0,draw=1,menu=null) 
   return pose;
 }
 
-// Matching overhand throw animation for first-person and remote egg rigs.
+// Matching overhand throw animation for first-person and remote humanoid rigs.
 const THROW_RIGHT = [
   [0,[.09,-.23,.12]], [.16,[.12,-.08,-.08]], [.34,[.20,.035,.17]],
   [.48,[.23,.01,.30]], [.66,[.18,-.10,-.10]], [1,[.09,-.23,.12]],
@@ -206,11 +208,11 @@ export function throwArms(rig, progress) {
 }
 function makeThrowProp(hand) {
   const prop=new THREE.Group();prop.name='Held popper';
-  const shell=new THREE.Mesh(new THREE.SphereGeometry(.082,16,12),new THREE.MeshStandardMaterial({color:0xb9a0ed,roughness:.48,metalness:.08}));
-  shell.scale.set(.82,1.2,.82);shell.castShadow=true;prop.add(shell);
+  const shell=new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.16,10),new THREE.MeshStandardMaterial({color:0x435549,roughness:.48,metalness:.08}));
+  shell.scale.set(1,1,1);shell.castShadow=true;prop.add(shell);
   const band=new THREE.Mesh(new THREE.TorusGeometry(.071,.014,8,16),new THREE.MeshStandardMaterial({color:0xf5c45d,roughness:.42,metalness:.24}));
   band.rotation.x=Math.PI/2;band.position.y=-.008;prop.add(band);
-  const cap=new THREE.Mesh(new THREE.SphereGeometry(.027,12,8),new THREE.MeshStandardMaterial({color:0x7859b1,roughness:.4}));
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(.027,12,8),new THREE.MeshStandardMaterial({color:0x263536,roughness:.4}));
   cap.position.y=.09;prop.add(cap);prop.position.set(.01,.03,-.105);prop.visible=false;hand.add(prop);
   return prop;
 }

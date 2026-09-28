@@ -7,7 +7,7 @@ export const MATERIALS={
 };
 export const GRID=4,COST=10,CAP=999,EDIT_RANGE=8;
 export const PICKAXE={player:20,environment:50,structure:75,weakMultiplier:2,interval:.45};
-// Original Sunnybreak balancing, NOT claimed to be Fortnite object statistics.
+// Original Ravel Coast balancing, NOT claimed to be Fortnite object statistics.
 export const HARVEST_TYPES={
  tree:{material:'wood',health:250,resources:55,volume:3.2},
  crate:{material:'wood',health:150,resources:32,volume:11},

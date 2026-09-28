@@ -11,9 +11,9 @@ const wait=async(fn)=>{const end=Date.now()+20000;while(!fn()){assert.ok(Date.no
 function client(name){const n={state:null,sim:null,errors:[]};n.profile=safeProfile({name});n.net=new Network({getCheckpoint:()=>n.sim?.checkpoint(),getChatState:()=>n.sim?.snapshot()||n.state,onJoin:(id,p)=>!!n.sim.admitPlayer(id,p),onLeave:id=>n.sim?.leavePlayer(id),onRoster:ids=>n.sim?.setConnectedHumans(ids),onState:s=>{n.state=s;},onError:e=>n.errors.push(e)});nodes.push(n);let ticks=0;timers.push(setInterval(()=>{if(n.sim&&!n.net.closed){n.sim.tick(1/60);if(++ticks%3===0)n.net.broadcast(n.sim.snapshot());}},1000/60));return n;}
 try{
  const host=client('Clock Host');host.sim=new RoyaleSimulation({capacity:16,fill:true,bots:15,seed:57});host.sim.addPlayer('host',host.profile);await host.net.host();host.sim.startRound();host.net.broadcast(host.sim.snapshot());
- assert.equal(host.sim.queueEnds-host.sim.time,60);host.sim.advanceWarmupClock(20);const deadline=host.sim.queueEnds;
+ assert.equal(host.sim.queueEnds-host.sim.time,30);host.sim.advanceWarmupClock(20);const deadline=host.sim.queueEnds;
  const first=client('Clock Guest 1');await first.net.join(host.net.code,first.profile);await wait(()=>first.state?.royale?.humanContestants===2);
- assert.equal(first.state.royale.queueEnds,deadline);assert.ok(first.state.royale.queueEnds-first.state.time<41);assert.equal(first.state.royale.botContestants,14);assert.equal(first.state.royale.stage,'spawn-island');
+ assert.equal(first.state.royale.queueEnds,deadline);assert.ok(first.state.royale.queueEnds-first.state.time<11);assert.equal(first.state.royale.botContestants,14);assert.equal(first.state.royale.stage,'spawn-island');
  console.log('PASS midway guest sees the existing remaining countdown; bots do not trigger an early start');
  for(let i=2;i<16;i++){const guest=client('Clock Guest '+i);await guest.net.join(host.net.code,guest.profile);await wait(()=>guest.state?.royale);if(i<15)assert.notEqual(host.sim.stage,'battle-bus');}
  await wait(()=>nodes.every(n=>n===host||n.state?.royale?.stage==='battle-bus'));

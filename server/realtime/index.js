@@ -9,7 +9,7 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
   const owner=new OwnerService();await owner.ready;
   const server=createServer((req,res)=>{
     if(req.url?.startsWith('/owner/')){void owner.handle(req,res,{origins,relay});return;}
-    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,features:['parties','duos','party-reservations']}:{error:'Not found'}));
+    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',features:['parties','duos','party-reservations','marks-rewards','afk-59','humanoids']}:{error:'Not found'}));
   });
   const sockets=new WebSocketServer({noServer:true,maxPayload:2_000_000,perMessageDeflate:false});
   server.on('upgrade',(req,socket,head)=>{
@@ -20,6 +20,6 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
   return {server,relay,owner,async close(){relay.close();for(const ws of sockets.clients)ws.terminate();await new Promise(r=>sockets.close(r));await new Promise(r=>server.close(r));await owner.close();}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
-  const app=await startRealtimeServer();console.log(`Yolk relay listening on ${app.server.address().port}`);
+  const app=await startRealtimeServer();console.log(`Ravelfront relay listening on ${app.server.address().port}`);
   for(const signal of ['SIGINT','SIGTERM'])process.once(signal,async()=>{await app.close();process.exit(0);});
 }

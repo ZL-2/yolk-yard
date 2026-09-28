@@ -23,10 +23,10 @@ export function warmupInput(sim,p){
  const brain=p.warmupBrain??={...newBrain(sim,p),until:0};
  if(sim.time>=brain.until){
   brain.until=sim.time+3+sim.random()*5;brain.idle=sim.random()<.3;
-  const points=sim.map.spawns,point=points[Math.floor(sim.random()*points.length)];brain.goal={x:point[0],y:p.y,z:point[1]};
+  const home=p.spawnHome||p;const points=sim.map.spawns.filter(([x,z])=>Math.hypot(x-home.x,z-home.z)<15),point=points[Math.floor(sim.random()*points.length)]||[home.x,home.z];brain.goal={x:point[0],y:p.y,z:point[1]};
   brain.jump=sim.random()<.3;brain.jumpAt=sim.time+.5+sim.random()*2;
  }
- const practice=practicing&&sim.time%7>1&&sim.time%7<3.2;
+ const practice=practicing&&p.x>16&&Math.abs(p.z-6)<17&&sim.time%7>1&&sim.time%7<3.2;
  const goal=practice?{x:31,y:4,z:6}:brain.goal,dx=goal.x-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz),yaw=Math.atan2(-dx,-dz);
  const move=!practice&&!brain.idle&&d>1.5?navigate(sim,p,brain,goal,skillFor(sim)):{mx:0,mz:0,jump:false};
  const burst=practice&&sim.time%1.1<.32&&d>5&&d<42&&seesPoint(sim,p,{x:goal.x-dx/(d||1)*1.3,y:goal.y,z:goal.z-dz/(d||1)*1.3});
@@ -67,11 +67,11 @@ export function botInput(sim,p){
  if(visible){
   if(now>=brain.nextBurst){
    brain.nextBurst=now+skill.burst+skill.pause+r()*.4;brain.burstUntil=now+skill.burst;
-   const accurate=r()<skill.hit;brain.errorX=(r()-.5)*skill.error+(accurate?0:brain.side*(.65+r()*.8)/Math.max(5,distance));brain.errorY=(r()-.5)*skill.error*.65;brain.height=accurate?.78+(r()-.5)*.3:.25+r()*1.5;
+   const accurate=r()<skill.hit;brain.errorX=(r()-.5)*skill.error+(accurate?0:brain.side*(.65+r()*.8)/Math.max(5,distance));brain.errorY=(r()-.5)*skill.error*.65;brain.height=accurate?1.22+(r()-.5)*.24:.55+r()*1.18;
   }
   const lead=w.hitscan?0:Math.min(1,distance/w.boltSpeed)*skill.lead,tx=target.x+(target.vx||0)*lead-p.x,tz=target.z+(target.vz||0)*lead-p.z;
   yaw=Math.atan2(-tx,-tz)+(brain.errorX||0)+Math.sin(now*1.7+(p.botSeed||0))*skill.error*.15;
-  pitch=Math.atan2(target.y+(brain.height??.9)*(target.bodyScale||1)-p.y-1.43,Math.hypot(tx,tz))+(brain.errorY||0);
+  pitch=Math.atan2(target.y+(brain.height??1.22)-p.y-1.70,Math.hypot(tx,tz))+(brain.errorY||0);
   fire=!(p.inventory&&slot===0)&&now>=brain.aimAt&&now<brain.burstUntil&&distance<(w.flightRange??w.range)*.95&&(!w.projectile||distance>7);
   if(task.kind==='rotate'&&task.urgent&&distance>12)fire=false;
   if(p.inventory&&now-(brain.attackedAt??-100)<1.5&&now>(brain.buildAt||0)&&r()<skill.build*.12){

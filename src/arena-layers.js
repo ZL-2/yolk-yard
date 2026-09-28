@@ -1,5 +1,5 @@
 // Connected galleries and an upper crossing, with matching solid geometry.
-// These additions only belong to the three arena maps; Sunnybreak is separate.
+// These additions only belong to the three arena maps; Ravel Coast is separate.
 export function addArenaLayers(map){
  const put=(x,z,w,d,h,y=0,color='stone',kind='gallery')=>map.boxes.push({x,z,w,d,h,y,color,kind});
  const x=map.id==='yard'?26:map.id==='depot'?27:28;

@@ -1,15 +1,15 @@
 import {naturalHeight,createTerrain,groundAt,riverX} from './terrain.js';
-// Sunnybreak: an egg-export island fractured by an experimental hatchery pulse.
+// Ravel Coast: a coastal communications frontier fractured by a relay-network collapse.
 // Authoring is deterministic and static. Only match loot is randomized by the host.
 export const DISTRICTS=[
- {id:'borough',name:'Shellside Borough',x:-53,z:-30,kind:'town',color:0xe4ad75,risk:'high'},
- {id:'farm',name:'Cornflake Commons',x:-155,z:-140,kind:'farm',color:0xd4b364,risk:'medium'},
- {id:'observatory',name:'Albumen Observatory',x:117,z:-139,kind:'hatchery',color:0x9fc7ca,risk:'high'},
- {id:'docks',name:'Sunny Docks',x:151,z:157,kind:'dock',color:0x719ba6,risk:'high'},
- {id:'woods',name:'Whisker Woods',x:-96,z:163,kind:'park',color:0x699178,risk:'low'},
- {id:'works',name:'Yolkworks Quarry',x:-158,z:62,kind:'factory',color:0x9aa6a5,risk:'high'},
- {id:'terraces',name:'Toast Terraces',x:90,z:52,kind:'resort',color:0xe9ae8d,risk:'medium'},
- {id:'heights',name:'Hatchery Heights',x:-20,z:-186,kind:'hatchery',color:0xc5d7b1,risk:'high'},
+ {id:'borough',name:'Relay Borough',x:-53,z:-30,kind:'town',color:0xe4ad75,risk:'high'},
+ {id:'farm',name:'Northfield Commons',x:-155,z:-140,kind:'farm',color:0xd4b364,risk:'medium'},
+ {id:'observatory',name:'Aster Observatory',x:117,z:-139,kind:'hatchery',color:0x9fc7ca,risk:'high'},
+ {id:'docks',name:'Breakwater Docks',x:151,z:157,kind:'dock',color:0x719ba6,risk:'high'},
+ {id:'woods',name:'Sable Woods',x:-96,z:163,kind:'park',color:0x699178,risk:'low'},
+ {id:'works',name:'Ironwake Quarry',x:-158,z:62,kind:'factory',color:0x9aa6a5,risk:'high'},
+ {id:'terraces',name:'Sunward Terraces',x:90,z:52,kind:'resort',color:0xe9ae8d,risk:'medium'},
+ {id:'heights',name:'Signal Heights',x:-20,z:-186,kind:'hatchery',color:0xc5d7b1,risk:'high'},
  {id:'crater',name:'Crater Conservatory',x:172,z:-25,kind:'camp',color:0xa5bca6,risk:'medium'},
 ];
 const boxes=[],chests=[],floorLoot=[],buildings=[],trees=[],props=[],landmarks=[],roads=[],navLinks=[],signs=[];
@@ -33,9 +33,9 @@ function addBuilding(p,plan,index=0){
 }
 for(const p of DISTRICTS)buildingPlans[p.id].forEach((b,i)=>addBuilding(p,b,i));
 const landmarkPlan=[
- ['Nestwatch Tower',-207,-24,'tower','camp',2],['Last Stop Fuel',-93,-99,'station','factory',1],['Shellfall Cabin',-202,157,'cabin','park',1],
+ ['Watchline Tower',-207,-24,'tower','camp',2],['Last Stop Fuel',-93,-99,'station','factory',1],['Driftwood Cabin',-202,157,'cabin','park',1],
  ['Old Mill',-19,101,'mill','farm',2],['Tideglass Beacon',207,88,'tower','dock',3],['Mossy Relay',-106,99,'radio','camp',2],
- ['Eggspress Depot',-9,211,'station','town',1],['North Pump',61,-218,'station','factory',1],['Copper Camp',73,-65,'cabin','camp',1],
+ ['Kestrel Depot',-9,211,'station','town',1],['North Pump',61,-218,'station','factory',1],['Copper Camp',73,-65,'cabin','camp',1],
  ['Orchard Rest',-204,-102,'cabin','farm',1],['Cracked Cargo',205,-117,'warehouse','dock',1],['Field Kitchen',-89,-204,'cabin','farm',1],
  ['Hush Hollow',-28,47,'cabin','park',1],['Driftwood Shed',113,214,'shed','dock',1],
 ];
@@ -111,7 +111,7 @@ for(const [bi,b] of buildings.entries()){
  anchor(b,-.1,-d*.25,floors,'weapon','roof');anchor(b,w*.32,0,floors,'mixed','roof',true);anchor(b,0,d*.28,floors,'ammo','roof');
  // Exterior doorstep loot remains on the authored pad and outside door clearance.
  const az=z+d/2+3;floorLoot.push({x:x+w*.32,z:az,y:yAt(x+w*.32,az),poi:b.poi,building:bi,role:'mixed',room:'porch',source:'ground',chance:.55});
- signs.push({x,z:z+d/2+.24,y:baseY+3.5,text:b.type==='bakery'?'DAILY YOLK':b.type==='lab'?'ALBUMEN / '+(bi+1):b.type==='warehouse'?'SUNNYBREAK FREIGHT':b.type==='station'?'EGGSPRESS':b.type.toUpperCase(),building:bi});
+ signs.push({x,z:z+d/2+.24,y:baseY+3.5,text:b.type==='bakery'?'COASTAL PROVISIONS':b.type==='lab'?'ASTER / '+(bi+1):b.type==='warehouse'?'RAVEL FREIGHT':b.type==='station'?'KESTREL':(b.type==='hatchery'?'relay laboratory':b.type).toUpperCase(),building:bi});
 }
 // Interconnected loops and cross-island routes, not spokes converging on one dominant center.
 const routePoints=[[-205,-32],[-155,-140],[-20,-186],[117,-139],[205,-100],[172,-25],[207,88],[151,157],[113,214],[-9,211],[-96,163],[-202,157],[-158,62],[-205,-32]];
@@ -125,10 +125,10 @@ function roadDistance(x,z){let best=1e6;for(const r of roads)for(let i=1;i<r.poi
 for(const z of [-102,20,112]){
  const x=riverX(z),y=.9,w=32;box(x,z,w,6,.35,'crate',y-.35,'bridge',{material:'wood'});
  for(const side of [-1,1]){box(x,z+side*3,w,.2,.8,'crate',y,'bridge',{material:'wood'});for(const dx of [-12,-6,0,6,12])box(x+dx,z+side*2.7,.28,.28,1.6,'crate',0,'bridge',{material:'wood'});}
- landmarks.push({id:'bridge-'+z,name:z<0?'Copper Crossing':z<80?'Shellspan Bridge':'Millwater Crossing',x,z,kind:'bridge',risk:'medium'});
+ landmarks.push({id:'bridge-'+z,name:z<0?'Copper Crossing':z<80?'Span Nine':'Millwater Crossing',x,z,kind:'bridge',risk:'medium'});
  for(const side of [-1,1]){const xx=x+side*18;floorLoot.push({x:xx,z:z+5,y:yAt(xx,z+5),poi:'bridge-'+z,role:'weapon',room:'bridge-bank',source:'ground',chance:.78});chests.push({x:xx,z:z-5,y:yAt(xx,z-5),poi:'bridge-'+z,source:'chest',chance:.65,room:'bridge-bank'});}
 }
-// Major landmarks tell a shared story: freight, food production and the ruptured hatchery.
+// Major landmarks tell a shared story: freight, food production and the failed relay.
 for(const p of DISTRICTS){
  const y=yAt(p.x,p.z);
  if(p.kind==='farm'){for(const dx of [-7,7])prop('silo',p.x+dx,p.z,4.4,4.4,13,y);}
@@ -144,7 +144,7 @@ for(const p of DISTRICTS){
 // Sheltered coastal docks with real collision and loot.
 for(const x of [127,147,167]){const z=212,y=Math.max(...Array.from({length:13},(_,i)=>yAt(x,z-12+i*2)))+.15;box(x,z,5,24,.3,'crate',y-.3,'bridge',{material:'wood'});for(const dz of [-10,0,10])prop('bollard',x+2,z+dz,.3,.3,1.2,y);floorLoot.push({x,z:z+8,y,poi:'docks',role:'weapon',room:'pier',source:'ground',chance:.85});chests.push({x,z:z-8,y,poi:'docks',source:'high',chance:.6,room:'pier'});}
 const clear=(x,z,r=2)=>!buildings.some(b=>Math.abs(x-b.x)<b.w/2+r+3&&Math.abs(z-b.z)<b.d/2+r+5)&&!boxes.some(b=>Math.abs(x-b.x)<b.w/2+r&&Math.abs(z-b.z)<b.d/2+r)&&!floorLoot.some(p=>Math.hypot(x-p.x,z-p.z)<r+2)&&!chests.some(p=>Math.hypot(x-p.x,z-p.z)<r+2);
-// Freight, farming and the hatchery experiment share a recognizable island history.
+// Freight, farming and relay research share a recognizable island history.
 for(const [kind,x,z,w,d,h]of [['crane',118,192,2,2,15],['crane',184,180,2,2,13],['telescope',117,-139,2,2,5],['drill',-171,64,3,3,8],['waterwheel',-9,101,2,3,6]])if(clear(x,z,1))prop(kind,x,z,w,d,h);
 for(const [i,b]of buildings.entries())if(b.type==='tower')prop(b.poi==='observatory'?'dome':'beacon',b.x+b.w*.23,b.z,3,3,4,b.baseY+b.h+2.3,{building:i,decorative:true});
 for(let row=0;row<5;row++)for(let col=0;col<10;col++){
@@ -174,4 +174,4 @@ for(let i=0;i<650;i++){
 // Material assignments and stable IDs are shared by harvesting, destruction and rendering.
 for(const [i,b]of boxes.entries())b.objectId='world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
-export const ROYALE_MAP={id:'sunnybreak',revision:3,name:'Sunnybreak Island',tag:'SUNNYBREAK REBORN • 512 × 512',description:'Rivers, ridgelines and nine distinct districts.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,material:'brick'};
+export const ROYALE_MAP={id:'sunnybreak',revision:3,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Rivers, ridgelines and nine distinct districts.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,material:'brick'};

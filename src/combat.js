@@ -1,4 +1,4 @@
-// Original Yolk Yard game balance. Angles are radians; distances are map units.
+// Original Ravelfront game balance. Angles are radians; distances are map units.
 // This module is shared by host simulation, prediction, HUD and bot planning.
 const base={critical:1.75,hitscan:true,gravity:0,projectile:false,pellets:1,falloff:[[0,1],[35,1],[90,.65],[180,.45]],spread:.032,adsSpread:.007,movementPenalty:.022,airPenalty:.04,sprintPenalty:.055,bloomStep:.008,bloomMax:.05,bloomRecovery:.11,recoveryDelay:.14,firstShot:.3,recoilUp:.006,recoilSide:.0018,recoilRecovery:9,recoilADS:.65,buildDamage:24,range:250,flightRange:250,boltSpeed:180,engage:[12,45],magazine:24,reserve:240,reload:2.2,reloadEmpty:2.5,interval:.15,automatic:true};
 export const COMBAT_PROFILES={
@@ -18,7 +18,7 @@ export const RARITY_SCALE=[{damage:1,reload:1},{damage:1.04,reload:.975},{damage
 export function combatProfile(id){const c={...base,...COMBAT_PROFILES[id]};return {...c,aimSpread:c.spread?c.adsSpread/c.spread:0,spreadMax:c.bloomMax,shotBloom:c.bloomStep,spreadRecovery:c.bloomRecovery/30,movementSpread:1};}
 export function rarityVariant(w,rarity){const scale=RARITY_SCALE[Math.max(0,Math.min(4,Math.floor(rarity)||0))];return {...w,damage:w.damage*scale.damage,buildDamage:w.buildDamage*scale.damage,reload:w.reload*scale.reload,reloadEmpty:w.reloadEmpty*scale.reload};}
 export function falloffAt(w,distance){const points=w.falloff;for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i];if(distance<=b[0])return a[1]+(b[1]-a[1])*Math.max(0,(distance-a[0])/(b[0]-a[0]));}return points.at(-1)[1];}
-export const criticalHit=(hit,egg,w)=>w.critical>1&&(hit.y-egg.y)/(egg.bodyScale||1)>=1.32;
+export const criticalHit=(hit,person,w)=>w.critical>1&&hit.y-person.y>=1.505;
 export function updateCombatAccuracy(p,w,a,dt,time,speed=0){
  if(a.weapon&&a.weapon!==w.id)for(const key of Object.keys(a))delete a[key];a.weapon=w.id;
  const settled=time-(a.lastShot??-100),stable=p.aim&&w.stableScope,walking=Math.min(1,speed/Math.max(1,w.speed));
@@ -27,7 +27,7 @@ export function updateCombatAccuracy(p,w,a,dt,time,speed=0){
  a.movement=movement;a.shot=(p.aim?w.adsSpread:w.spread)+a.bloom*(p.aim?.65:1);
  a.still=(p.aim&&p.grounded!==false&&speed<.12&&!p.reloadEnd)?(a.still||0)+dt:0;
  a.firstShot=!!w.firstShot&&a.still>=w.firstShot&&settled>=w.firstShot&&a.bloom<.0001;
- a.spread=a.firstShot?0:stable?0:a.shot+movement;
+ a.spread=a.firstShot?0:stable?0:(a.shot+movement)*(p.focus?.8:1);
  a.recoilPitch=(a.recoilPitch||0)*Math.exp(-w.recoilRecovery*dt);a.recoilYaw=(a.recoilYaw||0)*Math.exp(-w.recoilRecovery*dt);
  return a;
 }

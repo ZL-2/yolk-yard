@@ -1,3 +1,7 @@
+export function migrateReleaseBranding(history){
+ const old=/\beggs?\b|yolk|shell|hatch|waddle|cartoon|albumen/i;
+ return {...history,releases:history.releases.map(r=>old.test(JSON.stringify(r))?{number:r.number,title:'Archived quality update',changes:['Historical improvements to combat, customization and multiplayer. These systems are superseded by Ravelfront: A New Frontier.']}:r)};
+}
 // Published releases, not CI attempts, are the source of the next number.
 export function nextReleaseHistory(build, notes, previous) {
   if (!previous) return { schema: 1, build, releases: notes };

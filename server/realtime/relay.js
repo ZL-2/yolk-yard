@@ -1,11 +1,12 @@
 import {randomUUID} from 'node:crypto';
 import {mergeRelayMessage} from '../../src/relay-queue.js';
+import {ProgressionService} from './progression.js';
 import {PartyService} from './parties.js';
 const MAX_FRAME=2_000_000, MAX_QUEUE=4_000_000, GRACE=10_000;
 const address=/^yolk-yard-v\d+-[A-Z2-9]{8}$/;
 // One persistent process owns every connected socket. No database in the data path.
 export class RealtimeRelay {
-  constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
+  constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.progression=new ProgressionService(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
   attach(ws){
     let peer; const started=Date.now();
     // Browser networking can answer native pings while a costly render blocks JS.
@@ -28,7 +29,7 @@ export class RealtimeRelay {
             if(this.peers.has(id)){ws.send(JSON.stringify({type:'error',error:'unavailable-id'}));ws.close(1008,'Address taken');return;}
             if(this.peers.size>=1000)throw Error('Server full');
             peer={id,token:randomUUID(),ws,links:new Map(),pending:[],pendingBytes:0,seq:0,acked:0,clientSeq:0,history:[],historyBytes:0,lastSeen:Date.now(),rateAt:Date.now(),frames:0,bytes:0};
-            this.peers.set(id,peer);this.sessions.add(peer);
+            this.peers.set(id,peer);this.sessions.add(peer);void this.progression.register(peer,m.progressToken);
           }
           clearTimeout(registration);peer.detachedAt=0;peer.lastSeen=Date.now();
           ws.send(JSON.stringify({type:'ready',id:peer.id,resumed:!!m.resume,resume:peer.token,protocol:2}));
@@ -75,6 +76,7 @@ export class RealtimeRelay {
     }
   }
   handle(peer,m){
+    if(m.type==='progress'){this.progression.frame(peer,m.state);return;}
     if(m.type==='list'){
       const rooms=[...this.peers.values()].filter(p=>p.ws&&p.listing&&p.listing.public!==false&&Date.now()-p.listedAt<15000).map(p=>p.listing).slice(0,100);
       this.send(peer,{type:'rooms',request:m.request,rooms});return;
@@ -83,7 +85,7 @@ export class RealtimeRelay {
       if(!address.test(peer.id))throw Error('Not a room');
       const r=m.room;
       if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!Number.isInteger(r.players)||r.players<1||r.players>20))throw Error('Invalid room');
-      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Egg').slice(0,32),map:String(r.map||'').slice(0,24),mode:String(r.mode||'').slice(0,24),players:r.players,capacity:Math.max(2,Math.min(16,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(32,Number(r.contestantCapacity)||8)),teamSize:r.teamSize===2?2:1,public:r.public!==false,phase:r.phase}:null;
+      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:String(r.mode||'').slice(0,24),players:r.players,capacity:Math.max(2,Math.min(16,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(32,Number(r.contestantCapacity)||8)),teamSize:r.teamSize===2?2:1,public:r.public!==false,phase:r.phase}:null;
       peer.listedAt=Date.now();return;
     }
     if(m.type==='connect'){
@@ -100,6 +102,7 @@ export class RealtimeRelay {
         if(!entry||!['accept','data','close'].includes(entry.type)||typeof entry.channel!=='string')throw Error('Invalid entry');
         const other=peer.links.get(entry.channel);
         if(!other){this.send(peer,{type:'closed',channel:entry.channel});continue;}
+        if(entry.type==='data'&&entry.data?.type==='input')this.progression.input(peer,entry.data.input||entry.data);
         if(entry.type==='data'&&entry.data?.type==='hello'){
           const admission=entry.data.ticket?this.parties.claim(entry.data.ticket,peer.id,other.id):null;
           if(entry.data.ticket&&!admission){this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'Your party reservation expired. Return to the lobby and try again.'}});continue;}
@@ -118,10 +121,10 @@ export class RealtimeRelay {
     for(const [channel,other] of peer.links){other.links.delete(channel);this.send(other,{type:'closed',channel});}
     peer.links.clear();peer.history=[];peer.pending=[];
   }
-  sweep(){for(const peer of this.peers.values()){
+  sweep(){this.progression.sweep();for(const peer of this.peers.values()){
     if(peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)this.remove(peer);
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
-  close(){this.parties.close();clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');}
+  close(){void this.progression.close();this.parties.close();clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');}
 }

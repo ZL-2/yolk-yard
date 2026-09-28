@@ -1,9 +1,9 @@
 import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon } from "./data.js";
 import {groundAt,terrainHit} from './terrain.js';
-export const RADIUS = 0.46,
-  HEIGHT = 1.75,
-  EYE = 1.43;
+export const RADIUS = 0.32,
+  HEIGHT = 1.85,
+  EYE = 1.70;
 export const ROYALE_MOVEMENT = Object.freeze({walk:5, sprint:7.4});
 export const dist = (a, b) =>
   Math.hypot(a.x - b.x, (a.y || 0) - (b.y || 0), a.z - b.z);
@@ -59,22 +59,34 @@ export function wallDistance(map, o, d, max = 200) {
   const ground=terrainHit(map,o,d,t);if(ground)t=Math.min(t,ground.distance);
   return t;
 }
-// Small shell margin covers the centered waddle and bounded render smoothing.
-export const EGG_HIT = { radius: 0.64, height: 0.94, center: 0.9 };
-export function rayEgg(o, d, p) {
-  const scale=p.bodyScale||1, r = [EGG_HIT.radius*scale, EGG_HIT.height*scale, EGG_HIT.radius*scale],
-    a = [(o.x - p.x) / r[0], (o.y - p.y - EGG_HIT.center*scale) / r[1], (o.z - p.z) / r[2]],
-    v = [d.x / r[0], d.y / r[1], d.z / r[2]];
-  const A = v.reduce((s, x) => s + x * x, 0),
-    B = 2 * a.reduce((s, x, i) => s + x * v[i], 0),
-    C = a.reduce((s, x) => s + x * x, 0) - 1,
-    D = B * B - 4 * A * C;
-  if (A < 1e-12) return Infinity;
-  if (C <= 0) return 0; // A segment starting inside the shell already overlaps it.
-  if (D < 0) return Infinity;
-  const t = (-B - Math.sqrt(D)) / (2 * A);
-  return t >= 0 ? t : Infinity;
+// Fixed anatomical regions, independent of cosmetics and visual animation.
+// Torso/limbs all deal body damage. Only the head region is critical.
+export const HUMAN_HIT=[
+ {region:'head',x:0,y:1.68,z:0,rx:.145,ry:.18,rz:.145},
+ {region:'body',x:0,y:1.24,z:0,rx:.26,ry:.30,rz:.17},
+ {region:'body',x:0,y:.92,z:0,rx:.20,ry:.19,rz:.17},
+ ...[-1,1].flatMap(side=>[
+  {region:'body',x:side*.31,y:1.29,z:-.03,rx:.095,ry:.19,rz:.13},
+  {region:'body',x:side*.24,y:1.15,z:-.22,rx:.10,ry:.13,rz:.20},
+  {region:'body',x:side*.12,y:.65,z:0,rx:.11,ry:.26,rz:.13},
+  {region:'body',x:side*.12,y:.25,z:0,rx:.08,ry:.23,rz:.1}])
+];
+export const humanFlightPitch=p=>p.flight==='dive'?.78:p.flight==='glide'?.09+Math.max(-.06,Math.min(.11,(-(p.vx||0)*Math.sin(p.yaw||0)-(p.vz||0)*Math.cos(p.yaw||0))*.005)):0;
+export function humanHit(o,d,p){
+ const yaw=p.yaw||0,c=Math.cos(yaw),s=Math.sin(yaw),dx=o.x-p.x,dz=o.z-p.z;
+ const origin={x:dx*c-dz*s,y:o.y-p.y,z:dx*s+dz*c},v={x:d.x*c-d.z*s,y:d.y,z:d.x*s+d.z*c};
+ const pitch=humanFlightPitch(p),cp=Math.cos(pitch),sp=Math.sin(pitch);for(const vector of [origin,v]){const y=vector.y,z=vector.z;vector.y=y*cp+z*sp;vector.z=-y*sp+z*cp;}
+ let result={distance:Infinity,region:null};
+ for(const h of HUMAN_HIT){
+  const a=[(origin.x-h.x)/h.rx,(origin.y-h.y)/h.ry,(origin.z-h.z)/h.rz],b=[v.x/h.rx,v.y/h.ry,v.z/h.rz];
+  const A=b.reduce((n,x)=>n+x*x,0),B=2*a.reduce((n,x,i)=>n+x*b[i],0),C=a.reduce((n,x)=>n+x*x,0)-1,D=B*B-4*A*C;
+  if(A<1e-12||D<0)continue;const t=C<=0?0:(-B-Math.sqrt(D))/(2*A);
+  if(t>=0&&t<result.distance)result={distance:t,region:h.region};
+ }return result;
 }
+// Stable internal API retained for saved simulations and existing callers.
+export const rayEgg=(o,d,p)=>humanHit(o,d,p).distance;
+export const rayHuman=rayEgg;
 function overlaps(p, b) {
   return (
     p.y < b.y + b.h - 0.015 &&
@@ -164,7 +176,7 @@ function movePlayerStep(p, input, map, dt) {
   const speed =
     (p.inventory ? ROYALE_MOVEMENT[p.sprinting ? 'sprint' : 'walk'] : weapon(p.weapon).speed) *
     (input.aim ? 0.7 : 1) *
-    (p.crown != null ? 0.88 : 1);
+    (p.crown != null ? 0.88 : 1)*(p.quickstep?1.12:1);
   const dx = (-Math.sin(p.yaw) * f + Math.cos(p.yaw) * s) * speed * dt,
     dz = (-Math.cos(p.yaw) * f - Math.sin(p.yaw) * s) * speed * dt;
   if (input.jump && p.grounded && !p.jumpLatch) {
@@ -233,7 +245,7 @@ export function sanitizeInput(i = {}) {
   };
 }
 
-export const VIEWMODEL = { scale: 0.62, x: 0.28, y: -0.28, z: -0.78 };
+export const VIEWMODEL = { scale: 0.55, x: 0.10, y: -0.26, z: -0.20 };
 export function muzzleOrigin(p, w) {
   const f = direction(p.yaw, p.pitch),
     right = { x: Math.cos(p.yaw), y: 0, z: -Math.sin(p.yaw) };
@@ -247,7 +259,7 @@ export function muzzleOrigin(p, w) {
     forward = -VIEWMODEL.z + w.muzzle * VIEWMODEL.scale;
   return {
     x: p.x + right.x * side + up.x * height + f.x * forward,
-    y: p.y + EYE * (p.bodyScale||1) + up.y * height + f.y * forward,
+    y: p.y + EYE + up.y * height + f.y * forward,
     z: p.z + right.z * side + up.z * height + f.z * forward,
   };
 }

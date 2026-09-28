@@ -1,3 +1,4 @@
+import {makeHumanoid,animateHumanoid,humanoidDiagnostics} from './humanoid.js';
 import {lobbyScene} from './lobby-scene.js';
 import {lootModel,gliderModel} from './royale-art.js';
 import {inventoryPreview} from './inventory-previews.js';
@@ -75,99 +76,16 @@ function cylinder(parent, x, y, z, radius, height, color, segments = 16) {
   parent.add(m);
   return m;
 }
-export function eggGeometry() {
-  const pts = [];
-  for (let i = 0; i <= 64; i++) {
-    const t = (Math.PI * i) / 64,
-      y = 0.08 + (1.6 * (1 - Math.cos(t))) / 2,
-      r = Math.sin(t) * (0.55 - (0.1 * i) / 64);
-    pts.push(new THREE.Vector2(r, y));
-  }
-  return new THREE.LatheGeometry(pts, 64);
-}
-const eggGeo = eggGeometry();
+// Compatibility export; all callers now construct the shared human rig.
 export function makeEgg(profile, team = -1, withWeapon = true) {
-  if(team>=0)profile={...profile,color:team===0?"#3d8ce8":"#d94949",accent:team===0?"#3d8ce8":"#d94949",pattern:0};
-  const group = new THREE.Group(),
-    body = new THREE.Mesh(eggGeo, patternedShell(profile));
-  body.userData.ownedMaterial = true;
-  body.castShadow = true;
-  group.add(body);
-  // Jagged paths follow the same lathed shell surface and reveal with damage.
-  const cracks = [];
-  for (let n = 0; n < 12; n++) {
-    const points = [];
-    for (let j = 0; j <= 14; j++) {
-      const t = 0.22 + j / 14 * 2.65;
-      const angle = n * Math.PI / 6 + Math.sin(j * 2.4 + n) * 0.085;
-      const r = Math.sin(t) * (0.55 - 0.1 * t / Math.PI) + 0.007;
-      points.push(new THREE.Vector3(Math.sin(angle)*r, 0.08+0.8*(1-Math.cos(t)), Math.cos(angle)*r));
-    }
-    const crack = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineBasicMaterial({color: 0x44332d}));
-    crack.visible = false;
-    group.add(crack);
-    cracks.push(crack);
+  const group=makeHumanoid({...profile,teamColor:team>=0?(team===0?'#3d8ce8':'#d94949'):null});
+  if(shopItem(profile.backbling)){const back=makeShopBack(profile.backbling);back.position.set(0,1.23,.18);group.add(back);group.userData.back=back;}
+  if(withWeapon){
+    const held=new THREE.Group(),blaster=makeBlaster(profile.weapon,profile.wrap),arms=makeArms(profile.weapon,profile,false);
+    held.position.set(VIEWMODEL.x,EYE+VIEWMODEL.y,VIEWMODEL.z);held.scale.setScalar(VIEWMODEL.scale);
+    arms.visible=false;held.add(blaster,arms);group.add(held);Object.assign(group.userData,{blaster,held,arms});
   }
-  group.userData.cracks = cracks;
-
-  const trim = team < 0 ? (profile.accent || 0xf2b933) : TEAM_COLORS[team];
-  const band = new THREE.Mesh(
-    new THREE.TorusGeometry(0.446, 0.064, 8, 30),
-    mat(trim),
-  );
-  band.position.y = 1.02;
-  band.rotation.x = Math.PI / 2;
-  band.visible = team >= 0 || profile.eyewear !== NO_EYEWEAR;
-  group.add(band);
-  addEyewear(group, profile, {block, ball, mat});
-
-  const hat = Number(profile.hat) || 0;
-  if (hat === 1) {
-    for (const x of [-0.45, 0.45])
-      ball(group, x, 1.19, 0, 0.12, 0.19, 0.14, 0x315569);
-    const hoop = new THREE.Mesh(
-      new THREE.TorusGeometry(0.41, 0.055, 8, 24, Math.PI),
-      mat(trim),
-    );
-    hoop.position.y = 1.33;
-    group.add(hoop);
-  }
-  if (hat === 2) {
-    ball(group, 0, 1.55, 0, 0.33, 0.19, 0.32, trim);
-    block(group, 0, 1.55, -0.27, 0.53, 0.06, 0.42, trim);
-  }
-  if (hat === 3) {
-    cylinder(group, 0, 1.62, 0, 0.27, 0.18, 0xf9c84c);
-    for (let i = 0; i < 5; i++) {
-      const a = (i * Math.PI * 2) / 5;
-      const cone = new THREE.Mesh(
-        new THREE.ConeGeometry(0.075, 0.2, 4),
-        mat(0xf9c84c),
-      );
-      cone.position.set(Math.sin(a) * 0.22, 1.78, Math.cos(a) * 0.22);
-      group.add(cone);
-    }
-  }
-  if (hat === 4) {
-    cylinder(group, 0, 1.79, 0, 0.027, 0.28, 0x6f9a50);
-    const leaf = ball(group, 0.1, 1.87, 0, 0.17, 0.04, 0.08, 0x8ac763);
-    leaf.rotation.z = 0.4;
-  }
-  addHeadwear(group, profile, {ball, block, cylinder, mat});
-  addShopOutfit(group,profile);
-  if(shopItem(profile.backbling)){const back=makeShopBack(profile.backbling);back.position.set(0,.95,.47);group.add(back);}
-  if (withWeapon) {
-    const blaster = makeBlaster(profile.weapon,profile.wrap);
-    const held = new THREE.Group();
-    held.position.set(VIEWMODEL.x, EYE + VIEWMODEL.y, VIEWMODEL.z);
-    held.scale.setScalar(VIEWMODEL.scale);
-    const arms = makeArms(profile.weapon, profile, false);
-    held.add(blaster, arms); group.add(held);
-    group.userData.blaster = blaster;
-    group.userData.held = held;
-    group.userData.arms = arms;
-  }
+  animateHumanoid(group,{health:100,grounded:true},1/60,0,{menu:true});
   return group;
 }
 function label(text, color = "#ffffff", compact = false, critical = false, runs = null) {
@@ -328,6 +246,7 @@ export class View {
   }
   disposeGroup(group) {
     group.traverse((o) => {
+      if (o.isSkinnedMesh) o.skeleton?.dispose();
       if (o.isLine) { o.geometry.dispose(); o.material.dispose(); }
       if (o.isSprite) {
         o.material.map?.dispose();
@@ -336,7 +255,6 @@ export class View {
         o.isMesh &&
         o.geometry !== boxGeo &&
         o.geometry !== sphereGeo &&
-        o.geometry !== eggGeo &&
         !o.geometry.userData.shared
       )
         o.geometry?.dispose();
@@ -438,6 +356,8 @@ export class View {
   diagnostics() {
     return {
       menuPose: this.menuPose,
+      humanoid: humanoidDiagnostics(this.menuEgg),
+      humans: [...this.models.values()].map(humanoidDiagnostics),
       weapon: this.localWeapon,
       draw: this.drawPresentation,
       outgoing: !!this.outgoing,
@@ -486,13 +406,13 @@ export class View {
     return this.portraits.get(id);
   }
   shopPortrait(item,angle=0){
-    this.shopPortraits??=new Map();const key=(item.previewKey||item.id)+':'+angle;if(this.shopPortraits.has(key))return this.shopPortraits.get(key);
+    this.shopPortraits??=new Map();const key=(item.previewKey||item.id)+':'+angle;if(this.shopPortraits.has(key))return this.shopPortraits.get(key);if(this.shopPortraits.size>140)this.shopPortraits.delete(this.shopPortraits.keys().next().value);
     if(!this.portraitRenderer){this.portraitRenderer=makeRenderer({alpha:true,antialias:true});this.portraitRenderer.setPixelRatio(1);}
     this.portraitRenderer.setSize(320,320);
     const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0x768697,3));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(-3,5,-4);scene.add(light);
     let model;
-    if(item.starter){const kit={block,ball,cylinder,mat,palette};model=item.slot==='pickaxe'?lootModel({id:'pickaxe',pickaxe:true},kit,{ground:false}):item.slot==='glider'?gliderModel(kit):item.slot==='wrap'?makeBlaster('sprinter'):makeEgg({...item.profile,outfit:''},-1,false);}
-    else if(item.slot==='outfit')model=makeEgg({...item.profile,outfit:item.id},-1,false);
+    if(item.starter){const kit={block,ball,cylinder,mat,palette};model=item.slot==='pickaxe'?lootModel({id:'pickaxe',pickaxe:true},kit,{ground:false}):item.slot==='glider'?gliderModel(kit):item.slot==='wrap'?makeBlaster('sprinter'):makeEgg({...item.profile,outfit:''},-1,!!item.characterInspection);}
+    else if(item.slot==='outfit')model=makeEgg({...item.profile,outfit:item.id},-1,!!item.characterInspection);
     else if(item.slot==='wrap')model=makeBlaster('sprinter',item.id);
     else if(item.slot==='pickaxe')model=makeShopPickaxe(item.id);
     else if(item.slot==='backbling')model=makeShopBack(item.id);
@@ -791,12 +711,11 @@ export class View {
       const pose=this.menuPose.update(dt),held=this.menuEgg.userData.held;
       this.menuEgg.rotation.y=pose.yaw;
       held.position.set(pose.x,pose.y,pose.z);held.rotation.set(pose.pitch,0,pose.roll,'YXZ');held.updateMatrix();
-      const inverse=held.matrix.clone().invert();
-      this.menuEgg.userData.arms.userData.limbs.forEach((l,i)=>{l.shoulder.copy(this.menuShoulders[i]).applyMatrix4(inverse);l.lastWrist.set(Infinity,Infinity,Infinity);});
-      const blaster=this.menuEgg.userData.blaster,blend=1-Math.exp(-Math.min(dt,.05)*14);
-      blaster.position.lerp(new THREE.Vector3(0,pose.flight,0),blend);
-      blaster.quaternion.slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(pose.spin,0,0)),blend);
-      updateArms(this.menuEgg.userData.arms,pose.reload,blaster,0,1,{release:pose.release,blend});
+      held.position.set(.10,1.39,-.22);held.rotation.set(-.12+Math.sin(this.clock*.65)*.035,0,-.06,'YXZ');
+      const blaster=this.menuEgg.userData.blaster;
+      updateArms(this.menuEgg.userData.arms,pose.clip==='reload'?pose.reload:-1,blaster);
+      animateHumanoid(this.menuEgg,{health:100,grounded:true,yaw:pose.yaw},dt,this.clock,{menu:true});
+      for(const teammate of this.partyEggs||[])animateHumanoid(teammate,{health:100,grounded:true},dt,this.clock+1.2,{menu:true});
       const partyOffset=this.partyEggs?.length?1:0,narrow=this.camera.aspect<.85;
       this.camera.position.set(5.8+partyOffset,4.3,narrow?(partyOffset?22.5:19):12.5);
       this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):1.8, 0);
@@ -896,7 +815,7 @@ export class View {
       const seen = new Set();
       for (const p of state.players) {
         // Transport passengers share one simulation position; the airship
-        // represents them until exit instead of rendering sixteen overlapping eggs.
+        // represents them until exit instead of rendering sixteen overlapping Marks.
         if(state.royale&&p.flight==='transport')continue;
         if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.75)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
         seen.add(p.id);
@@ -915,8 +834,8 @@ export class View {
             { ...p, weapon: gun(p).id },
             mode(state.options.mode).teams ? p.team : -1,
           );
-          const aura = new THREE.Mesh(new THREE.SphereGeometry(1,24,16),new THREE.MeshBasicMaterial({color:0x83e6ff,transparent:true,opacity:.18,depthWrite:false,wireframe:true}));
-          aura.position.y=.9;aura.scale.set(.73,1.04,.73);model.add(aura);model.userData.bonusAura=aura;
+          const aura = new THREE.Mesh(new THREE.CapsuleGeometry(.37,1.1,5,10),new THREE.MeshBasicMaterial({color:0x83e6ff,transparent:true,opacity:.18,depthWrite:false,wireframe:true}));
+          aura.position.y=.95;model.add(aura);model.userData.bonusAura=aura;
           model.userData.signature = sig;
           const name = label(
             p.name,
@@ -924,7 +843,7 @@ export class View {
               ? "#b3f2ff"
               : "#ffffff",
           );
-          name.position.y = 2.08;
+          name.position.y = 2.15;
           name.visible = !state.royale||teammates(state.options,p,local);
           model.add(name);
           this.actors.add(model);
@@ -940,7 +859,7 @@ export class View {
             model.userData.outgoing={group:old,position:old.position.clone(),rotation:old.rotation.clone()};
           }else{old.removeFromParent();this.disposeGroup(old);}
           const held=new THREE.Group(),blaster=makeBlaster(gun(p).id,p.wrap),arms=makeArms(gun(p).id,p,false);
-          held.scale.setScalar(VIEWMODEL.scale);held.add(blaster,arms);model.add(held);
+          held.scale.setScalar(VIEWMODEL.scale);arms.visible=false;held.add(blaster,arms);model.add(held);
           Object.assign(model.userData,{held,blaster,arms,armRecoil:0});
           model.userData.shopTool=null;
         }
@@ -950,18 +869,8 @@ export class View {
         if(model.userData.shopTool)model.userData.shopTool.visible=harvesting;
         model.userData.blaster.visible=!harvesting;
         model.userData.draw=draw;
-        // Continuous time-based gait; network snapshots never jump the phase.
-        const walking = p.health > 0 && p.grounded && p.moving;
-        const gait = model.userData.gait = THREE.MathUtils.lerp(
-          model.userData.gait || 0, walking ? 1 : 0, 1 - Math.exp(-dt * 6));
-        const stride = model.userData.stride = (model.userData.stride || 0) + dt * 4.4 * gait;
-        const bob = (1 - Math.cos(stride * 2)) * 0.014 * gait;
-        const deathAge = p.health <= 0 ? state.time - (p.eliminatedAt ?? p.respawnAt - 3) : 0;
-        model.visible = p.health > 0 || deathAge < 0.75;
-        model.userData.cracks.forEach((crack, i) => {
-          crack.visible = p.health < 100 && i < Math.ceil((1-p.health/100)*12);
-        });
-
+        const deathAge=p.health<=0?state.time-(p.eliminatedAt??p.respawnAt-3):0;
+        model.visible=p.health>0||deathAge<1.3;
         if (model.userData.arms) {
           const recoil = model.userData.armRecoil = Math.max(0, (model.userData.armRecoil || 0) - dt * 7);
           const hands = updateArms(model.userData.arms, draw.active?-1:reloadProgress(p, state.time), model.userData.blaster, recoil,draw.progress);
@@ -977,7 +886,7 @@ export class View {
             model.userData.held.rotation.x+=.16*gesture;
           }
         }
-        // Do not let cosmetic smoothing leave a moving shell behind its hitbox.
+        // Do not let cosmetic smoothing leave a moving character behind its hit regions.
         const base = model.userData.basePosition ||= new THREE.Vector3(p.x, p.y, p.z);
         const targetPosition = new THREE.Vector3(p.x, p.y, p.z);
         base.lerp(targetPosition, Math.min(1, dt * 18));
@@ -987,31 +896,14 @@ export class View {
         let delta = p.yaw - model.rotation.y;
         delta = Math.atan2(Math.sin(delta), Math.cos(delta));
         model.rotation.y = p.id===local?.id ? p.yaw : model.rotation.y + delta * Math.min(1, dt * 18);
-        model.scale.setScalar(
-          state.time < p.shieldUntil
-            ? 1.03 + Math.sin(this.clock * 10) * 0.02
-            : 1,
-        );
-        model.scale.multiplyScalar(p.bodyScale || 1);
+        model.scale.setScalar(1);model.rotation.x=model.rotation.z=0;
         const aura=model.userData.bonusAura;
-        aura.visible=p.health>0&&(p.streakArmor>0||p.damageUntil>state.time);
+        aura.visible=p.health>0&&(p.streakArmor>0||p.damageUntil>state.time||state.time<p.shieldUntil);
         aura.material.color.setHex(p.damageUntil>state.time?0xff625f:0x83e6ff);
-        aura.material.opacity=.13+Math.sin(this.clock*5)*.05;
-        if (p.health <= 0) {
-          const collapse = Math.min(1, Math.max(0, deathAge - 0.2) / 0.55);
-          model.scale.set(1 + collapse * 0.25, 1 - collapse * 0.95, 1 + collapse * 0.25);
-          model.rotation.z = collapse * 0.35;
-        } else {
-          model.rotation.z = Math.sin(stride) * 0.27 * gait;
-          model.rotation.x = Math.cos(stride * 2) * 0.015 * gait;
-          // Rotate around the shell center, not its feet: the wide waddle no
-          // longer swings the visible upper body outside the collision shell.
-          const pivot = new THREE.Vector3(0, 0.88, 0);
-          const rotatedPivot = pivot.clone().multiply(model.scale).applyEuler(model.rotation);
-          model.position.add(pivot).sub(rotatedPivot);
-          model.position.y += bob;
-        }
+        aura.material.opacity=.13+Math.sin(this.clock*5)*.025;
         if(p.inventory)this.royaleView.animateActor(model,p,this.clock,dt);
+        animateHumanoid(model,p,dt,state.time,{distance:this.camera.position.distanceTo(model.position)});
+
       }
       for (const [id, model] of this.models)
         if (!seen.has(id)) {

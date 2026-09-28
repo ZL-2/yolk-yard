@@ -1,4 +1,5 @@
 // Original procedural sound palette. Every sound is generated locally, with no samples/CDN.
+import {getMap} from './maps.js';
 import {ITEMS} from './royale-data.js';
 const note=(f,d=.12,v=.12,w='sine',to=0,at=0)=>({f,d,v,w,to,at});
 const noise=(f,d=.15,v=.15,at=0)=>({noise:true,f,d,v,at});
@@ -48,7 +49,11 @@ export const SOUND_CUES={
  'storm-exit':[noise(2000,.23,.05),note(440,.17,.05,'sine',800)],
  'storm-tick':[noise(400,.12,.035),note(110,.1,.035,'sine',80)],
  elimination:[note(740,.15,.08),note(1108,.25,.07,'triangle',0,.11)],
- 'shell-down':[noise(1100,.23,.09),note(420,.45,.1,'triangle',65)],
+ 'operator-down':[noise(250,.22,.08),noise(700,.12,.035,.08)],
+ 'step-soil':[noise(380,.085,.042),noise(1900,.055,.015)],
+ 'step-wood':[noise(650,.07,.042),note(130,.04,.018,'triangle',85)],
+ 'step-metal':[noise(1350,.065,.035),note(530,.04,.015,'sine',270)],
+ 'step-stone':[noise(930,.06,.045),noise(2300,.035,.015)],
  'spectator-switch':[noise(2400,.09,.025),note(520,.08,.04,'sine',780)],
  'top-ten':[note(440,.12,.055),note(587,.18,.06,'sine',0,.12),note(880,.25,.05,'sine',0,.24)],
  'final-duel':[note(196,.25,.08,'triangle'),note(294,.3,.07,'triangle',0,.2),note(392,.4,.08,'triangle',0,.4)],
@@ -99,7 +104,7 @@ export class Sound {
  }
  tone(freq,duration=.09,type='sine',volume=.15,end=0){this.layer(note(freq,duration,volume,type,end));}
  shot(id,distance=0,position=null){if(!position&&distance>160)return;if(position)position={...position,radius:id==='thumper'?190:['needle','anchor','peeper'].includes(id)?170:125};const [f,filter,d]=SHOT_PALETTE[id]||SHOT_PALETTE.sprinter;const scale=position?1:1/(1+distance/15);this.layer(note(f,d,.16,id==='comet'?'sine':'triangle',id==='comet'?180:35),position,'effects',scale);this.layer(noise(filter,d*.65,.15),position,'effects',scale);this.layer(note(filter*.65,.045,.025,'square',140),position,'effects',scale);if(distance<15)this.cue('shell-casing',position,.7);}
- death(distance=0,position=null){if(distance>38)return;this.cue('shell-down',position,1/(1+distance/12));}
+ death(distance=0,position=null){if(distance>38)return;this.cue('operator-down',position,1/(1+distance/12));}
  hit(){this.layer(note(950,.065,.11,'sine',1400));}
  pop(distance=0,position=null){if(distance>190)return;const source=position?{...position,radius:190}:null,scale=source?1:1/(1+distance/18);this.layer(noise(160,.38,.25),source,'effects',scale);this.layer(note(70,.4,.17,'triangle',25),source,'effects',scale);}
  pickup(){this.cue('pickup-1');}eliminate(){this.cue('elimination');}
@@ -117,7 +122,7 @@ export class Sound {
  event(e,me,state){
   if(e.type==='round')this.cue('round-start');
   if(e.type==='royale-cue'){
-   // Personal inventory cues are local, spatial actions are audible to nearby eggs.
+   // Personal inventory cues are local, spatial actions are audible to nearby operators.
    if(e.player&&e.player!==me?.id&&e.x===undefined)return;
    if(e.cue==='victory')this.cue(state.royale?.winnerId===me?.id?'victory':'defeat');
    else this.cue(e.cue,e.x===undefined?null:e);
@@ -131,6 +136,15 @@ export class Sound {
   this.clock+=dt;this.listener=me;
   if(!playing||!state||!me){if(this.loops.size)this.stopWorld();return;}
   const royale=state.royale,ground=me.flight==='ground'||!royale;
+  this.stepClocks??=new Map();
+  const map=getMap(state.options?.map);
+  for(const p of state.players||[]){if(p.health<=0||!p.grounded||p.flight&&p.flight!=='ground'||Math.hypot(p.x-me.x,p.z-me.z)>18)continue;
+   const speed=Math.hypot(p.vx||0,p.vz||0),previous=this.stepClocks.get(p.id)||0,next=previous+speed*dt/(p.sprinting?1:.85);this.stepClocks.set(p.id,next);
+   if(Math.floor(next)>Math.floor(previous)&&speed>.8){const support=map?.boxes?.find(b=>Math.abs(b.y+b.h-p.y)<.08&&Math.abs(b.x-p.x)<b.w/2&&Math.abs(b.z-p.z)<b.d/2),surface=support?(['wood','metal'].includes(support.material)?support.material:'stone'):'soil';this.cue('step-'+surface,p,p.id===me.id?.75:.6);}
+  }
+  if(this.stepClocks.size>48)this.stepClocks=new Map([...this.stepClocks].filter(([id])=>state.players.some(p=>p.id===id)));
+  if(ground&&me.grounded&&this.wasAirborne&&!royale)this.cue('land',me,.7);this.wasAirborne=!me.grounded;
+
   this.loop('island',royale?.18:0,{freq:900,volume:.055});
   this.loop('transport',me.flight==='transport'?1:0,{freq:72,volume:.13,noise:false});
   this.loop('rotor',me.flight==='transport'?(.7+Math.sin(this.clock*20)*.2):0,{freq:220,volume:.08});

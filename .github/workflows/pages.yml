@@ -1,7 +1,7 @@
-name: Test and publish Yolk Yard
+name: Test and publish Ravelfront
 on:
   push:
-    branches: [main, match-setup, better-together]
+    branches: [main, match-setup, better-together, ravelfront]
     paths-ignore:
       - public/room-test.html
       - public/room-test.js
@@ -29,6 +29,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Verify Ravelfront operators, cosmetics and populated island
+        if: contains(github.event.head_commit.message, '[rebrand]')
+        run: |
+          npx playwright install --with-deps chromium
+          node scripts/rebrand-browser-check.mjs
+          node scripts/party-duos-check.mjs
+          node scripts/lobby-duos-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[rebrand]')
+        with:
+          name: ravelfront-verification
+          path: test-results
+
       - name: Verify party service, Duo rules and responsive lobby
         if: contains(github.event.head_commit.message, '[lobby-duos]')
         run: |
@@ -36,7 +49,7 @@ jobs:
           npx playwright install --with-deps chromium
           node scripts/lobby-duos-check.mjs
       - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[lobby-duos]')
+        if: always() && (contains(github.event.head_commit.message, '[lobby-duos]') || contains(github.event.head_commit.message, '[rebrand]'))
         with:
           name: lobby-duos
           path: test-results/lobby-duos
@@ -55,7 +68,7 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           node scripts/inventory-layout-check.mjs
-      - name: Verify Egg Shop purchases, previews and mobile layout
+      - name: Verify Outfitter purchases, previews and mobile layout
         if: contains(github.event.head_commit.message, '[egg-shop]')
         run: |
           npx playwright install --with-deps chromium
@@ -86,7 +99,7 @@ jobs:
   browser:
     # Relay-only releases use the real WebSocket/simulation checks in the build job.
     # Other verified releases retain the existing local-browser opt-in.
-    if: "!(contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]'))"
+    if: "!(contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || contains(github.event.head_commit.message, '[rebrand]'))"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -124,7 +137,7 @@ jobs:
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           BROWSER_RESULT: ${{ needs.browser.result }}
-          VERIFIED_RELEASE: ${{ (contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]')) }}
+          VERIFIED_RELEASE: ${{ (contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || contains(github.event.head_commit.message, '[rebrand]')) }}
         run: |
           test "$BUILD_RESULT" = success
           if [ "$VERIFIED_RELEASE" = true ]; then
@@ -157,7 +170,7 @@ jobs:
       - uses: actions/deploy-pages@v4
         id: deployment
   verify-live:
-    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[lobby-duos]')
+    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[lobby-duos]') || contains(github.event.head_commit.message, '[rebrand]'))
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 8

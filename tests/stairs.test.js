@@ -15,7 +15,7 @@ for(const dt of [1/20,1/60,1/144])for(const narrow of [true,false])test(`stairs 
 });
 test('steps cannot climb tall walls or low ceilings and jumps still leave the ground',()=>{
  for(const boxes of [[{x:0,y:0,z:0,w:4,d:1,h:1}],[{x:0,y:0,z:0,w:4,d:1,h:.4},{x:0,y:1.9,z:0,w:4,d:1,h:1}]]){
- const p=player();for(let i=0;i<40;i++)movePlayer(p,{forward:1},{size:50,boxes},1/60);assert.ok(p.z<-.9);assert.equal(p.y,0);
+ const p=player();for(let i=0;i<40;i++)movePlayer(p,{forward:1},{size:50,boxes},1/60);assert.ok(p.z<-.82);assert.equal(p.y,0);
  }
  const p=player();movePlayer(p,{jump:true},{size:50,boxes:[]},1/60);assert.equal(p.grounded,false);assert.ok(p.y>0);
 });

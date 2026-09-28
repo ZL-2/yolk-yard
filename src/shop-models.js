@@ -21,9 +21,9 @@ export function makeShopPickaxe(id){
  part(g,new THREE.CylinderGeometry(.045,.065,1.25,12),c,0,.05,0);for(let j=0;j<5;j++)ring(g,a,0,-.39+j*.065,0,.063,.012).rotation.x=Math.PI/2;
  if(k===0){const crescent=part(g,new THREE.TorusGeometry(.38,.095,8,28,Math.PI*1.45),a,0,.6,0);crescent.rotation.z=-.7;orb(g,c,0,.6,0,.12);}
  if(k===1){box(g,c,0,.65,0,.58,.22,.24);for(let j=-1;j<=1;j++)part(g,new THREE.ConeGeometry(.085,.29,8),a,j*.22,.87,0);orb(g,a,0,.65,-.16,.09);}
- if(k===2){box(g,a,0,.7,0,.65,.11,.16);for(const x of [-.26,0,.26])box(g,c,x,.9,0,.085,.4,.12);}
+ if(k===2){const blade=part(g,new THREE.ConeGeometry(.12,.75,4),a,.18,.8,0);blade.rotation.z=-.8;box(g,c,0,.62,0,.38,.15,.18);}
  if(k===3){const crystal=part(g,new THREE.OctahedronGeometry(.35),a,0,.69,0,true);crystal.scale.set(1.6,.9,.6);box(g,c,0,.7,0,.2,.28,.27);}
- if(k===4){for(let j=0;j<6;j++){const angle=j*Math.PI/3;orb(g,a,Math.cos(angle)*.25,.75+Math.sin(angle)*.25,0,.16);}orb(g,c,0,.75,-.06,.17);}
+ if(k===4){box(g,c,0,.7,0,.64,.24,.28);for(const x of [-.3,.3])box(g,a,x,.7,0,.07,.28,.32);}
  if(k===5){box(g,c,0,.65,0,.8,.22,.2);for(const x of [-.43,.43]){const hook=part(g,new THREE.ConeGeometry(.15,.38,10),a,x,.52,0);hook.rotation.z=Math.sign(x)*2.35;}}
  g.name=item.name;return g;
 }
@@ -35,7 +35,7 @@ export function makeShopBack(id){
  if(k===1){const plate=part(g,new THREE.CylinderGeometry(.32,.24,.09,6),a,0,0,.17);plate.rotation.x=Math.PI/2;orb(g,c,0,0,.25,.12);}
  if(k===2){ring(g,a,0,0,.19,.2);orb(g,a,0,0,.21,.14);for(let j=0;j<3;j++)box(g,a,0,-.19+j*.15,.16,.38,.035,.045);}
  if(k===3){for(let j=0;j<5;j++){const crystal=part(g,new THREE.OctahedronGeometry(.18),a,(j-2)*.11,.1+Math.sin(j)*.12,.17,true);crystal.scale.y=1.8;}}
- if(k===4){for(let j=0;j<3;j++){part(g,new THREE.CylinderGeometry(.018,.018,.35,6),a,(j-1)*.14,.35,0);orb(g,j%2?c:a,(j-1)*.14,.55,.02,.13);}}
+ if(k===4){for(let j=0;j<3;j++){part(g,new THREE.CylinderGeometry(.018,.018,.45,6),a,(j-1)*.14,.4,0);box(g,a,(j-1)*.14,.03,.14,.08,.26,.08);}}
  if(k===5){const shell=part(g,new THREE.SphereGeometry(.3,16,10),a,0,0,.1);shell.scale.set(1,1.1,.5);for(let j=-2;j<=2;j++)box(g,c,j*.09,0,.25,.025,.4,.035);}
  return g;
 }

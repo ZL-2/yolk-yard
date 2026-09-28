@@ -1,3 +1,5 @@
+> Historical technical notes. Current identity, humanoid combat, economy and timing are specified in [Ravelfront](RAVELFRONT.md).
+
 # Connected Island — Quality Updates 55–56
 
 This update supersedes the old pickaxe numbering, 16-contestant target and
@@ -7,7 +9,7 @@ the source note number is not the deployment counter. Network protocol is 18.
 
 ## Population and pacing
 
-Sunnybreak is 512 × 512 units, with nine major districts, 17 smaller landmarks,
+Ravel Coast is 512 × 512 units, with nine major districts, 17 smaller landmarks,
 61 buildings, 100 interior floors, 603 floor-loot sockets and 170 chest sockets.
 The target is **32 contestants**, including **at most 16 human contestants**.
 The existing relay has 20 connection seats; four remain separate observers.

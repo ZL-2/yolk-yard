@@ -6,7 +6,7 @@ export class StreakUI{
  update(state,p){
   if(!arenaBonuses(state.options.mode)||p.health<=0||p.spectating){this.root.hidden=true;this.message=null;return;}
   const active=[];
-  for(const [key,name]of [['damageUntil','Egg Breaker'],['eggsUntil','Double Eggs'],['miniUntil','Mini Egg']])if(p[key]>state.time)active.push({name,text:clock(p[key]-state.time)});
+  for(const [key,name]of [['damageUntil','Overdrive'],['eggsUntil','Focus'],['miniUntil','Quickstep']])if(p[key]>state.time)active.push({name,text:clock(p[key]-state.time)});
   if(p.streakArmor>0)active.push({name:'Hard Boiled',text:Math.ceil(p.streakArmor)+' shield'});
   if(p.health>100)active.push({name:'Overheal',text:Math.ceil(p.health)+' HP'});
   if(this.activeCount&&!active.length)this.fadeAt=state.time;

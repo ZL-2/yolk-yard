@@ -51,8 +51,8 @@ export function dressIslandBuilding(g,b,raw){
   for(const side of [-1,1])for(let j=0;j<6;j++)box(g,x+side*(w/2+.2),y+h-.5,z-d/2+.5+j*(d-1)/5,.05,.5,.1,s.roof);
   beam(g,[x+w/2+.3,y+.3,z-d/2+.4],[x+w/2+.3,y+h+.8,z-d/2+.4],.12,s.roof);
  }
- // Small egg-shaped maker's mark over each entry, shared across the island's industries.
- rock(g,x,y+3.5,z+d/2+.3,.19,.26,.055,s.trim,1);
+ // Angular relay insignia over each entry, shared across the island's industries.
+ box(g,x,y+3.5,z+d/2+.3,.34,.09,.055,0x50c8bd);box(g,x-.12,y+3.6,z+d/2+.3,.09,.28,.055,0xe8ae4c);
 }
 export function islandProp(g,p,raw){
  const k=artKit(raw),{block:box,cylinder,cone,rounded,rock,torus,beam}=k,{x,y,z,w,d,h,kind}=p;
@@ -99,7 +99,7 @@ export function islandProp(g,p,raw){
   cylinder(g,x,y+h*.46,z,w*.49,h*.92,kind==='incubator'?0xd3dfca:0x9bafb0,16);cone(g,x,y+h*.96,z,w*.5,h*.16,0x587787);
   for(const yy of [.18,.52,.84]){const r=torus(g,x,y+h*yy,z,w*.5,.07,0xd2b778);r.rotation.x=Math.PI/2;}
   for(let yy=.7;yy<h;yy+=.6)box(g,x,y+yy,z-d*.51,.65,.07,.12,0x485d68);
-  if(kind==='incubator'){rock(g,x,y+h*.68,z+w*.49,1.15,1.5,.14,0x75d8d4,1);for(const a of [-1,1])beam(g,[x+a*1.5,y,z],[x+a*2.2,y+h*.55,z],.18,0x638e98);}
+  if(kind==='incubator'){box(g,x,y+h*.68,z+w*.49,1.15,1.5,.14,0x75d8d4);for(const a of [-1,1])beam(g,[x+a*1.5,y,z],[x+a*2.2,y+h*.55,z],.18,0x638e98);}
  }else if(kind==='radio'){
   for(const side of [-1,1])beam(g,[x+side*2,y,z],[x,y+h,z],.12,0x697c87);
   for(let yy=1;yy<h-1;yy+=1.5)beam(g,[x-1.2,y+yy,z],[x+1.2,y+yy+1,z],.07,0xc7b57e);

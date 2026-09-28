@@ -10,7 +10,7 @@ export class ConnectionReport {
     this.rows[stage] = {status, detail, at:new Date().toISOString()};
   }
   text(build) {
-    return ['Yolk Yard connection report', 'Build: ' + build,
+    return ['Ravelfront connection report', 'Build: ' + build,
       ...stages.map(key => {const r=this.rows[key];return key + ': ' + r.status + ' — ' + r.detail + (r.at ? ' ['+r.at+']' : '');}),
       this.performance.text(),
       this.network.text(),

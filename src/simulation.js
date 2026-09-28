@@ -1,3 +1,4 @@
+import {newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
 import {RemoteInputBuffer} from './remote-input.js';
 import {updateCombatAccuracy,firedAccuracy,pelletOffsets,criticalHit,falloffAt} from './combat.js';
 import {arenaBonuses,resetBonuses,updateBonuses,awardBonus} from './streaks.js';
@@ -22,18 +23,18 @@ import {
   sanitizeInput,
   direction,
   wallDistance,
-  rayEgg,
+  rayEgg, humanHit,
   dist,
   EYE,
 } from "./physics.js";
 const BOT_NAMES = [
-  "Benedict",
+  "Relay",
   "Sunny",
-  "Omelette",
-  "Poach",
-  "Frittata",
-  "Custard",
-  "Scrambles",
+  "Scout",
+  "Drift",
+  "Vanguard",
+  "Sable",
+  "Rook",
 ];
 export class Simulation {
   constructor(options = {}) {
@@ -59,6 +60,11 @@ export class Simulation {
     this.winner = "";
   }
   emit(type, data = {}) {
+    if(data.player&&['shot','launch','build-place','harvest','build-result','royale-cue'].includes(type)){
+      const p=this.players.get(data.player);
+      if(p?.activity&&!p.bot){const valid=type!=='royale-cue'||['chest-open','item-drop','weapon-swap','glider-deploy','complete-medkit','complete-bandage'].includes(data.cue);if(valid){if(meaningfulActivity(p.activity,'action',type+':'+(data.cue||data.weapon||'')+':'+Math.round(p.x/3)+','+Math.round(p.z/3),this.time))p.activity.contributions++;}}
+    }
+    if(type==='hit'&&data.player&&this.players.get(data.player)?.activity){this.players.get(data.player).activity.damage+=Math.max(0,Math.min(100,data.amount||0));}
     const e = { id: ++this.eventId, time: this.time, type, ...data };
     this.events.push(e);
     if (this.events.length > 120) this.events.shift();
@@ -109,6 +115,7 @@ export class Simulation {
       ack: 0,
       lastInput: 0,
     };
+    p.activity=newActivity(this.time);
     this.players.set(id, p);
     this.spawn(p);
     if (!p.bot) this.waitForEntry(p);
@@ -142,6 +149,7 @@ export class Simulation {
     if (safe.seq <= Math.max(p.ack, previous?.seq || 0)) return;
     // Track the raw edge before coalescing. A release followed by another tap
     // can share one host tick; OR-ing the buttons alone would erase that edge.
+    if(p.activity&&!p.afkRemoved)observeInput(p.activity,safe,this.time);
     safe.jumpHeld = safe.jump;
     safe.jumpPress = safe.jump && !previous?.jumpHeld ? safe.seq : previous?.jumpPress || 0;
     if(remote) {
@@ -221,6 +229,7 @@ export class Simulation {
     }));
     this.addBots();
     for (const p of this.players.values()) {
+      p.activity=newActivity(this.time);p.afkRemoved=false;
       p.eggs = 0;
       p.kills = 0;
       p.deaths = 0;
@@ -320,10 +329,22 @@ export class Simulation {
     p.botTarget = null;
     this.emit("spawn", { player: p.id, x: p.x, y: p.y, z: p.z });
   }
+  tickActivity(dt){
+    if(this.phase!=='playing')return;
+    for(const p of this.players.values()){
+      if(p.bot||p.afkRemoved)continue;
+      const a=p.activity??=newActivity(this.time);
+      // Reconnects, loading/entry, the transport and eliminated spectators are
+      // controlled by the game. They never accrue participation or idle debt.
+      if(p.connected===false||p.awaitingEntry||p.spectating||p.health<=0||p.flight==='transport'||this.recovering){a.last=this.time;p.afkRemaining=59;continue;}
+      observeMotion(a,p,dt,this.time);p.afkRemaining=Math.ceil(activityRemaining(a,this.time));
+      if(p.afkRemaining<=0){p.afkRemoved=true;p.spectating=true;p.contestant=false;p.health=0;p.activity.active=0;this.inputs.delete(p.id);this.remoteInputs.delete(p.id);this.emit('afk-removed',{player:p.id});}
+    }
+  }
   tick(dt) {
     dt = clamp(dt, 0, 1 / 30);
     this.time += dt;
-    this.recordPoses();
+    this.recordPoses();this.tickActivity(dt);
     if (this.phase !== "playing") return;
     this.remaining = Math.max(0, this.remaining - dt);
     for (const p of this.players.values()) {
@@ -498,14 +519,14 @@ export class Simulation {
       if(path.blocked){blocked=true;if(path.blocked.box)this.damageWorld?.(path.blocked.box,w.buildDamage);this.emit('impact',{...path.blocked.point,normal:path.blocked.normal,weapon:w.id});continue;}
       if(w.hitscan){
         const hit=worldHit(this.map,origin,path.d,w.range);
-        let distance=hit?.distance??w.range,victim=null,pose=null;
+        let distance=hit?.distance??w.range,victim=null,pose=null,region=null;
         for(const target of this.players.values()){
           if(target===p||target.health<=0||target.spectating||target.flight==='transport'||teammates(this.options,p,target))continue;
-          const candidate=this.shotPose(target,p,w),d=rayEgg(origin,path.d,candidate);
-          if(d<distance){distance=d;victim=target;pose=candidate;}
+          const candidate=this.shotPose(target,p,w),contact=humanHit(origin,path.d,candidate),d=contact.distance;
+          if(d<distance){distance=d;victim=target;pose=candidate;region=contact.region;}
         }
         const point={x:origin.x+path.d.x*distance,y:origin.y+path.d.y*distance,z:origin.z+path.d.z*distance};
-        if(victim){const critical=criticalHit(point,pose,w);this.damage(victim,p,w.damage*falloffAt(w,distance)*(critical?w.critical:1),w.name,critical,p.shotGroup);}
+        if(victim){const critical=w.critical>1&&region==='head';this.damage(victim,p,w.damage*falloffAt(w,distance)*(critical?w.critical:1),w.name,critical,p.shotGroup);}
         else if(hit?.box)this.damageWorld?.(hit.box,w.buildDamage);
         shots.push({id:++this.projectileId,vx:path.d.x*180,vy:path.d.y*180,vz:path.d.z*180,end:point});
         if(victim||hit)this.emit('impact',{...point,normal:victim?{x:-path.d.x,y:-path.d.y,z:-path.d.z}:hit.normal,weapon:w.id,tag:!!victim});
@@ -595,7 +616,7 @@ export class Simulation {
         b.kind === "bolt" ? 0 : 0.14,
       );
       let distance = hit?.distance ?? length,
-        victim = null;
+        victim = null,region=null;
       const attacker = this.players.get(b.owner);
       if (!b.popper)
         for (const p of this.players.values()) {
@@ -605,10 +626,10 @@ export class Simulation {
             teammates(this.options,p,attacker)
           )
             continue;
-          const t = rayEgg(b, d, p);
+          const contact=humanHit(b,d,p),t=contact.distance;
           if (Number.isFinite(t) && t <= distance + 1e-9 && t <= length + 1e-9) {
             distance = t;
-            victim = p;
+            victim = p;region=contact.region;
           }
         }
       b.x += d.x * distance;
@@ -618,7 +639,7 @@ export class Simulation {
       if (victim || hit) {
         if (b.kind === "bolt") {
           if (victim) {
-            const w=weapon(b.weapon),precision=criticalHit(b,victim,w),hitFactor=falloffAt(w,b.travelled)*(precision?(b.critical??w.critical):1);
+            const w=weapon(b.weapon),precision=w.critical>1&&region==='head',hitFactor=falloffAt(w,b.travelled)*(precision?(b.critical??w.critical):1);
             this.damage(
               victim,
               attacker,
@@ -698,6 +719,7 @@ export class Simulation {
       if(victim.health<=100){absorbed=Math.min(victim.streakArmor||0,amount);victim.streakArmor-=absorbed;amount-=absorbed;}
     }
     const applied = absorbed + Math.min(victim.health, amount);
+    if(attacker&&attacker!==victim){victim.damageLedger??={};victim.damageLedger[attacker.id]=this.time;}
     victim.health = Math.max(0, victim.health - amount);
     victim.lastDamage = this.time;
     if(source!=='Storm'||this.time>=(victim.stormFeedbackAt||0)){
@@ -707,12 +729,13 @@ export class Simulation {
       target: victim.id,
       amount: applied, shotId,
       sourceX:attacker?.x, sourceY:attacker?.y, sourceZ:attacker?.z,
-      x: victim.x, y: victim.y + 2.35, z: victim.z,
+      x: victim.x, y: victim.y + 1.28, z: victim.z,
       precision,
     });
     }
     if (victim.health > 0) return;
     victim.killerId = attacker && attacker !== victim ? attacker.id : null;
+    for(const [id,time] of Object.entries(victim.damageLedger||{})){const helper=this.players.get(id);if(helper&&id!==victim.killerId&&this.time-time<12)helper.assists=(helper.assists||0)+1;}victim.damageLedger={};
     victim.deaths++;
     resetBonuses(victim);
     victim.respawnAt = this.time + 3;
@@ -831,6 +854,7 @@ export class Simulation {
   }
   snapshot() {
     const keys = [
+      "afkRemaining", "afkRemoved", "lastDamage", "assists", "quickstep", "focus",
       "id", "joinedOrder", "vx", "vz", "place",
       "name",
       "weapon",

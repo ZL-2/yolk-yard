@@ -84,29 +84,29 @@ function canopy(kit,color=0xffcf64){const g=gliderModel(kit,color);bake(g,false,
 export class RoyaleView{
  constructor(view,kit){this.view=view;this.kit=kit;this.root=new THREE.Group();view.scene.add(this.root);this.chests=new Map();this.loot=new Map();this.gliders=new Map();this.pads=new Map();this.createTransport();this.createStorm();this.marker=null;this.fx=[];this.flightPoses=new Map();}
  createTransport(){
-  const {block,ball,cylinder,mat,rounded,beam,torus,cone}=artKit(this.kit),g=this.transport=new THREE.Group();g.name='Eggspress island airship';this.root.add(g);
-  for(let i=0;i<12;i++){
-   const skin=new THREE.Mesh(new THREE.SphereGeometry(1,8,20,i*Math.PI/6,Math.PI/6),mat(i%3===0?0xf9dfa0:i%2?0xf1be4f:0xffd46a));skin.position.set(0,10,0);skin.scale.set(6.4,6.4,9);g.add(skin);
+  const {block,ball,cylinder,rounded,beam}=artKit(this.kit),g=this.transport=new THREE.Group();g.name='Kestrel tiltrotor';this.root.add(g);
+  // An original cargo tiltrotor: low graphite fuselage, swept wings and four
+  // independent rotor nacelles. No balloon or borrowed Battle Bus silhouette.
+  rounded(g,0,1,0,5.8,3.8,13.6,0x334d58,.7);rounded(g,0,-.7,.4,4.7,.65,11.8,0x182d38,.22);
+  rounded(g,0,1.3,-6.9,4.5,3.1,3.5,0x3c606b,.7);rounded(g,0,2,-8.5,3.7,1.4,.18,0x79b8c4,.18);
+  block(g,0,2,-8.62,.12,1.4,.06,0x142e38);
+  for(const side of [-1,1]){
+   const wing=block(g,side*5.1,2.5,-.7,5.8,.3,4.1,0x425b63);wing.rotation.z=side*.04;wing.rotation.y=side*.14;
+   block(g,side*2.93,1.6,1,.08,1.7,7.2,0x21343f);block(g,side*2.99,2.55,1,.1,.18,7.4,0xe2aa50);
+   for(const z of [-2,0,2,4])rounded(g,side*2.97,2.04,z,.12,.6,1.3,0x81b1b6,.09);
+   beam(g,[side*2,-.4,-4],[side*2,-1.3,-4],.18,0x1d303b);beam(g,[side*2,-.4,4],[side*2,-1.3,4],.18,0x1d303b);
+   rounded(g,side*2,-1.35,0,.3,.24,11,0x182d38,.1);
+   const tail=block(g,side*2.6,3.5,6.2,.22,4,3,0x456a70);tail.rotation.z=-side*.24;
+   block(g,side*2.6,4.25,6.18,.28,.65,2.4,0xedae45);
   }
-  for(const z of [-6,0,6]){const hoop=torus(g,0,10,z,z===0?6.45:4.83,.045,0xe9b45a);hoop.scale.y=1;}
-  rounded(g,0,.1,0,7.2,2.1,13.2,0x357e86,.6);rounded(g,0,1.25,0,7.7,.3,13.7,0xf7dc9f,.15);
-  rounded(g,0,-.95,0,6.5,.35,11.8,0x294f63,.12);
-  for(const x of [-3.7,3.7]){
-   for(const z of [-5,-2.5,0,2.5,5]){beam(g,[x,1.4,z],[x,2.4,z],.065,0xf6e3b0);rounded(g,x,.2,z, .06,.6,1.45,0xaddcda,.12);}
-   beam(g,[x,2.4,-6],[x,2.4,6],.085,0xf6e3b0);
-   for(const z of [-4,4])beam(g,[x,1.4,z],[x*1.2,7.1,z*1.3],.06,0x536e76);
-  }
-  for(const x of [-2.5,2.5])for(const z of [-3,0,3]){rounded(g,x,1.62,z,1.35,.48,1.5,0xe8ba69,.22);rounded(g,x*1.12,2,z,.3,1.15,1.5,0x488f97,.12);}
-  rounded(g,0,2,-6.7,4.2,2.4,2.7,0x4b9ca1,.4);rounded(g,0,2.3,-8.1,3.65,1.2,.12,0xa9dfe0,.1);block(g,0,2.3,-8.18,.15,1.3,.06,0xf5d398);
-  for(const x of [-1.45,1.45]){ball(g,x,1.18,-8.05,.3,.25,.16,0xffe7a5);rounded(g,x,2,-5.45,.65,1.3,.12,0x2e596b,.06);}
-  for(const x of [-1,1]){const fin=block(g,x*4.3,10,8,4.2,.18,3.6,0x438d96);fin.rotation.z=x*.22;}
-  const tail=block(g,0,13,8.2,.22,5.8,3.8,0x3f8790);tail.rotation.x=-.25;
-  const title=islandLabel('EGGSPRESS',.45);title.position.set(0,3.8,-6.2);g.add(title);
-  this.rotors=[];for(const x of [-6.5,6.5]){
-   beam(g,[x*.45,.1,0],[x,1.2,0],.24,0xe6c48e);rounded(g,x,.9,0,1.25,1.2,2.2,0x406577,.25);cylinder(g,x,1.65,0,.32,.55,0xf0cd7d,12);
-   const r=new THREE.Group();r.position.set(x,1.95,0);
-   for(let i=0;i<4;i++){const a=i*Math.PI/2,m=rounded(r,Math.cos(a)*1.65,0,Math.sin(a)*1.65,2.9,.09,.4,0x315465,.04);m.rotation.y=-a;}
-   bake(r,false,true);g.add(r);this.rotors.push(r);
+  block(g,0,2.5,6.3,7,.24,3.5,0x37545f);
+  for(const x of [-1.7,1.7])ball(g,x,.4,-8.52,.24,.15,.1,0xf5e4bd);
+  const title=islandLabel('KESTREL / R-04',.33);title.position.set(0,4.2,0);g.add(title);
+  this.rotors=[];for(const x of [-6.5,6.5])for(const z of [-3.5,3.5]){
+   rounded(g,x,2.55,z,1.6,1.25,2.2,0x1c3543,.25);cylinder(g,x,3.35,z,.28,.55,0xc69448,12);
+   const rotor=new THREE.Group();rotor.position.set(x,3.7,z);
+   for(let i=0;i<3;i++){const a=i*Math.PI*2/3,m=rounded(rotor,Math.cos(a)*1.8,0,Math.sin(a)*1.8,3.7,.09,.32,0x192e3a,.035);m.rotation.y=-a;}
+   bake(rotor,false,true);g.add(rotor);this.rotors.push(rotor);
   }
   bake(g,false,true);
  }
@@ -181,17 +181,13 @@ export class RoyaleView{
   const flying=p.flight==='dive'||p.flight==='glide'||p.flight==='launch';
   if(model.userData.held)model.userData.held.visible=!p.building&&!flying&&!!p.inventory?.[p.slot]&&(!!p.inventory[p.slot].weapon||!!p.inventory[p.slot].pickaxe);
   if(model.userData.blaster)model.userData.blaster.visible=!p.building&&!flying&&!!p.inventory?.[p.slot]?.weapon;
-  if(!model.userData.flightArms){const arms=makeArms('pip',p,false);arms.position.y=1.1;arms.scale.setScalar(.85);for(const limb of arms.userData.limbs)limb.shoulder.set(limb.side*.5,0,.04);model.add(arms);model.userData.flightArms=arms;}
-  const arms=model.userData.flightArms,item=p.building?{id:'blueprint'}:p.inventory?.[p.slot];arms.visible=flying||(!item?.weapon&&!item?.pickaxe);
-  const resting=p.use?[[-.3,.12,-.65],[.3,.16+Math.sin(t*7)*.035,-.65]]:[[-.56,-.45,-.15],[.56,-.45,-.15]];
-  const reach=resting.map((point,i)=>{const side=i?1:-1,air=[side*(1.25-.35*pose.glide),-.12+1.37*pose.glide,-.25+.05*pose.glide];return point.map((v,k)=>v+(air[k]-v)*pose.air);});
-  if(arms.visible)actionArms(arms,reach,-.2-1.1*pose.glide);
+  const item=p.building?{id:'blueprint'}:p.inventory?.[p.slot];
   const itemKey=!flying&&item&&!item.weapon&&!item.pickaxe?item.id:null;
   if(model.userData.utilityKey!==itemKey){if(model.userData.utility){model.userData.utility.removeFromParent();this.view.disposeGroup(model.userData.utility);}model.userData.utility=null;model.userData.utilityKey=itemKey;if(itemKey){const prop=this.itemModel(item,false);prop.scale.setScalar(.6);prop.position.set(.36,.7,-.35);model.add(prop);model.userData.utility=prop;}}
   if(model.userData.utility){model.userData.utility.position.y=p.use?1.15+Math.sin(t*7)*.02:.7;if(item?.pickaxe){const swing=Math.max(0,1-(this.view.lastStateTime-(p.swingAt??-100))/.45);model.userData.utility.rotation.x=-Math.sin(swing*Math.PI)*1.5;}}
 
   if(pose.air>.01){model.rotation.x=model.rotation.x*(1-pose.air)+pose.pitch;model.rotation.z=model.rotation.z*(1-pose.air)+pose.roll;model.position.y+=pose.bob;}
-  else if(p.sprinting){model.rotation.x=.17;model.rotation.z=Math.sin(t*9)*.16;}
-  if(p.place===1&&p.health>0){model.position.y+=Math.max(0,Math.sin(t*5))*.5;model.rotation.y+=Math.sin(t*2)*.15;}
+
+  if(p.place===1&&p.health>0)model.userData.victory=true;
  }
 }

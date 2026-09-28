@@ -53,7 +53,7 @@ test("movement has equal diagonal speed and obeys collision walls", () => {
     map = { size: 30, boxes: [{ x: 0, y: 0, z: -3, w: 10, d: 1, h: 3 }] };
   for (let i = 0; i < 180; i++)
     movePlayer(c, { forward: 1, yaw: 0 }, map, 1 / 60);
-  assert.ok(c.z >= -2.041);
+  assert.ok(c.z >= -2.181);
 });
 test("jump lands, cannot be held to fly, and steps climb", () => {
   const p = player();
@@ -274,10 +274,10 @@ test("specialized long-range bolts have finite travel and configured drop", () =
 test("clear eye shots retract an obstructed muzzle without bypassing cover", () => {
   const { s, a, b } = fixture();
   s.random = () => 0.5;
-  s.map.boxes = [{ x: 0, y: 0, z: 7.1, w: 4, h: 1.3, d: 0.4 }];
-  a.pitch = Math.atan2(0.9 - 1.43, 8);
+  s.map.boxes = [{ x: 0, y: 0, z: 7.75, w: 4, h: 1.58, d: 0.12 }];
+  a.pitch = Math.atan2(1.24 - 1.70, 8);
   s.fire(a);
-  assert.equal(s.events.findLast(e=>e.type==="shot").origin.y, a.y + 1.43);
+  assert.equal(s.events.findLast(e=>e.type==="shot").origin.y, a.y + 1.70);
   advance(s, 30);
   assert.ok(b.health < 100);
   b.health = 100;

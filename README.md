@@ -1,201 +1,30 @@
-# Yolk Yard
+# Ravelfront
 
-[Play Yolk Yard](https://zl-2.github.io/yolk-yard/) — an original browser egg shooter with arena modes and **Yolk Royale**. Open the HTTPS site in a current browser with WebGL 2. No account or download is required.
+[Play Ravelfront](https://zl-2.github.io/yolk-yard/) — an original browser multiplayer shooter set on Ravel Coast, a storm-struck communications frontier. The existing deployment address stays stable so players keep their browser profiles and saved collections.
 
-## Yolk Royale
+Choose Frontier Royale Solo or Duos, Free for All, or Team Scramble. The lobby supports parties, invitations, public matchmaking and configurable custom rooms. Royale supports 32 contestants, up to 16 connected humans, with four separate spectator positions. Arena modes support eight contestants. Human players replace fill bots.
 
-Choose **Yolk Royale** on the home screen:
+Online Spawn Island lasts **30 authoritative seconds**, with early departure when the configured human capacity is genuinely full. Humans and bots spread across Relay Cay. The Kestrel tiltrotor carries contestants to the 512 × 512 Ravel Coast, with nine districts, smaller landmarks, connected buildings, loot, harvesting, building and editing. Late arrivals spectate. Offline development practice uses its existing ten-second warmup and awards no currency.
 
-- **Find public match** discovers a waiting Royale lobby. If none is available, it creates one with a 60-second countdown and fills empty seats with bots. Online departure happens earlier only when connected humans fill every configured contestant seat. Public matchmaking is the primary path; Solo and Duos share the same host countdown.
-- **Create public / private match** lets the host choose 2–32 contestants, bot count/fill, difficulty and normal/quick storm. Private matches use an invite link or code and stay out of the directory.
-- **Social & Party** connects real browser sessions through the relay. Invite, accept/decline, ready up and queue together. Duos Fill finds a teammate; No Fill permits a solo Duo. Two-person parties stay together through public or custom matches. The separate offline-bot Play option has been removed; bots still fill sessions.
+Human operators use original sculpted skinned meshes, shared 32-bone anatomical rigs, blended locomotion/action states and analytic hand/foot IK. Outfits never alter head/body combat regions or movement dimensions. The Outfitter offers 84 original cosmetics across outfits, tools, wraps, back equipment, gliders and dive trails. Locker inspection shows the complete equipped operator and actual slot previews.
 
-Warm up on playable Hatchling Atoll for up to 60 host-timed seconds online, then ride the Eggspress over the 512 × 512 Sunnybreak island. Practice gear resets at departure, when contestant admission closes and new arrivals become spectators. Choose one of nine districts, skydive and deploy your shell glider. The dedicated P-bound pickaxe comes first, followed by five equal numbered slots 1–5 holding eleven blasters and eight healing, shield, explosive or mobility items. Ordinary falls can damage health, while Shock Eggs protect their resulting landing without deploying a glider. Loot falls when its support disappears. Eight nested storm stages close the island until one egg or Duo survives. See [Better Together](docs/party-combat-update.md) for party authority, team rules and the centralized fictional combat model. See [Connected Island](docs/CONNECTED_ISLAND.md) for the 32-contestant population, building rules, storm schedule and validation. See [Hatch, Drop & Outplay](docs/HATCH_DROP_OUTPLAY.md) for match authority, shared bot intelligence, reference differences and verification.
+**Marks** replace the previous currency at **1:1**. Existing item IDs map one-to-one to replacement cosmetics at unchanged prices. Browser profile, balances, ownership, settings, keybinds and historical statistics retain their existing storage keys. No real-money transactions, account requirement or cross-device synchronization.
 
-One life per contestant. During Spawn Island, joining humans replace fill bots. Once departure is committed, new arrivals can only spectate; the roster never reopens because someone leaves. Eliminated contestants spectate until the rematch. If the host disconnects, the oldest connected player takes over with the same room code and saved match state.
+Online rewards are calculated and settled by the persistent relay. Meaningful participation, legitimate opposition, bot difficulty, population, placement, victory, eliminations and assists determine a capped budget. Custom matches are reduced; brief matches, AFK participation and repetitive elimination trading do not receive normal rewards. Active contestants receive an inactivity warning at 12 seconds remaining and removal after 59 seconds without meaningful input. Loading, transport, recovery and eliminated spectators are exempt.
 
-The original sound system contains 73 named effect cues, eleven weapon palettes and five continuous environmental layers. World sounds fade out beyond their appropriate radius; storm countdown ticks play only during the last five seconds. Settings have separate master, effects, ambience and music controls. Audio starts after user interaction.
+## Development and deployment
 
-Inventory opens on the right with actual item images, drag-and-drop slot reordering, stack splitting, dropping and inspection. Victory and placement banners appear before results. See [the complete design and rules](docs/BATTLE_ROYALE.md). Arena modes keep loadouts, an eight-player limit and respawns, with connected new upper routes on all three arena maps.
-
-## Version 2 quality update
-
-- Eight distinct beveled weapon models, including the Pip sidearm, with detailed
-  barrels, grips, magazines, stocks, and sights. Loadout images render those same
-  models rather than using unrelated artwork.
-- Physical open/reflex sights; the Needle's 3.5× scope and Duet's 1.8× prism render
-  a separate magnified view inside the modeled lens, with a reticle and range marks.
-- Muzzle-origin traveling bolts, visible trails and flashes, game-world gravity,
-  swept collision, surface impacts, and surface-normal popper bounces. Damage
-  happens on arrival. Low cover can block a barrel even when the eye is above it.
-- Three rebuilt arenas: 80 × 80 glasshouse gardens, an 84 × 84 freight harbor with
-  a bridge and underpass, and an 88 × 88 terraced town with rooftop routes.
-  Bot navigation handles both ground routes and raised platforms.
-- Static architectural and weapon details are batched by material to keep the
-  extra visual detail from requiring a draw call for each part.
-
-Refresh all players' pages before creating a new room after this update.
-Version 2 uses a new multiplayer protocol and separate room namespace.
-
-## Included
-
-- Seven primary classes: Sprinter, Scatter, Needle, Zipper, Thumper, Anchor, Duet.
-- Pip sidearm, timed poppers, ammunition, reloads, modeled optics, hit feedback.
-- Three original arenas: The Yard, Cargo Club, Sunset Social.
-- Yolk Royale, Free for all and Team scramble. Arena maps have connected galleries, stairs and an upper crossing.
-- Bot practice and optional bot-filled matches, with Easy, Normal, Hard and Impossible difficulty.
-- Arena spawn protection, manual respawn, health regeneration and health/ammo pickups.
-- Timed arena rounds; Royale continues until one survivor. Placement banners lead into scoreboards and rematches.
-- Shell colors, patterns, finishes, headwear and eyewear; all unlocked, no purchases.
-- Mouse sensitivity, field of view, sound, graphics, and drag-look settings.
-- Touch movement/look/action controls and responsive menus.
-- Original procedural 3D meshes and synthesized sound. No asset CDN needed.
-
-## Controls
-
-| Action               | Control               |
-| -------------------- | --------------------- |
-| Move                 | WASD or arrow keys    |
-| Look                 | Mouse                 |
-| Fire                 | Left click            |
-| Aim                  | Right click  |
-| Jump                 | Space                 |
-| Reload               | R                     |
-| Throw popper         | E or G                |
-| Primary / sidearm    | 1 / 2, or Q to toggle |
-| Royale slots         | 1–5, Q or mouse wheel |
-| Royale search / take | Hold F for chests; F for floor items |
-| Royale sprint        | Hold Shift |
-| Royale map / inventory | M / I |
-| Royale drop item     | X |
-| Leave transport / deploy glider | Space |
-| Scoreboard           | Tab, or Scores button |
-| Release mouse / menu | Escape                |
-
-Desktop play uses mouse lock. Press Escape for the menu; M and I open the Royale map and inventory without needing a pointer.
-On a touch device, use the left joystick and right look area/action buttons.
-
-## Publish in GitHub Pages
-
-1. Put this project's contents in a repository, with `package.json` at the root.
-2. Open the repository's **Settings → Pages** and select **GitHub Actions** as
-   the source.
-3. Push to `main` (or run **Test and publish Yolk Yard** in Actions).
-4. GitHub installs the pinned dependencies, runs the simulation and browser
-   multiplayer tests, builds the static game, and publishes it.
-
-Relative asset paths are configured, so project sites under `/repository-name/`
-work without changing the source. A `.nojekyll` file is included.
-
-The `dist` folder from `npm run build` is also ready for any ordinary static
-HTTPS host. Do not open `index.html` directly with `file://`; browser module
-and WebRTC security requirements need a web server.
-
-## Connection reports
-
-Choose **Check connection** on the home screen, public-match browser, or connection
-error. **Run service & directory check** checks signaling and listing retrieval.
-To check a particular host, join normally with its code, then open the report
-from the error screen. The latest host result survives a service/directory recheck.
-A local directory coordinator result does not verify connectivity from other
-computers. Copy the report or take a screenshot; no developer tools are needed.
-Reports stay in memory and omit room codes, names, addresses and credentials.
-A failure identifies the observed stage, not the cause of a network policy.
-
-## Multiplayer architecture and limits
-
-GitHub Pages hosts static game files. **It does not run the match server.**
-The host's browser runs the authoritative 60 Hz simulation. Production players
-connect to the shared game service over secure WebSockets. The server relays
-ordered inputs, snapshots, checkpoints, and approved chat between browsers;
-it also owns the public directory. No direct WebRTC connection is required.
-Snapshots originate at 20 Hz in arenas and 10 Hz in Royale. Client prediction
-and interpolation remain enabled. Private rooms never publish directory entries.
-
-The host controls movement, collision, damage, ammo, respawns and scoring.
-This is suitable for friend rooms, not a cheat-proof dedicated simulation server.
-The oldest remaining player can restore the checkpoint and reclaim the same code
-when the host leaves. A lost connection to the relay itself asks the affected
-player to rejoin; remaining connected players can continue through host transfer.
-
-The current service uses short-lived D1 mailboxes so players connected to separate
-Worker instances still receive each other's messages. Messages are consumed after
-forwarding; undelivered records expire after 30 seconds and are cleaned up during
-active sessions. Server sessions renew their WebSocket invocation while retaining
-channel identity and ordered queued traffic. This avoids invocation query-budget
-exhaustion during longer matches. Room heartbeats expire after 25 seconds.
-
-**Performance limit:** this compatibility transport adds database polling and
-network latency. Automated local checks prove ordering, discovery, admission,
-checkpoint transfer and connection renewal, not school-network match speed or
-service capacity. Busy full rooms need real-network evaluation. A dedicated
-in-memory room service is the next step if latency is excessive. The game server
-must be reachable and permitted by the network; no VPN or concealed transport is
-included.
-
-`public/network-config.js` selects the deployed relay. Removing `relay` and setting
-`peer`/`iceServers` explicitly retains the WebRTC path for local development or an
-operator's own deployment. Refresh all players after updating protocol versions.
-The game remains statically hosted on GitHub Pages; the relay is deployed separately.
-See `server/README.md` for the deployed service source and focused checks.
-
-## Chat and safety
-
-Messages stay on screen; press **Enter** or **T**, or tap **Enter to chat**, to type. Open **Pause → Player controls & quick chat** for quick messages, preferences and room controls. Use Room or Team chat; spectators in an active match speak only to other spectators. Quick messages work on desktop and touch devices. Chat can be disabled, or limited to quick messages, in Settings or Players & safety.
-
-All messages are checked before leaving the sender, at the host, and at the recipient. Names are filtered on save, profile admission, public listings, snapshots, events and result displays. Blocked input is not echoed into shared chat or saved to an abuse log. Common contact details, links, addresses, numeric identifiers, personal-information disclosures, common real names/locations, profanity, slurs, harassment and obfuscated variants are filtered. Typed chat supports English with normalized Latin characters; unsupported scripts fail closed and can use quick messages.
-
-Players can mute or report others. A report uses a fixed reason, mutes that player locally, and notifies the room host. Hosts can silence/remove players and pause room chat. Spam throttles, duplicate rejection, a temporary cooldown after repeated prohibited submissions, verified sender identity, team routing and replay checks apply independently of the sender UI. Displayed chat history is capped at 60 messages in memory and cleared on leaving; no late-join history or direct messages are sent. The relay briefly buffers delivered game messages, including approved chat, as described above.
-
-**Limits:** this is a local rules/English NLP filter, not Roblox’s proprietary moderation service, and it cannot guarantee detection of every personal detail or prohibited expression. A name or place may be ambiguous, and entirely unknown information cannot always be recognized. The game has no central accounts, moderation staff, persistent global bans or trusted dedicated match server. Reports go to the current host; muting and leaving remain available if the host is the problem. A modified client/host can inspect or alter its own software; standard recipients independently reject unsafe text. Quick-message-only mode provides the most restrictive communication option. Do not claim Roblox equivalence or complete prevention.
-
-See [CHAT_SAFETY.md](CHAT_SAFETY.md) for the policy, trust boundaries and regression coverage.
-
-## Develop and test
-
-Node.js 24 or later:
-
-```sh
+```bash
 npm ci
-npm run dev
+npm run dev -- --host 127.0.0.1
 npm test
-npx playwright install chromium
-npm run test:browser
-npm run test:quality
-npm run test:royale
-node scripts/royale-solo-check.mjs
+npm run test:relay
+npm run test:realtime
 npm run build
-npm run preview
 ```
 
-Browser tests run a local PeerServer and two independent browser sessions to
-exercise the actual WebRTC path. Local tests do not verify a school's Wi-Fi.
-They write screenshots and a report to `test-results/`. Development-only QA
-hooks require both Vite dev mode and `?qa=1`; they are removed from production.
+GitHub Actions tests the game and publishes `dist` to the existing Pages site. The persistent Node/WebSocket relay is a separate deployment using `server/realtime/Dockerfile`; frontend and relay protocol versions must agree. A successful frontend push alone does not verify the live game.
 
-## Project layout
+See [the rebrand implementation and verification notes](docs/RAVELFRONT.md), [relay operations](server/realtime/README.md), and [building reference](docs/BUILDING_REFERENCE.md).
 
-- `src/simulation.js`: authoritative match rules, bots, combat, objectives.
-- `src/physics.js`: movement, collision, ray tests, input validation.
-- `src/maps.js`: map geometry, spawn points, bot navigation.
-- `src/view.js`: Three.js scenes, modeled optics, muzzle effects, projectile presentation.
-- `src/weapons.js`: shared authored weapon models and model portraits.
-- `src/arenas.js`: batched architecture and distinct scenery for each map.
-- `src/network.js`: room signaling, WebRTC lifecycle and message validation.
-- `src/main.js`: menus, controls, prediction, HUD and game loop.
-- `src/audio.js`: original synthesized effects.
-- `tests/game.test.js`: simulation and physics regression checks.
-- `scripts/browser-check.mjs`: real browser and two-client integration checks.
-
-## Credits and privacy
-
-Yolk Yard is independent and is not affiliated with Shell Shockers or Blue
-Wizard Digital. It uses original names, maps, art, UI, and sound rather than
-their source code, models, textures, or branding.
-
-Your chosen name, appearance, settings, and cumulative results are stored in
-localStorage on your browser. Gameplay and chosen display names are shared
-with the host and room participants. The relay service sees connection metadata and forwards game messages. The default WebSocket mode does not reveal player network addresses to other players. Explicit WebRTC deployments can reveal peer addresses.
-No analytics, advertisements, camera, microphone, or payment systems are used.
-
-See `THIRD_PARTY.md` for open-source notices. Original code is MIT licensed.
+The game uses Three.js (MIT), PeerJS (MIT, optional direct transport), WebSockets, and original procedural artwork and sounds. All source is in this repository. Browser WebGL2, keyboard/mouse and touch are supported. No camera or microphone is used.

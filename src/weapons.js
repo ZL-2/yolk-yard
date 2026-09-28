@@ -5,7 +5,7 @@ import { weapon } from "./data.js";
 import {OPTICS} from './weapon-presentation.js';
 import {applyWrap} from './shop-models.js';
 
-// The same authored model is used in the player's hands, on other eggs, and in previews.
+// The same authored model is used in the player's hands, on other operators, and in previews.
 const materials = new Map();
 const geometries = new Map();
 const color = (hex, metal = false) => {

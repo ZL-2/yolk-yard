@@ -3,7 +3,7 @@ import {teammates,teamMode} from './teams.js';
 import {wallDistance,dist,EYE} from './physics.js';
 import {wrapAngle,BOT_WORLD_SENSES} from './bot-config.js';
 export const hostile=(sim,p,t)=>t!==p&&t.health>0&&!t.spectating&&t.flight!=='transport'&&!teammates(sim.options,p,t);
-export function seesPoint(sim,p,t){const o={x:p.x,y:p.y+EYE,z:p.z},d={x:t.x-o.x,y:t.y+.9-o.y,z:t.z-o.z},len=Math.hypot(d.x,d.y,d.z)||1;return wallDistance(sim.map,o,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.08;}
+export function seesPoint(sim,p,t){const o={x:p.x,y:p.y+EYE,z:p.z},d={x:t.x-o.x,y:t.y+1.22-o.y,z:t.z-o.z},len=Math.hypot(d.x,d.y,d.z)||1;return wallDistance(sim.map,o,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.08;}
 export function newBrain(sim,p){return {memory:{},eventId:Math.max(0,sim.eventId-32),perceiveAt:0,decision:0,aimAt:0,nextBurst:0,burstUntil:0,turnAt:sim.time,checkAt:sim.time+1,lastX:p.x,lastZ:p.z,side:sim.random()<.5?-1:1,visited:{},lootMemory:{},objective:'survey',target:null,targetUntil:0};}
 function hear(sim,p,brain,id,point,kind,damage=0){
  if(damage){brain.attackedAt=sim.time;brain.decision=0;brain.perceiveAt=0;}
@@ -32,7 +32,7 @@ export function observe(sim,p,brain,skill){
   if(dist(p,source)<skill.hearing){
    const id=e.player||'sound-'+e.id;hear(sim,p,brain,id,source,'sound');
    // A heard shot aimed into our vicinity is an active threat, even before it hits.
-   const dx=p.x-source.x,dy=p.y+.9-source.y,dz=p.z-source.z,len=Math.hypot(dx,dy,dz)||1;
+   const dx=p.x-source.x,dy=p.y+1.22-source.y,dz=p.z-source.z,len=Math.hypot(dx,dy,dz)||1;
    if(e.type==='shot'&&e.shots?.some(s=>(s.vx*dx+s.vy*dy+s.vz*dz)/(Math.hypot(s.vx,s.vy,s.vz)*len)>.965)){
     brain.memory[id].engagedAt=sim.time;brain.decision=0;brain.perceiveAt=0;
    }

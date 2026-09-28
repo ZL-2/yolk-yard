@@ -4,6 +4,7 @@ import {HostHeartbeat} from './host-heartbeat.js';
 // Peer-shaped, ordered WebSocket transport; the game rules stay in Network.
 // Explicit peer configuration retains the local WebRTC development path.
 export const relayURL=()=>globalThis.window?.YOLK_NETWORK?.relay||'';
+function progressToken(){try{let token=localStorage.getItem('ravelfront-progress-token');if(!/^[a-f0-9]{32}$/.test(token||'')){token=Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');localStorage.setItem('ravelfront-progress-token',token);}return token;}catch{return undefined;}}
 class Events {
  constructor(){this.events=new Map();}
  on(type,fn){if(!this.events.has(type))this.events.set(type,[]);this.events.get(type).push(fn);return this;}
@@ -28,7 +29,7 @@ export class RelayPeer extends Events {
   if(this.destroyed)return;
   try{this.socket=new WebSocket(relayURL());}catch{this.emit('error',{type:'socket-error'});return;}
   const ws=this.socket;this.transportHeartbeat=new HostHeartbeat(Date.now(),{silence:18000,grace:0});
-  ws.addEventListener('open',()=>ws.send(JSON.stringify({type:'register',...(this.id?{id:this.id}:{}),...this.resume,...(this.protocol===2?{cursor:this.cursor}:{})})));
+  ws.addEventListener('open',()=>ws.send(JSON.stringify({type:'register',progressToken:progressToken(),...(this.id?{id:this.id}:{}),...this.resume,...(this.protocol===2?{cursor:this.cursor}:{})})));
   ws.addEventListener('message',event=>{
    if(ws!==this.socket)return;this.transportHeartbeat.contact(Date.now());this.receivedBytes+=event.data.length;let data;try{data=JSON.parse(event.data);}catch{return this.destroy();}
    for(const m of Array.isArray(data)?data:[data]){
@@ -77,6 +78,7 @@ export class RelayPeer extends Events {
  acknowledge(){if(!this.ackTimer)this.ackTimer=setTimeout(()=>{this.ackTimer=null;this.control({type:'ack',seq:this.cursor});},16);}
  message(m){
   if(!m||typeof m!=='object')return;
+  if(['reward','afk','afk-enforce'].includes(m.type)){this.emit(m.type,m);return;}
   if(m.type==='command-ack'){const sent=this.sentTimes.get(m.seq);if(sent!==undefined)this.relayLatency=performance.now()-sent;for(const seq of this.unacked.keys())if(seq<=m.seq){this.unacked.delete(seq);this.sentTimes.delete(seq);}return;}
   if(m.type==='rotate-request'){this.flush();this.rotating=true;this.control({type:'rotate'});return;}
   if(m.type==='rotated'){this.resume={resume:m.resume,cursor:m.cursor,parts:m.parts};this.start();return;}

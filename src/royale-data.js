@@ -7,14 +7,14 @@ export const AMMO_CAPS={light:400,medium:360,shells:80,heavy:60,rockets:18};
 export const ammoType=id=>({pip:'light',zipper:'light',scatter:'shells',doubleyolk:'shells',needle:'heavy',peeper:'heavy',thumper:'rockets'}[id]||'medium');
 export const ROYALE_GUN_IDS=['sprinter','scatter','needle','zipper','thumper','anchor','duet','pip','peeper','doubleyolk','comet'];
 export const ITEMS={
- bandage:{name:'Shell Wrap',kind:'heal',amount:25,cap:75,duration:2.5,stack:5,color:'#f4f4dd',icon:'✚'},
- medkit:{name:'Nest Medkit',kind:'heal',amount:100,cap:100,duration:6,stack:2,color:'#8be4b7',icon:'✚'},
+ bandage:{name:'Field Dressing',kind:'heal',amount:25,cap:75,duration:2.5,stack:5,color:'#f4f4dd',icon:'✚'},
+ medkit:{name:'Trauma Kit',kind:'heal',amount:100,cap:100,duration:6,stack:2,color:'#8be4b7',icon:'✚'},
  mini:{name:'Mini Shield',kind:'shield',amount:25,cap:50,duration:2,stack:6,color:'#65bdfa',icon:'◈'},
  flask:{name:'Shield Flask',kind:'shield',amount:50,cap:100,duration:4,stack:3,color:'#81a5ff',icon:'◈'},
- splash:{name:'Splash Egg',kind:'splash',amount:30,duration:.55,stack:4,color:'#74ebd9',icon:'✦'},
+ splash:{name:'Restoration Capsule',kind:'splash',amount:30,duration:.55,stack:4,color:'#74ebd9',icon:'✦'},
  popper:{name:'Popper',kind:'popper',duration:.35,stack:6,color:'#c091ef',icon:'●'},
- impulse:{name:'Shock Egg',kind:'impulse',duration:.35,stack:3,color:'#ec9fff',icon:'◎'},
- launchpad:{name:'Launch Nest',kind:'launchpad',duration:.6,stack:2,color:'#f9ca65',icon:'↟'},
+ impulse:{name:'Impulse Charge',kind:'impulse',duration:.35,stack:3,color:'#ec9fff',icon:'◎'},
+ launchpad:{name:'Launch Pad',kind:'launchpad',duration:.6,stack:2,color:'#f9ca65',icon:'↟'},
 };
 export const itemInfo=item=>!item?{name:'Empty slot',color:'#7c8a98',icon:''}:item.pickaxe?{name:'Pickaxe',color:'#7aaddb',icon:''}:item.weapon?{...weapon(item.id),color:RARITIES[item.rarity||0].color,icon:'',name:weapon(item.id).name}:ITEMS[item.id]||{name:item.id,color:'#d6caa5',icon:'▥'};
 // 32 contestants / 512 m island. Opening loot time grows; later stages tighten.

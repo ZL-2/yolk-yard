@@ -1,9 +1,9 @@
 import { safeName } from './moderation.js';
 import {OPTICS} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
-import {cosmeticProfile} from './shop-catalog.js';
+import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // The rebuilt island and movement model must not mix with older clients.
-export const VERSION = 19;
+export const VERSION = 20;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -132,9 +132,9 @@ export const ROYALE_WEAPONS = [
     "sightY": 0.32399999999999995,
     "optic": "scope",
     "magnification": 3.5,
-    "name": "Peeper",
+    "name": "Sentry",
     "role": "MARKSMAN",
-    "desc": "A repeating long-range shell scout.",
+    "desc": "A repeating rifle for long-range reconnaissance.",
     "speed": 7.4,
     "color": 9756314,
     "size": 1.35,
@@ -147,7 +147,7 @@ export const ROYALE_WEAPONS = [
     "muzzle": 0.9,
     "sightY": 0.22,
     "optic": "iron",
-    "name": "Double Yolk",
+    "name": "Breach",
     "role": "TACTICAL",
     "desc": "A quick cycling tactical scatter blaster.",
     "speed": 7.4,
@@ -174,12 +174,12 @@ for(const w of [...WEAPONS,...ROYALE_WEAPONS])if(OPTICS[w.id]){w.ads={...OPTICS[
 for(const w of [...WEAPONS,...ROYALE_WEAPONS])Object.assign(w,combatProfile(w.id));
 const royaleStats = new Map();
 export const MODES = [
- {id:"royale",name:"Yolk Royale",short:"ROYALE",description:"Drop in, loot up, outrun the storm. Last egg standing.",limit:1,teams:false},
+ {id:"royale",name:"Frontier Royale",short:"ROYALE",description:"Drop in, loot up, outrun the storm. Last operator standing.",limit:1,teams:false},
   {
     id: "ffa",
     name: "Free for all",
     short: "FFA",
-    description: "Every egg for itself. First to 20 eliminations.",
+    description: "Every operator for themselves. First to 20 eliminations.",
     limit: 20,
     teams: false,
   },
@@ -255,6 +255,6 @@ export function rng(seed) {
 export const nameKey = value => String(value ?? '').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();
 export function randomAppearance(random = Math.random) {
  const pick = list => list[Math.floor(random() * list.length)];
- return {color:pick(COLORS),accent:pick(COLORS),hat:Math.floor(random()*HATS.length),pattern:Math.floor(random()*PATTERNS.length),finish:Math.floor(random()*FINISHES.length),eyewear:Math.floor(random()*EYEWEAR.length)};
+ return {color:pick(COLORS),accent:pick(COLORS),outfit:'outfit-'+SHOP_SETS[Math.floor(random()*SHOP_SETS.length)].id,hat:0,pattern:0,finish:0,eyewear:NO_EYEWEAR};
 }
 export const BOT_DIFFICULTIES = ['Casual','Intermediate','Advanced','Impossible'];

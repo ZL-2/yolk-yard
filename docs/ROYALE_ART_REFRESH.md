@@ -1,4 +1,6 @@
-# Sunnybreak art and controls refresh
+> Historical technical notes. Current identity, humanoid combat, economy and timing are specified in [Ravelfront](RAVELFRONT.md).
+
+# Ravel Coast art and controls refresh
 
 Implementation plan, agreed scope: retain existing public/private matchmaking, authority, inventory, storm and spectating. Preserve arena gameplay and current chat protections.
 
@@ -14,7 +16,7 @@ Implementation plan, agreed scope: retain existing public/private matchmaking, a
 - Nine districts become recognizable by silhouette: shopfronts and clock plaza, timber barns and silos, port warehouses and cranes, resort villas and pools, expedition huts, park lodges, hatchery conservatories, industrial workshops and seaside houses.
 - Expand from 38 buildings toward 80+, and from sparse canopies to hundreds of broadleaf, pine, palm, orchard and autumn trees. Add satellite settlements, fences, gardens, field rows, lamps, benches, barrels, rocks and roadside equipment.
 - Author terrain as a shared sampled heightfield, flattened around roads and structures. Rendering, movement, projectile collision, loot, map shading and bot navigation use that same surface. District access, wide doors, usable roofs and chest approaches remain clear.
-- Detailed new loot assets: actual blaster models, unique utility silhouettes, ammo packages, hinged treasure chests, supply crates, launch pads, ribbed gliders and a rebuilt Eggspress airship. Peeper, Double Yolk and Comet get their own models, not modified arena duplicates.
+- Detailed new loot assets: actual blaster models, unique utility silhouettes, ammo packages, hinged treasure chests, supply crates, launch pads, ribbed gliders and a rebuilt Kestrel airship. Sentry, Double Ravelfront and Comet get their own models, not modified arena duplicates.
 - Batch static scenery by material and spatial chunk, share reusable geometry/materials and distance-limit dynamic loot. No per-tree lights or unbounded effects.
 
 ## Verification and publication

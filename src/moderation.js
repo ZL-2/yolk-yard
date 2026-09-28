@@ -85,10 +85,10 @@ export function moderateText(value, { kind = 'chat', previous = [] } = {}) {
 }
 const nameCache = new Map();
 export function safeName(value) {
-  if (typeof value !== 'string' || value.length > 128) return 'Egg';
+  if (typeof value !== 'string' || value.length > 128) return 'Operator';
   if (nameCache.has(value)) return nameCache.get(value);
   const result = moderateText(value, {kind:'name'});
-  if (!result.ok) return 'Egg';
+  if (!result.ok) return 'Operator';
   // Cache only approved strings. Snapshots reuse names at 20 Hz.
   if (nameCache.size >= 256) nameCache.delete(nameCache.keys().next().value);
   nameCache.set(result.text, result.text);
@@ -103,7 +103,7 @@ export const SAFETY_MESSAGES = Object.freeze({
   empty:'Write a message first.',
   unavailable:'Chat safety is unavailable. Try a quick message.',
   slow:'Slow down a little before sending again.',
-  duplicate:'You already sent that. Give other eggs a turn.',
+  duplicate:'You already sent that. Give other operators a turn.',
   muted:'The host has silenced your chat for this room.',
   cooldown:'Chat is cooling down after repeated blocked messages.',
   disabled:'The host has paused room chat.',

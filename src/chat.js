@@ -1,7 +1,7 @@
 import { CHAT_LIMIT, FILTER_VERSION, foldText, moderateText, safeName } from './moderation.js';
 
 export const QUICK_MESSAGES = Object.freeze({
-  hello:'Hello, eggs!', gg:'Good game!', nice:'Nice shot!', thanks:'Thanks!',
+  hello:'Hello, Marks!', gg:'Good game!', nice:'Nice shot!', thanks:'Thanks!',
   ready:'Ready!', help:'Need backup!', regroup:'Regroup here!', defend:'Defend the objective!',
   ammo:'Need ammo!', go:'Let’s go!', wait:'Wait for the team!', sorry:'Sorry!',
 });

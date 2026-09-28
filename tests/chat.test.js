@@ -24,7 +24,7 @@ test('every supplied entry and canonical form is blocked in messages and player 
       assert.equal(result.ok,false,`imported chat entry ${i}`);
       assert.equal(result.text,'');
     }
-    assert.equal(safeName(term),'Egg',`imported name entry ${i}`);
+    assert.equal(safeName(term),'Operator',`imported name entry ${i}`);
   });
 });
 test('imported words remain blocked with separators and invisible characters',()=>{
@@ -49,12 +49,12 @@ test('language policy rejects disguised prohibited language without echoing the 
 });
 test('names use the same policy at profile and directory boundaries; invalid input fails closed',()=>{
   for(const value of [null,{},'','<b>egg</b>','x'.repeat(300),profanity,'user@example.com']){
-    assert.equal(safeName(value),'Egg');assert.equal(safeProfile({name:value}).name,'Egg');
+    assert.equal(safeName(value),'Operator');assert.equal(safeProfile({name:value}).name,'Operator');
   }
-  assert.equal(safeProfile(null).name,'Egg');
+  assert.equal(safeProfile(null).name,'Operator');
   assert.equal(safeName('Golden Egg'),'Golden Egg');
   const listing=cleanListing({code:'ABCDEFGH',host:profanity,map:'yard',mode:'ffa',players:1,phase:'lobby'});
-  assert.equal(listing.host,'Egg');
+  assert.equal(listing.host,'Operator');
   for(const value of [null,{},['hello'],'x'.repeat(CHAT_LIMIT+1),'###','<script>','%66%75','漢字'])assert.equal(moderateText(value).ok,false);
 });
 test('ordinary names pass chat, profiles and public listings without a privacy false positive',()=>{

@@ -72,6 +72,7 @@ export class Network {
         ],
       },
     });
+    for(const type of ['reward','afk','afk-enforce'])this.peer.on(type,event=>this.callbacks.onProgress?.(type,event));
     this.peer.on("error", (err) => {
       if (this.closed) return;
       const message = errorText(err);
@@ -423,7 +424,7 @@ export class Network {
     const s = this.snapshot;
     const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
     const capacity=s?.royale?Math.min(s.options.capacity,MAX_HUMANS):(s?.options.capacity||8);
-    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Egg",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,public:this.visibility==='public',players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase} : null;
+    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,public:this.visibility==='public',players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase} : null;
     if(relayURL()){const relay=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;relay?.publish?.(this.visibility==='public'||relay.protocol===2?listing:null);}
     else directory.publish(this.visibility==='public'?listing:null);
   }
@@ -534,7 +535,7 @@ export class Network {
     if(this.peer.id===PREFIX+this.code)return;
     const config=window.YOLK_NETWORK||{};
     const alias=relayURL()?new RelayPeer(PREFIX+this.code):new Peer(PREFIX+this.code,{debug:0,...config.peer,config:{iceServers:config.iceServers||[{urls:'stun:stun.l.google.com:19302'}]}});this.aliasPeer=alias;
-    alias.on('open',()=>this.publishRoom());
+    alias.on('open',()=>this.publishRoom());for(const type of ['reward','afk','afk-enforce'])alias.on(type,event=>this.callbacks.onProgress?.(type,event));
     alias.on('connection',conn=>this.accept(conn));
     alias.on('error',()=>{alias.destroy();this.later(()=>this.claimRoomAddress(),2500);});
     alias.on('disconnected',()=>{if(!alias.destroyed&&!this.closed){if(relayURL()){alias.destroy();this.later(()=>this.claimRoomAddress(),2500);}else alias.reconnect();}});

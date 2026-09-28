@@ -72,16 +72,16 @@ test('all 61 foundations clear terrain, structural floor tiles do not overlap, f
  assert.ok(SPAWN_ISLAND.spawns.length>=MAX_CONTESTANTS);for(const [x,z]of SPAWN_ISLAND.spawns)assert.ok(canStand(SPAWN_ISLAND,{x,z,y:groundAt(SPAWN_ISLAND,x,z)},.6));
  const ids=ROYALE_MAP.boxes.map(b=>[b.x,b.y,b.z,b.w,b.h,b.d].join(','));assert.equal(new Set(ids).size,ids.length);
 });
-test('32 filled seats, finite 60-second host countdown, admission cap, practice isolation and valid fifth-slot operations',()=>{
+test('32 filled seats, finite 30-second host countdown, admission cap, practice isolation and valid fifth-slot operations',()=>{
  const s=new RoyaleSimulation({capacity:32,fill:true,bots:31,seed:42}),p=s.addPlayer('host',{name:'Host'});s.startRound();
  assert.equal(s.players.size,32);assert.equal(s.queueEnds-s.time,WARMUP_SECONDS);
  let maxFiring=0,practice=0;
  // Exercise the scheduled practice windows without running 60 seconds of physics.
- for(let time=0;time<60;time+=.1){s.time=time;let firing=0;for(const bot of s.players.values())if(bot.bot){const i=warmupInput(s,bot);if(i.fire)firing++;}maxFiring=Math.max(maxFiring,firing);practice+=firing;}
+ for(let time=0;time<30;time+=.1){s.time=time;let firing=0;for(const bot of s.players.values())if(bot.bot){const i=warmupInput(s,bot);if(i.fire)firing++;}maxFiring=Math.max(maxFiring,firing);practice+=firing;}
  assert.ok(maxFiring<=3);assert.ok(practice>0);s.damage(p,[...s.players.values()][1],100,'Sprinter');assert.equal(p.health,100);assert.equal(p.kills,0);
- s.time=59.5;s.tick(1/30);assert.equal(s.stage,'starting');assert.equal(s.snapshot().royale.queueEnds,60);
+ s.time=29.5;s.tick(1/30);assert.equal(s.stage,'starting');assert.equal(s.snapshot().royale.queueEnds,30);
  for(let i=1;i<MAX_HUMANS;i++)assert.ok(s.admitPlayer('human-'+i,{name:'Guest '+i}));assert.equal(s.admitPlayer('overflow',{name:'Overflow'}),null);assert.equal(s.players.size,32);
- s.time=60;s.tick(1/60);assert.equal(s.stage,'battle-bus');assert.equal(s.alive,32);assert.equal(p.inventory.slice(1).filter(Boolean).length,0);assert.deepEqual(p.materials,{wood:0,brick:0,metal:0});
+ s.time=30;s.tick(1/60);assert.equal(s.stage,'battle-bus');assert.equal(s.alive,32);assert.equal(p.inventory.slice(1).filter(Boolean).length,0);assert.deepEqual(p.materials,{wood:0,brick:0,metal:0});
  const spectator=s.admitPlayer('watch',{name:'Watcher'});assert.ok(spectator.spectating);assert.equal(s.alive,32);
  Object.assign(p,{flight:'ground',x:-230,y:0,z:-230});s.map={...s.map,terrain:null,boxes:[]};s.worldBoxes=[];p.inventory=inventory();p.inventory[5]={id:'mini',count:4};s.playerAction(p.id,'inventory-select-5');assert.equal(p.slot,5);s.playerAction(p.id,'inventory-swap-5-1');assert.equal(p.inventory[1].id,'mini');s.playerAction(p.id,'inventory-swap-1-5');s.playerAction(p.id,'inventory-drop-one-5');assert.equal(p.inventory[5].count,3);s.dropSlot(p,5);assert.equal(p.inventory[5],null);assert.equal(p.inventory[0].id,'pickaxe');
  const restored=new RoyaleSimulation().restore(s.checkpoint());assert.equal(restored.options.capacity,32);assert.equal(restored.stage,s.stage);assert.equal(restored.alive,s.alive);
@@ -90,7 +90,7 @@ test('32 filled seats, finite 60-second host countdown, admission cap, practice 
 test('host warmup uses real elapsed time through slow frames and recovery without speeding up physics',()=>{
  const s=new RoyaleSimulation({capacity:4,bots:0,fill:false,seed:43});s.addPlayer('host',{name:'Host'});s.addPlayer('guest',{name:'Guest'});s.startRound();
  // Two rendered frames per second, six safe physics steps per frame.
- for(let i=0;i<119;i++){s.advanceWarmupClock(.4);for(let j=0;j<6;j++)s.tick(1/60);}
+ for(let i=0;i<59;i++){s.advanceWarmupClock(.4);for(let j=0;j<6;j++)s.tick(1/60);}
  assert.equal(s.stage,'starting');assert.ok(Math.abs(s.queueEnds-s.time-.5)<1e-8);assert.ok(s.time<12);
  const recovered=new RoyaleSimulation().restore(s.checkpoint());assert.ok(Math.abs(recovered.snapshot().royale.queueEnds-recovered.time-.5)<1e-8);
  recovered.advanceWarmupClock(.4);for(let j=0;j<7;j++)recovered.tick(1/60);

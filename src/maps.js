@@ -1,3 +1,4 @@
+import {RADIUS,HEIGHT,canStand} from './physics.js';
 import {addArenaLayers} from './arena-layers.js';
 import {SPAWN_ISLAND} from './spawn-island.js';
 import {ROYALE_MAP} from './royale-map.js';
@@ -81,7 +82,7 @@ const arch = (x, z, axis = "x", width = 8, top = 5.5) => [
 export const MAPS = [
   {
     id: "yard",
-    name: "The Yard",
+    name: "Relay Gardens",
     tag: "GLASSHOUSE GARDENS • 80 × 80",
     description:
       "Garden lanes, a glasshouse, and raised observation decks around a sunken-looking central plaza.",
@@ -155,7 +156,7 @@ export const MAPS = [
   },
   {
     id: "depot",
-    name: "Cargo Club",
+    name: "Freight Terminal",
     tag: "FREIGHT HARBOR • 84 × 84",
     description:
       "A working harbor with stacked freight, a central overpass, loading decks, and wide dockside flanks.",
@@ -230,7 +231,7 @@ export const MAPS = [
   },
   {
     id: "courtyard",
-    name: "Sunset Social",
+    name: "Sunward District",
     tag: "TERRACED TOWN • 88 × 88",
     description:
       "Arcaded streets, climbable rooftops, market awnings, and a bell tower overlooking a warm stone plaza.",
@@ -343,17 +344,17 @@ export function navigation(map) {
         pz = origin + z * cell;
       const overlapping = nearby(px,pz).filter(
         (b) =>
-          Math.abs(px - b.x) < b.w / 2 + 0.48 &&
-          Math.abs(pz - b.z) < b.d / 2 + 0.48,
+          Math.abs(px - b.x) < b.w / 2 + RADIUS + .02 &&
+          Math.abs(pz - b.z) < b.d / 2 + RADIUS + .02,
       );
       const ground=groundAt(map,px,pz), levels = new Set([ground]);
       for (const b of overlapping)
-        if (Math.abs(px - b.x) < b.w / 2 + (map.theme==='royale'?.44:0) && Math.abs(pz - b.z) < b.d / 2 + (map.theme==='royale'?.44:0))
+        if (Math.abs(px - b.x) < b.w / 2 + (map.theme==='royale'?RADIUS-.02:0) && Math.abs(pz - b.z) < b.d / 2 + (map.theme==='royale'?RADIUS-.02:0))
           levels.add(b.y + b.h);
       for (const y of levels) {
         if (
           y > (map.navMax||8) ||
-          overlapping.some((b) => y + 0.04 < b.y + b.h && y + 1.78 > b.y + 0.01)
+          overlapping.some((b) => y + 0.04 < b.y + b.h && y + HEIGHT + .02 > b.y + 0.01)
         )
           continue;
         const node = {
@@ -385,12 +386,26 @@ export function navigation(map) {
         else if (b.y-a.y<=(a.terrain&&b.terrain?cell*.8:cell*.55)&&a.y-b.y<=3.7){
           let valid=true,previous=a.y;
           for(let i=1;i<=4;i++){const t=i/4,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,expected=a.y+(b.y-a.y)*t,over=nearby(x,z);let y=groundAt(map,x,z);
-           for(const o of over)if(Math.abs(x-o.x)<o.w/2+.44&&Math.abs(z-o.z)<o.d/2+.44&&o.y+o.h<=expected+.38)y=Math.max(y,o.y+o.h);
-           if((!a.terrain||!b.terrain)&&y-previous>.431||over.some(o=>Math.abs(x-o.x)<o.w/2+.44&&Math.abs(z-o.z)<o.d/2+.44&&y+.04<o.y+o.h&&y+1.76>o.y+.02)){valid=false;break;}previous=y;
+           for(const o of over)if(Math.abs(x-o.x)<o.w/2+RADIUS-.02&&Math.abs(z-o.z)<o.d/2+RADIUS-.02&&o.y+o.h<=expected+.38)y=Math.max(y,o.y+o.h);
+           if((!a.terrain||!b.terrain)&&y-previous>.431||over.some(o=>Math.abs(x-o.x)<o.w/2+RADIUS-.02&&Math.abs(z-o.z)<o.d/2+RADIUS-.02&&y+.04<o.y+o.h&&y+HEIGHT+.01>o.y+.02)){valid=false;break;}previous=y;
           }
           if(valid)a.edges.push(b.id);
         }
     }
+  // Explicit stair lanes bridge coarse terrain cells. Their waypoints follow
+  // the authored treads, so a narrower human capsule cannot cut across two risers.
+  for(const link of map.navLinks||[]){
+    const dx=link.to.x-link.from.x,dz=link.to.z-link.from.z,dy=link.to.y-link.from.y,length=Math.hypot(dx,dz);if(length<1||dy<.4)continue;
+    const b=map.buildings?.[link.building],steps=b?12:Math.ceil(dy/.35),run=b?b.d-4:Math.max(1,length-1.4),sign=dz>=0?1:-1;
+    const points=[...(b?[{...link.from,x:b.x}]:[]),link.from,...Array.from({length:steps},(_,i)=>({x:link.from.x+(dx?dx*(i+.5)/steps:0),z:b?b.z+sign*(-run/2+(i+.5)*run/steps):link.from.z+dz*(i+1)/steps,y:link.from.y+dy*(i+1)/steps})),link.to,...(b?[{...link.to,x:b.x}]:[])];
+    const lane=points.map(p=>{const cx=Math.max(0,Math.min(n-1,Math.round((p.x-origin)/cell))),cz=Math.max(0,Math.min(n-1,Math.round((p.z-origin)/cell))),node={...p,cx,cz,id:nodes.length,edges:[]};nodes.push(node);cells[cz*n+cx].push(node);return node;});
+    for(let i=1;i<lane.length;i++){lane[i-1].edges.push(lane[i].id);lane[i].edges.push(lane[i-1].id);}
+    for(const end of [lane[0],lane.at(-1)])for(let x=Math.max(0,end.cx-2);x<=Math.min(n-1,end.cx+2);x++)for(let z=Math.max(0,end.cz-2);z<=Math.min(n-1,end.cz+2);z++)for(const node of cells[z*n+x]){
+      if(node===end||Math.abs(node.y-end.y)>.08||Math.hypot(node.x-end.x,node.z-end.z)>cell*2.1)continue;
+      let clear=true;for(let j=1;j<=6;j++){const t=j/6;if(!canStand(map,{x:end.x+(node.x-end.x)*t,z:end.z+(node.z-end.z)*t,y:end.y},RADIUS)){clear=false;break;}}
+      if(clear){end.edges.push(node.id);node.edges.push(end.id);}
+    }
+  }
   const nearest=(p)=>{
    let best=null,distance=Infinity;const cx=Math.floor((p.x-origin)/cell),cz=Math.floor((p.z-origin)/cell);
    for(let radius=0;radius<12;radius++){
@@ -412,7 +427,7 @@ export function navigation(map) {
       // A partial route is useful immediately and will be extended on the next
       // scheduled search. Unreachable indoor targets cannot stall a host frame.
       while(q.length&&visited++<4000){const id=pop();if(closed[id])continue;closed[id]=1;const a=nodes[id],d=heuristic(a);if(d<bestD){bestD=d;best=id;}if(id===end.id)break;
-       for(const k of a.edges){const b=nodes[k],next=cost[id]+cell+Math.abs(b.y-a.y)*.8;if(next<cost[k]){cost[k]=next;parent[k]=id;push(k,next+heuristic(b));}}
+       for(const k of a.edges){const b=nodes[k],next=cost[id]+Math.hypot(b.x-a.x,b.z-a.z)+Math.abs(b.y-a.y)*.8;if(next<cost[k]){cost[k]=next;parent[k]=id;push(k,next+heuristic(b));}}
       }
       const path = [];
       for (let k = best; k !== start.id && parent[k] >= 0; k = parent[k]) {

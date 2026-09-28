@@ -11,7 +11,7 @@ import {botInput} from '../src/bots.js';
 import {newBrain,observe,selectThreat} from '../src/bot-perception.js';
 import {BOT_SKILL} from '../src/bot-config.js';
 import {chooseObjective,stormPriority} from '../src/bot-objectives.js';
-import {MatchEarnings} from '../src/egg-wallet.js';
+import {calculateReward} from '../src/rewards.js';
 import {glidePose} from '../src/glide-pose.js';
 const flat={size:80,theme:'royale',boxes:[],spawns:[[0,0],[30,30]],floorLoot:[],districts:[{x:20,z:20,name:'Camp'}],landmarks:[]};
 const round=()=>{const s=new RoyaleSimulation({capacity:4,bots:0,seed:141});s.addPlayer('host',{name:'Host'});s.addPlayer('guest',{name:'Guest'});s.startRound();return s;};
@@ -22,7 +22,7 @@ test('Spawn Island admits separated contestants, ignores damage and rewards, and
  const join=s.admitPlayer('early',{name:'Early'});assert.ok(join.contestant);assert.equal(join.flight,'ground');assert.ok(canStand(s.map,join));
  assert.ok(Math.hypot(join.x-p.x,join.z-p.z)>2);assert.equal(p.inventory[0].id,'pickaxe');
  s.damage(p,join,1000,'Practice');assert.equal(p.health,100);assert.equal(join.kills,0);
- const earnings=new MatchEarnings();let paid=0;earnings.sample({key:'warmup',eligible:false,active:true,dt:60,kills:20,finished:true,won:true},()=>paid++);assert.equal(paid,0);
+ assert.equal(calculateReward({player:{active:0},opponents:[],elapsed:30}).amount,0);
  s.dropWeapon(p,'needle',4);s.pads.push({x:0,y:0,z:0});s.projectiles.push({id:1});p.shield=100;p.streak=5;
  s.queueEnds=s.time+.01;s.tick(1/60);assert.equal(s.stage,'battle-bus');assert.equal(s.map.id,'sunnybreak');assert.equal(s.projectiles.length,0);assert.equal(s.pads.length,0);
  for(const egg of s.players.values()){assert.equal(egg.health,100);assert.equal(egg.shield,0);assert.equal(egg.slot,0);assert.deepEqual(egg.inventory.slice(1),Array(5).fill(null));assert.deepEqual(egg.materials,{wood:0,brick:0,metal:0});assert.equal(egg.streak,0);assert.equal(egg.flight,'transport');}

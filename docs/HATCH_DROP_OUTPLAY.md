@@ -1,6 +1,8 @@
+> Historical technical notes. Current identity, humanoid combat, economy and timing are specified in [Ravelfront](RAVELFRONT.md).
+
 # Quality Updates 53–54 — Hatch, Drop & Outplay / Smooth Boarding
 
-This release extends Sunnybreak Reborn (Quality Update 52). It preserves its nine districts, 17 landmarks, modeled blasters, configurable optics, distinct ammunition, authored loot sockets, harvesting, building and maps. Protocol 16 prevents older clients from entering rooms with incompatible phase and inventory rules.
+This release extends Ravel Coast Reborn (Quality Update 52). It preserves its nine districts, 17 landmarks, modeled blasters, configurable optics, distinct ammunition, authored loot sockets, harvesting, building and maps. Protocol 16 prevents older clients from entering rooms with incompatible phase and inventory rules.
 
 Update 54 follows live profiling: inventory previews are shipped as cached images rendered from the same item models, avoiding synchronous GPU readbacks during play. Run `node scripts/generate-inventory-previews.mjs` when item geometry changes. Map shader preparation uses Three's asynchronous compilation API; production omits synchronous driver diagnostic queries while development retains them. Spectator capacity is four, keeping sixteen contestants and all observers within the deployed relay limit.
 
@@ -8,7 +10,7 @@ Update 54 follows live profiling: inventory previews are shipped as cached image
 
 `royale-phases.js` defines waiting → spawn-island → starting → battle-bus → drop → active → ending → finished. The transport's generic `phase` remains lobby/playing/results for compatibility; gameplay decisions use the authoritative Royale stage. Clients derive the current map from that stage, including during recovery.
 
-Hatchling Atoll is a separate 128 m practice island with a terminal, stairs and roof deck, cargo area, target range, palms, benches, beach and hopping pier. Twenty collision-checked spawn points are selected with occupied-position rejection. Contestants have temporary practice blasters and building materials. Damage, eliminations, streaks, placements and currency rewards are disabled. Static scenery is reconstructed locally.
+Relay Cay is a separate 128 m practice island with a terminal, stairs and roof deck, cargo area, target range, palms, benches, beach and hopping pier. Twenty collision-checked spawn points are selected with occupied-position rejection. Contestants have temporary practice blasters and building materials. Damage, eliminations, streaks, placements and currency rewards are disabled. Static scenery is reconstructed locally.
 
 The host owns a 30-second countdown and requires at least two contestants (including configured bots). The last five seconds enter `starting`. Contestant admission stays open until the atomic Battle Bus transition. That transition replaces the map, navigation graph, builds, destruction, loot, chests, projectiles, inputs, effects and temporary powers; it resets health, shield, inventory, ammunition and materials. Cosmetics persist. The rematch returns to a fresh Atoll and resets tip dismissal.
 
@@ -20,9 +22,9 @@ After departure, public listings say Spectate. Up to four late spectators occupy
 
 Reference decisions:
 
-- Epic's [September 2017 BR balance notes](https://www.fortnite.com/news/ea-1-6-3-release-notes) document the classic threshold: just over three stories begins at 10 damage; six stories becomes lethal, with slope reduction. Yolk stories are four world units. Above 12 units, damage is `10 + 90 × ((fall − 12) / 12)²`, multiplied by the squared upward surface normal. This intermediate curve is Yolk tuning, not an assertion that Epic publishes that formula.
+- Epic's [September 2017 BR balance notes](https://www.fortnite.com/news/ea-1-6-3-release-notes) document the classic threshold: just over three stories begins at 10 damage; six stories becomes lethal, with slope reduction. Ravelfront stories are four world units. Above 12 units, damage is `10 + 90 × ((fall − 12) / 12)²`, multiplied by the squared upward surface normal. This intermediate curve is Ravelfront tuning, not an assertion that Epic publishes that formula.
 - Epic's [Showdown Act III announcement](https://communities.epicgames.com/thread/showdown-act-iii-moving-into-the-next-era-for-zero-build/5FiD) changes otherwise lethal falls in noncompetitive Build/Zero Build to leave one HP, remove shield and add a recovery state; competitive is excluded. This update deliberately keeps lethal ordinary falls, as requested, rather than adopting that newer nonlethal rule.
-- Epic's [Shockwave Grenade announcement](https://www.fortnite.com/patch-notes/v5-30-content-update) specifies fall protection for the resulting launch. Yolk's Shock Egg grants one landing's immunity without glider deployment. Ordinary impulses remain vulnerable. Launch Nests explicitly force their intended glider; Bus exits explicitly permit deployment. Height alone never redeploys a glider after an ordinary launch.
+- Epic's [Shockwave Grenade announcement](https://www.fortnite.com/patch-notes/v5-30-content-update) specifies fall protection for the resulting launch. Ravelfront's Impulse Charge grants one landing's immunity without glider deployment. Ordinary impulses remain vulnerable. Launch Pads explicitly force their intended glider; Bus exits explicitly permit deployment. Height alone never redeploys a glider after an ordinary launch.
 
 The central launch policy records immunity, redeploy permission, forced glider and source independently. Landing clears all of them. Normal terrain/build falls, destroyed support and higher landing platforms use the same state machine.
 
@@ -52,19 +54,19 @@ Visual perception runs every 0.13–0.28 seconds; strategy runs less frequently.
 
 ## UI and animation
 
-The Shell Market uses original cream, teal and yolk styling, rendered cosmetic imagery, clear rarity/category/price information, collections, filters, favorites, purchase confirmation and responsive layouts. Keyboard arrows/Home/End navigate cards; existing purchase, equip and saved-loadout behavior remains. All six Locker slots show the actual equipped model or an explicit starter/empty preview. Outfit preview cache keys preserve the cosmetic's real asset identity.
+The Outfitter uses original cream, teal and yolk styling, rendered cosmetic imagery, clear rarity/category/price information, collections, filters, favorites, purchase confirmation and responsive layouts. Keyboard arrows/Home/End navigate cards; existing purchase, equip and saved-loadout behavior remains. All six Locker slots show the actual equipped model or an explicit starter/empty preview. Outfit preview cache keys preserve the cosmetic's real asset identity.
 
 A compact egg icon and formatted balance sit beside account statistics. Wallet subscriptions update balances immediately; the shop retains the balance needed for purchases. Currency remains earned, local-browser progress, with no real-money purchases.
 
 The upper arena streak banner is triggered by the real authoritative `streak-bonus` event. It announces the earned upgrade, then keeps compact timers only for timed powers. Shield/overheal show their actual remaining state; Restock has no fake countdown. Royale cannot award or display arena streak powers.
 
-Glider deployment, turning, forward lean, subtle body sway and landing blend from existing velocity/orientation state for local and remote eggs. No animation packets are needed. Pickaxe now occupies the first hotbar slot (1), items occupy 2–6, and P is the dedicated pickaxe shortcut. Existing customized bindings remain editable. L closes flight tips independently of movement, mouse lock and glider actions.
+Glider deployment, turning, forward lean, subtle body sway and landing blend from existing velocity/orientation state for local and remote operators. No animation packets are needed. Pickaxe now occupies the first hotbar slot (1), items occupy 2–6, and P is the dedicated pickaxe shortcut. Existing customized bindings remain editable. L closes flight tips independently of movement, mouse lock and glider actions.
 
 ## Essential verification
 
 - The 191-test suite passed, including a complete seeded sixteen-bot Royale round: twelve contestants acquired weapons and the match reached valid results.
 - Focused regression coverage checks admission, spectator isolation, reset/checkpoint state, falls and slope/landing conditions, launch immunity, support destruction, airborne drops, sparse loot versions, perception limits, objective priorities, difficulty and smooth glide blending.
-- A real local WebSocket relay run connects a host, early human guest, late spectator and bots. It checks Spawn Island movement, synchronized Bus departure, rejected forged spectator actions, guest glider inputs, Shock Egg immunity, shared final loot positions, host migration and rematch reset.
+- A real local WebSocket relay run connects a host, early human guest, late spectator and bots. It checks Spawn Island movement, synchronized Bus departure, rejected forged spectator actions, guest glider inputs, Impulse Charge immunity, shared final loot positions, host migration and rematch reset.
 - Browser checks exercise the real play menu, Spawn Island movement, slot selection, Bus/map handoff, flight tips, deployment, mobility, rematch and arena streak HUD. Shop checks cover purchases, actual images, equip, presets, persistence and mobile overflow.
 
 The Pages workflow runs the authoritative relay flow in addition to its existing unit and network gates. Deployed version and browser verification are recorded with the release, not inferred from local source files.
