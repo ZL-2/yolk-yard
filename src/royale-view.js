@@ -158,7 +158,7 @@ export class RoyaleView{
    let mesh=this.gliders.get(p.id);const style=(p.glider||'')+':'+(p.trail||'');
    if(mesh&&mesh.userData.style!==style){this.root.remove(mesh);this.view.disposeGroup(mesh);this.gliders.delete(p.id);mesh=null;}
    if(!mesh&&['dive','glide'].includes(p.flight)){mesh=new THREE.Group();const sail=shopItem(p.glider)?makeShopGlider(p.glider):canopy(kit),trail=makeShopTrail(p.trail);mesh.add(sail,trail);Object.assign(mesh.userData,{sail,trail,style});this.gliders.set(p.id,mesh);this.root.add(mesh);}
-   if(mesh){const pose=this.flightPose(p,t,dt);mesh.visible=p.health>0&&pose.air>.025;mesh.userData.sail.visible=pose.glide>.025;mesh.userData.sail.scale.setScalar(Math.max(.01,pose.glide));mesh.userData.trail.scale.y=(1+Math.sin(t*5)*.04)*pose.air;mesh.position.set(p.x,p.y+pose.bob,p.z);mesh.rotation.set(pose.pitch*.23,pose.yaw,pose.roll*.5);}
+   if(mesh){const pose=this.flightPose(p,t,dt);mesh.visible=p.health>0&&pose.air>.025;mesh.userData.sail.visible=pose.glide>.025;mesh.userData.sail.scale.setScalar(Math.max(.01,pose.glide));mesh.userData.trail.scale.y=(1+Math.sin(t*5)*.04)*pose.air;mesh.position.set(p.x,p.y+pose.bob,p.z);mesh.rotation.set(pose.pitch,pose.yaw,pose.roll);}
   }
   const padIds=new Set();for(const p of r.pads){padIds.add(p.id);let mesh=this.pads.get(p.id);if(!mesh){mesh=launchpadModel(kit);bake(mesh);this.root.add(mesh);this.pads.set(p.id,mesh);}mesh.position.set(p.x,p.y,p.z);mesh.scale.setScalar(1+Math.sin(t*3)*.035);}
   for(const [id,m]of this.pads)if(!padIds.has(id)){this.root.remove(m);this.view.disposeGroup(m);this.pads.delete(id);}
@@ -179,14 +179,14 @@ export class RoyaleView{
  animateActor(model,p,t,dt=1/60){
   this.poseDt=dt;const pose=this.flightPose(p,t,dt);
   const flying=p.flight==='dive'||p.flight==='glide'||p.flight==='launch';
-  if(model.userData.held)model.userData.held.visible=!p.building&&!flying&&!!p.inventory?.[p.slot]&&(!!p.inventory[p.slot].weapon||!!p.inventory[p.slot].pickaxe);
+  if(model.userData.held)model.userData.held.visible=p.health>0&&model.userData.draw?.visible!==false&&!p.building&&!flying&&!!p.inventory?.[p.slot]&&(!!p.inventory[p.slot].weapon||!!p.inventory[p.slot].pickaxe);
   if(model.userData.blaster)model.userData.blaster.visible=!p.building&&!flying&&!!p.inventory?.[p.slot]?.weapon;
   const item=p.building?{id:'blueprint'}:p.inventory?.[p.slot];
-  const itemKey=!flying&&item&&!item.weapon&&!item.pickaxe?item.id:null;
+  const itemKey=p.health>0&&!flying&&item&&!item.weapon&&!item.pickaxe?item.id:null;
   if(model.userData.utilityKey!==itemKey){if(model.userData.utility){model.userData.utility.removeFromParent();this.view.disposeGroup(model.userData.utility);}model.userData.utility=null;model.userData.utilityKey=itemKey;if(itemKey){const prop=this.itemModel(item,false);prop.scale.setScalar(.6);prop.position.set(.36,.7,-.35);model.add(prop);model.userData.utility=prop;}}
   if(model.userData.utility){model.userData.utility.position.y=p.use?1.15+Math.sin(t*7)*.02:.7;if(item?.pickaxe){const swing=Math.max(0,1-(this.view.lastStateTime-(p.swingAt??-100))/.45);model.userData.utility.rotation.x=-Math.sin(swing*Math.PI)*1.5;}}
 
-  if(pose.air>.01){model.rotation.x=model.rotation.x*(1-pose.air)+pose.pitch;model.rotation.z=model.rotation.z*(1-pose.air)+pose.roll;model.position.y+=pose.bob;}
+  if(pose.air>.01){model.rotation.y=pose.yaw;model.rotation.x=model.rotation.x*(1-pose.air)+pose.pitch;model.rotation.z=model.rotation.z*(1-pose.air)+pose.roll;model.position.y+=pose.bob;}
 
   if(p.place===1&&p.health>0)model.userData.victory=true;
  }

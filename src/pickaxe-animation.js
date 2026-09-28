@@ -24,9 +24,9 @@ export function pickaxePose(id,age){
 const grip=new THREE.Vector3();
 export function animatePickaxe(tool,arms,id,age){
  const pose=pickaxePose(id,age);
- tool.scale.setScalar(.85);
+ tool.scale.setScalar(tool.userData.firstPerson?.65:.85);
  tool.rotation.set(...pose.rotation);
- tool.position.set(-.03+pose.offset[0],.03+pose.offset[1],-.25+pose.offset[2]);
+ tool.position.set((tool.userData.firstPerson?.22:-.03)+pose.offset[0],(tool.userData.firstPerson?-.08:.03)+pose.offset[1],(tool.userData.firstPerson?-.6:-.25)+pose.offset[2]);
  tool.updateMatrix();
  if(arms){
   // Both hands remain attached to distinct points on the moving shaft.

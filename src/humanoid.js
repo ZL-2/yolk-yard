@@ -25,6 +25,7 @@ function template(profile){
  const key=JSON.stringify([colors,style%6]);if(geometries.has(key))return geometries.get(key);
  const parts=[];
  function add(g,color,bone,next=null,blend=null){
+  if(bone==='head'){g.translate(0,-1.666,0);g.scale(.86,.83,.86);g.translate(0,1.686,0);}
   const n=g.attributes.position.count,c=new T.Color(color),rgb=new Float32Array(n*3),index=new Uint16Array(n*4),weights=new Float32Array(n*4);
   for(let i=0;i<n;i++){rgb.set([c.r,c.g,c.b],i*3);const t=blend?blend(g.attributes.position,i):0;index[i*4]=ids[bone];index[i*4+1]=ids[next||bone];weights[i*4]=1-t;weights[i*4+1]=t;}
   g.setAttribute('color',new T.BufferAttribute(rgb,3));g.setAttribute('skinIndex',new T.Uint16BufferAttribute(index,4));g.setAttribute('skinWeight',new T.Float32BufferAttribute(weights,4));parts.push(g);

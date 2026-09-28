@@ -24,3 +24,11 @@ export function observeMotion(a,p,dt,time){
  if(time-a.last<6)a.active+=Math.min(1.5,Math.max(0,dt));
 }
 export function activityRemaining(a,time){return Math.max(0,AFK_SECONDS-(time-a.last));}
+
+// Only accepted gameplay results qualify; failed edits and slot toggles do not.
+export function activityEvent(e){
+ const cue=e.cue||'',build=e.type==='build-result'&&e.ok&&e.changed;
+ const contribution=build||['harvest','pickup','inventory-change'].includes(e.type)||e.type==='royale-cue'&&(/^(pickup-|complete-)/.test(cue)||['chest-open','ammo-pickup','build-place','harvest-hit'].includes(cue));
+ const action=contribution||['shot','launch'].includes(e.type)||e.type==='royale-cue'&&['item-drop','glider-deploy','glider-cut','pickaxe-swing','launch'].includes(cue);
+ return action?{signature:e.type+':'+(cue||e.weapon||e.buildId||''),contribution}:null;
+}

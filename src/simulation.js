@@ -1,4 +1,4 @@
-import {newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
+import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
 import {RemoteInputBuffer} from './remote-input.js';
 import {updateCombatAccuracy,firedAccuracy,pelletOffsets,criticalHit,falloffAt} from './combat.js';
 import {arenaBonuses,resetBonuses,updateBonuses,awardBonus} from './streaks.js';
@@ -60,10 +60,8 @@ export class Simulation {
     this.winner = "";
   }
   emit(type, data = {}) {
-    if(data.player&&['shot','launch','build-place','harvest','build-result','royale-cue'].includes(type)){
-      const p=this.players.get(data.player);
-      if(p?.activity&&!p.bot){const valid=type!=='royale-cue'||['chest-open','item-drop','weapon-swap','glider-deploy','complete-medkit','complete-bandage'].includes(data.cue);if(valid){if(meaningfulActivity(p.activity,'action',type+':'+(data.cue||data.weapon||'')+':'+Math.round(p.x/3)+','+Math.round(p.z/3),this.time))p.activity.contributions++;}}
-    }
+    const activity=activityEvent({type,...data}),actor=this.players.get(data.player);
+    if(activity&&actor?.activity&&!actor.bot&&meaningfulActivity(actor.activity,'action',activity.signature+':'+Math.round(actor.x/3)+','+Math.round(actor.z/3),this.time)&&activity.contribution)actor.activity.contributions++;
     if(type==='hit'&&data.player&&this.players.get(data.player)?.activity){this.players.get(data.player).activity.damage+=Math.max(0,Math.min(100,data.amount||0));meaningfulActivity(this.players.get(data.player).activity,'damage',data.target,this.time);}
     const e = { id: ++this.eventId, time: this.time, type, ...data };
     this.events.push(e);
@@ -443,7 +441,7 @@ export class Simulation {
   }
   recordPoses(){
     this.poseHistory??=new Map();
-    for(const p of this.players.values()){let h=this.poseHistory.get(p.id);if(!h){h=[];this.poseHistory.set(p.id,h);}if(h.at(-1)?.time>this.time-1/30)continue;h.push({time:this.time,x:p.x,y:p.y,z:p.z,yaw:p.yaw,flight:p.flight,vx:p.vx,vz:p.vz});while(h.length>10)h.shift();}
+    for(const p of this.players.values()){let h=this.poseHistory.get(p.id);if(!h){h=[];this.poseHistory.set(p.id,h);}if(h.at(-1)?.time>this.time-1/30)continue;h.push({time:this.time,x:p.x,y:p.y,z:p.z,yaw:p.yaw,flight:p.flight,vx:p.vx,vz:p.vz,sprinting:p.sprinting});while(h.length>10)h.shift();}
     for(const id of this.poseHistory.keys())if(!this.players.has(id))this.poseHistory.delete(id);
   }
   shotPose(target,shooter,w){
@@ -453,7 +451,7 @@ export class Simulation {
     if(!history?.length)return target;
     const after=history.find(v=>v.time>=time)||history.at(-1),before=history.findLast(v=>v.time<=time)||history[0],f=clamp((time-before.time)/(after.time-before.time||1),0,1);
     if(Math.hypot(target.x-before.x,target.y-before.y,target.z-before.z)>5)return target;
-    return {...target,yaw:before.yaw??target.yaw,flight:before.flight??target.flight,vx:before.vx??target.vx,vz:before.vz??target.vz,x:before.x+(after.x-before.x)*f,y:before.y+(after.y-before.y)*f,z:before.z+(after.z-before.z)*f};
+    return {...target,yaw:before.yaw??target.yaw,flight:before.flight??target.flight,vx:before.vx??target.vx,vz:before.vz??target.vz,sprinting:before.sprinting??target.sprinting,x:before.x+(after.x-before.x)*f,y:before.y+(after.y-before.y)*f,z:before.z+(after.z-before.z)*f};
   }
   updateAccuracy(p, previous, dt) {
     const w=gun(p),a=p.accuracyState[p.slot]??={};
@@ -461,7 +459,7 @@ export class Simulation {
     p.recoilPitch=a.recoilPitch;p.recoilYaw=a.recoilYaw;
   }
   shotPath(p, w, directionOverride = null) {
-    const eye = { x: p.x, y: p.y + EYE * (p.bodyScale || 1), z: p.z },
+    const eye = { x: p.x, y: p.y + EYE, z: p.z },
       aim = directionOverride || direction(p.yaw, p.pitch);
     let distance = wallDistance(this.map, eye, aim, (w.flightRange??w.range));
     for (const target of this.players.values())
@@ -543,7 +541,7 @@ export class Simulation {
       path = this.shotPath(p, w, aim),
       d = popper ? direction(p.yaw, p.pitch) : path.d;
     const origin = popper
-      ? { x: p.x, y: p.y + EYE * (p.bodyScale || 1) - 0.15, z: p.z }
+      ? { x: p.x, y: p.y + EYE - 0.15, z: p.z }
       : path.origin;
     if (!popper && path.blocked) {
       this.emit("impact", {

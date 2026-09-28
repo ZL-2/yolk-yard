@@ -1,7 +1,7 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {dirname} from 'node:path';
-import {newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from '../../src/activity.js';
+import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from '../../src/activity.js';
 import {calculateReward,participation} from '../../src/rewards.js';
 const warmup=new Set(['waiting','spawn-island','starting']);
 const bounded=(v,max=1e7)=>Number.isFinite(v)?Math.min(max,Math.max(-max,v)):0;
@@ -11,7 +11,7 @@ export class ProgressionService{
  identity(token){return typeof token==='string'&&/^[a-f0-9]{32,64}$/.test(token)?createHash('sha256').update(token).digest('hex'):null;}
  async register(peer,token){peer.progressId=this.identity(token)||randomUUID();await this.ready;for(const receipt of this.account(peer.progressId).receipts.slice(-30))this.relay.send(peer,{type:'reward',receipt});}
  account(id){if(!this.accounts.has(id))this.accounts.set(id,{receipts:[],pairs:[],earned:[],encounters:[]});return this.accounts.get(id);}
- input(peer,input){const now=this.clock();for(const match of this.matches.values()){const p=[...match.players.values()].find(p=>p.identity===peer.progressId);if(p&&!match.finished&&p.controlled){observeInput(p.activity,input||{},now);p.inputAt=now;}}}
+ input(peer,input){const now=this.clock();for(const match of this.matches.values()){const p=[...match.players.values()].find(p=>p.identity===peer.progressId);if(p&&!match.finished&&!p.afkRemoved){observeInput(p.activity,input||{},now);p.inputAt=now;}}}
  frame(peer,s){
   if(!peer.listing||!Array.isArray(s?.players)||s.players.length>36||!Number.isInteger(s.round)||!['playing','results'].includes(s.phase))return;
   // A room's public/custom provenance is assigned by matchmaking, not the host.
@@ -29,7 +29,7 @@ export class ProgressionService{
    if(!bot&&!isHost&&![...remote.links.values()].some(p=>p.id===room||p.progressId===peer.progressId))continue;
    let p=m.players.get(raw.id);if(!p){if(now-m.started>15)continue;const identity=bot?raw.id:remote.progressId;if(!bot&&[...m.players.values()].some(p=>!p.bot&&p.identity===identity))continue;p={id:raw.id,identity,bot,activity:newActivity(now),joined:now,difficulty:m.difficulty,kills:0,assists:0};m.players.set(p.id,p);}
    p.peer=remote;p.raw={...raw,x:bounded(raw.x),y:bounded(raw.y),z:bounded(raw.z)};p.afkRemoved||=!!raw.afkRemoved;
-   p.controlled=!bot&&!p.afkRemoved&&!raw.awaitingEntry&&!raw.spectating&&raw.health>0&&raw.flight!=='transport'&&remote?.ws;
+   p.controlled=!bot&&!p.afkRemoved&&!raw.awaitingEntry&&!raw.spectating&&raw.health>0&&raw.flight!=='transport'&&remote?.ws&&(isHost||p.inputAt!=null);
    if(!p.controlled){p.activity.last=now;p.activity.x=raw.x;p.activity.z=raw.z;continue;}
    p.activity.elapsed=(p.activity.elapsed||0)+dt;
    if(isHost)observeInput(p.activity,s.input||{},now);
@@ -40,7 +40,7 @@ export class ProgressionService{
   for(const e of s.events||[]){if(!Number.isInteger(e.id)||e.id<=m.event)continue;m.event=Math.max(m.event,e.id);const p=m.players.get(e.player),target=m.players.get(e.target);if(e.type==='afk-removed'&&p){p.afkRemoved=true;p.controlled=false;continue;}if(!p||p.afkRemoved)continue;
    if(e.type==='hit'&&target&&target!==p){p.activity.damage+=Math.max(0,Math.min(100,e.amount||0));if(p.controlled)meaningfulActivity(p.activity,'damage',target.id,now);const hits=m.hits.get(target.id)||new Map();hits.set(p.id,now);m.hits.set(target.id,hits);}
    if(e.type==='elimination'&&target&&target!==p&&now-(target.lastEliminated||-999)>2){target.lastEliminated=now;p.kills++;m.eliminations.push({attacker:p.id,target:target.id,time:now});for(const [id,t]of m.hits.get(target.id)||[])if(id!==p.id&&now-t<12){const helper=m.players.get(id);if(helper)helper.assists++;}m.hits.delete(target.id);}
-   if(p.controlled&&['shot','launch','build-place','harvest','pickup','royale-cue'].includes(e.type)){const accepted=meaningfulActivity(p.activity,e.type,`${e.cue||e.weapon||''}:${Math.round(p.raw.x/3)},${Math.round(p.raw.z/3)}`,now);if(accepted&&['build-place','harvest','pickup'].includes(e.type))p.activity.contributions++;}
+   const activity=activityEvent(e);if(p.controlled&&activity&&meaningfulActivity(p.activity,'action',activity.signature+':'+Math.round(p.raw.x/3)+','+Math.round(p.raw.z/3),now)&&activity.contribution)p.activity.contributions++;
   }
   if(s.phase==='results')this.settle(m);
  }

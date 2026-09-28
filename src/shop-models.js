@@ -46,7 +46,8 @@ export function makeShopGlider(id){
  if(k===1){for(const side of [-1,1])for(let j=0;j<4;j++){const wing=box(g,j%2?c:a,side*(.7+j*.4),3-j*.09,.15+j*.12,.75,.13,1.6-j*.22);wing.rotation.z=side*.17;}orb(g,a,0,3,0,.28);}
  if(k===2){const kite=part(g,new THREE.OctahedronGeometry(1.8,0),c,0,3,0);kite.scale.set(1.25,.08,.8);box(g,a,0,3.12,0,3.5,.055,.07);}
  if(k===3){const dome=part(g,new THREE.SphereGeometry(1.9,16,8,0,Math.PI*2,0,Math.PI/2),c,0,2.8,0);dome.scale.y=.4;dome.material.side=THREE.DoubleSide;for(const side of [-1,1])box(g,a,side*1.4,3,.0,.25,.2,2);}
- for(const x of [-.7,.7])for(const z of [-.4,.4]){const wire=part(g,new THREE.CylinderGeometry(.014,.014,1.35,6),a,x,2.1,z);wire.rotation.z=-x*.18;}
+ for(const x of [-1.3,1.3])for(const z of [-.4,.4]){const top=new THREE.Vector3(x,2.8,z),end=new THREE.Vector3(Math.sign(x)*.33,1.93,-.06),delta=top.clone().sub(end),mid=top.clone().add(end).multiplyScalar(.5);const wire=part(g,new THREE.CylinderGeometry(.012,.012,delta.length(),6),a,...mid.toArray());wire.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());}
+ for(const x of [-.33,.33])box(g,'#162b36',x,1.93,-.06,.11,.075,.14);
  return g;
 }
 export function makeShopTrail(id){

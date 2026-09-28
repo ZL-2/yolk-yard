@@ -1,4 +1,4 @@
-import {direction,rayBox,rayEgg,EYE,wallDistance,worldHit,invalidateCollision,candidates} from './physics.js';
+import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates} from './physics.js';
 import {groundAt} from './terrain.js';
 import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
 import {PIECES,pieceBoxes,validEdit,editRay,wallPattern} from './building-shapes.js';
@@ -36,7 +36,7 @@ export function validPlacement(p,map,builds,players=[]){
  if(builds.some(b=>b.type===p.type&&b.x===p.x&&Math.abs(b.y-p.y)<.2&&b.z===p.z&&(p.type!=='wall'||b.rotation%2===p.rotation%2)))return 'Already built';
  const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,4)].filter(o=>!o.buildId&&blocksBuilding(o));
  for(const b of bs){
-  if(players.some(o=>o.health>0&&!o.spectating&&!(['floor','stairs'].includes(p.type)&&o.grounded&&b.y>=o.y&&b.y-o.y<=.43)&&o.y<b.y+b.h-.05&&o.y+1.75>b.y+.05&&Math.abs(o.x-b.x)<b.w/2+.42&&Math.abs(o.z-b.z)<b.d/2+.42))return 'Player in the way';
+  if(players.some(o=>o.health>0&&!o.spectating&&!(['floor','stairs'].includes(p.type)&&o.grounded&&b.y>=o.y&&b.y-o.y<=.43)&&o.y<b.y+b.h-.05&&o.y+HEIGHT>b.y+.05&&Math.abs(o.x-b.x)<b.w/2+RADIUS+.02&&Math.abs(o.z-b.z)<b.d/2+RADIUS+.02))return 'Player in the way';
   if(near.some(o=>Math.abs(o.x-b.x)<(o.w+b.w)/2-.06&&Math.abs(o.z-b.z)<(o.d+b.d)/2-.06&&b.y<o.y+o.h-.06&&b.y+b.h>o.y+.06))return 'Blocked';
  }
  // Buried floor/roof surfaces are not usable. Walls and ramps can root in a slope.
@@ -145,7 +145,7 @@ export function swingPickaxe(sim,p){
 export function buildingTick(sim,p,input){
  const wasBuilding=p.building;
  p.buildFacing=snappedFacing(p.yaw,wasBuilding?p.buildFacing:undefined);
- p.building=!!input.buildMode;p.buildType=input.buildType||'wall';
+ p.editing=!!input.editing;p.building=!!input.buildMode||p.editing;p.buildType=input.buildType||'wall';
  const requested=MATERIALS[input.buildMaterial]?input.buildMaterial:'wood';
  if(requested!==p.buildRequested||!p.buildMaterial){p.buildMaterial=requested;p.buildRequested=requested;}
  p.buildMaterial=selectMaterial(p.materials,p.buildMaterial)||p.buildMaterial;p.buildRotation=Number.isInteger(input.buildRotation)?((input.buildRotation%4)+4)%4:0;
@@ -194,17 +194,17 @@ export function editBuilding(sim,p,action){
   const proposal={...b,mask:cmd.mask,path:cmd.path||[],doorOpen:false};
   if(!validEdit(proposal))return fail('Invalid selection');
   if(JSON.stringify([b.mask,b.path||[]])===JSON.stringify([proposal.mask,proposal.path])){sim.emit('build-result',{player:p.id,buildId:b.id,ok:true});return true;}
-  const overlaps=(box,p)=>p.health>0&&p.y<box.y+box.h-.03&&p.y+1.75>box.y+.03&&Math.abs(p.x-box.x)<box.w/2+.45&&Math.abs(p.z-box.z)<box.d/2+.45;
+  const overlaps=(box,p)=>p.health>0&&p.y<box.y+box.h-.03&&p.y+HEIGHT>box.y+.03&&Math.abs(p.x-box.x)<box.w/2+RADIUS+.03&&Math.abs(p.z-box.z)<box.d/2+RADIUS+.03;
   if(pieceBoxes(proposal).some(box=>[...sim.players.values()].some(p=>overlaps(box,p))))return fail('Player in the way');
   b.mask=proposal.mask;b.path=proposal.path;b.doorOpen=false;b.revision=(b.revision||0)+1;
  }
- sim.buildVersion++;rebuildMap(sim);collapse(sim);sim.emit('build-result',{player:p.id,buildId:b.id,ok:true});return true;
+ sim.buildVersion++;rebuildMap(sim);collapse(sim);sim.emit('build-result',{player:p.id,buildId:b.id,ok:true,changed:true});return true;
 }
 export function toggleDoor(sim,p){
  const hit=aimedObject(sim.map,p,3),b=sim.builds.find(b=>b.id===hit?.box.buildId);
  if(!b||wallPattern(b.mask)?.door==null||sim.time<(p.nextDoor||0))return false;
  const proposal={...b,doorOpen:!b.doorOpen};
- for(const box of pieceBoxes(proposal).filter(b=>b.door))if([...sim.players.values()].some(o=>o.health>0&&o.y<box.y+box.h&&o.y+1.75>box.y&&Math.abs(o.x-box.x)<box.w/2+.46&&Math.abs(o.z-box.z)<box.d/2+.46))return false;
+ for(const box of pieceBoxes(proposal).filter(b=>b.door))if([...sim.players.values()].some(o=>o.health>0&&o.y<box.y+box.h&&o.y+HEIGHT>box.y&&Math.abs(o.x-box.x)<box.w/2+RADIUS+.04&&Math.abs(o.z-box.z)<box.d/2+RADIUS+.04))return false;
  b.doorOpen=proposal.doorOpen;b.revision=(b.revision||0)+1;p.nextDoor=sim.time+.25;sim.buildVersion++;rebuildMap(sim);return true;
 }
 export function constructionTick(sim){

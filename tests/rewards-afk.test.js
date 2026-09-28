@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {calculateReward} from '../src/rewards.js';import {ProgressionService} from '../server/realtime/progression.js';
-import {newActivity,observeInput,observeMotion,activityRemaining} from '../src/activity.js';
+import {activityEvent,newActivity,observeInput,observeMotion,activityRemaining} from '../src/activity.js';
 import {SPAWN_ISLAND,SPAWN_REGIONS,distributedSpawn} from '../src/spawn-island.js';import {canStand} from '../src/physics.js';import {groundAt} from '../src/terrain.js';
 const active={active:160,distance:600,damage:120,contributions:8};
 const pay=(n,{difficulty=0,custom=false,place=1,player=active,elapsed=300,...rest}={})=>calculateReward({player,elapsed,opponents:Array.from({length:n-1},()=>({...active,bot:!!difficulty,difficulty})),custom,mode:'royale',place,won:place===1,...rest});
@@ -31,4 +31,18 @@ test('32 contestants cover all safe island sectors without overlap',()=>{
  assert.ok(SPAWN_ISLAND.spawns.length>100);const players=[];let seed=17;const random=()=>((seed=Math.imul(seed,1664525)+1013904223|0)>>>0)/4294967296;
  for(let i=0;i<32;i++){const {point:[x,z],region}=distributedSpawn(players,random),p={x,z,y:groundAt(SPAWN_ISLAND,x,z),health:100,region};assert.ok(canStand(SPAWN_ISLAND,p));assert.ok(players.every(o=>Math.hypot(x-o.x,z-o.z)>3));players.push(p);}
  for(const r of SPAWN_REGIONS){const count=players.filter(p=>p.region===r.id).length;assert.ok(count>=2&&count<=6,`${r.id}: ${count}`);}
+});
+
+test('only successful gameplay actions count; idle slots and failed or unchanged edits do not',()=>{
+ assert.equal(activityEvent({type:'royale-cue',cue:'weapon-swap'}),null);
+ assert.equal(activityEvent({type:'build-result',ok:false}),null);
+ assert.equal(activityEvent({type:'build-result',ok:true}),null);
+ assert.equal(activityEvent({type:'build-result',ok:true,changed:true}).contribution,true);
+ assert.equal(activityEvent({type:'royale-cue',cue:'build-place'}).contribution,true);
+ assert.equal(activityEvent({type:'royale-cue',cue:'complete-mini'}).contribution,true);
+});
+test('simulation warns then removes at 59 seconds and suspends the clock during transport',async()=>{
+ const {Simulation}=await import('../src/simulation.js');const sim=new Simulation({bots:0,mode:'ffa'});const p=sim.addPlayer('a',{name:'Scout'});sim.phase='playing';p.awaitingEntry=false;p.spectating=false;p.health=100;p.activity=newActivity(0);
+ for(let t=1;t<=58;t++){sim.time=t;sim.tickActivity(1);}assert.equal(p.afkRemaining,1);assert.equal(p.afkRemoved,undefined);sim.time=59;sim.tickActivity(1);assert.equal(p.afkRemoved,true);assert.equal(p.activity.active,0);
+ Object.assign(p,{afkRemoved:false,health:100,spectating:false,flight:'transport',activity:newActivity(59)});sim.time=300;sim.tickActivity(1);assert.equal(p.afkRemaining,59);p.flight='ground';sim.time=358;sim.tickActivity(1);assert.equal(p.afkRemoved,false);sim.time=359;sim.tickActivity(1);assert.equal(p.afkRemoved,true);
 });
