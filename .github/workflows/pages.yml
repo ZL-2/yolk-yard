@@ -30,14 +30,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - name: Verify Ravelfront operators, cosmetics and populated island
-        if: contains(github.event.head_commit.message, '[rebrand]')
+        if: (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]'))
         run: |
           npx playwright install --with-deps chromium
           node scripts/rebrand-browser-check.mjs
           node scripts/party-duos-check.mjs
           node scripts/lobby-duos-check.mjs
       - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[rebrand]')
+        if: always() && (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]'))
         with:
           name: ravelfront-verification
           path: test-results
@@ -49,7 +49,7 @@ jobs:
           npx playwright install --with-deps chromium
           node scripts/lobby-duos-check.mjs
       - uses: actions/upload-artifact@v4
-        if: always() && (contains(github.event.head_commit.message, '[lobby-duos]') || contains(github.event.head_commit.message, '[rebrand]'))
+        if: always() && (contains(github.event.head_commit.message, '[lobby-duos]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))
         with:
           name: lobby-duos
           path: test-results/lobby-duos
@@ -99,7 +99,7 @@ jobs:
   browser:
     # Relay-only releases use the real WebSocket/simulation checks in the build job.
     # Other verified releases retain the existing local-browser opt-in.
-    if: "!(contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || contains(github.event.head_commit.message, '[rebrand]'))"
+    if: "!(contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -137,7 +137,7 @@ jobs:
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           BROWSER_RESULT: ${{ needs.browser.result }}
-          VERIFIED_RELEASE: ${{ (contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || contains(github.event.head_commit.message, '[rebrand]')) }}
+          VERIFIED_RELEASE: ${{ (contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]'))) }}
         run: |
           test "$BUILD_RESULT" = success
           if [ "$VERIFIED_RELEASE" = true ]; then
@@ -170,7 +170,7 @@ jobs:
       - uses: actions/deploy-pages@v4
         id: deployment
   verify-live:
-    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[lobby-duos]') || contains(github.event.head_commit.message, '[rebrand]'))
+    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[lobby-duos]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 8
