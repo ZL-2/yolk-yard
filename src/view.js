@@ -358,7 +358,7 @@ export class View {
   setParty(profiles){
     const key=JSON.stringify(profiles);if(key===this.partyPreviewKey)return;this.partyPreviewKey=key;
     for(const egg of this.partyEggs||[]){this.scene.remove(egg);this.disposeGroup(egg);}this.partyEggs=[];
-    for(const [i,profile]of profiles.slice(0,1).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.1);egg.position.set(4.1+i*2.5,.08,-.7);egg.rotation.y=Math.PI+.35;egg.userData.lobbyMotion=new LobbyMotion(11.3+i*5.7);this.scene.add(egg);this.partyEggs.push(egg);}
+    for(const [i,profile]of profiles.slice(0,1).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.3);egg.position.set(4.1+i*2.5,.08,-.7);egg.rotation.y=Math.PI+.35;egg.userData.lobbyMotion=new LobbyMotion(11.3+i*5.7);this.scene.add(egg);this.partyEggs.push(egg);}
   }
   preview(profile) {
     const signature = JSON.stringify(profile);
@@ -384,11 +384,11 @@ export class View {
   animateLobbyCharacter(model,motion,dt,yawOffset=0){
     const pose=motion.update(dt),held=model.userData.held;
     model.rotation.y=pose.yaw+yawOffset;
-    held.position.set(.10+pose.weaponSide,1.36+pose.breath+pose.grip,-.22+pose.weaponDepth);
+    held.position.set(.10+pose.weaponSide,1.36+pose.breath+pose.grip+pose.weaponBob,-.22+pose.weaponDepth);
     held.rotation.set(pose.pitch,pose.weaponYaw,pose.roll,'YXZ');
     updateArms(model.userData.arms,-1,model.userData.blaster);
     animateHumanoid(model,{health:100,grounded:true,yaw:model.rotation.y,pitch:pose.pitch,
-      scan:pose.scan,lobbyIdle:pose},dt,motion.time,{menu:true});
+      scan:pose.scan,lobbyPatrol:pose,vx:-Math.sin(model.rotation.y)*pose.speed,vz:-Math.cos(model.rotation.y)*pose.speed},dt,motion.time,{menu:true});
   }
   diagnostics() {
     return {
@@ -714,7 +714,7 @@ export class View {
     if(playing)this.loadMap(state?.options.map || "yard");
     if(playing&&state?.royale?.practice)this.prepareBattleMap();
     this.world.visible=playing;
-    if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x97c6c4;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(sky,playing?(map.theme==='royale'?330:72):40,playing?(map.theme==='royale'?1000:175):125);}
+    if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x6f9295;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(sky,playing?(map.theme==='royale'?330:72):35,playing?(map.theme==='royale'?1000:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
     if(this.lobbyStage)this.lobbyStage.visible=!playing;
     for(const egg of this.partyEggs||[])egg.visible=!playing;
@@ -725,6 +725,7 @@ export class View {
       this.clearOutgoing(this);
       this.preview(profile);
       this.animateLobbyCharacter(this.menuEgg,this.lobbyMotion,dt);
+      this.lobbyStage.userData.update?.(dt);
       for(const teammate of this.partyEggs||[])this.animateLobbyCharacter(teammate,teammate.userData.lobbyMotion,dt,.17);
       const partyOffset=this.partyEggs?.length?1:0,narrow=this.camera.aspect<.85;
       this.camera.position.set(5.8+partyOffset,4.3,narrow?(partyOffset?22.5:19):12.5);

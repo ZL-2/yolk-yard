@@ -1,3 +1,4 @@
+import {LobbyMusic} from './lobby-music.js';
 // Original procedural sound palette. Every sound is generated locally, with no samples/CDN.
 import {FIREARM_SOUNDS,synthesizeShot,reloadSequence} from './firearm-audio.js';
 import {gun} from './data.js';
@@ -80,12 +81,14 @@ for(const [i,id]of Object.keys(ITEMS).entries()){
 }
 export const SHOT_PALETTE={sprinter:[145,1200,.15],scatter:[78,700,.25],needle:[62,2100,.33],zipper:[210,1900,.10],thumper:[52,500,.45],anchor:[100,1100,.19],duet:[185,1800,.14],pip:[240,1800,.12],peeper:[105,2500,.21],doubleyolk:[95,900,.21],comet:[520,2400,.18]};
 export class Sound {
- constructor(){this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];}
+ constructor(){this.lobbyMusic=new LobbyMusic();this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];}
  unlock(){
+  this.lobbyMusic.unlock();
   if(!this.ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(Audio){this.ctx=new Audio();this.master=this.ctx.createGain();this.compressor=this.ctx.createDynamicsCompressor();this.master.connect(this.compressor).connect(this.ctx.destination);this.master.gain.value=this.volume;const size=this.ctx.sampleRate*2;this.noiseBuffer=this.ctx.createBuffer(1,size,this.ctx.sampleRate);const a=this.noiseBuffer.getChannelData(0);let seed=12345;for(let i=0;i<size;i++){seed=(seed*1664525+1013904223)>>>0;a[i]=seed/2147483648-1;}}}
   this.ctx?.resume().catch(()=>{});
  }
- setVolumes(settings){this.volume=settings.volume??this.volume;this.effectsVolume=settings.effectsVolume??.85;this.ambienceVolume=settings.ambienceVolume??.5;this.musicVolume=settings.musicVolume??.3;if(this.master)this.master.gain.setTargetAtTime(this.enabled?this.volume:0,this.ctx.currentTime,.03);}
+ setVolumes(settings){this.volume=settings.volume??this.volume;this.effectsVolume=settings.effectsVolume??.85;this.ambienceVolume=settings.ambienceVolume??.5;this.musicVolume=settings.musicVolume??.3;this.lobbyMusic.setVolume(this.enabled?this.volume*this.musicVolume:0);if(this.master)this.master.gain.setTargetAtTime(this.enabled?this.volume:0,this.ctx.currentTime,.03);}
+ updateLobby(inLobby,dt,hidden=false){this.lobbyMusic.update(inLobby,dt,hidden);}
  spatial(position){
   if(!position||!this.listener)return {gain:1,pan:0};
   const dx=position.x-this.listener.x,dz=position.z-this.listener.z,dy=(position.y||0)-(this.listener.y||0),d=Math.hypot(dx,dy,dz),radius=position.radius||65;

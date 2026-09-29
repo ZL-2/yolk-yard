@@ -121,7 +121,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const interval=distance>90?.1:distance>40?.05:0;if(h.clock<h.nextUpdate){h.skipped=(h.skipped||0)+dt;return;}dt=Math.min(.12,dt+(h.skipped||0));h.skipped=0;h.nextUpdate=h.clock+interval;
  const b=h.bones,alpha=1-Math.exp(-dt*12);for(const bone of Object.values(b)){bone.position.copy(bone.userData.rest);bone.quaternion.slerp(new T.Quaternion(),alpha);}
  const vx=p.vx||0,vz=p.vz||0,speed=Math.min(9,Math.hypot(vx,vz)),grounded=p.grounded!==false;
- h.speed+=(speed-h.speed)*(1-Math.exp(-dt*10));const cycleDistance=p.downed?.85:p.crouching?1.1:p.sprinting?2.0:1.7;h.phase+=speed*dt/cycleDistance*Math.PI*2;
+ h.speed+=(speed-h.speed)*(1-Math.exp(-dt*10));const cycleDistance=p.lobbyPatrol?.cycleDistance|| (p.downed?.85:p.crouching?1.1:p.sprinting?2.0:1.7);h.phase+=speed*dt/cycleDistance*Math.PI*2;
  if(grounded&&!h.grounded)h.land=1;h.grounded=grounded;h.land=Math.max(0,h.land-dt*5);
  const airborne=['dive','glide','launch'].includes(p.flight),dead=p.health!==undefined&&p.health<=0;
  h.air+=(Number(airborne)-h.air)*(1-Math.exp(-dt*7));h.death+=(Number(dead)-h.death)*(1-Math.exp(-dt*6));
@@ -137,20 +137,30 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const turn=Math.atan2(Math.sin((p.yaw||0)-h.lastYaw),Math.cos((p.yaw||0)-h.lastYaw))/Math.max(.016,dt);h.lastYaw=p.yaw||0;b.spine.rotation.z=T.MathUtils.clamp(-side*.012-turn*.007,-.09,.09);b.hips.rotation.y=T.MathUtils.clamp(turn*.008,-.07,.07);b.chest.rotation.y=Math.sin(h.phase)*.018*moving;b.chest.rotation.x=Math.sin(time*1.8)*.008+(p.lastDamage&&time-p.lastDamage<.18?-.06:0);
  b.head.rotation.x=(menu?Math.sin(time*.7)*.025:-(p.pitch||0)*.3)+h.down*1.04+h.revive*.14;
  if(menu){b.head.rotation.y=p.scan||0;b.chest.rotation.y+=(p.scan||0)*.3;}
- const idle=menu?p.lobbyIdle:null;
- if(idle){
-  // Weight travels through the pelvis while both boot targets stay planted.
-  b.hips.position.x+=idle.weight;b.hips.position.y+=idle.breath-.012;
-  b.hips.rotation.z=idle.lean;b.spine.rotation.z=-idle.lean*.65;
-  b.chest.rotation.x=idle.breath*1.8-idle.ready*.015;
-  b.head.rotation.x=idle.headPitch;
+ const patrol=menu?p.lobbyPatrol:null;
+ if(patrol){
+  h.phase=patrol.phase;h.speed=patrol.speed;
+  b.hips.position.x+=patrol.bodySway;b.hips.position.y=b.hips.userData.rest.y-.13+patrol.bodyBob;
+  b.hips.rotation.x=-.025;b.hips.rotation.y=Math.sin(patrol.phase)*.032;
+  b.hips.rotation.z=patrol.lean;b.spine.rotation.z=-patrol.lean*.65;
+  b.chest.rotation.y=(p.scan||0)*.26-Math.sin(patrol.phase)*.025;
+  b.chest.rotation.x=patrol.breath*1.8-patrol.ready*.025;
+  b.head.rotation.x=patrol.headPitch;
  }
  const f=forward/(speed||1),s=side/(speed||1);
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R',phase=h.phase+(sideSign<0?Math.PI:0),cycle=((phase/(2*Math.PI))%1+1)%1;
   // Stance travels backward linearly at ground speed; swing lifts the foot.
   const stance=cycle<.54,u=stance?cycle/.54:(cycle-.54)/.46,stride=stance?1-u*2:-Math.cos(u*Math.PI),lift=stance?0:Math.sin(u*Math.PI)*.12*moving;
   let foot=V(sideSign*.12+s*stride*step,.09+lift,-f*stride*step);
-  if(idle)foot=V(sideSign*.155,.09,sideSign<0?.055:-.045);
+  if(patrol){
+   // 62% stance: planted boot travels at exactly the scenery's local speed.
+   const stanceFraction=.62,onGround=cycle<stanceFraction;
+   const u=onGround?cycle/stanceFraction:(cycle-stanceFraction)/(1-stanceFraction);
+   const halfStride=patrol.cycleDistance*stanceFraction/2;
+   const travel=onGround?1-2*u:-Math.cos(u*Math.PI);
+   const travelZ=-travel*halfStride,heading=(p.yaw||Math.PI)-Math.PI;
+   foot=V(sideSign*.135+Math.sin(heading)*travelZ,.09+(onGround?0:Math.sin(u*Math.PI)*.105),Math.cos(heading)*travelZ);
+  }
   if(!grounded&&!airborne)foot=V(sideSign*.14,.17+(sideSign>0?.10:0),.10);
   if(airborne)foot=V(sideSign*.24,p.flight==='glide'?.22:.2,p.flight==='glide'?.10:.28);
   if(h.slide>.01)foot.lerp(V(sideSign*.17,.12,-.67),h.slide);

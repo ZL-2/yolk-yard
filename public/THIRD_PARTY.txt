@@ -196,3 +196,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ```
+
+Lobby music: The Complex — Kevin MacLeod (incompetech.com)
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300025
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/The%20Complex.mp3
+License: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+Changes: encoded to 96 kbps stereo MP3, opening/ending fades for lobby playback.

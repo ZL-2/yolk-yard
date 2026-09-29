@@ -1107,7 +1107,7 @@ const actions = {
   },
   'royale-inspect':()=>{royaleUI.inspect=!royaleUI.inspect;royaleUI.updateInventory(state.players.find(p=>p.id===localId));},
   updates: () => modal("Update history", RELEASES.map(r =>
-    `<article class="release-note"><div class="eyebrow">UPDATE ${esc(r.number)}</div><h3>${esc(r.title)}</h3><ul>${r.changes.map(c => `<li>${esc(c)}</li>`).join("")}</ul></article>`).join("")),
+    `<article class="release-note"><div class="eyebrow">UPDATE ${esc(r.number)}</div><h3>${esc(r.title)}</h3><ul>${r.changes.map(c => `<li>${esc(c)}</li>`).join("")}</ul></article>`).join("")+`<article class="release-note"><h3>Music credits</h3><p>“The Complex” by <a href="https://incompetech.com/" target="_blank" rel="noopener">Kevin MacLeod (incompetech.com)</a>. Licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">Creative Commons Attribution 4.0</a>. Re-encoded and faded for lobby playback.</p></article>`),
   "team-entry-0": () => playerAction("team-entry-0"),
   "team-entry-1": () => playerAction("team-entry-1"),
   "enter-yard": () => playerAction(state?.players.find(p => p.id === localId)?.awaitingEntry ? "rejoin" : "respawn"),
@@ -1317,6 +1317,9 @@ function captureBinding(e) {
   const code=e.type==='mousedown'?`Mouse${e.button}`:e.type==='wheel'?(e.deltaY>0?'WheelDown':'WheelUp'):e.code;
   bindingEditor.input(code);
 }
+document.addEventListener('visibilitychange',()=>sound.updateLobby(screen!=='game',0,document.hidden));
+document.addEventListener('pointerdown',()=>sound.unlock(),{passive:true});
+document.addEventListener('keydown',()=>sound.unlock());
 document.addEventListener('click',e=>{if(suppressBindingClick){suppressBindingClick=false;e.preventDefault();e.stopImmediatePropagation();}},true);
 document.addEventListener('keydown',captureBinding,true);
 document.addEventListener('mousedown',captureBinding,true);
@@ -1621,6 +1624,7 @@ function loop(now) {
   if (me?.spectating && !state.players.some(p => p.id === spectateTarget && p.health > 0 && !p.spectating))
     switchSpectator(1);
   view.spectateTarget = me?.spectating ? spectateTarget : null;
+  sound.updateLobby(screen!=='game',dt,document.hidden);
   sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!(!net&&paused));
   let renderPlayer = predicted;
   if (sim && !sim.remote && me) {
