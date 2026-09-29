@@ -91,6 +91,7 @@ export class RoyaleSimulation extends Simulation {
   this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.round++;this.phase='playing';this.stage=RP.ISLAND;this.queueEnds=this.time+(this.options.session==='offline'?OFFLINE_WARMUP_SECONDS:WARMUP_SECONDS);this.startedAt=0;this.elapsed=0;this.winner='';this.winnerId=null;this.winnerTeam=-1;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.chests=[];this.lootId=0;this.lootVersion++;this.pads=[];this.alive=0;this.remaining=0;
   this.map={...SPAWN_ISLAND,boxes:SPAWN_ISLAND.boxes.map(b=>({...b}))};resetBuilding(this);this.nav=navigation(SPAWN_ISLAND);this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
   for(const p of this.players.values()){if(p.contestant)this.spawnWarmup(p);else Object.assign(p,{health:0,contestant:false,lateSpectator:true,spectating:true,flight:'out'});}
+  this.departureMs=null;
   this.battleLootSeed=Math.floor(this.random()*2147483647);battlePreparation.delete(this);
   this.emit('warmup',{round:this.round});return true;
  }
@@ -107,6 +108,7 @@ export class RoyaleSimulation extends Simulation {
  }
  beginBattle(reason='manual'){
   if(!isWarmup(this.stage)||this.phase!=='playing')return false;
+  const departureStarted=performance.now();
   for(const p of [...this.players.values()])if(!p.bot&&p.connected===false)this.removePlayer(p.id);
   // Commit only complete invited groups. An invitation arriving at the cutoff
   // never sends one party member into combat and the other into spectating.
@@ -137,7 +139,7 @@ export class RoyaleSimulation extends Simulation {
   if(isDuos(this.options))for(const p of seats.filter(p=>p.bot)){const mate=seats.find(o=>teammates(this.options,p,o)&&(!o.bot||seats.indexOf(o)<seats.indexOf(p)));if(mate){p.botLand={...mate.botLand,x:mate.botLand.x+3};p.botDrop=mate.botDrop+.25;}}
   this.alive=seats.filter(p=>p.health>0).length;
   this.nav=navigation(ROYALE_MAP);this.loot=prepared.loot;this.chests=prepared.chests;this.lootId=prepared.lootId;this.lootVersion++;
-  this.emit('round',{round:this.round});this.emit('royale-cue',{cue:'transport-horn'});return true;
+  this.emit('round',{round:this.round});this.emit('royale-cue',{cue:'transport-horn'});this.departureMs=Math.round(performance.now()-departureStarted);return true;
  }
  randomGun(){return rollItem(this.random,'ground','weapon').id;}
  dropLoot(point,item,avoid=[]){

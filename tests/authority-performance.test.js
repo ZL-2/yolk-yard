@@ -52,3 +52,15 @@ test('staged battle preparation stays isolated and survives warmup checkpoint re
  assert.ok(staged.loot.length>100);assert.deepEqual(staged.loot,direct.loot);assert.deepEqual(staged.chests,direct.chests);
  assert.deepEqual(staged.loot,restored.loot);assert.deepEqual(staged.chests,restored.chests);
 });
+
+test('server timing separates transitions, broadcast work and new rounds',async()=>{
+ const {recordTiming,roomTiming,timingPhase}=await import('../server/realtime/timing.js');
+ const room={sim:{matchId:'a',round:1,stage:'spawn-island'}};
+ recordTiming(room,timingPhase(room.sim),'stepMaxMs',703);
+ room.sim.stage='battle-bus';room.sim.departureMs=15;
+ recordTiming(room,'departure','stepMaxMs',18);recordTiming(room,timingPhase(room.sim),'broadcastMaxMs',43);
+ recordTiming(room,timingPhase(room.sim),'gapMaxMs',1500);
+ assert.equal(room.timing.phases.spawn.stepMaxMs,703);assert.equal(room.timing.phases.bus.stepMaxMs,0);
+ assert.equal(room.timing.phases.bus.broadcastMaxMs,43);assert.equal(room.timing.departureMs,15);
+ room.sim.round++;room.sim.departureMs=null;assert.deepEqual(roomTiming(room),{stepMaxMs:0,gapMaxMs:0,phases:{}});
+});

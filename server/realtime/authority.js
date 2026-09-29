@@ -1,3 +1,4 @@
+import {timingPhase,roomTiming,recordTiming} from './timing.js';
 import {randomInt} from 'node:crypto';
 import {Simulation} from '../../src/simulation.js';
 import {RoyaleSimulation} from '../../src/royale.js';
@@ -71,6 +72,7 @@ export class MatchAuthority{
  }
  publish(room){const s=room.sim,p=room.hostPeer;const humans=[...s.players.values()].filter(p=>!p.bot&&!p.lateSpectator);p.listedAt=Date.now();p.listing={code:room.code,version:VERSION,host:s.players.get(room.owner)?.name||'Operator',map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize,players:humans.length,capacity:Math.min(16,s.options.capacity),contestantCapacity:s.options.capacity,public:room.visibility==='public',phase:s.stage&&['spawn-island','starting','waiting'].includes(s.stage)?'lobby':s.phase};}
  broadcast(room){
+  const broadcastStarted=performance.now();roomTiming(room);
   const state=room.sim.snapshot();state.visibility=room.visibility;state.chatEnabled=room.chat.enabled;state.chatMuted=[...room.chat.muted];state.network={hostId:room.owner,members:this.members(room),chatSequence:room.chat.sequence,authority:'server',timing:room.timing};
   const groups=new Map();
   for(const [id,peer]of room.members){
@@ -96,6 +98,7 @@ export class MatchAuthority{
   }
   if(!room.publishedAt||room.age-room.publishedAt>=2){this.publish(room);room.publishedAt=room.age;}
   if(room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,'host',room.sim.inputs.get('host')||{}));}
+  recordTiming(room,timingPhase(room.sim),'broadcastMaxMs',performance.now()-broadcastStarted);
  }
  disconnect(peer){
   const room=this.roomFor(peer),id=peer.authorityId;if(!room||room.members.get(id)!==peer)return false;
@@ -107,9 +110,9 @@ export class MatchAuthority{
  }
  tick(now=performance.now()){const elapsed=Math.max(0,(now-this.last)/1000);this.last=now;this.accumulator=Math.min(.75,this.accumulator+elapsed);let steps=0;
   for(const room of this.rooms.values()){
-   room.timing??={stepMaxMs:0,gapMaxMs:0};room.timing.gapMaxMs=Math.max(room.timing.gapMaxMs,Math.round(elapsed*1000));
+   recordTiming(room,timingPhase(room.sim),'gapMaxMs',elapsed*1000);
   }
-  while(this.accumulator+1e-8>=1/60&&steps++<6){this.accumulator=Math.max(0,this.accumulator-1/60);for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;const start=performance.now();room.sim.tick(1/60);room.timing.stepMaxMs=Math.max(room.timing.stepMaxMs,Math.round(performance.now()-start));}}
+  while(this.accumulator+1e-8>=1/60&&steps++<6){this.accumulator=Math.max(0,this.accumulator-1/60);for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;const phase=timingPhase(room.sim),start=performance.now();room.sim.tick(1/60);recordTiming(room,phase==='spawn'&&timingPhase(room.sim)==='bus'?'departure':phase,'stepMaxMs',performance.now()-start);}}
   // One fresh broadcast after catch-up, never several obsolete broadcasts in a burst.
   for(const room of this.rooms.values())if(room.age-room.frameAt>=.05){room.frameAt=room.age;this.broadcast(room);}
   // Retain bounded time debt for subsequent callbacks; never discard a short stall.

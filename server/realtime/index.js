@@ -14,7 +14,7 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
   const owner=new OwnerService();await owner.ready;
   const server=createServer((req,res)=>{
     if(req.url?.startsWith('/owner/')){void owner.handle(req,res,{origins,relay});return;}
-    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',performanceRevision:74,features:['parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
+    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',performanceRevision:75,features:['parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
   });
   const sockets=new WebSocketServer({noServer:true,maxPayload:2_000_000,perMessageDeflate:false});
   server.on('upgrade',(req,socket,head)=>{
