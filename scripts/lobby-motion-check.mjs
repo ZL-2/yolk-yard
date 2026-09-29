@@ -10,7 +10,7 @@ try{
  const p=await browser.newPage({viewport:{width:1280,height:800}});p.on('pageerror',e=>errors.push(e.message));
  if(live){
   const version=await(await p.request.get(origin+'/version.json?motion='+Date.now())).json();
-  assert.equal(version.build,process.env.GITHUB_SHA);assert.ok(Number(version.release)>=72);
+  assert.equal(version.build,process.env.GITHUB_SHA);assert.ok(Number(version.release)>=77);
   const html=await(await p.request.get(origin+'/?motion='+Date.now())).text();
   const entry=html.match(/<script[^>]*src="([^"]*assets\/[^"]+\.js)"/);assert.ok(entry);
   const entryUrl=new URL(entry[1],origin+'/').href;
