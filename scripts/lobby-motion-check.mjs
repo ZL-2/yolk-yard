@@ -13,7 +13,11 @@ try{
   assert.equal(version.build,process.env.GITHUB_SHA);assert.ok(Number(version.release)>=70);
   const html=await(await p.request.get(origin+'/?motion='+Date.now())).text();
   const entry=html.match(/<script[^>]*src="([^"]*assets\/[^"]+\.js)"/);assert.ok(entry);
-  const js=await(await p.request.get(new URL(entry[1],origin+'/').href)).text();
+  const entryUrl=new URL(entry[1],origin+'/').href;
+  let js=await(await p.request.get(entryUrl)).text();
+  // Maintenance loader defers the main game chunk until owner authentication.
+  const main=js.match(/["'](\.\/main-[^"']+\.js)["']/);
+  if(main)js=await(await p.request.get(new URL(main[1],entryUrl).href)).text();
   assert.ok(js.includes('sight-check')&&js.includes('ready-idle')&&js.includes('lobbyIdle'));
   console.log(JSON.stringify({live:true,build:version.build,release:version.release,animationInDeployedBundle:true}));
  }else{
