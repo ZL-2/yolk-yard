@@ -1,6 +1,6 @@
 {
   "name": "ravelfront",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,7 +15,7 @@
     "test:royale": "node scripts/building-browser-check.mjs && node scripts/royale-browser-check.mjs",
     "start:relay": "node server/realtime/index.js",
     "test:realtime": "node scripts/realtime-check.mjs",
-    "test:field": "node --test tests/field-systems.test.js tests/server-authority.test.js tests/weapon-presentation.test.js tests/hitbox.test.js tests/arms.test.js tests/audio.test.js tests/owner.test.js tests/remote-input.test.js tests/keybinds.test.js tests/weapon-stats.test.js",
+    "test:field": "node --test tests/render-performance.test.js tests/input-clock.test.js tests/snapshot-codec.test.js tests/authority-performance.test.js tests/field-systems.test.js tests/server-authority.test.js tests/weapon-presentation.test.js tests/hitbox.test.js tests/arms.test.js tests/audio.test.js tests/owner.test.js tests/remote-input.test.js tests/keybinds.test.js tests/weapon-stats.test.js",
     "test:field-browser": "node scripts/field-browser-check.mjs",
     "art:weapons": "node scripts/render-weapon-previews.mjs"
   },

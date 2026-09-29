@@ -228,7 +228,7 @@ export class View {
     this.resize();
     window.addEventListener("resize", () => this.resize());
     this.royaleView = new RoyaleView(this, {block,ball,cylinder,mat,palette});
-    this.loadMap("yard");
+
     canvas.addEventListener("webglcontextlost", (e) => {
       e.preventDefault();
       document.dispatchEvent(new CustomEvent("graphics-lost"));
@@ -680,7 +680,7 @@ export class View {
     }
     this.clock += dt;
     this.recoil = Math.max(0, this.recoil - dt * 7);
-    this.loadMap(state?.options.map || "yard");
+    if(playing)this.loadMap(state?.options.map || "yard");
     this.world.visible=playing;
     if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x97c6c4;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(sky,playing?(map.theme==='royale'?330:72):40,playing?(map.theme==='royale'?1000:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
@@ -799,12 +799,19 @@ export class View {
     }
     if (state) {
       const seen = new Set();
+      this.camera.updateMatrixWorld();
+      this.actorFrustum ||= new THREE.Frustum();
+      this.actorMatrix ||= new THREE.Matrix4();
+      this.actorBounds ||= new THREE.Sphere(new THREE.Vector3(),2.5);
+      this.actorFrustum.setFromProjectionMatrix(this.actorMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse));
       for (const p of state.players) {
         // Transport passengers share one simulation position; the airship
         // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;
         if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.75)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && !p.downed && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
         seen.add(p.id);
+        this.actorBounds.center.set(p.x,p.y+.9,p.z);
+        if(playing&&!this.actorFrustum.intersectsSphere(this.actorBounds)){const hidden=this.models.get(p.id);if(hidden)hidden.visible=false;continue;}
         const sig =
           p.color +
           p.hat + JSON.stringify([p.pattern,p.finish,p.eyewear,p.accent,p.outfit,p.wrap,p.backbling,p.pickaxe]) +

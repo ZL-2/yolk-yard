@@ -29,5 +29,5 @@ test('remote catch-up cannot simulate more time than the host grants',()=>{
  assert.equal(buffer.push({seq:121}),false);
  assert.equal(buffer.take(1/60).length,1);
  assert.equal(buffer.take(1/60).length,1);
- assert.equal(buffer.take(10).length,6);
+ assert.equal(buffer.take(10).length,30);
 });

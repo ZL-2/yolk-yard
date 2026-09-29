@@ -46,6 +46,11 @@ export class MatchAuthority{
   if(message.type==='authority-create'){this.create(peer,message);return;}
   const room=this.roomFor(peer),id=peer.authorityId;if(!room||room.members.get(id)!==peer)return;
   const sim=room.sim,m=message.command||{},leader=id===room.owner;
+  if(m.type==='inputs'){
+   if(!Array.isArray(m.inputs)||m.inputs.length>30)return;
+   for(const input of m.inputs)this.command(peer,{command:{type:'input',input}});
+   return;
+  }
   if(m.type==='input'){sim.setInput(id,m.input,true);if(!peer.controlReady&&sim.inputs.has(id)){peer.controlReady=true;sim.players.get(id).loading=false;this.connection(peer,true);}this.relay.progression.input(peer,m.input);return;}
   if(m.type==='player-action'&&typeof m.action==='string'&&m.action.length<350){sim.playerAction(id,m.action);return;}
   if(m.type==='profile'){const ok=sim.setProfile(id,safeProfile(m.profile));this.send(peer,{type:'authority-notice',event:ok===false?'name-required':'name-accepted'});return;}
@@ -67,13 +72,29 @@ export class MatchAuthority{
  publish(room){const s=room.sim,p=room.hostPeer;const humans=[...s.players.values()].filter(p=>!p.bot&&!p.lateSpectator);p.listedAt=Date.now();p.listing={code:room.code,version:VERSION,host:s.players.get(room.owner)?.name||'Operator',map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize,players:humans.length,capacity:Math.min(16,s.options.capacity),contestantCapacity:s.options.capacity,public:room.visibility==='public',phase:s.stage&&['spawn-island','starting','waiting'].includes(s.stage)?'lobby':s.phase};}
  broadcast(room){
   const state=room.sim.snapshot();state.visibility=room.visibility;state.chatEnabled=room.chat.enabled;state.chatMuted=[...room.chat.muted];state.network={hostId:room.owner,members:this.members(room),chatSequence:room.chat.sequence,authority:'server'};
-  for(const [id,peer]of room.members){if(!peer.ws)continue;let encoder=room.encoders.get(id);if(!encoder){encoder=new SnapshotEncoder();room.encoders.set(id,encoder);}const p=state.players.find(p=>p.id===id);if(!p)continue;
-   const outgoing={...state,events:state.events.filter(e=>e.id>(room.eventCursors.get(id)||0)&&(e.type!=='duo-marker'||e.player===id||isDuos(state.options)&&e.team===p.team))};
-   if(outgoing.royale)outgoing.royale={...outgoing.royale,markers:visibleMarkers(state,p)};
+  const groups=new Map();
+  for(const [id,peer]of room.members){
+   // Do not encode dependent deltas faster than a socket can deliver them.
+   if(!peer.ws||peer.ws.bufferedAmount>65536||peer.pendingBytes>0||peer.historyBytes>65536)continue;
+   let encoder=room.encoders.get(id);if(!encoder){encoder=new SnapshotEncoder();room.encoders.set(id,encoder);}const p=state.players.find(p=>p.id===id);if(!p)continue;
+   const r=state.royale,worldKey=r?`${r.matchId}:${state.options.map}:${state.round}`:null;
+   const lootKey=r?`${worldKey}:${r.lootVersion}`:null,buildKey=r?`${worldKey}:${r.buildVersion}`:null;
+   const cursor=room.eventCursors.get(id)||0,privateMarkers=r?.markers?.length||state.events.some(e=>e.id>cursor&&e.type==='duo-marker');
+   const key=JSON.stringify([cursor,encoder.lootKey===lootKey,encoder.buildKey===buildKey,privateMarkers?(isDuos(state.options)?p.team:id):'public']);
+   let outgoing=groups.get(key);
+   if(!outgoing){
+    outgoing={...state,events:state.events.filter(e=>e.id>(room.eventCursors.get(id)||0)&&(e.type!=='duo-marker'||e.player===id||isDuos(state.options)&&e.team===p.team))};
+    if(r){outgoing.royale={...r,markers:visibleMarkers(state,p)};
+     if(encoder.lootKey===lootKey){delete outgoing.royale.loot;delete outgoing.royale.chests;}
+     if(encoder.buildKey===buildKey){delete outgoing.royale.builds;delete outgoing.royale.worldDamage;}
+    }
+    groups.set(key,outgoing);
+   }
+   encoder.lootKey=lootKey;encoder.buildKey=buildKey;
    room.eventCursors.set(id,state.events.at(-1)?.id||room.eventCursors.get(id)||0);
    const message=encoder.encode({type:'authority-state',state:outgoing});this.send(peer,{type:'authority-frame',frame:message.frame});
   }
-  this.publish(room);
+  if(!room.publishedAt||room.age-room.publishedAt>=2){this.publish(room);room.publishedAt=room.age;}
   if(room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,'host',room.sim.inputs.get('host')||{}));}
  }
  disconnect(peer){
@@ -84,6 +105,11 @@ export class MatchAuthority{
   if(peer===room.hostPeer){peer.virtualRoom=true;peer.detachedAt=0;peer.ws?.close(1000,'Session ended');peer.ws=null;}
   room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));this.broadcast(room);return peer===room.hostPeer;
  }
- tick(){const now=performance.now(),elapsed=Math.min(.5,(now-this.last)/1000);this.last=now;this.accumulator+=elapsed;let steps=0;while(this.accumulator>=1/60&&steps++<6){this.accumulator-=1/60;for(const room of this.rooms.values()){room.age+=1/60;room.sim.tick(1/60);if(room.age-room.frameAt>=.05){room.frameAt=room.age;this.broadcast(room);}}}if(this.accumulator>1/60){for(const room of this.rooms.values())room.sim.advanceWarmupClock?.(this.accumulator);this.accumulator=0;}}
+ tick(){const now=performance.now(),elapsed=Math.min(.5,(now-this.last)/1000);this.last=now;this.accumulator+=elapsed;let steps=0;
+  while(this.accumulator>=1/60&&steps++<6){this.accumulator-=1/60;for(const room of this.rooms.values()){room.age+=1/60;room.sim.tick(1/60);}}
+  // One fresh broadcast after catch-up, never several obsolete broadcasts in a burst.
+  for(const room of this.rooms.values())if(room.age-room.frameAt>=.05){room.frameAt=room.age;this.broadcast(room);}
+  if(this.accumulator>1/60){for(const room of this.rooms.values())room.sim.advanceWarmupClock?.(this.accumulator);this.accumulator=0;}
+ }
  close(){clearInterval(this.timer);this.rooms.clear();}
 }

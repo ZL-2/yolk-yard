@@ -1,4 +1,5 @@
 export const RELEASE_NOTES = [
+  {number:'65',title:'Performance and Connection Recovery',changes:['Movement input now runs independently of drawing, with bounded recovery from short stalls and server-enforced timing. Battle Royale broadcasts skip unchanged world collections and backlogged connections; catch-up produces one fresh snapshot instead of repeated stale frames.','Off-screen operators skip animation and model creation. Humanoids use conservative visibility bounds, weapon geometry reuses its baked cache, and lobby entry defers loading unused map geometry. Existing weapon artwork is regenerated from the unchanged designs.','Maintenance remains enabled with the existing server-validated administrator access. Accounts, currency and cosmetics are preserved. Refresh to use protocol 22.']},
   {number:'64',title:'Maintenance: Administrator Access Only',changes:['Public access is paused while performance and connection issues are repaired. The maintenance page offers administrator authentication using the existing server-only owner code. Production game and party connections require a valid, expiring administrator session.']},
   {
     number: "63",

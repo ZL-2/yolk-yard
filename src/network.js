@@ -373,11 +373,16 @@ export class Network {
     }, 2000);
   }
   send(msg) {
-    if(this.serverAuthority&&['input','player-action','profile','chat-send','chat-report'].includes(msg.type)){this.authorityCommand(msg);return;}
+    if(this.serverAuthority&&['input','inputs','player-action','profile','chat-send','chat-report'].includes(msg.type)){this.authorityCommand(msg);return;}
     if (this.hostConnection?.open) this.hostConnection.send(msg);
   }
   input(input) {
     this.send({ type: "input", input });
+  }
+  inputBatch(inputs) {
+    if(!inputs.length)return;
+    if(this.serverAuthority)this.send({type:'inputs',inputs:inputs.slice(0,30)});
+    else for(const input of inputs)this.input(input);
   }
   profile(profile) {
     this.send({ type: "profile", profile:safeProfile(profile) });

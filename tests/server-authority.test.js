@@ -14,7 +14,7 @@ test('real sockets: server owns movement, teams, damage, revives, private marker
   const h=sim.players.get('host'),m=sim.players.get(mate.net.id),e=sim.players.get(enemy.net.id);h.team=m.team=0;e.team=1;
   sim.beginBattle();sim.map={id:'yard',size:256,theme:'royale',boxes:[],terrain:null};sim.chests=[];sim.loot=[];
   for(const [i,p]of [h,m,e].entries())Object.assign(p,{x:i===2?30:i*1.5,y:0,z:0,flight:'ground',grounded:true,shieldUntil:0,shield:0});
-  host.net.input({seq:1,crouch:true,dt:1/60});mate.net.input({seq:1,crouch:true,dt:1/60});await until(()=>h.crouching&&m.crouching);
+  host.net.inputBatch([{seq:1,crouch:true,dt:1/60}]);mate.net.inputBatch([{seq:1,crouch:true,dt:1/60}]);await until(()=>h.crouching&&m.crouching);
   await until(()=>mate.state.players.find(p=>p.id==='host')?.crouching);assert.equal(host.state.players.find(p=>p.id===m.id).crouching,true);
   host.net.authorityCommand({type:'damage',target:e.id,amount:10000});mate.net.authorityCommand({type:'state',state:{players:[]}});await new Promise(r=>setTimeout(r,80));assert.equal(e.health,100);
   mate.net.send({type:'player-action',action:'ping-'+JSON.stringify({kind:'map',x:5,z:5,team:1})});await until(()=>host.state.royale.markers.length===1);assert.equal(enemy.state.royale.markers.length,0);

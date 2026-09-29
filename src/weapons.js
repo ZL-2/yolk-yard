@@ -367,11 +367,13 @@ export function makeBlaster(id,wrap='') {
       const key = object.material.uuid;
       if (!batches.has(key))
         batches.set(key, { material: object.material, parts: [] });
+      if(!geometries.has(`model:${id}:${key}`)){
       const geometry = object.geometry.index
         ? object.geometry.toNonIndexed()
         : object.geometry.clone();
       geometry.applyMatrix4(object.matrixWorld);
       batches.get(key).parts.push(geometry);
+      }
       g.remove(object);
     }
   for (const [key, batch] of batches) {

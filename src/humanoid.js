@@ -99,7 +99,7 @@ function template(profile){
 export function makeHumanoid(profile={}){
  const root=new T.Group();root.name='Ravelfront operator';const bones={},list=[];
  for(const [name,parent,xyz]of defs){const b=new T.Bone();b.name=name;const rest=V(...xyz).sub(parent?points[parent]:V());b.position.copy(rest);b.userData.rest=rest.clone();bones[name]=b;list.push(b);if(parent)bones[parent].add(b);}
- const mesh=new T.SkinnedMesh(template(profile),material);mesh.name='Skinned operator';mesh.add(bones.root);mesh.bind(new T.Skeleton(list));mesh.frustumCulled=false;mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);
+ const mesh=new T.SkinnedMesh(template(profile),material);mesh.name='Skinned operator';mesh.add(bones.root);mesh.bind(new T.Skeleton(list));mesh.boundingSphere=new T.Sphere(new T.Vector3(0,.9,0),2);mesh.frustumCulled=true;mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);
  root.userData.human={mesh,bones,clock:0,phase:0,speed:0,previous:null,grounded:true,land:0,air:0,death:0,lastYaw:0,pose:'idle',nextUpdate:0};root.userData.cracks=[];
  return root;
 }

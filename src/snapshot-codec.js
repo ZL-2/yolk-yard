@@ -50,7 +50,7 @@ export class SnapshotEncoder {
   // next pickup would retransmit every remaining item after an omitted frame.
   const omitWorld=[];
   if(next.state?.royale)next.state={...next.state,royale:{...next.state.royale}};
-  for(const key of ['loot','chests','builds'])if(next.state?.royale&&!Object.hasOwn(next.state.royale,key)&&this.previous?.state?.royale?.[key]){next.state.royale[key]=this.previous.state.royale[key];omitWorld.push(key);}
+  for(const key of ['loot','chests','builds','worldDamage'])if(next.state?.royale&&!Object.hasOwn(next.state.royale,key)&&this.previous?.state?.royale?.[key]){next.state.royale[key]=this.previous.state.royale[key];omitWorld.push(key);}
   const frame=this.previous?{base:this.seq,seq:this.seq+1,patch:patch(this.previous,next)||{}}:{base:0,seq:1,full:next};
   if(omitWorld.length)frame.omitWorld=omitWorld;
   this.previous=next;this.seq=frame.seq;return {type:'snapshot-v1',frame};
@@ -67,12 +67,14 @@ export class SnapshotDecoder {
   }
   // Game/UI sanitization must never mutate the next delta's baseline.
   const {checkpoint,...rest}=this.previous;
-  const message=structuredClone(rest);
+  // Omit sleeping world collections BEFORE cloning; retain the immutable baseline.
+  const payload={...rest};
+  if(frame.omitWorld?.length&&rest.state?.royale){payload.state={...rest.state,royale:{...rest.state.royale}};for(const key of frame.omitWorld)if(['loot','chests','builds','worldDamage'].includes(key))delete payload.state.royale[key];}
+  const message=structuredClone(payload);
   if(checkpoint&&(frame.full||Object.hasOwn(frame.patch||{},'checkpoint')))message.checkpoint=structuredClone(checkpoint);
   for(const key of recordKeys)if(message.state?.[key])message.state[key]=Object.values(message.state[key]);
   if(message.checkpoint?.simulation?.players)message.checkpoint.simulation.players=Object.values(message.checkpoint.simulation.players);
   for(const key of ['loot','chests','builds']){if(message.state?.royale?.[key])message.state.royale[key]=Object.values(message.state.royale[key]);if(message.checkpoint?.simulation?.[key])message.checkpoint.simulation[key]=Object.values(message.checkpoint.simulation[key]);}
-  for(const key of frame.omitWorld||[])if(['loot','chests','builds'].includes(key)&&message.state?.royale)delete message.state.royale[key];
   return message;
  }
 }

@@ -1,3 +1,4 @@
+import {InputClock} from './input-clock.js';
 import {RemoteSimulation} from './remote-simulation.js';
 import {canFight} from './stance.js';
 import {StreakUI} from './streak-ui.js';
@@ -1489,7 +1490,7 @@ document.addEventListener("graphics-lost", () => {
   );
 });
 function frameInput() {
-  const active = !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && state?.players.find(p => p.id === localId)?.health > 0;
+  const active = !document.hidden && !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && state?.players.find(p => p.id === localId)?.health > 0;
   const combat=active&&canFight(state?.players.find(p=>p.id===localId));
   if(active&&!combat){buildControls.buildMode=false;buildUI.cancel();}
   buildControls.yaw=input.yaw;buildControls.pitch=input.pitch;
@@ -1542,27 +1543,13 @@ let lastTime = performance.now(),
   broadcastClock = 0,
   hudClock = 0,
   lobbyClock = 0;
-function loop(now) {
-  if(state?.royale){view.buildMap=getMap(state.options.map);applyBuildState(view.buildMap,state.royale);}
-  if(screen==='game'&&!document.hidden)connectionReport.performance.frame(now-lastTime,net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');
-  const elapsedFrame=Math.max(0,(now-lastTime)/1000),dt=Math.min(0.1,elapsedFrame);
-  const simulate=!(paused&&!net&&screen==='game'&&!['royale-inventory','royale-map'].includes(dialogType));
-  if(simulate)sim?.advanceWarmupClock?.(elapsedFrame-dt);
-  lastTime = now;
-  accumulator += dt;
-  broadcastClock += dt;
-  hudClock += dt;
-  lobbyClock += dt;
-  while (accumulator >= 1 / 60) {
-    accumulator -= 1 / 60;
-    const i = frameInput();
-    if (sim && !sim.remote && !net?.serverAuthority) {
-      if (simulate) {
-        sim.setInput(localId, i);
-        sim.tick(1 / 60);
-      }
-    } else if (net?.ready && !net.migrating && state?.phase === "playing") {
-      net.input(i);
+const inputClock=new InputClock();
+function pumpNetworkInput(now=performance.now()) {
+  if(!net?.ready||net.migrating||state?.phase!=="playing"||document.hidden||(sim&&!sim.remote&&!net.serverAuthority)){inputClock.reset(now);return;}
+  const commands=[];
+  for(let step=0,count=inputClock.take(now);step<count;step++){
+    const i=frameInput();
+      commands.push(i);
       connectionReport.network.sent(i.seq,now);
       const me = state.players.find((p) => p.id === localId);
       if (me?.health > 0) {
@@ -1577,6 +1564,29 @@ function loop(now) {
         }
         pendingInputs.push(i);
         if (pendingInputs.length > 180) pendingInputs.shift();
+      }
+  }
+  net.inputBatch(commands);
+}
+function loop(now) {
+  pumpNetworkInput(now);
+  if(state?.royale){view.buildMap=getMap(state.options.map);applyBuildState(view.buildMap,state.royale);}
+  if(screen==='game'&&!document.hidden)connectionReport.performance.frame(now-lastTime,net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');
+  const elapsedFrame=Math.max(0,(now-lastTime)/1000),dt=Math.min(0.1,elapsedFrame);
+  const simulate=!(paused&&!net&&screen==='game'&&!['royale-inventory','royale-map'].includes(dialogType));
+  if(simulate)sim?.advanceWarmupClock?.(elapsedFrame-dt);
+  lastTime = now;
+  accumulator += dt;
+  broadcastClock += dt;
+  hudClock += dt;
+  lobbyClock += dt;
+  while (accumulator >= 1 / 60) {
+    accumulator -= 1 / 60;
+    if (sim && !sim.remote && !net?.serverAuthority) {
+      const i = frameInput();
+      if (simulate) {
+        sim.setInput(localId, i);
+        sim.tick(1 / 60);
       }
     }
   }
@@ -1660,6 +1670,7 @@ try {
   view.buildControls=buildControls;view.buildMap=getMap('sunnybreak');
   renderMenu();
   initializeParty();
+  setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
   if (invite) joinMenu(formatCode(cleanCode(invite)));
