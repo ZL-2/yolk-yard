@@ -16,6 +16,7 @@ test('crouch changes movement, camera, body hit regions and low-ceiling clearanc
 test('slide requires real momentum; slows, has cooldown and cannot expand into a tunnel',()=>{
  const p=room().players.get('p0');walk(p,{crouch:true},flat,1);assert.equal(p.sliding,false);walk(p,{forward:1,sprint:true,yaw:0},flat,30);assert.ok(p.vz<-7);walk(p,{forward:1,crouch:true,yaw:0},flat,1);assert.equal(p.sliding,true);const v=Math.hypot(p.slideVX,p.slideVZ);walk(p,{forward:1,crouch:true,yaw:0},flat,30);assert.ok(Math.hypot(p.slideVX,p.slideVZ)<v);walk(p,{crouch:true},flat,200);assert.equal(p.sliding,false);assert.equal(p.crouching,true);
  p.sliding=true;p.slideVX=0;p.slideVZ=-3;p.slideAge=3.3;const tunnel={...flat,boxes:[{x:p.x,y:1.03,z:p.z,w:10,h:.4,d:10}]};walk(p,{},tunnel,1);assert.equal(p.sliding,false);assert.equal(p.lowCrouch,true);assert.equal(bodyHeight(p),.96);
+ p.flight='glide';p.y=30;walk(p,{},flat,1);assert.equal(p.lowCrouch,false);assert.equal(bodyHeight(p),1.85);
 });
 test('Duo knock restricts combat and loot; hold revive is authoritative and completes once',()=>{
  const s=room(),p=s.players.get('p0'),mate=s.players.get('p1'),enemy=s.players.get('p2');s.damage(p,enemy,200,'Sprinter');assert.equal(p.lifeState,'DOWNED');assert.equal(p.kills,0);assert.equal(enemy.kills,0);assert.equal(p.spectating,false);

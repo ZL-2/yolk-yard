@@ -145,7 +145,7 @@ function movePlayerStep(p, input, map, dt) {
   );
   if (p.flight === 'transport') return;
   if (p.flight === 'dive' || p.flight === 'glide' || p.flight === 'launch') {
-    p.crouching=false;p.sliding=false;p.crouchLatch=!!input.crouch;
+    p.crouching=false;p.lowCrouch=false;p.sliding=false;p.crouchLatch=!!input.crouch;
     const toggle=input.jump&&!p.flightLatch;p.flightLatch=!!input.jump;
     const f=clamp(input.forward || 0,-1,1),s=clamp(input.strafe || 0,-1,1),length=Math.max(1,Math.hypot(f,s));
     const speed=p.flight==='glide'?24:p.flight==='launch'?26:17;
