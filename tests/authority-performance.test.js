@@ -24,3 +24,11 @@ test('populated authority broadcasts sleep unchanged world data and respect sock
  console.log(JSON.stringify({recipients:16,contestants:sim.players.size,loot:sim.loot.length,fullWorldMs:before,sparseWorldMs:after}));
  }finally{authority.close();}
 });
+
+test('a 600ms scheduling stall is recovered across bounded callbacks',()=>{
+ const authority=new MatchAuthority({});clearInterval(authority.timer);let ticks=0;
+ authority.broadcast=()=>{};authority.rooms.set('test',{age:0,frameAt:0,sim:{tick(){ticks++;}}});
+ const start=authority.last;authority.tick(start+600);assert.equal(ticks,6);
+ for(let i=0;i<6;i++){const before=ticks;authority.tick(start+600);assert.ok(ticks-before<=6);}
+ assert.equal(ticks,36);assert.ok(authority.accumulator<1/60);authority.close();
+});

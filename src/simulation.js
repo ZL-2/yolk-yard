@@ -168,7 +168,7 @@ export class Simulation {
   movementInput(p, dt) {
     const buffer=this.remoteInputs.get(p.id);
     if(!buffer)return null;
-    const steps=buffer.take(dt);
+    const steps=buffer.take(dt,!!this.recoveringTick);
     let input={...(steps.at(-1)||buffer.last||{yaw:p.yaw,pitch:p.pitch,slot:p.slot})};
     for(const key of ['fire','reload','popper','interact','drop'])
       if(steps.some(step=>step[key]))input[key]=true;

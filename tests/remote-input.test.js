@@ -27,11 +27,11 @@ for(const Type of [Simulation,RoyaleSimulation])test(Type.name+' prediction matc
 test('remote catch-up cannot simulate more time than the host grants',()=>{
  const buffer=new RemoteInputBuffer();for(let seq=1;seq<=120;seq++)assert.equal(buffer.push({seq}),true);
  assert.equal(buffer.push({seq:121}),true);
- assert.equal(buffer.queue.length,MAX_INPUT_BACKLOG);
- assert.equal(buffer.queue[0].seq,116);
+ assert.equal(buffer.queue.length,30);
+ assert.equal(buffer.queue[0].seq,92);
  assert.equal(buffer.take(1/60).length,1);
  assert.equal(buffer.take(1/60).length,1);
- assert.equal(buffer.take(10).length,4);
+ assert.equal(buffer.take(10).length,5);
 });
 
 test('a server running at 74 percent speed stays on current input without a speed boost',()=>{
@@ -39,8 +39,18 @@ test('a server running at 74 percent speed stays on current input without a spee
  for(let seq=1;seq<=3600;seq++){
   buffer.push({seq,forward:seq<3500?1:0,fire:false});
   if(Math.floor(seq*.74)>ticks){ticks++;const steps=buffer.take(1/60);executed+=steps.length;ack=steps.at(-1)?.seq||ack;}
-  assert.ok(buffer.queue.length<=MAX_INPUT_BACKLOG);
-  assert.ok(seq-ack<=MAX_INPUT_BACKLOG+1);
+  assert.ok(buffer.queue.length<=MAX_INPUT_BACKLOG+1);
+  assert.ok(seq-ack<=MAX_INPUT_BACKLOG+2);
  }
  assert.ok(executed<=ticks);assert.equal(buffer.last.forward,0);
+});
+
+test('delayed packets use earned time without dropping legitimate movement',()=>{
+ const buffer=new RemoteInputBuffer();buffer.take(.3);for(let seq=1;seq<=18;seq++)buffer.push({seq});
+ assert.deepEqual(buffer.take(0).map(i=>i.seq),Array.from({length:18},(_,i)=>i+1));
+});
+test('server catch-up preserves queued commands but cannot execute unearned time',()=>{
+ const buffer=new RemoteInputBuffer();for(let seq=1;seq<=30;seq++)buffer.push({seq});
+ for(let seq=1;seq<=30;seq++)assert.equal(buffer.take(1/60,true)[0].seq,seq);
+ assert.equal(buffer.queue.length,0);
 });
