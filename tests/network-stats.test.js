@@ -23,3 +23,9 @@ test('normal transport and phase changes are not prediction corrections',async()
  assert.equal(predictionCorrection(a,b,state,{...state,round:2}),null);
  assert.equal(predictionCorrection(a,after,state,state),null);
 });
+
+test('connection report displays elapsed and paired process CPU separately',()=>{
+ const stats=new NetworkStats();stats.update({now:1,time:1,serverTiming:{phases:{bus:{stepMaxMs:800,stepCpuAtMaxMs:9,broadcastMaxMs:400,broadcastCpuAtMaxMs:12,gapMaxMs:1000}}}});
+ assert.match(stats.text(),/Bus: step max 800 ms \(process CPU 9 ms\); broadcast max 400 ms \(process CPU 12 ms\)/);
+ assert.match(stats.text(),/does not alone prove throttling/);
+});

@@ -64,3 +64,13 @@ test('server timing separates transitions, broadcast work and new rounds',async(
  assert.equal(room.timing.phases.bus.broadcastMaxMs,43);assert.equal(room.timing.departureMs,15);
  room.sim.round++;room.sim.departureMs=null;assert.deepEqual(roomTiming(room),{stepMaxMs:0,gapMaxMs:0,phases:{}});
 });
+
+test('CPU timings stay paired with the slowest elapsed sample',async()=>{
+ const {recordTiming,startTiming,finishTiming}=await import('../server/realtime/timing.js');
+ const room={sim:{round:1}};
+ recordTiming(room,'bus','stepMaxMs',800,9);recordTiming(room,'bus','stepMaxMs',100,95);
+ recordTiming(room,'bus','broadcastMaxMs',400,12);
+ assert.equal(room.timing.phases.bus.stepCpuAtMaxMs,9);assert.equal(room.timing.phases.bus.broadcastCpuAtMaxMs,12);
+ recordTiming(room,'bus','stepMaxMs',900,15);assert.equal(room.timing.phases.bus.stepCpuAtMaxMs,15);
+ const measured=finishTiming(startTiming());assert.ok(measured.wallMs>=0);assert.ok(measured.cpuMs>=0);
+});
