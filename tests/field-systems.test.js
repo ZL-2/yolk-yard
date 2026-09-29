@@ -53,3 +53,14 @@ test('cached collision buckets cover cell boundaries and invalidate after geomet
  const after=candidates(map,{x:16,y:0,z:0});assert.notEqual(before,after);assert.ok(!after.has(a));assert.ok(after.has(b));
  assert.ok(!candidates(map,{x:80,y:0,z:80}).has(b));
 });
+
+ test('nearby loot lookup matches brute force and refreshes after movement and pickup',async()=>{
+ const {nearbyItems}=await import('../src/nearby-items.js');
+ const sim={lootVersion:0,loot:Array.from({length:120},(_,i)=>({uid:i,x:(i%12)*7-35,z:Math.floor(i/12)*9-40})),chests:[]};
+ const p={x:-.5,z:16};
+ const expected=()=>sim.loot.filter(i=>(i.x-p.x)**2+(i.z-p.z)**2<=28**2).map(i=>i.uid).sort((a,b)=>a-b);
+ const actual=()=>nearbyItems(sim,'loot',p,28).map(i=>i.uid).sort((a,b)=>a-b);
+ assert.deepEqual(actual(),expected());sim.loot[0].x=p.x;sim.loot[0].z=p.z;sim.lootVersion++;assert.deepEqual(actual(),expected());
+ sim.loot.splice(0,15);sim.lootVersion++;assert.deepEqual(actual(),expected());
+ sim.loot=[];assert.deepEqual(actual(),[]);
+ });

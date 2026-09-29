@@ -1,3 +1,4 @@
+import {nearbyItems} from './nearby-items.js';
 import {gun,weapon,mode} from './data.js';
 import {falloffAt} from './combat.js';
 import {ITEMS,ammoType,AMMO_CAPS} from './royale-data.js';
@@ -56,12 +57,12 @@ export function chooseObjective(sim,p,brain,skill,target){
   const heal=p.inventory.findIndex(i=>i&&((ITEMS[i.id]?.kind==='heal'&&p.health<80)||(ITEMS[i.id]?.kind==='shield'&&p.shield<Math.min(100,ITEMS[i.id].cap||100))||(i.id==='splash'&&(p.health<85||p.shield<70))));
   if(heal>=1&&!underFire){if(target){const cover=coverPoint(sim,p,target);if(cover&&dist(p,cover)>1)return {kind:'cover',goal:cover};}return {kind:'heal',goal:{x:p.x,y:p.y,z:p.z},slot:heal};}
   // Items become known by proximity + LOS. Authored rooms guide searches, not hidden rolls.
-  for(const item of sim.loot)if(dist(p,item)<28&&seesPoint(sim,p,item))brain.lootMemory[item.uid]={uid:item.uid,at:sim.time};
+  for(const item of nearbyItems(sim,'loot',p,28))if(dist(p,item)<28&&seesPoint(sim,p,item))brain.lootMemory[item.uid]={uid:item.uid,at:sim.time};
   let best=null,bestValue=0;
   for(const item of sim.loot){const known=brain.lootMemory[item.uid];if(!known||sim.time-known.at>35)continue;const value=usefulLoot(p,item)/(1+dist(p,item)*.055);if(value>bestValue){bestValue=value;best=item;}}
   if(best)return {kind:'loot',goal:{x:best.x,y:best.y,z:best.z},uid:best.uid};
   const weapons=p.inventory.filter(i=>i?.weapon),needs=weapons.length<2||!weapons.some(i=>i.ammo+p.bank[ammoType(i.id)]>10)||p.shield<35;
-  if(needs){const chest=sim.chests.filter(c=>!c.opened&&(!c.landAt||c.landAt<=sim.time)&&dist(p,c)<20&&(dist(p,c)<BOT_WORLD_SENSES.chestHumRadius||seesPoint(sim,p,c))).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(chest)return {kind:'chest',goal:{x:chest.x,y:chest.y,z:chest.z},id:chest.id};}
+  if(needs){const chest=nearbyItems(sim,'chests',p,20).filter(c=>!c.opened&&(!c.landAt||c.landAt<=sim.time)&&dist(p,c)<20&&(dist(p,c)<BOT_WORLD_SENSES.chestHumRadius||seesPoint(sim,p,c))).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(chest)return {kind:'chest',goal:{x:chest.x,y:chest.y,z:chest.z},id:chest.id};}
   if(!underFire&&p.materials.wood<40&&weapons.length){const tree=[...candidates(sim.map,p,null,0,15)].filter(b=>b.kind==='tree'&&dist(p,b)<15&&seesPoint(sim,p,b)).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(tree)return {kind:'harvest',goal:{x:tree.x,y:tree.y,z:tree.z}};}
   if(needs){const anchors=(sim.map.floorLoot||[]).filter(q=>q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35).sort((a,b)=>dist(p,a)-dist(p,b));if(anchors[0])return {kind:'search-room',goal:anchors[0],id:anchors[0].id};}
  }

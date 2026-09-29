@@ -1,3 +1,4 @@
+import {nearbyItems} from './nearby-items.js';
 import {markerAction} from './team-markers.js';
 import {newActivity,meaningfulActivity} from './activity.js';
 import {resetStance,canFight,eyeHeight} from './stance.js';
@@ -173,15 +174,15 @@ export class RoyaleSimulation extends Simulation {
   if(!canFight(p))return;
   if(input.editing)return;
   if(input.interact&&!p.interactLatch&&toggleDoor(this,p)){p.interactLatch=true;return;}
-  for(const item of [...this.loot])if((item.ammoType||item.resource)&&this.accessible(p,item,1.6))this.takeLoot(p,item);
-  const chest=input.interact?this.chests.filter(c=>!c.opened&&this.accessible(p,c,3.3)).sort((a,b)=>dist(p,a)-dist(p,b))[0]:null;
+  for(const item of nearbyItems(this,'loot',p,1.6))if((item.ammoType||item.resource)&&this.accessible(p,item,1.6))this.takeLoot(p,item);
+  const chest=input.interact?nearbyItems(this,'chests',p,3.3).filter(c=>!c.opened&&this.accessible(p,c,3.3)).sort((a,b)=>dist(p,a)-dist(p,b))[0]:null;
   if(input.interact&&chest){
    if(p.chestId!==chest.id){p.chestId=chest.id;p.chestProgress=0;this.emit('royale-cue',{player:p.id,cue:'chest-search'});}
    p.chestProgress+=dt;
    if(p.chestProgress>=.8){this.openChest(p,chest);p.chestProgress=0;p.chestId=null;}
   }else{p.chestProgress=0;p.chestId=null;}
   if(input.interact&&!p.interactLatch&&!chest){
-   const item=this.loot.filter(i=>!i.ammoType&&this.accessible(p,i,3)).sort((a,b)=>dist(p,a)-dist(p,b))[0];
+   const item=nearbyItems(this,'loot',p,3).filter(i=>!i.ammoType&&this.accessible(p,i,3)).sort((a,b)=>dist(p,a)-dist(p,b))[0];
    if(item)this.takeLoot(p,item);
   }
   p.interactLatch=!!input.interact;

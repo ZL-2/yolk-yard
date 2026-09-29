@@ -110,17 +110,18 @@ export function canStand(map,p,margin=RADIUS) {
 }
 export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS) {
  if(Math.abs(p.x)>map.size-margin||Math.abs(p.z)>map.size-margin)return false;
- return ![...candidates(map,p,null,0,margin)].some(b=>p.y+.035<b.y+b.h&&p.y+height>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin);
+ for(const b of candidates(map,p,null,0,margin))if(p.y+.035<b.y+b.h&&p.y+height>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin)return false;
+ return true;
 }
 function pushAxis(p,map,axis,delta) {
  if(Math.abs(delta)<1e-10)return;
  const start=p[axis],base=p.y,other=axis==='x'?'z':'x',size=axis==='x'?'w':'d';
  let target=start+delta;
- const nearby=[...candidates(map,{...p,[axis]:target})];
- const hits=nearby.filter(b=>p.y<b.y+b.h-.015&&p.y+bodyHeight(p)>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(target-b[axis])<b[size]/2+RADIUS);
+ const height=bodyHeight(p),point={x:p.x,y:p.y,z:p.z};point[axis]=target;
+ const hits=[];let top=base;
+ for(const b of candidates(map,point))if(p.y<b.y+b.h-.015&&p.y+height>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(target-b[axis])<b[size]/2+RADIUS){hits.push(b);top=Math.max(top,b.y+b.h);}
  // One stair rise per axis. Never stack multiple step corrections in one move.
- const top=Math.max(base,...hits.map(b=>b.y+b.h));
- if(hits.length&&p.grounded&&top-base>0&&top-base<=.43&&canOccupy(map,{...p,[axis]:target,y:top})) {
+ if(hits.length&&p.grounded&&top-base>0&&top-base<=.43&&canOccupy(map,{...point,y:top},height)) {
   p[axis]=target;p.y=top;return;
  }
  for(const b of hits){
@@ -240,7 +241,7 @@ function movePlayerStep(p, input, map, dt) {
   if(wasGrounded){
     let support=ground;
     for(const b of candidates(map,p))if(b.y+b.h<=p.y+.001&&Math.abs(p.x-b.x)<b.w/2+RADIUS&&Math.abs(p.z-b.z)<b.d/2+RADIUS)support=Math.max(support,b.y+b.h);
-    if(p.y-support<=.43&&canOccupy(map,{...p,y:support})){p.y=support;p.vy=0;}
+    if(p.y-support<=.43&&canOccupy(map,{x:p.x,y:support,z:p.z},bodyHeight(p))){p.y=support;p.vy=0;}
   }
   const oldY = p.y;
   p.vy -= 24 * dt;
