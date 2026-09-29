@@ -21,3 +21,23 @@ test('repeated weapon creation reuses the exact baked geometry for every firearm
   a.forEach((mesh,i)=>assert.equal(mesh.geometry,b[i].geometry));
  }
 });
+
+test('warmup construction preserves the full island and departure adopts prepared geometry',async()=>{
+ const THREE=await import('three'),{View}=await import('../src/view.js');
+ const previous=globalThis.document;
+ globalThis.document={createElement:()=>({getContext:()=>({strokeText(){},fillText(){}})})};
+ try{
+  const make=()=>Object.assign(Object.create(View.prototype),{world:new THREE.Group(),scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),scopeCamera:new THREE.PerspectiveCamera(),pickupMeshes:new Map(),renderer:{compileAsync:async()=>{}}});
+  const direct=make();direct.loadMap('sunnybreak');
+  const prepared=make();let batches=0;
+  while(!prepared.preparedBattle?.done){prepared.prepareBattleMap();assert.ok(++batches<3000);}
+  assert.ok(batches>1,'construction yields across frames');
+  const meshes=prepared.preparedBattle.group.children.slice();prepared.loadMap('sunnybreak');
+  assert.equal(prepared.preparedBattle,null);assert.equal(prepared.world.children.length,direct.world.children.length);
+  meshes.forEach(mesh=>assert.equal(mesh.parent,prepared.world));
+  for(let i=0;i<direct.world.children.length;i++){
+   const a=direct.world.children[i],b=prepared.world.children[i];assert.deepEqual(a.position.toArray(),b.position.toArray());assert.deepEqual(a.userData,b.userData);
+   for(const key of ['position','color'])assert.deepEqual(a.geometry?.attributes[key]?.array,b.geometry?.attributes[key]?.array);
+  }
+ }finally{globalThis.document=previous;}
+});

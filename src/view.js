@@ -4,7 +4,7 @@ import {lootModel,gliderModel} from './royale-art.js';
 import {inventoryPreview} from './inventory-previews.js';
 import {adsFov,viewmodelProfile} from './weapon-presentation.js';
 import {animatePickaxe} from './pickaxe-animation.js';
-import {buildIsland,RoyaleView} from './royale-view.js';
+import {buildIsland,buildIslandSteps,RoyaleView} from './royale-view.js';
 import {shopItem} from './shop-catalog.js';
 import {makeShopBack,makeShopPickaxe,makeShopGlider,makeShopTrail} from './shop-models.js';
 import {stairCamera} from './stair-camera.js';
@@ -280,6 +280,20 @@ export class View {
     });
     group.clear();
   }
+  prepareBattleMap(){
+    if(this.mapId==='sunnybreak'||this.preparedBattle?.done)return;
+    if(!this.preparedBattle){
+      const map=getMap('sunnybreak'),group=new THREE.Group();
+      this.preparedBattle={group,steps:buildIslandSteps(group,map.authored?{...map,boxes:map.authored}:map,{block,ball,cylinder,mat,palette}),done:false};
+    }
+    const pending=this.preparedBattle,deadline=performance.now()+4;
+    do{pending.done=pending.steps.next().done;}while(!pending.done&&performance.now()<deadline);
+    if(pending.done){
+      // Compile the detached scene while the player is still on Spawn Island.
+      const scene=new THREE.Scene();scene.fog=new THREE.Fog(getMap('sunnybreak').sky,330,1000);scene.add(pending.group);
+      this.renderer.compileAsync(scene,this.camera,this.scene).catch(()=>{});
+    }
+  }
   loadMap(id) {
     if (id === this.mapId) return;
     this.mapId = id;
@@ -291,7 +305,12 @@ export class View {
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;
     this.camera.near=map.theme==='royale'?.15:.025;
     this.camera.updateProjectionMatrix();this.scopeCamera.updateProjectionMatrix();
-    (map.theme==='royale'?buildIsland:buildArena)(this.world, map.authored?{...map,boxes:map.authored}:map, { block, ball, cylinder, mat, palette });
+    if(id==='sunnybreak'&&this.preparedBattle){
+      const pending=this.preparedBattle;
+      // A full-human early departure may arrive before preparation finishes.
+      if(!pending.done)for(const _ of pending.steps){}
+      this.world.add(...pending.group.children.slice());this.preparedBattle=null;
+    }else (map.theme==='royale'?buildIsland:buildArena)(this.world, map.authored?{...map,boxes:map.authored}:map, { block, ball, cylinder, mat, palette });
     for (let i = 0; i < 2; i++) {
       const [x, z] = map.bases[i];
       const ring = new THREE.Mesh(
@@ -690,6 +709,7 @@ export class View {
     this.clock += dt;
     this.recoil = Math.max(0, this.recoil - dt * 7);
     if(playing)this.loadMap(state?.options.map || "yard");
+    if(playing&&state?.royale?.practice)this.prepareBattleMap();
     this.world.visible=playing;
     if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x97c6c4;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(sky,playing?(map.theme==='royale'?330:72):40,playing?(map.theme==='royale'?1000:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;

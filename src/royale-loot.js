@@ -1,7 +1,7 @@
 import {weapon} from './data.js';
 import {ammoType} from './royale-data.js';
 import {groundAt} from './terrain.js';
-import {canStand,wallDistance} from './physics.js';
+import {canStand,wallDistance,candidates} from './physics.js';
 // One host-only table for authored floor sockets, chests and supply rewards.
 const sources=['ground','chest','high','supply'];
 export const AMMO_DROPS={light:{weight:28,min:18,max:36},medium:{weight:36,min:20,max:40},shells:{weight:24,min:6,max:12},heavy:{weight:9,min:4,max:8},rockets:{weight:3,min:1,max:3}};
@@ -24,7 +24,7 @@ export function rollItem(random,source='ground',role='mixed'){
 export function matchingAmmo(item,random){const type=ammoType(item.id),a=AMMO_DROPS[type];return {id:type,ammoType:type,count:quantity(random,a.min,a.max),rarity:0};}
 export function rollChest(random,source='chest'){const gun=rollItem(random,source,'weapon');return [gun,matchingAmmo(gun,random),rollItem(random,source,'utility')];}
 // Highest support *below this floor*, never the highest rooftop at X/Z.
-export function supportBelow(map,x,z,y){let floor=groundAt(map,x,z);for(const b of map.boxes)if(b.y+b.h<=y+.24&&Math.abs(x-b.x)<b.w/2&&Math.abs(z-b.z)<b.d/2)floor=Math.max(floor,b.y+b.h);return floor;}
+export function supportBelow(map,x,z,y){let floor=groundAt(map,x,z);for(const b of candidates(map,{x,y,z},null,0,0))if(b.y+b.h<=y+.24&&Math.abs(x-b.x)<b.w/2&&Math.abs(z-b.z)<b.d/2)floor=Math.max(floor,b.y+b.h);return floor;}
 export function validLootPoint(map,p,margin=.7){return p.y>=groundAt(map,p.x,p.z)-.06&&Math.abs(supportBelow(map,p.x,p.z,p.y)-p.y)<.26&&canStand(map,p,margin);}
 export function placeLoot(map,point,existing=[]){
  const base={x:point.x,y:Number.isFinite(point.y)?point.y:groundAt(map,point.x,point.z),z:point.z};let best=null,bestScore=-Infinity;

@@ -32,3 +32,12 @@ test('a 600ms scheduling stall is recovered across bounded callbacks',()=>{
  for(let i=0;i<6;i++){const before=ticks;authority.tick(start+600);assert.ok(ticks-before<=6);}
  assert.equal(ticks,36);assert.ok(authority.accumulator<1/60);authority.close();
 });
+
+test('indexed loot support matches a full geometry scan on every authored socket',async()=>{
+ const {ROYALE_MAP}=await import('../src/royale-map.js'),{supportBelow}=await import('../src/royale-loot.js'),{groundAt}=await import('../src/terrain.js');
+ for(const p of [...ROYALE_MAP.floorLoot,...ROYALE_MAP.chests])for(const y of [p.y,p.y+3,p.y-1]){
+  let expected=groundAt(ROYALE_MAP,p.x,p.z);
+  for(const b of ROYALE_MAP.boxes)if(b.y+b.h<=y+.24&&Math.abs(p.x-b.x)<b.w/2&&Math.abs(p.z-b.z)<b.d/2)expected=Math.max(expected,b.y+b.h);
+  assert.equal(supportBelow(ROYALE_MAP,p.x,p.z,y),expected);
+ }
+});

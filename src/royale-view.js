@@ -12,7 +12,8 @@ import {transportAt} from './royale-data.js';
 import {artKit,buildingStyle,dressBuilding,treeModel,propModel,gliderModel,chestModel,lootModel,launchpadModel} from './royale-art.js';
 const bakedMaterial=new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true});
 
-export function bake(group,chunked=false,colored=chunked){
+export function bake(group,chunked=false,colored=chunked){for(const _ of bakeSteps(group,chunked,colored)){} }
+function* bakeSteps(group,chunked=false,colored=chunked){
  group.updateMatrixWorld(true);const batches=new Map();
  for(const o of [...group.children])if(o.isMesh&&!o.userData.ownedMaterial&&!o.userData.keepDynamic){
   const key=(colored?'color':o.material.uuid)+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');if(!batches.has(key))batches.set(key,{mat:colored?bakedMaterial:o.material,parts:[],ranges:[],vertices:0});
@@ -20,8 +21,9 @@ export function bake(group,chunked=false,colored=chunked){
   if(colored){g.deleteAttribute('uv');if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3),c=o.material.color;for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}}
   const batch=batches.get(key);if(o.userData.objectId)batch.ranges.push({id:o.userData.objectId,start:batch.vertices,count:g.attributes.position.count});batch.vertices+=g.attributes.position.count;batch.parts.push(g);group.remove(o);
   if(o.geometry.type==='CylinderGeometry'&&!o.geometry.userData.shared)o.geometry.dispose();
+  yield;
  }
- for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);}
+ for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);yield;}
 }
 // Roads are the terrain's own triangles, not floating intersecting ribbons.
 // One surface also makes intersections a union instead of duplicate road meshes.
@@ -33,7 +35,7 @@ function roadColor(map,x,z){
  }
  return null;
 }
-function buildTerrain(world,map){
+function* buildTerrain(world,map){
  const t=map.terrain,material=new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true});
  for(let cz=0;cz<t.n-1;cz+=32)for(let cx=0;cx<t.n-1;cx+=32){
   const positions=[],colors=[];
@@ -47,7 +49,7 @@ function buildTerrain(world,map){
    }
   }
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.computeVertexNormals();geometry.computeBoundingSphere();
-  const m=new THREE.Mesh(geometry,material);m.receiveShadow=true;m.userData.ownedMaterial=true;world.add(m);
+  const m=new THREE.Mesh(geometry,material);m.receiveShadow=true;m.userData.ownedMaterial=true;world.add(m);yield;
  }
 }
 export function islandLabel(text,size=1){
@@ -55,10 +57,12 @@ export function islandLabel(text,size=1){
  const c=canvas.getContext('2d');c.font='800 34px system-ui';c.textAlign='center';c.lineWidth=8;c.strokeStyle='#23443ae6';c.fillStyle='#fff8de';c.strokeText(text.toUpperCase(),256,60);c.fillText(text.toUpperCase(),256,60);
  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthWrite:false}));sprite.scale.set(24*size,4.5*size,1);return sprite;
 }
-export function buildIsland(world,map,kit){
+export function buildIsland(world,map,kit){for(const _ of buildIslandSteps(world,map,kit)){} }
+// Resumable construction lets warmup frames keep servicing input and sockets.
+export function* buildIslandSteps(world,map,kit){
  const {block,palette}=kit;
  const ocean=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800),new THREE.MeshLambertMaterial({color:0x4195ad,transparent:true,opacity:.87}));ocean.rotation.x=-Math.PI/2;ocean.position.y=.5;ocean.userData.ownedMaterial=true;world.add(ocean);
- buildTerrain(world,map);
+ yield* buildTerrain(world,map);
  const byBuilding=map.buildings.map(()=>[]),treeBoxes=new Map(),propBoxes=new Map();
  for(const b of map.boxes){
   if(b.building!==undefined)byBuilding[b.building].push(b);
@@ -67,15 +71,15 @@ export function buildIsland(world,map,kit){
   if(['tree','prop','roof-collider'].includes(b.kind))continue;
   const s=b.building===undefined?null:buildingStyle(map.buildings[b.building]);
   const color=s?(b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:b.color==='foundation'?0x8e988a:s.wall):palette[b.color]||0x9cb7aa;
-  const m=block(world,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color);m.userData.objectId=b.objectId;
+  const m=block(world,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color);m.userData.objectId=b.objectId;yield;
  }
  for(const [i,b] of map.buildings.entries()){
   const start=world.children.length;dressBuilding(world,b,kit);
-  for(const mesh of world.children.slice(start)){let closest=null,distance=Infinity;for(const o of byBuilding[i]){const d=(o.x-mesh.position.x)**2+(o.y+o.h/2-mesh.position.y)**2+(o.z-mesh.position.z)**2;if(d<distance){distance=d;closest=o;}}if(closest)mesh.userData.objectId=closest.objectId;}
+  for(const mesh of world.children.slice(start)){let closest=null,distance=Infinity;for(const o of byBuilding[i]){const d=(o.x-mesh.position.x)**2+(o.y+o.h/2-mesh.position.y)**2+(o.z-mesh.position.z)**2;if(d<distance){distance=d;closest=o;}}if(closest)mesh.userData.objectId=closest.objectId;}yield;
  }
- for(const [i,t]of map.trees.entries()){const start=world.children.length;treeModel(world,t,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=treeBoxes.get(i)?.objectId;}
- for(const [i,p]of map.props.entries()){const start=world.children.length;propModel(world,p,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=propBoxes.get(i)?.objectId;}
- bake(world,true);
+ for(const [i,t]of map.trees.entries()){const start=world.children.length;treeModel(world,t,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=treeBoxes.get(i)?.objectId;yield;}
+ for(const [i,p]of map.props.entries()){const start=world.children.length;propModel(world,p,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=propBoxes.get(i)?.objectId;yield;}
+ yield* bakeSteps(world,true);
  // World names are separate from the small diegetic signs and only visible during the drop.
  for(const p of map.districts){const label=islandLabel(p.name);label.position.set(p.x,groundAt(map,p.x,p.z)+19,p.z);label.userData.poiLabel=true;world.add(label);}
  for(const sign of map.signs){const label=islandLabel(sign.text,.16);label.position.set(sign.x,sign.y,sign.z);label.userData.detailLabel=true;label.visible=false;world.add(label);}
