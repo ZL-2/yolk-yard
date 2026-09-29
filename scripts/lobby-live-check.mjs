@@ -10,7 +10,7 @@ for(let i=0;i<18;i++){try{const r=await fetch(base+'version.json?t='+Date.now(),
 assert.equal(version?.build,expected,'Pages must serve this exact release');
 let health;for(let i=0;i<36;i++){try{health=await fetch('https://yolk-yard-relay.onrender.com/health',{signal:AbortSignal.timeout(10000)}).then(r=>r.json());if(health.gameVersion===VERSION)break;}catch{}await new Promise(r=>setTimeout(r,5000));}
 assert.equal(health?.gameVersion,VERSION);assert.equal(health.brand,'Ravelfront');for(const feature of ['parties','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings'])assert.ok(health.features.includes(feature));
-const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']}),pages=[];
+const browser=await chromium.launch({headless:true,...(process.env.YOLK_TEST_CHROME?{executablePath:process.env.YOLK_TEST_CHROME}:{}),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']}),pages=[];
 await mkdir('test-results/live-lobby',{recursive:true});
 async function player(name){const c=await browser.newContext({viewport:{width:1365,height:768}}),p=await c.newPage();p.setDefaultTimeout(90000);await p.addInitScript(name=>{localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));},name);await p.goto(base+'?build='+version.build);pages.push(p);await p.locator('#menu [data-action="find-public"]:enabled').waitFor();return p;}
 try{
@@ -31,5 +31,5 @@ try{
  await Promise.all([a,b].map(p=>p.locator('#royale-flight-title').filter({hasText:/Doors open|Choose your landing/}).waitFor({timeout:90000})));
  await b.screenshot({path:'test-results/live-lobby/bus.png'});
  console.log(JSON.stringify({passed:true,build:version.build,qualityUpdate:version.release,relayGameVersion:health.gameVersion,liveInvitations:true,livePrivateDuos:true,sharedIslandAndBus:true}));
-}catch(e){for(let i=0;i<pages.length;i++)await pages[i].screenshot({path:`test-results/live-lobby/failure-${i}.png`}).catch(()=>{});throw e;}
+}catch(e){for(let i=0;i<pages.length;i++){await pages[i].screenshot({path:`test-results/live-lobby/failure-${i}.png`}).catch(()=>{});console.error('LIVE PAGE',i,await pages[i].evaluate(()=>({dialog:document.querySelector('#dialog')?.textContent,notice:document.querySelector('#notice')?.textContent,connection:document.querySelector('#connection-report')?.textContent})).catch(()=>null));}throw e;}
 finally{await browser.close();}
