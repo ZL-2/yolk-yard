@@ -41,3 +41,14 @@ test('indexed loot support matches a full geometry scan on every authored socket
   assert.equal(supportBelow(ROYALE_MAP,p.x,p.z,y),expected);
  }
 });
+
+test('staged battle preparation stays isolated and survives warmup checkpoint recovery',()=>{
+ const make=()=>{const s=new RoyaleSimulation({capacity:2,bots:1,fill:true,seed:31});s.addPlayer('host',{name:'Host'});s.startRound();return s;};
+ const staged=make(),direct=make();let batches=0;
+ while(!staged.prepareBattleWorld(0).done){staged.prepareBattleWorld(2);assert.ok(++batches<2000);}
+ assert.ok(batches>1);assert.equal(staged.loot.length,0);assert.equal(staged.map.id,'hatchery-atoll');
+ const restored=new RoyaleSimulation().restore(staged.checkpoint());
+ for(const s of [staged,direct,restored])assert.equal(s.beginBattle(),true);
+ assert.ok(staged.loot.length>100);assert.deepEqual(staged.loot,direct.loot);assert.deepEqual(staged.chests,direct.chests);
+ assert.deepEqual(staged.loot,restored.loot);assert.deepEqual(staged.chests,restored.chests);
+});

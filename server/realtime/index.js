@@ -1,3 +1,6 @@
+import {MAPS,navigation} from '../../src/maps.js';
+import {ROYALE_MAP} from '../../src/royale-map.js';
+import {SPAWN_ISLAND} from '../../src/spawn-island.js';
 import {createServer} from 'node:http';
 import {pathToFileURL} from 'node:url';
 import {WebSocketServer} from 'ws';
@@ -5,11 +8,13 @@ import {RealtimeRelay} from './relay.js';
 import {OwnerService} from './owner.js';
 import {VERSION} from '../../src/data.js';
 export async function startRealtimeServer({port=Number(process.env.PORT)||3000,host='0.0.0.0',origins=(process.env.ALLOWED_ORIGINS||'https://zl-2.github.io').split(','),maintenance=host!=='127.0.0.1'}={}){
+  // Build immutable navigation before accepting sockets or starting the match clock.
+  for(const map of [...MAPS,ROYALE_MAP,SPAWN_ISLAND])navigation(map);
   const relay=new RealtimeRelay();
   const owner=new OwnerService();await owner.ready;
   const server=createServer((req,res)=>{
     if(req.url?.startsWith('/owner/')){void owner.handle(req,res,{origins,relay});return;}
-    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',performanceRevision:73,features:['parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
+    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',performanceRevision:74,features:['parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
   });
   const sockets=new WebSocketServer({noServer:true,maxPayload:2_000_000,perMessageDeflate:false});
   server.on('upgrade',(req,socket,head)=>{

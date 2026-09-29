@@ -39,22 +39,26 @@ export function placeLoot(map,point,existing=[]){
  }
  return best;
 }
-export function seedIslandLoot(sim){
+export function seedIslandLoot(sim){for(const _ of seedIslandLootSteps(sim)){} }
+export function* seedIslandLootSteps(sim){
  sim.chests=[];const armed=new Set();
  for(const point of sim.map.floorLoot){
+  yield;
   if(sim.random()>point.chance||!validLootPoint(sim.map,point))continue;
   const item=rollItem(sim.random,'ground',point.role),drop=sim.dropLoot(point,item);
   if(drop?.weapon){if(point.floor===0)armed.add(point.building);sim.dropLoot(point,matchingAmmo(item,sim.random));}
  }
  // Each structure has a usable early-game weapon, with variable sockets and contents.
  for(const [index]of sim.map.buildings.entries())if(!armed.has(index)){
+  yield;
   const choices=sim.map.floorLoot.filter(p=>p.building===index&&p.floor===0&&p.role==='weapon'&&validLootPoint(sim.map,p));
   const point=choices[Math.floor(sim.random()*choices.length)];if(!point)continue;
   const item=rollItem(sim.random,'ground','weapon');if(sim.dropLoot(point,item))sim.dropLoot(point,matchingAmmo(item,sim.random));
  }
- for(const p of sim.map.chests)if(sim.random()<p.chance&&validLootPoint(sim.map,p,.8))sim.chests.push({id:p.id,x:p.x,y:p.y,z:p.z,poi:p.poi,source:p.source,opened:false,supply:false,contents:rollChest(sim.random,p.source)});
+ for(const p of sim.map.chests){yield;if(sim.random()<p.chance&&validLootPoint(sim.map,p,.8))sim.chests.push({id:p.id,x:p.x,y:p.y,z:p.z,poi:p.poi,source:p.source,opened:false,supply:false,contents:rollChest(sim.random,p.source)});}
  // A poor random roll must not strip a major landing district of chests.
  for(const district of sim.map.districts){
+  yield;
   let count=sim.chests.filter(c=>c.poi===district.id).length;
   for(const point of sim.map.chests.filter(p=>p.poi===district.id&&!sim.chests.some(c=>c.id===p.id))){
    if(count>=3)break;if(!validLootPoint(sim.map,point,.8))continue;
