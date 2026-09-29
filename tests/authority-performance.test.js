@@ -86,3 +86,47 @@ test('CPU quota monitor handles v2/v1 units, unavailable data and counter deltas
  try{await monitor.start();periods=30;await monitor.sample();const s=monitor.snapshot();assert.equal(s.periods,10);assert.equal(s.throttledPeriods,5);assert.equal(s.throttledMs,10);assert.equal(s.quotaCores,.15);assert.ok(!JSON.stringify(s).includes('/sys/'));}finally{monitor.close();}
  const missing=new CpuQuotaMonitor(async()=>{throw Error('missing');});await missing.start();assert.equal(missing.snapshot().available,false);missing.close();
 });
+
+function referenceRayBox(o, d, b, max = Infinity) {
+  let lo = 0,
+    hi = max;
+  for (const [axis, min, maxV] of [
+    ["x", b.x - b.w / 2, b.x + b.w / 2],
+    ["y", b.y, b.y + b.h],
+    ["z", b.z - b.d / 2, b.z + b.d / 2],
+  ]) {
+    if (Math.abs(d[axis]) < 1e-8) {
+      if (o[axis] < min || o[axis] > maxV) return Infinity;
+      continue;
+    }
+    let a = (min - o[axis]) / d[axis],
+      c = (maxV - o[axis]) / d[axis];
+    if (a > c) [a, c] = [c, a];
+    lo = Math.max(lo, a);
+    hi = Math.min(hi, c);
+    if (lo > hi) return Infinity;
+  }
+  return lo;
+}
+
+test('allocation-free ray intersection preserves collision distances and edge cases',async()=>{
+ const {rayBox}=await import('../src/physics.js');let seed=91;
+ const random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
+ for(let i=0;i<20000;i++){
+  const b={x:random()*40-20,y:random()*10,z:random()*40-20,w:random()*12,d:random()*12,h:random()*10};
+  const o=i%7===0?{x:b.x,y:b.y,z:b.z}:{x:random()*40-20,y:random()*20,z:random()*40-20};
+  const d={x:i%3===0?0:random()*2-1,y:i%5===0?1e-10:random()*2-1,z:i%11===0?0:random()*2-1};
+  const max=i%2?Infinity:random()*60;
+  assert.equal(rayBox(o,d,b,max),referenceRayBox(o,d,b,max));
+ }
+});
+
+test('movement-only snapshots skip world copying without changing full snapshots',()=>{
+ const s=new RoyaleSimulation({capacity:2,fill:true,seed:29});s.addPlayer('host',{name:'Host'});s.startRound();s.beginBattle();
+ const full=s.snapshot();assert.ok(full.royale.loot.length>100);
+ s.loot.map=()=>{throw Error('Unneeded world clone');};
+ const sparse=s.snapshot({includeLoot:false,includeBuilds:false});delete s.loot.map;
+ assert.equal('loot' in sparse.royale,false);assert.equal('builds' in sparse.royale,false);
+ assert.deepEqual(sparse.players,full.players);assert.deepEqual(s.snapshot().royale.loot,full.royale.loot);
+ full.players[0].materials.wood=999;assert.notEqual(s.snapshot().players[0].materials.wood,999);
+});

@@ -16,24 +16,17 @@ export function direction(yaw, pitch = 0) {
   };
 }
 export function rayBox(o, d, b, max = Infinity) {
-  let lo = 0,
-    hi = max;
-  for (const [axis, min, maxV] of [
-    ["x", b.x - b.w / 2, b.x + b.w / 2],
-    ["y", b.y, b.y + b.h],
-    ["z", b.z - b.d / 2, b.z + b.d / 2],
-  ]) {
-    if (Math.abs(d[axis]) < 1e-8) {
-      if (o[axis] < min || o[axis] > maxV) return Infinity;
-      continue;
-    }
-    let a = (min - o[axis]) / d[axis],
-      c = (maxV - o[axis]) / d[axis];
-    if (a > c) [a, c] = [c, a];
-    lo = Math.max(lo, a);
-    hi = Math.min(hi, c);
-    if (lo > hi) return Infinity;
-  }
+  // Slab intersection without per-box arrays, iterators or dynamic property lookups.
+  // This runs for every sight line, navigation probe and projectile collision.
+  let lo=0,hi=max,a,c,min=b.x-b.w/2,upper=b.x+b.w/2;
+  if(Math.abs(d.x)<1e-8){if(o.x<min||o.x>upper)return Infinity;}
+  else{a=(min-o.x)/d.x;c=(upper-o.x)/d.x;if(a>c){const swap=a;a=c;c=swap;}lo=Math.max(lo,a);hi=Math.min(hi,c);if(lo>hi)return Infinity;}
+  min=b.y;upper=b.y+b.h;
+  if(Math.abs(d.y)<1e-8){if(o.y<min||o.y>upper)return Infinity;}
+  else{a=(min-o.y)/d.y;c=(upper-o.y)/d.y;if(a>c){const swap=a;a=c;c=swap;}lo=Math.max(lo,a);hi=Math.min(hi,c);if(lo>hi)return Infinity;}
+  min=b.z-b.d/2;upper=b.z+b.d/2;
+  if(Math.abs(d.z)<1e-8){if(o.z<min||o.z>upper)return Infinity;}
+  else{a=(min-o.z)/d.z;c=(upper-o.z)/d.z;if(a>c){const swap=a;a=c;c=swap;}lo=Math.max(lo,a);hi=Math.min(hi,c);if(lo>hi)return Infinity;}
   return lo;
 }
 // Spatial buckets keep large-island collision proportional to nearby cover.

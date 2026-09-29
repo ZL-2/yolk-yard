@@ -20,13 +20,33 @@ function normalize(message){
  }
  return value;
 }
+// Values have already passed JSON normalization. Compare arrays structurally
+// instead of serializing inventory/ammo/events again for every recipient.
+function equalJson(a,b){
+ if(a===b)return true;
+ if(!a||!b||typeof a!=='object'||typeof b!=='object'||Array.isArray(a)!==Array.isArray(b))return false;
+ if(Array.isArray(a)){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(!equalJson(a[i],b[i]))return false;return true;}
+ const keys=Object.keys(a);if(keys.length!==Object.keys(b).length)return false;
+ for(const key of keys)if(!Object.hasOwn(b,key)||!equalJson(a[key],b[key]))return false;
+ return true;
+}
+// Shared recipient states also share their object-pair diff. Weak keys keep old
+// frames collectable; each connection still owns its sequence and baseline.
+const patches=new WeakMap();
+function sharedPatch(previous,next){
+ if(previous&&next&&typeof previous==='object'&&typeof next==='object'){
+  let cache=patches.get(next);if(cache?.has(previous))return cache.get(previous);
+  const result=patch(previous,next);if(!cache){cache=new WeakMap();patches.set(next,cache);}cache.set(previous,result);return result;
+ }
+ return patch(previous,next);
+}
 function patch(previous,next){
  if(Object.is(previous,next))return undefined;
- if(!previous||!next||typeof previous!=='object'||typeof next!=='object'||Array.isArray(previous)||Array.isArray(next))
-  return JSON.stringify(previous)===JSON.stringify(next)?undefined:[next];
+ if(!previous||!next||typeof previous!=='object'||typeof next!=='object')return [next];
+ if(Array.isArray(previous)||Array.isArray(next))return equalJson(previous,next)?undefined:[next];
  const changes=Object.create(null);
  for(const key of Object.keys(previous))if(!Object.hasOwn(next,key))changes[key]=[];
- for(const key of Object.keys(next)){const change=patch(previous[key],next[key]);if(change!==undefined)changes[key]=change;}
+ for(const key of Object.keys(next)){const change=(key==='players'||key==='projectiles'||key==='loot'||key==='chests'||key==='builds'||key==='worldDamage'?sharedPatch:patch)(previous[key],next[key]);if(change!==undefined)changes[key]=change;}
  return Object.keys(changes).length?changes:undefined;
 }
 function apply(previous,changes){

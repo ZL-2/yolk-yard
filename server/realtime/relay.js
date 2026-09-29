@@ -61,6 +61,13 @@ export class RealtimeRelay {
     this.flush(peer);
   }
   send(peer,message){
+    // The normal writable-socket path needs one serialization, not a queue-size
+    // serialization, a dequeue serialization and then the actual wire packet.
+    if(!peer.pending.length&&peer.ws?.readyState===1&&peer.ws.bufferedAmount<65536&&peer.historyBytes<262144){
+      const raw=JSON.stringify({...message,relaySeq:peer.seq+1});
+      if(raw.length+peer.historyBytes>MAX_QUEUE){this.remove(peer,1013,'Connection too slow');return;}
+      peer.seq++;peer.history.push({seq:peer.seq,raw});peer.historyBytes+=raw.length;peer.ws.send(raw);return;
+    }
     const last=peer.pending.at(-1),merged=mergeRelayMessage(last,message);
     if(merged){peer.pendingBytes-=JSON.stringify(last).length;peer.pending[peer.pending.length-1]=merged;message=merged;}
     else peer.pending.push(message);

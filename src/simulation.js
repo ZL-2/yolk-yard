@@ -917,12 +917,13 @@ export class Simulation {
       remaining: this.remaining,
       scores: this.scores.map((v) => Math.floor(v)),
       winner: this.winner,
-      players: [...this.players.values()].map((p) => ({
-        inputQueue:this.remoteInputs.get(p.id)?.queue.length||0,
-        ...Object.fromEntries(keys.map((k) => [k, Array.isArray(p[k]) ? [...p[k]] : p[k]])),
+      players: [...this.players.values()].map((p) => {
+        const row={inputQueue:this.remoteInputs.get(p.id)?.queue.length||0};
+        for(const key of keys){const value=p[key];row[key]=Array.isArray(value)?value.slice():value;}
+        return Object.assign(row,{
         shotSpread: p.accuracyState[p.slot]?.spread ?? gun(p).spread * (p.aim ? gun(p).aimSpread : 1),
         recoilPitch:p.recoilPitch||0,recoilYaw:p.recoilYaw||0,firstShot:!!p.accuracyState[p.slot]?.firstShot,shotSerial:p.shotSerial||0,combatState:{...p.accuracyState[p.slot]},
-      })),
+      });}),
       projectiles: this.projectiles.map((b) => ({
         id: b.id,
         x: b.x,
