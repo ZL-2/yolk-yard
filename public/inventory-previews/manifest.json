@@ -1,0 +1,50 @@
+{
+  "revision": 4,
+  "source": "24ba33d7ac84d4f1589d7cbd698276886b50dd0491d9a9e9f19079706aab917c",
+  "weapons": {
+    "sprinter": {
+      "name": "Sprinter",
+      "sha256": "369a302ad659bfd24ecf5cf7cf4ae43efcd5861b4e06a53bcb156092ebc74919"
+    },
+    "scatter": {
+      "name": "Scatter",
+      "sha256": "2acfb17984b3bc9561baf32425bb32ada1fad625d42367efc3691572ced26be1"
+    },
+    "needle": {
+      "name": "Needle",
+      "sha256": "ef9174628dc9623af6360002cc9997c0bfc1bc5cf241a290a99d7d15f4e8bcfd"
+    },
+    "zipper": {
+      "name": "Zipper",
+      "sha256": "7d807a75f971900d22f44bc54d503b4faf862809e09b0515df229a55d5a29682"
+    },
+    "thumper": {
+      "name": "Thumper",
+      "sha256": "0adb9cebeea376e6295f14b14d4054419bb1148685f96096f288367e5314ddc8"
+    },
+    "anchor": {
+      "name": "Anchor",
+      "sha256": "2e440f92deefe30b4252243dd4974554aefbe9e49f123025d6bba4968d368595"
+    },
+    "duet": {
+      "name": "Duet",
+      "sha256": "6f8434301fc1b513d08f530e8d370f9954b1bcfe3c26bd33d9137fbba21603bb"
+    },
+    "pip": {
+      "name": "Pip",
+      "sha256": "9ed9497dedc745972078f067fa2fb690036fb3faf0b7ce147c2a879e0cefaf1c"
+    },
+    "peeper": {
+      "name": "Sentry",
+      "sha256": "6c6935cdd298e496a5cd0b9cbd3fd9b669cefb8b5f78025373b737bb54f631a5"
+    },
+    "doubleyolk": {
+      "name": "Breach",
+      "sha256": "9d3050d98322542cd2df23ad954c4499633ee33340e04fbe6c37bb3b3cbfd644"
+    },
+    "comet": {
+      "name": "Comet",
+      "sha256": "bac2b0bc3283224345edd483a78ebd864f10a6527cb851a05302e76068e2b16b"
+    }
+  }
+}

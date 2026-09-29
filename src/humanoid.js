@@ -22,15 +22,16 @@ function template(profile){
  const item=shopItem(profile.outfit),style=item?.shape??0,skin=['#c58a65','#754b37','#d7a47f','#a86d4f','#dfb696','#543728'][style%6];
  const colors={cloth:item?.color||profile.color||'#334952',trim:item?.accent||profile.accent||'#e8ae4c',skin,armor:'#243039',dark:'#121c23',sole:'#11171b',hair:['#241b19','#161619','#302620','#3e2b21'][style%4]};
  if(profile.teamColor){colors.cloth=profile.teamColor;colors.trim=profile.teamColor;}
+ const trouser=new T.Color(colors.cloth).multiplyScalar(.84),seam=new T.Color(colors.cloth).multiplyScalar(.68);
  const key=JSON.stringify([colors,style%6]);if(geometries.has(key))return geometries.get(key);
  const parts=[];
  function add(g,color,bone,next=null,blend=null){
-  if(bone==='head'){g.translate(0,-1.666,0);g.scale(.86,.83,.86);g.translate(0,1.686,0);}
+  if(bone==='head'){g.translate(0,-1.666,0);g.scale(1.06,1,1.05);g.translate(0,1.666,0);}
   const n=g.attributes.position.count,c=new T.Color(color),rgb=new Float32Array(n*3),index=new Uint16Array(n*4),weights=new Float32Array(n*4);
   for(let i=0;i<n;i++){rgb.set([c.r,c.g,c.b],i*3);const t=blend?blend(g.attributes.position,i):0;index[i*4]=ids[bone];index[i*4+1]=ids[next||bone];weights[i*4]=1-t;weights[i*4+1]=t;}
   g.setAttribute('color',new T.BufferAttribute(rgb,3));g.setAttribute('skinIndex',new T.Uint16BufferAttribute(index,4));g.setAttribute('skinWeight',new T.Float32BufferAttribute(weights,4));parts.push(g);
  }
- function ellipsoid(x,y,z,rx,ry,rz,color,bone,detail=12){const g=new T.SphereGeometry(1,detail,Math.max(6,detail-4));g.scale(rx,ry,rz);g.translate(x,y,z);add(g,color,bone);}
+ function ellipsoid(x,y,z,rx,ry,rz,color,bone,detail=10){const g=new T.SphereGeometry(1,detail,Math.max(6,detail-4));g.scale(rx,ry,rz);g.translate(x,y,z);add(g,color,bone);}
  function panel(x,y,z,w,h,d,color,bone){const g=mergeVertices(new RoundedBoxGeometry(w,h,d,1,Math.min(w,h,d)*.22));g.translate(x,y,z);add(g,color,bone);}
  function rings(rows,color,bone,next=null){const pos=[],uv=[],ind=[],sides=16;
   for(let j=0;j<rows.length;j++){const [y,rx,rz,cx=0,cz=0]=rows[j];for(let i=0;i<=sides;i++){const a=i/sides*Math.PI*2;pos.push(cx+Math.cos(a)*rx,y,cz+Math.sin(a)*rz);uv.push(i/sides,j/(rows.length-1));if(j<rows.length-1&&i<sides){const k=j*(sides+1)+i;ind.push(k,k+sides+1,k+1,k+1,k+sides+1,k+sides+2);}}}
@@ -49,9 +50,12 @@ function template(profile){
   panel(s*.080,1.12,-.145,.127,.108,.043,colors.cloth,'spine');
   panel(s*.08,1.16,-.170,.109,.023,.008,colors.armor,'spine');
   ellipsoid(s*.18,1.397,-.095,.037,.073,.033,colors.trim,'chest');
-  ellipsoid(s*.265,1.42,.0,.081,.075,.086,colors.cloth,`arm${s<0?'L':'R'}`);
+  ellipsoid(s*.265,1.42,.0,.068,.067,.071,colors.cloth,`arm${s<0?'L':'R'}`);
+  panel(s*.074,1.255,-.163,.116,.011,.008,colors.dark,'chest');
+  panel(s*.074,1.232,-.163,.116,.011,.008,colors.dark,'chest');
  }
  panel(0,.997,-.11,.29,.038,.015,colors.dark,'hips');panel(0,.997,-.125,.042,.032,.012,colors.trim,'hips');
+ for(const x of [-.125,-.06,.06,.125])panel(x,1.002,-.12,.013,.046,.012,colors.cloth,'hips');
  rings([[1.425,.088,.073],[1.465,.088,.073],[1.48,.07,.064]],colors.dark,'neck');
  ellipsoid(0,1.515,0,.064,.082,.062,colors.skin,'neck');
  // Sculpted cranium: jaw narrows below cheeks, recessed temples, defined brow.
@@ -60,9 +64,9 @@ function template(profile){
  ellipsoid(0,1.553,-.035,.066,.026,.057,skin,'head');
  for(const side of [-1,1]){
   ellipsoid(side*.118,1.667,.0,.019,.038,.023,skin,'head');
-  ellipsoid(side*.044,1.692,-.101,.031,.012,.012,'#b7a18d','head');
-  ellipsoid(side*.044,1.695,-.111,.019,.007,.005,'#dfded3','head');
-  ellipsoid(side*.044,1.695,-.116,.007,.007,.003,'#354c4b','head');
+  ellipsoid(side*.044,1.692,-.101,.029,.012,.012,skin,'head');
+  ellipsoid(side*.044,1.695,-.111,.019,.005,.004,'#d6cec4','head');
+  ellipsoid(side*.044,1.695,-.115,.006,.005,.003,'#354c4b','head');
   ellipsoid(side*.045,1.716,-.099,.035,.006,.01,colors.hair,'head');
  }
  ellipsoid(0,1.668,-.115,.016,.037,.021,skin,'head');ellipsoid(0,1.646,-.132,.02,.012,.016,skin,'head');
@@ -79,10 +83,12 @@ function template(profile){
   ellipsoid(side*.405,1.065,-.028,.043,.058,.025,colors.armor,'forearm'+s);
   ellipsoid(side*.44,.86,0,.042,.057,.027,colors.dark,'hand'+s);
   for(let i=0;i<5;i++){const b='finger'+s+i,P=points[b];const curve=new T.CatmullRomCurve3([P.clone(),P.clone().add(V(side*.002,-.026,-.008)),P.clone().add(V(side*.002,-.042,-.025)),P.clone().add(V(0,-.032,-.033))]);add(new T.TubeGeometry(curve,5,i===4?.01:.008,5,false),colors.dark,b);}
-  limb('thigh'+s,'shin'+s,[[0,.094],[.13,.103],[.4,.094],[.8,.07],[1,.059]],colors.cloth,'thigh'+s,'shin'+s);
-  limb('shin'+s,'foot'+s,[[0,.059],[.2,.066],[.45,.057],[.8,.04],[1,.04]],colors.cloth,'shin'+s,'foot'+s);
-  ellipsoid(side*.12,.495,-.065,.057,.072,.025,colors.armor,'shin'+s);
-  panel(side*.202,.78,.006,.044,.146,.127,colors.cloth,'thigh'+s);
+  limb('thigh'+s,'shin'+s,[[0,.094],[.13,.103],[.4,.094],[.69,.078],[.79,.074],[.82,.077],[.86,.069],[1,.062]],trouser,'thigh'+s,'shin'+s);
+  limb('shin'+s,'foot'+s,[[0,.062],[.2,.071],[.45,.063],[.7,.049],[.76,.052],[.81,.045],[1,.042]],trouser,'shin'+s,'foot'+s);
+  panel(side*.12,.495,-.068,.105,.122,.037,colors.armor,'shin'+s);
+  panel(side*.12,.51,-.09,.074,.054,.009,seam,'shin'+s);
+  panel(side*.202,.78,.006,.044,.146,.127,trouser,'thigh'+s);
+  panel(side*.226,.824,.006,.012,.03,.117,seam,'thigh'+s);
   ellipsoid(side*.12,.145,.004,.05,.099,.059,colors.dark,'foot'+s);
   ellipsoid(side*.12,.055,-.065,.055,.054,.125,colors.dark,'foot'+s);
   ellipsoid(side*.12,.024,-.065,.059,.022,.13,colors.sole,'foot'+s);
@@ -115,16 +121,22 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const interval=distance>90?.1:distance>40?.05:0;if(h.clock<h.nextUpdate){h.skipped=(h.skipped||0)+dt;return;}dt=Math.min(.12,dt+(h.skipped||0));h.skipped=0;h.nextUpdate=h.clock+interval;
  const b=h.bones,alpha=1-Math.exp(-dt*12);for(const bone of Object.values(b)){bone.position.copy(bone.userData.rest);bone.quaternion.slerp(new T.Quaternion(),alpha);}
  const vx=p.vx||0,vz=p.vz||0,speed=Math.min(9,Math.hypot(vx,vz)),grounded=p.grounded!==false;
- h.speed+=(speed-h.speed)*(1-Math.exp(-dt*10));const cycleDistance=p.sprinting?2.0:1.7;h.phase+=speed*dt/cycleDistance*Math.PI*2;
+ h.speed+=(speed-h.speed)*(1-Math.exp(-dt*10));const cycleDistance=p.downed?.85:p.crouching?1.1:p.sprinting?2.0:1.7;h.phase+=speed*dt/cycleDistance*Math.PI*2;
  if(grounded&&!h.grounded)h.land=1;h.grounded=grounded;h.land=Math.max(0,h.land-dt*5);
  const airborne=['dive','glide','launch'].includes(p.flight),dead=p.health!==undefined&&p.health<=0;
  h.air+=(Number(airborne)-h.air)*(1-Math.exp(-dt*7));h.death+=(Number(dead)-h.death)*(1-Math.exp(-dt*6));
- const previousPose=h.pose;h.pose=dead?'elimination':p.flight==='dive'?'skydive':p.flight==='glide'?'glide':!grounded?(p.vy>0?'jump':'fall'):p.building?(p.editing?'edit':'build'):p.use?'use':p.swingAt&&time-p.swingAt<.55?'melee':p.reloadEnd>time?'reload':p.equipUntil>time?(p.equipHolster&&time-p.equipStarted<p.equipHolster?'holster':'draw'):p.aim?'aim':p.sprinting?'sprint':h.speed>5.5?'run':h.speed>.2?'locomotion':'idle';
+ const previousPose=h.pose;h.lowerState=dead?'elimination':p.downed?(speed>.1?'crawling':'downed'):p.reviving?'reviving':p.sliding?'sliding':p.crouching?(speed>.1?'crouch-moving':'crouch-idle'):!grounded?(p.vy>0?'jump':'fall'):p.sprinting?'sprint':speed>.1?'walking':'standing';
+ h.upperState=p.downed?(p.reviverId?'being-revived':'downed'):p.reviving?'reviving':p.reloadEnd>time?'reloading':p.shotRecoil>.02?'firing':p.building?(p.editing?'editing':'building'):p.aim?'ads':'ready';
+ h.pose=dead?'elimination':p.downed?(p.reviverId?'being-revived':speed>.1?'crawling':'downed'):p.reviving?'reviving':p.sliding?'sliding':p.crouching?(speed>.1?'crouch-moving':'crouch-idle'):p.flight==='dive'?'skydive':p.flight==='glide'?'glide':!grounded?(p.vy>0?'jump':'fall'):p.building?(p.editing?'edit':'build'):p.use?'use':p.swingAt&&time-p.swingAt<.55?'melee':p.reloadEnd>time?'reload':p.equipUntil>time?(p.equipHolster&&time-p.equipStarted<p.equipHolster?'holster':'draw'):p.aim?'aim':p.sprinting?'sprint':h.speed>5.5?'run':h.speed>.2?'locomotion':'idle';
  if(previousPose!==h.pose){h.fromPose=previousPose;h.transition=0;}h.transition=Math.min(1,(h.transition||0)+dt*7);
  const forward=-vx*Math.sin(p.yaw||0)-vz*Math.cos(p.yaw||0),side=vx*Math.cos(p.yaw||0)-vz*Math.sin(p.yaw||0),moving=Math.min(1,h.speed/2),step=cycleDistance*.54/2*moving;
- b.hips.position.y-=(.15+(p.sprinting?.03:0))*moving+h.land*.075+h.death*.58;b.hips.rotation.x=.06*moving+(p.sprinting?.08:0)+h.death*.85;
+ const blend=1-Math.exp(-dt*14);for(const [key,on]of [['crouch',p.crouching&&!p.sliding],['compact',p.lowCrouch],['slide',p.sliding],['down',p.downed],['revive',p.reviving]])h[key]=(h[key]||0)+(Number(!!on)-(h[key]||0))*blend;
+ const lower=Math.max(h.crouch*.53+h.compact*.29,h.slide*.87,h.down*.65,h.revive*.53);
+ b.hips.position.y-=lower+(.09+(p.sprinting?.025:0))*moving*(1-Math.max(h.slide,h.down,h.crouch))+h.land*.075+h.death*.58;
+ b.hips.rotation.x=-.06*moving-(p.sprinting?.08:0)-h.crouch*.12+h.slide*.27-h.down*1.14-h.revive*.12+h.death*.85;
  const turn=Math.atan2(Math.sin((p.yaw||0)-h.lastYaw),Math.cos((p.yaw||0)-h.lastYaw))/Math.max(.016,dt);h.lastYaw=p.yaw||0;b.spine.rotation.z=T.MathUtils.clamp(-side*.012-turn*.007,-.09,.09);b.hips.rotation.y=T.MathUtils.clamp(turn*.008,-.07,.07);b.chest.rotation.y=Math.sin(h.phase)*.018*moving;b.chest.rotation.x=Math.sin(time*1.8)*.008+(p.lastDamage&&time-p.lastDamage<.18?-.06:0);
- b.head.rotation.x=menu?Math.sin(time*.7)*.025:-(p.pitch||0)*.3;
+ b.head.rotation.x=(menu?Math.sin(time*.7)*.025:-(p.pitch||0)*.3)+h.down*1.04+h.revive*.14;
+ if(menu){b.head.rotation.y=p.scan||0;b.chest.rotation.y+=(p.scan||0)*.3;}
  const f=forward/(speed||1),s=side/(speed||1);
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R',phase=h.phase+(sideSign<0?Math.PI:0),cycle=((phase/(2*Math.PI))%1+1)%1;
   // Stance travels backward linearly at ground speed; swing lifts the foot.
@@ -132,6 +144,9 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   let foot=V(sideSign*.12+s*stride*step,.09+lift,-f*stride*step);
   if(!grounded&&!airborne)foot=V(sideSign*.14,.17+(sideSign>0?.10:0),.10);
   if(airborne)foot=V(sideSign*.24,p.flight==='glide'?.22:.2,p.flight==='glide'?.10:.28);
+  if(h.slide>.01)foot.lerp(V(sideSign*.17,.12,-.67),h.slide);
+  if(h.down>.01)foot.lerp(V(sideSign*.2,.12,.43+Math.sin(phase)*.10*moving),h.down);
+  if(h.revive>.01)foot.lerp(V(sideSign*.15,sideSign<0?.10:.13,sideSign<0?-.32:.25),h.revive);
   if(dead)foot=V(sideSign*.23,.12,-.12);
   solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,V(sideSign*.15,.5,-1));const footBone=b['foot'+S];footBone.quaternion.copy(footBone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(h.mesh.getWorldQuaternion(new T.Quaternion())));if(!stance)footBone.rotateX(-lift*1.5);
  }
@@ -139,10 +154,12 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  if(held&&arms){held.updateMatrixWorld(true);h.mesh.updateMatrixWorld(true);}
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R';let target;
   if(airborne)target=p.flight==='glide'?V(sideSign*.33,1.93,-.06):V(sideSign*.68,1.40,-.1);
-  else if(p.building)target=V(sideSign*.25,1.22+(sideSign>0?Math.sin(time*8)*.035:0),-.38);
-  else if(p.use)target=V(sideSign*.22,sideSign>0?1.53:1.2,-.3);
+  else if(p.building)target=V(sideSign*.25,1.22-lower+(sideSign>0?Math.sin(time*8)*.035:0),-.38);
+  else if(p.use)target=V(sideSign*.22,(sideSign>0?1.53:1.2)-lower,-.3);
   else if(held?.visible&&arms){const limb=arms.userData.limbs.find(l=>l.side===sideSign);target=limb.hand.getWorldPosition(V());target.applyMatrix4(h.mesh.matrixWorld.clone().invert());target.y+=.035;}
   else target=V(sideSign*.33,1.03,-Math.sin(h.phase+(sideSign<0?Math.PI:0))*.16*moving);
+  if(p.downed)target=V(sideSign*.29,.14+Math.max(0,Math.sin(h.phase+(sideSign<0?Math.PI:0)))*.045*moving,-.46-Math.sin(h.phase+(sideSign<0?Math.PI:0))*.13*moving);
+  if(p.reviving)target=V(sideSign*.18,.58+Math.sin(time*3+sideSign)*.025,-.49);
   if(dead)target=V(sideSign*.40,.6,-.10);
   h['handTarget'+S]??=target.clone();h['handTarget'+S].lerp(target,1-Math.exp(-dt*(h.transition<1?16:40)));
   solveChain(h,'arm'+S,'forearm'+S,'hand'+S,h['handTarget'+S],V(sideSign*.65,1.0,.25));
@@ -154,4 +171,4 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  if(model.userData.utility){h.mesh.updateMatrixWorld(true);const position=b.handR.getWorldPosition(V());model.worldToLocal(position);model.userData.utility.position.copy(position);model.userData.utility.rotation.set(p.use?-.35:0,0,0);}
  model.userData.animationState=h.pose;
 }
-export function humanoidDiagnostics(model){const h=model.userData.human;return h?{bones:h.mesh.skeleton.bones.length,vertices:h.mesh.geometry.attributes.position.count,triangles:h.mesh.geometry.index.count/3,state:h.pose,transition:h.transition}:null;}
+export function humanoidDiagnostics(model){const h=model.userData.human;return h?{bones:h.mesh.skeleton.bones.length,vertices:h.mesh.geometry.attributes.position.count,triangles:h.mesh.geometry.index.count/3,state:h.pose,transition:h.transition,lower:h.lowerState,upper:h.upperState}:null;}

@@ -8,7 +8,7 @@ try{
  const items=await page.evaluate(async()=>{
   const {View}=await import('/src/view.js'),{ROYALE_GUN_IDS,ITEMS,AMMO_CAPS}=await import('/src/royale-data.js');
   window.previewView=new View(document.createElement('canvas'),{quality:'low',fov:85});window.previewView.generatingPreviews=true;
-  return [...ROYALE_GUN_IDS.map(id=>({id,weapon:true})),...Object.keys(ITEMS).map(id=>({id,count:1})),...Object.keys(AMMO_CAPS).map(id=>({id,ammoType:id})),{id:'pickaxe',pickaxe:true}];
+  return [...Object.keys(ITEMS).map(id=>({id,count:1})),...Object.keys(AMMO_CAPS).map(id=>({id,ammoType:id})),{id:'pickaxe',pickaxe:true}];
  });
  await mkdir('public/inventory-previews',{recursive:true});
  for(const item of items){
@@ -17,3 +17,4 @@ try{
   console.log('Rendered',item.id);
  }
 }finally{await browser.close();await vite.close();}
+await import('./render-weapon-previews.mjs');

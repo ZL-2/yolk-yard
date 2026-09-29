@@ -1,6 +1,7 @@
 import {isWarmup} from './royale-phases.js';
 import {gun,weapon,mode,clamp} from './data.js';
 import {dist} from './physics.js';
+import {eyeHeight,bodyHeight} from './stance.js';
 import {BOT_SKILL,skillFor,wrapAngle} from './bot-config.js';
 import {newBrain,observe,selectThreat,seesPoint} from './bot-perception.js';
 import {selectWeapon,chooseObjective,coverPoint} from './bot-objectives.js';
@@ -71,7 +72,7 @@ export function botInput(sim,p){
   }
   const lead=w.hitscan?0:Math.min(1,distance/w.boltSpeed)*skill.lead,tx=target.x+(target.vx||0)*lead-p.x,tz=target.z+(target.vz||0)*lead-p.z;
   yaw=Math.atan2(-tx,-tz)+(brain.errorX||0)+Math.sin(now*1.7+(p.botSeed||0))*skill.error*.15;
-  pitch=Math.atan2(target.y+(brain.height??1.22)-p.y-1.70,Math.hypot(tx,tz))+(brain.errorY||0);
+  pitch=Math.atan2(target.y+(brain.height??1.22)*bodyHeight(target)/1.85-p.y-eyeHeight(p),Math.hypot(tx,tz))+(brain.errorY||0);
   fire=!(p.inventory&&slot===0)&&now>=brain.aimAt&&now<brain.burstUntil&&distance<(w.flightRange??w.range)*.95&&(!w.projectile||distance>7);
   if(task.kind==='rotate'&&task.urgent&&distance>12)fire=false;
   if(p.inventory&&now-(brain.attackedAt??-100)<1.5&&now>(brain.buildAt||0)&&r()<skill.build*.12){

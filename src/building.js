@@ -1,4 +1,5 @@
 import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates} from './physics.js';
+import {bodyHeight,eyeHeight,canFight} from './stance.js';
 import {groundAt} from './terrain.js';
 import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
 import {PIECES,pieceBoxes,validEdit,editRay,wallPattern} from './building-shapes.js';
@@ -36,7 +37,7 @@ export function validPlacement(p,map,builds,players=[]){
  if(builds.some(b=>b.type===p.type&&b.x===p.x&&Math.abs(b.y-p.y)<.2&&b.z===p.z&&(p.type!=='wall'||b.rotation%2===p.rotation%2)))return 'Already built';
  const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,4)].filter(o=>!o.buildId&&blocksBuilding(o));
  for(const b of bs){
-  if(players.some(o=>o.health>0&&!o.spectating&&!(['floor','stairs'].includes(p.type)&&o.grounded&&b.y>=o.y&&b.y-o.y<=.43)&&o.y<b.y+b.h-.05&&o.y+HEIGHT>b.y+.05&&Math.abs(o.x-b.x)<b.w/2+RADIUS+.02&&Math.abs(o.z-b.z)<b.d/2+RADIUS+.02))return 'Player in the way';
+  if(players.some(o=>o.health>0&&!o.spectating&&!(['floor','stairs'].includes(p.type)&&o.grounded&&b.y>=o.y&&b.y-o.y<=.43)&&o.y<b.y+b.h-.05&&o.y+bodyHeight(o)>b.y+.05&&Math.abs(o.x-b.x)<b.w/2+RADIUS+.02&&Math.abs(o.z-b.z)<b.d/2+RADIUS+.02))return 'Player in the way';
   if(near.some(o=>Math.abs(o.x-b.x)<(o.w+b.w)/2-.06&&Math.abs(o.z-b.z)<(o.d+b.d)/2-.06&&b.y<o.y+o.h-.06&&b.y+b.h>o.y+.06))return 'Blocked';
  }
  // Buried floor/roof surfaces are not usable. Walls and ramps can root in a slope.
@@ -49,7 +50,7 @@ const cellKey=p=>[p.x,p.y,p.z,p.rotation].join(',');
 // One deterministic solver for host and preview. Enumerate local grid attachments,
 // rank intent before validation, and never search behind a major solid wall.
 export function solvePlacement(p,type,rotation,material,map,builds=[],players=[],preferred=null){
- const base=placement(p,type,rotation,material),forward=direction(p.yaw,0),ray=direction(p.yaw,p.pitch),eye={x:p.x,y:p.y+EYE,z:p.z};
+ const base=placement(p,type,rotation,material),forward=direction(p.yaw,0),ray=direction(p.yaw,p.pitch),eye={x:p.x,y:p.y+eyeHeight(p),z:p.z};
  const hit=worldHit(map,eye,ray,9),aim=hit?.point||{x:p.x+ray.x*5,y:eye.y+ray.y*5,z:p.z+ray.z*5};
  const aimed=builds.find(b=>b.id===hit?.box?.buildId&&b.type===type);
  if(aimed&&!(type==='stairs'&&Math.abs(p.x-aimed.x)<2.6&&Math.abs(p.z-aimed.z)<2.6&&p.y>aimed.y+.7&&p.pitch>-.45)){
@@ -100,7 +101,7 @@ export function solvePlacement(p,type,rotation,material,map,builds=[],players=[]
  return {piece:best?.piece||ranked[0]?.piece||base,reason:best?'':firstReason||'Blocked'};
 }
 export function aimedObject(map,p,range=5){
- const hit=worldHit(map,{x:p.x,y:p.y+EYE,z:p.z},direction(p.yaw,p.pitch),range);
+ const hit=worldHit(map,{x:p.x,y:p.y+eyeHeight(p),z:p.z},direction(p.yaw,p.pitch),range);
  return hit?.box?hit:null;
 }
 export function rebuildMap(sim){
@@ -136,13 +137,15 @@ export function damageObject(sim,box,amount,harvester=null){
  sim.buildVersion++;
 }
 export function swingPickaxe(sim,p){
+ if(!canFight(p))return;
  if(sim.time<(p.nextHarvest||0))return;p.nextHarvest=sim.time+PICKAXE.interval;p.swingAt=sim.time;
  sim.emit('royale-cue',{cue:'pickaxe-swing',player:p.id,x:p.x,y:p.y,z:p.z});
- const hit=aimedObject(sim.map,p,4.5),o={...p,y:p.y+EYE},d=direction(p.yaw,p.pitch);let target=null,range=hit?.distance??4.5;
+ const hit=aimedObject(sim.map,p,4.5),o={...p,y:p.y+eyeHeight(p)},d=direction(p.yaw,p.pitch);let target=null,range=hit?.distance??4.5;
  for(const other of sim.players.values())if(other!==p&&other.health>0){const t=rayEgg(o,d,other);if(t<range){target=other;range=t;}}
  if(target)sim.damage(target,p,PICKAXE.player,'Pickaxe');else if(hit){const entry=sim.worldDamage[hit.box.objectId],weak=entry?.weakpoint,bonus=weak&&Math.hypot(hit.point.x-weak.x,hit.point.y-weak.y,hit.point.z-weak.z)<.4;damageObject(sim,hit.box,(hit.box.buildId?PICKAXE.structure:PICKAXE.environment)*(bonus?PICKAXE.weakMultiplier:1),p);const object=sim.worldDamage[hit.box.objectId];if(object&&!object.destroyed){const offset=Math.sin(sim.time*7)*.35;object.weakpoint={x:Math.max(hit.box.x-hit.box.w/2+.03,Math.min(hit.box.x+hit.box.w/2-.03,hit.point.x+(Math.abs(d.z)>.7?offset:0))),y:Math.max(hit.box.y+.3,Math.min(hit.box.y+hit.box.h-.2,hit.point.y+.25)),z:Math.max(hit.box.z-hit.box.d/2+.03,Math.min(hit.box.z+hit.box.d/2-.03,hit.point.z+(Math.abs(d.x)>.7?offset:0)))};}sim.emit('royale-cue',{cue:'harvest-hit',player:p.id,x:hit.point.x,y:hit.point.y,z:hit.point.z});}
 }
 export function buildingTick(sim,p,input){
+ if(!canFight(p)){p.building=false;p.editing=false;return false;}
  const wasBuilding=p.building;
  p.buildFacing=snappedFacing(p.yaw,wasBuilding?p.buildFacing:undefined);
  p.editing=!!input.editing;p.building=!!input.buildMode||p.editing;p.buildType=input.buildType||'wall';
@@ -165,12 +168,13 @@ export function buildingTick(sim,p,input){
  return false;
 }
 export function targetBuild(map,builds,p){
- const hit=aimedObject(map,p,EDIT_RANGE),o={x:p.x,y:p.y+EYE,z:p.z},d=direction(p.yaw,p.pitch);
+ const hit=aimedObject(map,p,EDIT_RANGE),o={x:p.x,y:p.y+eyeHeight(p),z:p.z},d=direction(p.yaw,p.pitch);
  let best=null,limit=hit?.distance??EDIT_RANGE;
  for(const b of builds){const grid=editRay(b,o,d,EDIT_RANGE);if(grid&&grid.distance<=limit+.2){best=b;limit=grid.distance;}}
  return best||builds.find(b=>b.id===hit?.box.buildId)||null;
 }
 export function editBuilding(sim,p,action){
+ if(!canFight(p))return false;
  let cmd,legacy=/^build-edit-(\d+)-(build-\d+)$/.exec(action);
  if(action.startsWith('build-change:')){try{cmd=JSON.parse(action.slice(13));}catch{return false;}}
  else if(legacy)cmd={id:legacy[2],mask:Number(legacy[1]),path:[]};
@@ -179,7 +183,7 @@ export function editBuilding(sim,p,action){
  const fail=reason=>{sim.emit('build-result',{player:p.id,buildId:cmd?.id,ok:false,reason});return false;};
  if(!b||!canEdit(b,p)||p.health<=0||p.flight!=='ground')return fail('You cannot edit this structure');
  // Retest line of sight against its original plane; holes remain targetable.
- const ray=editRay(b,{x:p.x,y:p.y+EYE,z:p.z},direction(p.yaw,p.pitch),EDIT_RANGE);
+ const ray=editRay(b,{x:p.x,y:p.y+eyeHeight(p),z:p.z},direction(p.yaw,p.pitch),EDIT_RANGE);
  const hit=aimedObject(sim.map,p,EDIT_RANGE);
  if(!ray&&hit?.box.buildId!==b.id)return fail('Aim at the structure');
  if(hit&&hit.box.buildId!==b.id&&hit.distance+.2<(ray?.distance??Infinity))return fail('Structure is obstructed');
@@ -194,17 +198,18 @@ export function editBuilding(sim,p,action){
   const proposal={...b,mask:cmd.mask,path:cmd.path||[],doorOpen:false};
   if(!validEdit(proposal))return fail('Invalid selection');
   if(JSON.stringify([b.mask,b.path||[]])===JSON.stringify([proposal.mask,proposal.path])){sim.emit('build-result',{player:p.id,buildId:b.id,ok:true});return true;}
-  const overlaps=(box,p)=>p.health>0&&p.y<box.y+box.h-.03&&p.y+HEIGHT>box.y+.03&&Math.abs(p.x-box.x)<box.w/2+RADIUS+.03&&Math.abs(p.z-box.z)<box.d/2+RADIUS+.03;
+  const overlaps=(box,p)=>p.health>0&&p.y<box.y+box.h-.03&&p.y+bodyHeight(p)>box.y+.03&&Math.abs(p.x-box.x)<box.w/2+RADIUS+.03&&Math.abs(p.z-box.z)<box.d/2+RADIUS+.03;
   if(pieceBoxes(proposal).some(box=>[...sim.players.values()].some(p=>overlaps(box,p))))return fail('Player in the way');
   b.mask=proposal.mask;b.path=proposal.path;b.doorOpen=false;b.revision=(b.revision||0)+1;
  }
  sim.buildVersion++;rebuildMap(sim);collapse(sim);sim.emit('build-result',{player:p.id,buildId:b.id,ok:true,changed:true});return true;
 }
 export function toggleDoor(sim,p){
+ if(!canFight(p))return false;
  const hit=aimedObject(sim.map,p,3),b=sim.builds.find(b=>b.id===hit?.box.buildId);
  if(!b||wallPattern(b.mask)?.door==null||sim.time<(p.nextDoor||0))return false;
  const proposal={...b,doorOpen:!b.doorOpen};
- for(const box of pieceBoxes(proposal).filter(b=>b.door))if([...sim.players.values()].some(o=>o.health>0&&o.y<box.y+box.h&&o.y+HEIGHT>box.y&&Math.abs(o.x-box.x)<box.w/2+RADIUS+.04&&Math.abs(o.z-box.z)<box.d/2+RADIUS+.04))return false;
+ for(const box of pieceBoxes(proposal).filter(b=>b.door))if([...sim.players.values()].some(o=>o.health>0&&o.y<box.y+box.h&&o.y+bodyHeight(o)>box.y&&Math.abs(o.x-box.x)<box.w/2+RADIUS+.04&&Math.abs(o.z-box.z)<box.d/2+RADIUS+.04))return false;
  b.doorOpen=proposal.doorOpen;b.revision=(b.revision||0)+1;p.nextDoor=sim.time+.25;sim.buildVersion++;rebuildMap(sim);return true;
 }
 export function constructionTick(sim){

@@ -1,3 +1,6 @@
+import {visibleMarkers} from './team-markers.js';
+import {REVIVE_RULES,reviveAccessible} from './team-survival.js';
+import {canFight} from './stance.js';
 import {inventoryActionForSlot} from './keybinds.js';
 import {teammates,isDuos} from './teams.js';
 import {getMap} from './maps.js';
@@ -12,7 +15,7 @@ export class RoyaleUI{
  constructor(preview){
   this.preview=preview;this.waypoint=null;this.lastKey='';
   document.querySelector('#hud').insertAdjacentHTML('beforeend',`<div id="royale-hud" hidden>
-   <div class="royale-compass" id="royale-compass"></div>
+   <div id="duo-markers" aria-live="polite"></div><div id="downed-status" role="status" hidden></div><div class="royale-compass" id="royale-compass"></div>
    <div class="royale-map-stack"><button class="royale-minimap" data-action="royale-map" aria-label="Open island map"><canvas id="royale-mini" width="260" height="260"></canvas><span id="royale-phase">STORM 1</span></button><div class="royale-map-stats" aria-label="Battle Royale standings"><span><b id="royale-alive">32</b> ALIVE</span><span><b id="royale-elims">0</b> ELIMS</span></div></div>
    <div class="royale-storm-warning" id="royale-storm-warning" role="status"></div>
    <div class="royale-flight" id="royale-flight"><button class="flight-close" data-action="royale-close-flight" id="royale-flight-close" aria-label="Close flight tips">L Close</button><span class="eyebrow">KESTREL AIRLINES</span><strong id="royale-flight-title"></strong><p id="royale-flight-help"></p><button data-action="royale-jump" class="primary" id="royale-flight-button">JUMP</button></div>
@@ -21,7 +24,7 @@ export class RoyaleUI{
    <div class="royale-hotbar" id="royale-hotbar" role="group" aria-label="Inventory slots"></div>
    <div class="royale-tools"><button data-action="royale-inventory">Inventory</button><button data-action="royale-map">Map</button><button data-action="royale-drop">Drop</button></div>
    <div class="royale-use" id="royale-use"><span id="royale-use-label"></span><div><i id="royale-use-fill"></i></div></div>
-   <div class="royale-mobile"><button data-touch="sprint" aria-label="Hold to sprint">SPRINT</button><button data-touch="interact" aria-label="Hold to search or pick up">USE / TAKE</button></div>
+   <div class="royale-mobile"><button data-action="duo-marker">MARK</button><button data-action="duo-danger">DANGER</button><button data-touch="sprint" aria-label="Hold to sprint">SPRINT</button><button data-touch="interact" aria-label="Hold to search or pick up">USE / TAKE</button></div>
   </div>`);
   this.root=document.querySelector('#royale-hud');
   this.root.insertAdjacentHTML('beforeend','<div class="duo-hud" id="duo-hud" hidden></div>');
@@ -74,6 +77,7 @@ export class RoyaleUI{
   if(full){for(const landmark of map.landmarks){const [x,z]=point(landmark.x,landmark.z);c.strokeStyle='#fff2b7';c.lineWidth=1.5;c.strokeRect(x-3,z-3,6,6);c.font='600 9px system-ui';c.textAlign='center';c.fillStyle='#ffefc2';c.fillText(landmark.name,x,z+12);}
    c.font='800 13px system-ui';c.textAlign='center';c.strokeStyle='#23453b';c.lineWidth=3;c.fillStyle='#fff9e5';for(const poi of map.districts){const [x,z]=point(poi.x,poi.z);c.strokeText(poi.name.toUpperCase(),x,z-35*s);c.fillText(poi.name.toUpperCase(),x,z-35*s);}}
   for(const chest of r.chests||[])if(chest.supply&&!chest.opened){const [x,z]=point(chest.x,chest.z);c.fillStyle='#ffd377';c.beginPath();c.moveTo(x,z-5);c.lineTo(x+5,z);c.lineTo(x,z+5);c.lineTo(x-5,z);c.closePath();c.fill();}
+  for(const marker of visibleMarkers(state,p)){const [x,z]=point(marker.x,marker.z);c.fillStyle=marker.kind==='danger'?'#ff795f':'#64e3d0';c.strokeStyle='#102e36';c.lineWidth=2;c.beginPath();c.moveTo(x,z-7);c.lineTo(x+6,z);c.lineTo(x,z+7);c.lineTo(x-6,z);c.closePath();c.fill();c.stroke();if(marker.kind==='danger'){c.fillStyle='#102e36';c.font='bold 10px system-ui';c.fillText('!',x,z+3);}}
   if(this.waypoint){const[x,z]=point(this.waypoint.x,this.waypoint.z);c.fillStyle='#ffdd77';c.strokeStyle='#493e23';c.lineWidth=2;c.beginPath();c.arc(x,z,full?7:5,0,Math.PI*2);c.fill();c.stroke();}
   for(const mate of state.players.filter(o=>teammates(state.options,p,o)&&o.contestant&&o.health>0)){const [x,z]=point(mate.x,mate.z);c.fillStyle='#74ffdb';c.strokeStyle='#124641';c.lineWidth=2;c.beginPath();c.arc(x,z,full?7:5,0,Math.PI*2);c.fill();c.stroke();if(full){c.font='bold 12px system-ui';c.fillText(mate.name,x,z-12);}}
   if(p){const[x,z]=point(p.x,p.z);c.save();c.translate(x,z);c.rotate(-p.yaw);c.fillStyle='#fff';c.strokeStyle='#244c5c';c.lineWidth=2;c.beginPath();c.moveTo(0,-8);c.lineTo(5,6);c.lineTo(0,3);c.lineTo(-5,6);c.closePath();c.fill();c.stroke();c.restore();}
@@ -83,8 +87,12 @@ export class RoyaleUI{
   const active=!!state?.royale;this.root.hidden=!active;document.body.classList.toggle('in-royale',active);document.body.classList.toggle('in-duos',active&&isDuos(state.options));document.body.classList.toggle('in-spawn-island',!!state?.royale?.practice);
   if(!active||!local)return;
   const $=id=>document.getElementById(id),r=state.royale,p=watched||local;
+  this.waypoint=visibleMarkers(state,local).find(m=>m.player===local.id)||null;
+  const markerHTML=visibleMarkers(state,local).map(m=>{const pos=this.project?.(m);if(!pos)return '';return `<div class="duo-world-marker ${m.kind}" style="left:${pos.x}%;top:${pos.y}%"><b>${pos.offscreen?'➤':m.kind==='danger'?'!':'◆'}</b><span>${escape(m.kind==='danger'?'DANGER':m.label||'MARKER')} · ${Math.round(dist(local,m))} m</span><small>${escape(m.name)}</small></div>`;}).join('');$('duo-markers').innerHTML=markerHTML;
+  this.root.classList.toggle('downed',!!local.downed);document.body.classList.toggle('is-downed',!!local.downed);
+  $('downed-status').hidden=!local.downed;$('downed-status').textContent=local.downed?`${local.reviverId?'TEAMMATE REVIVING':'DOWNED · CRAWL TO COVER'} · ${Math.ceil(local.health)} VITALITY`:'';
   const mate=state.players.find(o=>teammates(state.options,local,o)&&o.contestant),duo=$('duo-hud');duo.hidden=!isDuos(state.options);
-  if(!duo.hidden){const markup=mate?`<small>YOUR DUO · ${mate.health>0?Math.round(Math.hypot(mate.x-local.x,mate.z-local.z))+' m':'ELIMINATED'}</small><strong>◆ ${escape(mate.name)}</strong><progress class="shield" value="${mate.shield||0}" max="100" aria-label="Teammate shield"></progress><progress value="${Math.max(0,mate.health)}" max="100" aria-label="Teammate health"></progress><small>${Math.ceil(Math.max(0,mate.health))} HEALTH · ${Math.ceil(mate.shield||0)} SHIELD</small>`:'<small>DUOS · NO TEAMMATE</small>';if(duo.innerHTML!==markup)duo.innerHTML=markup;}
+  if(!duo.hidden){const markup=mate?`<small>YOUR DUO · ${mate.downed?'DOWNED · REVIVE NEEDED':mate.health>0?Math.round(Math.hypot(mate.x-local.x,mate.z-local.z))+' m':'ELIMINATED'}</small><strong>◆ ${escape(mate.name)}</strong><progress class="shield" value="${mate.shield||0}" max="100" aria-label="Teammate shield"></progress><progress value="${Math.max(0,mate.health)}" max="100" aria-label="Teammate health"></progress><small>${Math.ceil(Math.max(0,mate.health))} ${mate.downed?'VITALITY':'HEALTH'} · ${Math.ceil(mate.shield||0)} SHIELD</small>`:'<small>DUOS · NO TEAMMATE</small>';if(duo.innerHTML!==markup)duo.innerHTML=markup;}
   const matchKey=r.matchId+':'+state.round;if(this.flightMatch!==matchKey){this.flightMatch=matchKey;this.flightDismissed=false;}
   $('royale-flight-close').textContent=label('dismissFlight')+' Close';
   const closest=getMap(state.options.map).districts.reduce((a,b)=>Math.hypot(b.x-p.x,b.z-p.z)<Math.hypot(a.x-p.x,a.z-p.z)?b:a);
@@ -101,7 +109,7 @@ export class RoyaleUI{
   $('royale-flight-close').hidden=warmup;
   const flight=['transport','dive','glide','launch'].includes(local.flight)&&local.health>0;
   $('royale-flight').hidden=(!flight&&!warmup)||(!warmup&&!!this.flightDismissed);$('royale-flight').classList.toggle('airborne',local.flight!=='transport');
-  $('royale-flight-title').textContent=local.flight==='transport'?`${r.elapsed<3?'Doors open in '+Math.ceil(3-r.elapsed):'Choose your landing spot'}${r.elapsed>=3?' · '+Math.ceil(r.route.duration-r.elapsed)+'s':''}`:local.flight==='dive'?'Freefall':'Shell glider deployed';
+  $('royale-flight-title').textContent=local.flight==='transport'?`${r.elapsed<3?'Doors open in '+Math.ceil(3-r.elapsed):'Choose your landing spot'}${r.elapsed>=3?' · '+Math.ceil(r.route.duration-r.elapsed)+'s':''}`:local.flight==='dive'?'Freefall':'Glider deployed';
   $('royale-flight-help').textContent=local.flight==='transport'?'Open the map to mark a district. Leave the Kestrel when you are ready.':local.flight==='dive'?`${label('forward')} to steer · ${label('jump')} to deploy glider`:`${label('jump')} to dive again at altitude. Your glider opens automatically near the ground.`;
   $('royale-flight-button').hidden=['glide','launch'].includes(local.flight);$('royale-flight-button').disabled=local.flight==='transport'&&r.elapsed<3;$('royale-flight-button').textContent=local.flight==='transport'?`JUMP · ${label('jump')}`:`DEPLOY GLIDER · ${label('jump')}`;
   if(warmup){$('royale-flight-title').textContent=`RELAY CAY · ${r.contestants}/${state.options.capacity} contestants`;$('royale-flight-help').textContent=`${state.options.session==='offline'?'Offline · ':''}Kestrel departs in ${Math.max(0,Math.ceil(r.queueEnds-state.time))}s · ${r.humanContestants??state.players.filter(p=>!p.bot&&p.contestant&&!p.spectating).length} real players · ${r.botContestants??state.players.filter(p=>p.bot&&p.contestant).length} bots · Practice equipment resets at departure`;$('royale-flight-button').hidden=true;}
@@ -111,12 +119,15 @@ export class RoyaleUI{
   const use=p.use;$('royale-use').hidden=!use&&!p.chestProgress;
   $('royale-use-label').textContent=use?`Using ${ITEMS[use.id].name} · ${Math.max(0,use.end-state.time).toFixed(1)}s`:'Searching chest…';
   $('royale-use-fill').style.width=(use?Math.min(1,(state.time-use.start)/(use.end-use.start)):Math.min(1,p.chestProgress/.8))*100+'%';
-  let prompt='';if(local.health>0&&local.flight==='ground'&&!paused){
+  const rescue=local.reviving?state.players.find(o=>o.id===local.reviving):local.downed&&local.reviverId?local:null;
+  if(rescue){$('royale-use').hidden=false;$('royale-use-label').textContent=`${local.downed?'Being revived':'Reviving '+rescue.name} · ${Math.max(0,REVIVE_RULES.seconds-rescue.reviveProgress).toFixed(1)}s`;$('royale-use-fill').style.width=(rescue.reviveProgress/REVIVE_RULES.seconds*100)+'%';}
+  let prompt='';if(canFight(local)&&local.flight==='ground'&&!paused){
    const accessible=item=>{if(dist(local,item)>3.2||item.landAt>state.time)return false;const from={x:local.x,y:local.y+.9,z:local.z},dx=item.x-from.x,dy=item.y+.6-from.y,dz=item.z-from.z,len=Math.hypot(dx,dy,dz)||1;return wallDistance(getMap(state.options.map),from,{x:dx/len,y:dy/len,z:dz/len},len)>=len-.15;};
    const chest=r.chests.find(c=>!c.opened&&accessible(c));const item=r.loot.filter(i=>!i.ammoType&&accessible(i)).sort((a,b)=>dist(local,a)-dist(local,b))[0];
    if(chest)prompt=`<kbd>${escape(label('interact'))}</kbd> HOLD TO SEARCH ${chest.supply?'SUPPLY DROP':'CHEST'}`;
    else if(item){const info=itemInfo(item);prompt=`<kbd>${escape(label('interact'))}</kbd> ${escape(info.name)} <span style="color:${info.color}">${item.weapon?RARITIES[item.rarity||0].name: '×'+item.count}</span><small>${local.inventory.every(Boolean)?'Replaces selected slot':'Pick up'}</small>`;}
   }
+  if(mate?.downed&&local.health>0&&!local.downed&&reviveAccessible(getMap(state.options.map),local,mate))prompt=`<kbd>${escape(label('interact'))}</kbd> HOLD TO REVIVE ${escape(mate.name)}<small>Stay close · Taking damage interrupts</small>`;
   $('royale-prompt').innerHTML=prompt;$('royale-prompt').hidden=!prompt;
  }
 }

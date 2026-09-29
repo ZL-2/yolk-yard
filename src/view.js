@@ -2,13 +2,14 @@ import {makeHumanoid,animateHumanoid,humanoidDiagnostics} from './humanoid.js';
 import {lobbyScene} from './lobby-scene.js';
 import {lootModel,gliderModel} from './royale-art.js';
 import {inventoryPreview} from './inventory-previews.js';
-import {adsFov} from './weapon-presentation.js';
+import {adsFov,viewmodelProfile} from './weapon-presentation.js';
 import {animatePickaxe} from './pickaxe-animation.js';
 import {buildIsland,RoyaleView} from './royale-view.js';
 import {shopItem} from './shop-catalog.js';
 import {makeShopBack,makeShopPickaxe,makeShopGlider,makeShopTrail} from './shop-models.js';
 import {stairCamera} from './stair-camera.js';
-import {MenuPose} from './menu-pose.js';
+import {LobbyMotion} from './lobby-motion.js';
+import {eyeHeight,bodyHeight,canFight} from './stance.js';
 import * as THREE from "three";
 import {equipPose} from "./equip.js";
 import { makeArms, updateArms, reloadProgress, utilityArms, throwArms, armAppearance } from "./arms.js";
@@ -79,7 +80,7 @@ function cylinder(parent, x, y, z, radius, height, color, segments = 16) {
 // Compatibility export; all callers now construct the shared human rig.
 export function makeEgg(profile, team = -1, withWeapon = true) {
   const group=makeHumanoid({...profile,teamColor:team>=0?(team===0?'#3d8ce8':'#d94949'):null});
-  if(shopItem(profile.backbling)){const back=makeShopBack(profile.backbling);back.position.set(0,1.23,.18);group.add(back);group.userData.back=back;}
+  if(shopItem(profile.backbling)){const back=makeShopBack(profile.backbling);back.position.set(0,-.09,.18);group.userData.human.bones.chest.add(back);group.userData.back=back;}
   if(withWeapon){
     const held=new THREE.Group(),blaster=makeBlaster(profile.weapon,profile.wrap),arms=makeArms(profile.weapon,profile,false);
     held.position.set(VIEWMODEL.x,EYE+VIEWMODEL.y,VIEWMODEL.z);held.scale.setScalar(VIEWMODEL.scale);
@@ -175,7 +176,7 @@ export class View {
     this.localThrowStart = -Infinity;
     this.mapId = null;
     this.menuEgg = null;
-    this.menuPose = new MenuPose();
+    this.lobbyMotion = new LobbyMotion();
     this.localWeapon = null;
     this.gunGroup = new THREE.Group();
     this.gunGroup.scale.setScalar(VIEWMODEL.scale);
@@ -217,9 +218,13 @@ export class View {
     r.fillStyle = "rgba(28,54,61,.7)";
     r.font = "bold 13px monospace";
     r.textAlign = "center";
-    r.fillText("Y / OPTICS", 256, 424);
+    r.fillText("RF / OPTICS", 256, 424);
     this.reticleTexture = new THREE.CanvasTexture(reticle);
-    this.camera.add(this.gunGroup);
+    this.viewmodelScene=new THREE.Scene();
+    this.viewmodelCamera=new THREE.PerspectiveCamera(70,1,.008,20);
+    this.viewmodelCamera.add(this.gunGroup);this.viewmodelScene.add(this.viewmodelCamera);
+    this.viewmodelScene.add(new THREE.HemisphereLight(0xf0f8fc,0x52606a,2.1));
+    const vmKey=new THREE.DirectionalLight(0xffedcf,2.4);vmKey.position.set(-2,4,3);this.viewmodelCamera.add(vmKey);
     this.resize();
     window.addEventListener("resize", () => this.resize());
     this.royaleView = new RoyaleView(this, {block,ball,cylinder,mat,palette});
@@ -239,6 +244,7 @@ export class View {
     this.renderer.setSize(innerWidth, innerHeight, false);
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
+    if(this.viewmodelCamera){this.viewmodelCamera.aspect=this.camera.aspect;this.viewmodelCamera.updateProjectionMatrix();}
   }
   setQuality() {
     this.renderer.shadowMap.enabled = this.settings.quality !== "low";
@@ -346,16 +352,15 @@ export class View {
     this.scene.add(this.menuEgg);
     if(!this.lobbyStage){this.lobbyStage=lobbyScene();this.scene.add(this.lobbyStage);}
   }
-  aimMenu(clientX,clientY){
-    const r=this.canvas.getBoundingClientRect();
-    const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((clientX-r.left)/r.width*2-1,1-(clientY-r.top)/r.height*2),this.camera);
-    const origin=new THREE.Vector3(0,2.8,0),normal=this.camera.getWorldDirection(new THREE.Vector3());
-    const point=ray.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(normal,origin.clone().lerp(this.camera.position,.5)),new THREE.Vector3());
-    if(point){point.sub(origin);this.menuPose.aim(Math.atan2(-point.x,-point.z),Math.atan2(point.y,Math.hypot(point.x,point.z)));}
+  projectMarker(point){
+    const v=new THREE.Vector3(point.x,point.y+.7,point.z),local=this.camera.worldToLocal(v.clone()),behind=local.z>0;
+    v.project(this.camera);if(behind){v.x=-v.x;v.y=-v.y;}
+    return {x:THREE.MathUtils.clamp((v.x+1)*50,7,93),y:THREE.MathUtils.clamp((1-v.y)*50,16,78),offscreen:behind||Math.abs(v.x)>1||Math.abs(v.y)>1};
   }
   diagnostics() {
     return {
-      menuPose: this.menuPose,
+      lobbyMotion: this.lobbyMotion,
+      viewmodel:{fov:this.viewmodelCamera.fov,near:this.viewmodelCamera.near,position:this.gunGroup.position.toArray(),scale:this.gunGroup.scale.x},
       humanoid: humanoidDiagnostics(this.menuEgg),
       humans: [...this.models.values()].map(humanoidDiagnostics),
       weapon: this.localWeapon,
@@ -472,7 +477,7 @@ export class View {
       const old=new THREE.Group();old.scale.copy(this.gunGroup.scale);
       old.position.copy(this.gunGroup.position);old.rotation.copy(this.gunGroup.rotation);
       while(this.gunGroup.children.length)old.add(this.gunGroup.children[0]);
-      this.camera.add(old);
+      this.viewmodelCamera.add(old);
       this.outgoing={group:old,position:old.position.clone(),rotation:old.rotation.clone()};
     }
     this.armStyle = appearance;
@@ -543,13 +548,13 @@ export class View {
         const m = new THREE.Mesh(
           sphereGeo,
           new THREE.MeshBasicMaterial({
-            color: i % 2 ? 0xffe5a5 : weapon(e.weapon).color,
+            color:e.tag?0xb9b7ad:e.surface==='metal'?(i%2?0xf5d59c:0x9ea7aa):e.surface==='wood'?0xa58b67:0xb2ada1,
             transparent: true,
           }),
         );
         m.position.set(e.x, e.y, e.z);
         m.position.addScaledVector(n, 0.025);
-        m.scale.setScalar(0.025 + Math.random() * 0.035);
+        m.scale.setScalar((e.surface==='metal'?.009:.017) + Math.random() * .017);
         this.effects.add(m);
         this.fx.push({
           mesh: m,
@@ -570,7 +575,7 @@ export class View {
       }
       if (!e.tag) {
         const mark = new THREE.Mesh(
-          new THREE.CircleGeometry(0.085, 10),
+          new THREE.CircleGeometry(0.027, 10),
           new THREE.MeshBasicMaterial({
             color: 0x445258,
             transparent: true,
@@ -627,7 +632,7 @@ export class View {
         new THREE.Vector3(e.origin?.x || 0, e.origin?.y || 0, e.origin?.z || 0);
       if (local) this.lastMuzzleFlash = pos.clone();
       if(!e.echoed){const flash = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(0.085, 0),
+        new THREE.IcosahedronGeometry(0.045, 0),
         new THREE.MeshBasicMaterial({
           color: 0xffe3a0,
           transparent: true,
@@ -639,7 +644,7 @@ export class View {
       flash.scale.set(1, 1, 2.2);
       if (model)
         flash.quaternion.copy(model.getWorldQuaternion(new THREE.Quaternion()));
-      this.effects.add(flash);
+      if(local&&model?.userData.muzzle){model.userData.muzzle.add(flash);flash.position.set(0,0,0);flash.quaternion.identity();flash.scale.multiplyScalar(1/(this.gunGroup.scale.x||.5));}else this.effects.add(flash);
       this.fx.push({
         mesh: flash,
         fresh: true,
@@ -648,47 +653,15 @@ export class View {
         ownedMaterial: true,
         ownedGeometry: true,
       });}
-      for (const shot of e.shots || []) {
-        this.shotOffsets.set(shot.id, {
-          delta: pos
-            .clone()
-            .sub(new THREE.Vector3(e.origin.x, e.origin.y, e.origin.z)),
-          born: this.clock,
-        });
-        // A short traveling segment starts at the visible muzzle, never at the camera.
-        const direction = new THREE.Vector3(
-          shot.vx,
-          shot.vy,
-          shot.vz,
-        ).normalize();
-        const end=shot.end?new THREE.Vector3(shot.end.x,shot.end.y,shot.end.z):null;
-        const length=end?Math.min(80,end.distanceTo(pos)):.65;
-        if(end)direction.copy(end).sub(pos).normalize();
-        const trace = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.012, 0.02, length, 5),
-          new THREE.MeshBasicMaterial({
-            color: weapon(e.weapon).color,
-            transparent: true,
-            depthWrite: false,
-            toneMapped: false,
-          }),
-        );
-        trace.position.copy(pos);if(end)trace.position.addScaledVector(end.clone().sub(pos).normalize(),length/2);
-        trace.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          direction,
-        );
-        this.effects.add(trace);
-        this.fx.push({
-          mesh: trace,
-          fresh: true,
-          life: 0.04,
-          max: 0.04,
-          v: end?new THREE.Vector3():new THREE.Vector3(shot.vx, shot.vy, shot.vz),
-          noGravity: true,
-          ownedMaterial: true,
-          ownedGeometry: true,
-        });
+      const w=weapon(e.weapon);
+      for (const [index,shot] of (e.shots||[]).entries()) {
+        if(!shot.end||w.pellets>1&&index%4!==0)continue;
+        const origin=new THREE.Vector3(e.origin.x,e.origin.y,e.origin.z),end=new THREE.Vector3(shot.end.x,shot.end.y,shot.end.z),length=origin.distanceTo(end);
+        if(length<.4)continue;
+        const dir=end.clone().sub(origin).normalize(),trace=new THREE.Mesh(new THREE.CylinderGeometry(.004,.006,1,5),new THREE.MeshBasicMaterial({color:w.id==='comet'?0xb7e4df:0xe5e0cd,transparent:true,opacity:.52,depthWrite:false,toneMapped:false}));
+        trace.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);trace.position.copy(origin);trace.scale.y=Math.min(.8,length);this.effects.add(trace);
+        const duration=Math.max(.035,Math.min(.14,length/900));
+        this.fx.push({mesh:trace,fresh:true,life:duration,max:duration,trace:true,origin,end,dir,length,ownedMaterial:true,ownedGeometry:true});
       }
     }
     this.pendingShots.length = 0;
@@ -704,18 +677,17 @@ export class View {
     for(const egg of this.partyEggs||[])egg.visible=!playing;
     this.actors.visible = playing;
     this.effects.visible = playing;
-    this.gunGroup.visible = playing && local?.health > 0 && (!local.inventory || local.flight==='ground');
+    this.gunGroup.visible = playing && canFight(local) && (!local.inventory || local.flight==='ground');
     if (!playing) {
       this.clearOutgoing(this);
       this.preview(profile);
-      const pose=this.menuPose.update(dt),held=this.menuEgg.userData.held;
+      const pose=this.lobbyMotion.update(dt),held=this.menuEgg.userData.held;
       this.menuEgg.rotation.y=pose.yaw;
-      held.position.set(pose.x,pose.y,pose.z);held.rotation.set(pose.pitch,0,pose.roll,'YXZ');held.updateMatrix();
-      held.position.set(.10,1.39,-.22);held.rotation.set(-.12+Math.sin(this.clock*.65)*.035,0,-.06,'YXZ');
+      held.position.set(.10+pose.grip*.3,1.36+Math.sin(this.clock*3.5)*.006+pose.grip,-.22);held.rotation.set(pose.pitch,pose.scan*.12,pose.roll+pose.grip,'YXZ');
       const blaster=this.menuEgg.userData.blaster;
-      updateArms(this.menuEgg.userData.arms,pose.clip==='reload'?pose.reload:-1,blaster);
-      animateHumanoid(this.menuEgg,{health:100,grounded:true,yaw:pose.yaw},dt,this.clock,{menu:true});
-      for(const teammate of this.partyEggs||[])animateHumanoid(teammate,{health:100,grounded:true},dt,this.clock+1.2,{menu:true});
+      updateArms(this.menuEgg.userData.arms,-1,blaster);
+      animateHumanoid(this.menuEgg,{health:100,grounded:true,yaw:pose.yaw,scan:pose.scan,pitch:pose.pitch,vx:-Math.sin(pose.yaw)*pose.speed,vz:-Math.cos(pose.yaw)*pose.speed},dt,this.clock,{menu:true});
+      for(const teammate of this.partyEggs||[])animateHumanoid(teammate,{health:100,grounded:true,yaw:teammate.rotation.y,vx:-Math.sin(teammate.rotation.y)*.92,vz:-Math.cos(teammate.rotation.y)*.92,scan:-pose.scan*.7},dt,this.clock+1.2,{menu:true});
       const partyOffset=this.partyEggs?.length?1:0,narrow=this.camera.aspect<.85;
       this.camera.position.set(5.8+partyOffset,4.3,narrow?(partyOffset?22.5:19):12.5);
       this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):1.8, 0);
@@ -725,18 +697,19 @@ export class View {
       const killer = local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && p.health > 0);
       const p = killer || (local.health <= 0 ? local : predicted || local);
       this.stairEye=stairCamera(this.stairEye,p,dt,`${state.round}:${p.id}:${local.health>0}`);
+      const desiredEye=eyeHeight(p);this.stanceEye=this.stanceEye===undefined?desiredEye:THREE.MathUtils.lerp(this.stanceEye,desiredEye,1-Math.exp(-dt*17));
       this.camera.position.set(
         p.x,
-        this.stairEye.y + EYE + (local.health <= 0 ? 0.8 : 0),
+        this.stairEye.y + this.stanceEye + (local.health <= 0 ? 0.8 : 0),
         p.z,
       );
       this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
-      if (killer) {
+      if (killer || local.downed) {
         const back = new THREE.Vector3(Math.sin(p.yaw), 0.35, Math.cos(p.yaw)).normalize();
-        const origin = {x:p.x, y:p.y+1.6, z:p.z};
+        const origin = {x:p.x, y:p.y+(p.downed?.8:1.6), z:p.z};
         const distance = Math.max(0.1, wallDistance(getMap(state.options.map), origin, back, 3.5)-0.2);
         this.camera.position.set(origin.x+back.x*distance, origin.y+back.y*distance, origin.z+back.z*distance);
-        this.camera.lookAt(p.x, p.y+1.05, p.z);
+        this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
       }
       const draw=equipPose(local,state.time);
       this.drawPresentation=draw;
@@ -745,7 +718,7 @@ export class View {
       this.gunGroup.visible=this.gunGroup.visible&&draw.visible;
       const w = gun(local),
         scoped = w.optic === "scope" || w.optic === "prism";
-      const aiming = !!(aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
+      const aiming = !!(canFight(local) && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
       if(!Number.isFinite(this.aimBlend))this.aimBlend=0;
       this.aimBlend += (Number(aiming) - this.aimBlend) * Math.min(1, dt * (w.ads?.transition||14));
       const fov=aiming?adsFov(w,this.settings.fov):this.settings.fov;
@@ -760,23 +733,25 @@ export class View {
       const hands = updateArms(this.localArms, draw.active?-1:reload, this.localModel, this.recoil,draw.progress);
       const throwT=(this.clock-this.localThrowStart)/.78;
       if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1)throwArms(this.localArms,throwT);
+      const vm=viewmodelProfile(w.id,this.camera.aspect);this.gunGroup.scale.setScalar(vm.scale);
+      this.viewmodelCamera.fov=vm.fov;this.viewmodelCamera.updateProjectionMatrix();
       const front = -VIEWMODEL.z + w.muzzle * VIEWMODEL.scale;
       const wall = wallDistance(
         getMap(state.options.map),
-        { x: p.x, y: p.y + EYE, z: p.z },
+        { x: p.x, y: p.y + eyeHeight(p), z: p.z },
         direction(p.yaw, p.pitch),
         front,
       );
       this.gunGroup.position.set(
-        VIEWMODEL.x * (1 - this.aimBlend) + draw.position[0],
+        vm.x * (1 - this.aimBlend) + draw.position[0],
         THREE.MathUtils.lerp(
-          VIEWMODEL.y,
-          -w.sightY * VIEWMODEL.scale,
+          vm.y,
+          -w.sightY * vm.scale,
           this.aimBlend,
         ) +
           bob -
           hands.dip + draw.position[1],
-        VIEWMODEL.z + this.recoil * 0.035 + Math.max(0, front - wall) * 0.65 + draw.position[2],
+        vm.z + this.recoil * 0.025 + draw.position[2],
       );
       this.gunGroup.rotation.set(
         this.recoil * 0.045 * (1 - this.aimBlend * 0.65) + hands.rotation[0] + draw.rotation[0],
@@ -817,7 +792,7 @@ export class View {
         // Transport passengers share one simulation position; the airship
         // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;
-        if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.75)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
+        if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.75)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && !p.downed && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
         seen.add(p.id);
         const sig =
           p.color +
@@ -843,7 +818,7 @@ export class View {
               ? "#b3f2ff"
               : "#ffffff",
           );
-          name.position.y = 2.15;
+          name.position.y = 2.15;model.userData.nameplate=name;
           name.visible = !state.royale||teammates(state.options,p,local);
           model.add(name);
           this.actors.add(model);
@@ -877,9 +852,9 @@ export class View {
           if(harvesting&&model.userData.shopTool)animatePickaxe(model.userData.shopTool,model.userData.arms,p.pickaxe,state.time-(p.swingAt??-100));
           const throwT=(this.clock-(model.userData.throwStart??-Infinity))/.78;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1)throwArms(model.userData.arms,throwT);
-          model.userData.held.visible=draw.visible&&p.health>0;
+          model.userData.held.visible=draw.visible&&canFight(p);
           model.userData.held.rotation.set(p.pitch + hands.rotation[0] + recoil * .045 + draw.rotation[0], hands.rotation[1]+draw.rotation[1], hands.rotation[2]+draw.rotation[2]);
-          model.userData.held.position.set(VIEWMODEL.x+draw.position[0],EYE+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
+          model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1){
             const gesture=Math.sin(Math.PI*throwT);
             model.userData.held.position.y-=.16*gesture;
@@ -902,7 +877,8 @@ export class View {
         aura.material.color.setHex(p.damageUntil>state.time?0xff625f:0x83e6ff);
         aura.material.opacity=.13+Math.sin(this.clock*5)*.025;
         if(p.inventory)this.royaleView.animateActor(model,p,this.clock,dt);
-        animateHumanoid(model,p,dt,state.time,{distance:this.camera.position.distanceTo(model.position)});
+        if(model.userData.nameplate)model.userData.nameplate.position.y=bodyHeight(p)+.3;
+        animateHumanoid(model,{...p,shotRecoil:model.userData.armRecoil||0},dt,state.time,{distance:this.camera.position.distanceTo(model.position)});
 
       }
       for (const [id, model] of this.models)
@@ -911,6 +887,7 @@ export class View {
           this.actors.remove(model);
           this.models.delete(id);
         }
+      this.viewmodelCamera.position.copy(this.camera.position);this.viewmodelCamera.quaternion.copy(this.camera.quaternion);this.viewmodelCamera.updateMatrixWorld(true);
       this.muzzleEffects();
       const active = new Set();
       if (this.lastSnapshotTime !== (state.snapshotTime??state.time)) {
@@ -924,10 +901,10 @@ export class View {
           const bolt = b.kind === "bolt";
           // Compact weapon-specific rounds; tails are brief motion cues, not giant cones.
           const profiles = {
-            sprinter: [0.018, 0.14, 0.55], scatter: [0.022, 0.025, 0.12],
-            needle: [0.015, 0.24, 0.95], zipper: [0.015, 0.08, 0.32],
-            anchor: [0.023, 0.17, 0.65], duet: [0.018, 0.18, 0.7],
-            pip: [0.02, 0.075, 0.25],
+            sprinter: [.005,.055,.22], scatter: [.005,.018,.06],
+            needle: [.006,.09,.35], zipper: [.004,.04,.14],
+            anchor: [.006,.065,.28], duet: [.005,.06,.23],
+            pip: [.005,.03,.12],comet:[.007,.065,.26],
           };
           const [radius, length, trail] = profiles[b.weapon] || profiles.sprinter;
           if(bolt)mesh = new THREE.Mesh(new THREE.CapsuleGeometry(radius,length,3,6),new THREE.MeshStandardMaterial({color:0xe4bc78,roughness:.4,metalness:.55}));
@@ -939,7 +916,7 @@ export class View {
             const tail = new THREE.Mesh(
               new THREE.CylinderGeometry(radius * 0.35, 0, trail, 5),
               new THREE.MeshBasicMaterial({
-                color: 0xffdc97, transparent: true, opacity: 0.3,
+                color: 0xdddcd2, transparent: true, opacity: 0.20,
                 depthWrite: false, toneMapped: false,
               }),
             );
@@ -1003,7 +980,7 @@ export class View {
       }
       f.life -= dt;
       if (f.life <= 0) {
-        this.effects.remove(f.mesh);
+        f.mesh.removeFromParent();
         if (f.mesh.isSprite) { f.mesh.material.map?.dispose(); f.mesh.material.dispose(); }
         if (f.ownedMaterial) f.mesh.material.dispose();
         if (f.ownedGeometry) f.mesh.geometry.dispose();
@@ -1022,6 +999,9 @@ export class View {
         f.mesh.position.y += dt * (0.85 - age * 0.45);
         f.mesh.position.x += dt * f.drift;
         f.mesh.material.opacity = Math.min(1, f.life / 0.3);
+      } else if(f.trace){
+        const travel=Math.min(f.length,(1-f.life/f.max)*f.length),length=Math.min(.85,f.length-travel);
+        f.mesh.position.copy(f.origin).addScaledVector(f.dir,travel+length/2);f.mesh.scale.y=Math.max(.01,length);f.mesh.material.opacity=.5*Math.min(1,f.life/.02);
       } else if (f.v) {
         if (!f.noGravity) f.v.y -= 12 * dt;
         f.mesh.position.addScaledVector(f.v, dt);
@@ -1065,7 +1045,9 @@ export class View {
       job.catch(error=>console.error('Map shader preparation failed',error)).finally(()=>{if(this.mapCompile===job)this.mapCompile=null;});
     }
     if(this.mapCompile)return;
+    this.renderer.info.autoReset=false;this.renderer.info.reset();
     this.renderer.render(this.scene, this.camera);
+    if(playing&&(this.gunGroup.visible||this.outgoing?.group.visible)){this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.viewmodelScene,this.viewmodelCamera);this.renderer.autoClear=true;}
   }
 }
 import {teammates} from './teams.js';

@@ -1,3 +1,5 @@
+import {RemoteSimulation} from './remote-simulation.js';
+import {canFight} from './stance.js';
 import {StreakUI} from './streak-ui.js';
 import {PartyClient} from './party-client.js';
 import {lobbyMarkup,modeMarkup,socialMarkup,EXPERIENCES} from './lobby-ui.js';
@@ -30,7 +32,7 @@ import {EggShop} from './egg-shop.js';
 import {rewardFrame} from './rewards.js';
 import {EggWallet,ownedLoadout} from './egg-wallet.js';
 import {KeybindEditor} from "./keybind-editor.js";
-import {touchPair,touchRotation} from './menu-pose.js';
+import './field-update.css';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
 import { CONTROLS, normalizeBindings, bindingDown, bindingLabel, wheelIntent } from "./keybinds.js";
 import { RELEASES, RELEASE } from "./releases.js";
@@ -159,7 +161,7 @@ const touch = {
   popper: false,
 };
 $("#app").innerHTML =
-  `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">OPERATOR ELIMINATED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Field ready</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
+  `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">OPERATOR ELIMINATED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Field ready</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="crouch">CROUCH / SLIDE</button><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
 const dialog = $("#dialog");
 const ownerConsole=new OwnerConsole({wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 startAnonymousVisits(()=>screen==='game'?(state?.royale?'royale':state?.options?.mode==='teams'?'teams':'ffa'):screen==='lobby'?'lobby':'menu');
@@ -334,6 +336,7 @@ function saveMatchSettings(start = false) {
   if(!next)return;
   const humans=[...sim.players.values()].filter(p=>!p.bot&&(next.mode!=='royale'||!p.lateSpectator)).length;
   if(humans>(next.mode==='royale'?next.capacity:8)){toast('Choose enough contestant seats for everyone in this room.');return;}
+  if(sim.remote){sim.configure(next);if(start)sim.startRound();closeDialog();return;}
   if((sim.options.mode==='royale')!==(next.mode==='royale')){
     const old=sim;sim=next.mode==='royale'?new RoyaleSimulation(next):new Simulation(next);
     for(const p of old.players.values())if(!p.bot)sim.addPlayer(p.id,p);sim.round=old.round;sim.phase=old.phase;
@@ -440,7 +443,7 @@ function callbacks() {
           stats.eggs=eggWallet.value.earned;save('yolk-stats',stats);if(r.amount)toast('+'+r.amount+' Marks · '+r.label);if(dialogType==='results')resultsMenu();
         }).catch(e=>toast(e.message));
       }else if(type==='afk'&&event.remaining<=0){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');}
-      else if(type==='afk-enforce'&&sim){const p=sim.players.get(event.player);if(p){p.afkRemoved=true;p.health=0;p.spectating=true;p.contestant=false;sim.emit('afk-removed',{player:p.id});}}
+      else if(type==='afk-enforce'&&sim&&!sim.remote){const p=sim.players.get(event.player);if(p){p.afkRemoved=true;p.health=0;p.spectating=true;p.contestant=false;sim.emit('afk-removed',{player:p.id});}}
       else if(type==='afk'&&state){const p=state.players.find(p=>p.id===localId);if(p)p.afkRemaining=event.remaining;}
     },
     getChatState: () => sim ? sim.snapshot() : state,
@@ -467,6 +470,7 @@ function callbacks() {
     onPlayerAction: (id, action) => sim?.playerAction(id, action),
     onInput: (id, i) => sim?.setInput(id, i, true),
     onProfile: (id, p) => sim?.setProfile(id, p),
+    onAuthorityOwner:()=>{sim=net.isHost?new RemoteSimulation(net,()=>state):null;toast(net.isHost?'You now lead this room. The match continues on the server.':'Room leadership updated.');},
     onState: (s) => {
       const updateStarted=performance.now(),previousPrediction=predicted;
       if(s.royale&&!s.royale.builds&&state?.royale)s.royale={...s.royale,builds:state.royale.builds,worldDamage:state.royale.worldDamage};
@@ -536,8 +540,8 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     await attempt.host(launch?.code);
     if (attempt !== net) return;
     attempt.setVisibility(visibility);
-    if(sim instanceof RoyaleSimulation)sim.startRound();
-    state=sim.snapshot();attempt.broadcast(state);attempt.publishRoom();
+    if(attempt.peer?.control){state=await attempt.createAuthority(options,profile,visibility,launch?.ticket);sim=new RemoteSimulation(attempt,()=>state);}
+    else {if(sim instanceof RoyaleSimulation)sim.startRound();state=sim.snapshot();attempt.broadcast(state);attempt.publishRoom();}
     localId = attempt.id;
     screen = "lobby";
     paused = true;
@@ -700,6 +704,11 @@ function chooseTeam() {
   for(const p of state?.players||[]) if(p.id!==localId&&!p.spectating) counts[p.team]++;
   modal('Choose your team', `<p>Pick a team before entering Team Scramble. When a team leads by two players, join the smaller team.</p><div class="split-actions">${['BLUE','RED'].map((name,team)=>`<button class="primary" data-action="team-entry-${team}" ${counts[team]-counts[1-team]>=2?'disabled':''}>${name} · ${counts[team]} players</button>`).join('')}</div>`, 'team-choice');
 }
+function sendMarker(kind,point=null){
+ if(!state?.royale||screen!=='game')return;
+ const action=kind==='clear'?'ping-clear':'ping-'+JSON.stringify({kind,...point});
+ if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});
+}
 function playerAction(action) {
   if(state?.options.mode==='teams' && action==='rejoin') {chooseTeam();return;}
   spawnIntentUntil = action === "spectate" ? 0 : performance.now() + 5000;
@@ -795,12 +804,16 @@ function processEvents() {
     if (e.id <= lastEvent) continue;
     lastEvent = e.id;
     if (state.time - e.time > 1.6) continue;
-    const echoed=!sim&&e.player===localId&&guestFire.confirm(e,performance.now()/1000);
+    const echoed=(!sim||sim.remote)&&e.player===localId&&guestFire.confirm(e,performance.now()/1000);
     if(echoed)e.echoed=true;
     if(e.type==='afk-removed'){if(e.player===localId){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');return;}if(net?.isHost)net.kick(e.player);}
+    if(e.type==='duo-marker'&&e.player!==localId&&e.team!==state.players.find(p=>p.id===localId)?.team)continue;
     view.event(e, localId);
     const me = state.players.find((p) => p.id === localId);
     sound.event(e,me,state);
+    if(e.type==='duo-marker')sound.cue(e.kind==='danger'?'danger-ping':'world-ping',null,.75);
+    if(e.type==='knocked')notice(`${e.targetName} downed`,1800);
+    if(e.type==='revived'&&(e.player===localId||e.target===localId))notice(e.target===localId?'Back in the fight · 30 health':'Teammate revived',2200);
     if(e.type==='streak-bonus'&&e.player===localId){streakUI.announce(e,state.options.mode);sound.pickup();}
     if(e.type==='royale-eliminated'&&e.player===localId){spectateTarget=state.players.find(p=>teammates(state.options,me,p)&&p.health>0)?.id||me?.killerId;pendingInputs=[];predicted=null;}
     if (e.type === "shot"&&!echoed) {
@@ -822,7 +835,7 @@ function processEvents() {
         if(Number.isFinite(e.sourceX)&&Number.isFinite(e.sourceZ)){damageSources.push({x:e.sourceX,z:e.sourceZ,until:performance.now()+1400});if(damageSources.length>5)damageSources.shift();}
       }
     }
-    if (e.type === "reload" && e.player === localId) sound.reload(Math.max(.3,(me?.reloadEnd||state.time+1.2)-state.time));
+    if (e.type === "reload" && e.player === localId) sound.reload(Math.max(.3,(me?.reloadEnd||state.time+1.2)-state.time),e.weapon||gun(me).id);
     if (e.type === "pickup" && e.player === localId) {
       sound.pickup();
       notice(
@@ -896,6 +909,7 @@ function hud() {
     m.id==='royale'&&state.royale.practice?`SPAWN ISLAND · ${state.royale.contestants} CONTESTANTS` : m.id==='royale' ? `${state.royale.alive} ALIVE · ${p.kills} ELIMS · ${p.place?'#'+p.place:'LAST OPERATOR STANDING'}` :
     `FIRST TO ${state.options.scoreLimit} ELIMINATIONS`;
   const vitals=state.royale&&watched?watched:p;
+  royaleUI.project=point=>view.projectMarker(point);
   $("#shield").textContent = Math.ceil(vitals.shield || 0);
   $("#shield-fill").style.width = Math.max(0, Math.min(100, vitals.shield || 0)) + "%";
   $("#health").textContent = Math.ceil(vitals.health);
@@ -913,7 +927,7 @@ function hud() {
   bonusPanel.textContent=bonusStatus(p,state.time).join(' • ');
   if(arenaBonuses(state.options.mode)&&p.health>0)$('#streak').textContent+=` · ${5-p.streak%5} to bonus`;
   $('#crosshair').classList.toggle('damage-boost',arenaBonuses(state.options.mode)&&p.damageUntil>state.time);
-  $('.quick-controls').innerHTML = [['forward','Move'],['reload','Reload'],['popper','Popper'],['swap','Swap']].map(([id,label]) => `<span><kbd>${esc(controlLabel(id))}</kbd> ${label}</span>`).join('') + '<span><kbd>Esc</kbd> Menu</span>';
+  $('.quick-controls').innerHTML = [['forward','Move'],['crouch','Crouch / slide'],['reload','Reload'],['swap','Swap']].map(([id,label]) => `<span><kbd>${esc(controlLabel(id))}</kbd> ${label}</span>`).join('') + '<span><kbd>Esc</kbd> Menu</span>';
   $("#gun-name").textContent = gun(p).name;
   $("#ammo").textContent = p.ammo[p.slot];
   $("#reserve").textContent = p.reserve[p.slot];
@@ -937,14 +951,14 @@ function hud() {
   const delay = Math.max(0, Math.ceil(p.respawnAt - state.time));
   $("#spawn-heading").textContent = p.awaitingEntry ? "OPERATOR READY" : "OPERATOR ELIMINATED";
   $("#spawn-status").textContent = p.spawnRequested
-    ? (delay ? `Entering in ${delay}…` : "Entering the yard…")
+    ? (delay ? `Entering in ${delay}…` : "Entering the arena…")
     : delay ? `Respawn available in ${delay}` : "Ready when you are";
   $("#spawn-button").textContent = p.awaitingEntry ? "DEPLOY" : "Respawn";
   $("#spawn-button").disabled = !!p.spawnRequested || delay > 0;
   if (p.health > 0) spawnIntentUntil = 0;
   if (p.health <= 0 && !p.spawnRequested && performance.now() > spawnIntentUntil && document.pointerLockElement)
     document.exitPointerLock();
-  const armed=!state.royale||p.flight==='ground'&&!!p.inventory?.[p.slot]?.weapon;
+  const armed=canFight(p)&&(!state.royale||p.flight==='ground'&&!!p.inventory?.[p.slot]?.weapon);
   const aiming = armed &&
     (actionDown("aim") || touch.aim) &&
     p.health > 0 &&
@@ -953,13 +967,13 @@ function hud() {
   $("#crosshair").style.display =
     p.health > 0 && armed && !paused && !(aiming&&['scope','prism'].includes(gun(p).optic)) ? "block" : "none";
   // Convert the host's current angular shot spread to a screen-space radius.
-  const spread = (!sim?predicted?.shotSpread:null)??p.shotSpread??gun(p).spread;
+  const spread = (!sim||sim.remote?predicted?.shotSpread:null)??p.shotSpread??gun(p).spread;
   const halfAngle = spread * .5;
   const radius = Math.tan(Math.min(halfAngle, 1)) * $("#world").clientHeight * view.camera.projectionMatrix.elements[5] / 2;
   $("#crosshair").style.setProperty("--crosshair-gap", `${clamp(radius, 4, 120)}px`);
-  $('#crosshair').classList.toggle('accuracy-ready',!!((!sim&&predicted?.firstShot)||p.firstShot));
+  $('#crosshair').classList.toggle('accuracy-ready',!!(((!sim||sim.remote)&&predicted?.firstShot)||p.firstShot));
   $('#crosshair').classList.toggle('pellet-reticle',gun(p).pellets>1);
-  $("#center-dot").hidden = !settings.centerDot;
+  $("#center-dot").hidden = !settings.centerDot || aiming;
   $("#hit-marker").hidden = !settings.hitMarkers || p.health <= 0 || paused || performance.now() >= hitUntil;
   const scoped =
     aiming && (gun(p).optic === "scope" || gun(p).optic === "prism");
@@ -1072,7 +1086,8 @@ const actions = {
  'royale-queue':()=>{leave(false);void queueParty();},
  'royale-map':royaleMap,
  'royale-inventory':royaleInventory,
- 'royale-clear-marker':()=>{royaleUI.waypoint=null;},
+ 'royale-clear-marker':()=>{sendMarker('clear');royaleUI.waypoint=null;},
+ 'duo-marker':()=>sendMarker('normal'), 'duo-danger':()=>sendMarker('danger'),
  'royale-close-flight':()=>royaleUI.dismissFlight(),
  'royale-jump':()=>{if(paused)resume(false);queuedActions.add('jump');sound.unlock();},
  'royale-drop':()=>inventoryAction('drop'),
@@ -1195,8 +1210,8 @@ document.addEventListener("click", (e) => {
 dialog.addEventListener('submit',e=>{
   if(e.target.id!=='owner-form')return;
   e.preventDefault();const code=e.target.querySelector('#owner-code').value;
-  e.target.querySelector('button[type="submit"]').disabled=true;
-  void ownerConsole.unlock(code);
+  const button=e.target.querySelector('button[type="submit"]');button.disabled=true;
+  void ownerConsole.unlock(code).finally(()=>{if(button.isConnected)button.disabled=false;});
   e.target.querySelector('#owner-code').value='';
 });
 document.addEventListener("input", (e) => {
@@ -1257,6 +1272,8 @@ function pressControl(code) {
 
   if(settings.keybinds.chat.includes(code)&&net?.ready&&screen!=="menu"){chat.open();return;}
   keys.add(code);
+  if(settings.keybinds.marker.includes(code))sendMarker('normal');
+  if(settings.keybinds.danger.includes(code))sendMarker('danger');
   for (const action of ['jump', 'fire', 'reload', 'popper', 'interact']) {
     if (settings.keybinds[action].includes(code)) queuedActions.add(action);
   }
@@ -1369,10 +1386,7 @@ function aimSensitivity() {
   const aiming = !buildControls.editing && (actionDown("aim") || touch.aim)&&(!p?.inventory||!!p.inventory[p.slot]?.weapon);
   return aiming ? settings.scopeSensitivity*(gun(p).ads?.sensitivity||1) : 1;
 }
-let menuMousePoint=null;
 document.addEventListener("mousemove", (e) => {
-  if(screen==='menu'&&!dialog.open&&(!menuMousePoint||menuMousePoint.x!==e.clientX||menuMousePoint.y!==e.clientY))view.aimMenu(e.clientX,e.clientY);
-  menuMousePoint={x:e.clientX,y:e.clientY};
   if (
     screen !== "game" ||
     paused ||
@@ -1398,7 +1412,7 @@ document.addEventListener('click',e=>{
  if(slot)inventoryAction('slot',Number(slot.dataset.royaleSlot));
  if(swap)inventoryAction('swap',Number(swap.dataset.royaleSwap));
  if(e.target.id==='royale-fullmap'){
-  const rect=e.target.getBoundingClientRect();royaleUI.waypoint={x:(e.clientX-rect.left)/rect.width*512-256,z:(e.clientY-rect.top)/rect.height*512-256};sound.cue('ui-select');
+  const rect=e.target.getBoundingClientRect(),size=getMap(state.options.map).size;sendMarker('map',{x:(e.clientX-rect.left)/rect.width*size*2-size,z:(e.clientY-rect.top)/rect.height*size*2-size});
  }
  if(e.target.closest('[data-build-control="repair"]')){if(sim)sim.playerAction(localId,'build-repair');else net?.send({type:'player-action',action:'build-repair'});}
  if(e.target.closest('[data-build-control="edit"]')){const p=state?.players.find(p=>p.id===localId);if(p)buildUI.beginEdit(state,predicted?{...p,...predicted}:p,view.buildMap);}
@@ -1415,14 +1429,6 @@ dialog.addEventListener('pointermove',e=>{if(touchDrag&&Math.hypot(e.clientX-tou
 dialog.addEventListener('pointerup',e=>{if(!touchDrag)return;const slot=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-royale-slot]'),from=touchDrag.from;touchDrag=null;const dragged=royaleUI.dragging;royaleUI.dragging=false;if(dragged&&slot&&Number(slot.dataset.royaleSlot)!==from)inventoryAction('swap',Number(slot.dataset.royaleSlot),from);});
 dialog.addEventListener('pointercancel',()=>{touchDrag=null;royaleUI.dragging=false;});
 dialog.addEventListener('keydown',e=>{if(dialogType!=='royale-inventory')return;const slot=e.target.closest('[data-royale-slot]');if(slot&&e.altKey&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const from=Number(slot.dataset.royaleSlot),to=1+((from-1+(e.key==='ArrowRight'?1:4))%5);inventoryAction('swap',to,from);dialog.querySelector(`[data-royale-slot="${to}"]`)?.focus();}});
-let menuTouch=null;
-const menuCanvas=$('#world');
-// Trackpads report two-finger scrolling as wheel events, unlike touchscreens.
-menuCanvas.addEventListener('wheel',e=>{if(screen!=='menu'||dialog.open||e.ctrlKey)return;e.preventDefault();const delta=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;view.menuPose.rotate(delta*(e.deltaMode===1?.045:.006));},{passive:false});
-menuCanvas.addEventListener('touchstart',e=>{if(screen!=='menu'||dialog.open)return;menuTouch=touchPair([...e.touches]);if(menuTouch){e.preventDefault();view.menuPose.rotate(0);}},{passive:false});
-menuCanvas.addEventListener('touchmove',e=>{if(screen!=='menu'||dialog.open){menuTouch=null;return;}const next=touchPair([...e.touches]);if(next&&menuTouch){e.preventDefault();view.menuPose.rotate(touchRotation(menuTouch,next,menuCanvas.clientWidth));}menuTouch=next;},{passive:false});
-for(const event of ['touchend','touchcancel'])menuCanvas.addEventListener(event,()=>{menuTouch=null;});
-window.addEventListener('blur',()=>{menuTouch=null;});
 document.addEventListener('wheel',e=>{if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
 document.addEventListener("contextmenu", (e) => {
   if (screen === "game" || (dialog.open&&dialogType==='settings'&&!e.target.matches('input,textarea'))) e.preventDefault();
@@ -1484,6 +1490,8 @@ document.addEventListener("graphics-lost", () => {
 });
 function frameInput() {
   const active = !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && state?.players.find(p => p.id === localId)?.health > 0;
+  const combat=active&&canFight(state?.players.find(p=>p.id===localId));
+  if(active&&!combat){buildControls.buildMode=false;buildUI.cancel();}
   buildControls.yaw=input.yaw;buildControls.pitch=input.pitch;
   buildControls.buildFacing=snappedFacing(input.yaw,buildControls.buildMode?buildControls.buildFacing:undefined);
   if(!actionDown('fire')&&!touch.fire)buildControls.suppressBuildFire=false;
@@ -1507,8 +1515,8 @@ function frameInput() {
       : 0,
     jump:
       active && (actionDown("jump") || touch.jump || queuedActions.has("jump")),
-    fire: active && !buildControls.editing && !buildControls.suppressBuildFire && (actionDown("fire") || touch.fire || queuedActions.has("fire")),
-    aim: active && !buildControls.editing && (actionDown("aim") || touch.aim),
+    fire: combat && !buildControls.editing && !buildControls.suppressBuildFire && (actionDown("fire") || touch.fire || queuedActions.has("fire")),
+    aim: combat && !buildControls.editing && (actionDown("aim") || touch.aim),
     reload:
       active &&
       (actionDown("reload") || touch.reload || queuedActions.has("reload")),
@@ -1517,8 +1525,9 @@ function frameInput() {
       (actionDown("popper") ||
         touch.popper ||
         queuedActions.has("popper")),
-    buildMode:active&&buildControls.buildMode,buildType:buildControls.buildType,buildMaterial:buildControls.buildMaterial,buildRotation:buildControls.buildRotation,buildAnchor:buildControls.buildAnchor,editing:buildControls.editing,
+    buildMode:combat&&buildControls.buildMode,buildType:buildControls.buildType,buildMaterial:buildControls.buildMaterial,buildRotation:buildControls.buildRotation,buildAnchor:buildControls.buildAnchor,editing:buildControls.editing,
     slot: input.slot,
+    crouch:active&&(actionDown('crouch')||touch.crouch),
     sprint:active&&(actionDown('sprint')||touch.sprint),
     interact:active&&(actionDown('interact')||touch.interact||queuedActions.has('interact')),
     drop:active&&queuedActions.has('drop'),swapSlot:active?swapSlot:-1,
@@ -1547,7 +1556,7 @@ function loop(now) {
   while (accumulator >= 1 / 60) {
     accumulator -= 1 / 60;
     const i = frameInput();
-    if (sim) {
+    if (sim && !sim.remote && !net?.serverAuthority) {
       if (simulate) {
         sim.setInput(localId, i);
         sim.tick(1 / 60);
@@ -1571,7 +1580,7 @@ function loop(now) {
       }
     }
   }
-  if (sim) {
+  if (sim && !sim.remote && !net?.serverAuthority) {
     state = sim.snapshot();handleState();
     if(autoQueue&&screen==='lobby'&&sim.queueEnds&&dialogType!=='setup'){
       const humans=[...sim.players.values()].filter(p=>!p.bot).length;
@@ -1592,7 +1601,7 @@ function loop(now) {
   }
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
-  if(net?.isHost&&state&&now-lastProgress>=750){
+  if(net?.isHost&&!net.serverAuthority&&state&&now-lastProgress>=750){
     lastProgress=now;(net.aliasPeer?.id?net.aliasPeer:net.peer)?.control?.({type:'progress',state:rewardFrame(state,localId,input)});
   }
   const currentProgress=(state?.royale?.matchId||net?.code||'local')+':'+state?.round;
@@ -1603,7 +1612,7 @@ function loop(now) {
   view.spectateTarget = me?.spectating ? spectateTarget : null;
   sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!(!net&&paused));
   let renderPlayer = predicted;
-  if (sim && me) {
+  if (sim && !sim.remote && me) {
     renderPlayer = {
       ...me,
       yaw: input.yaw,
@@ -1614,10 +1623,10 @@ function loop(now) {
     renderPlayer.yaw = input.yaw;
     renderPlayer.pitch = input.pitch;
   }
-  const presentation=!sim&&state?guestPresentation.frame(state,renderPlayer,now,dt):{state,player:renderPlayer};
+  const presentation=(!sim||sim.remote)&&state?guestPresentation.frame(state,renderPlayer,now,dt):{state,player:renderPlayer};
   view.update(
     presentation.state,
-    !sim&&presentation.player?.health>0?presentation.player:me,
+    (!sim||sim.remote)&&presentation.player?.health>0?presentation.player:me,
     presentation.player,
     dt,
     screen === "game",

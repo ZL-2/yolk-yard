@@ -1,9 +1,20 @@
 // Original procedural sound palette. Every sound is generated locally, with no samples/CDN.
+import {FIREARM_SOUNDS,synthesizeShot,reloadSequence} from './firearm-audio.js';
+import {gun} from './data.js';
 import {getMap} from './maps.js';
 import {ITEMS} from './royale-data.js';
 const note=(f,d=.12,v=.12,w='sine',to=0,at=0)=>({f,d,v,w,to,at});
 const noise=(f,d=.15,v=.15,at=0)=>({noise:true,f,d,v,at});
 export const SOUND_CUES={
+ 'world-ping':[note(740,.08,.08),note(1110,.13,.055,'sine',0,.065)],
+ 'danger-ping':[note(960,.09,.10,'triangle',580),note(960,.12,.075,'triangle',580,.14)],
+ 'teammate-down':[note(340,.18,.065,'triangle',170),note(250,.23,.06,'triangle',140,.19)],
+ 'revive-complete':[note(440,.12,.06),note(660,.18,.07,'sine',0,.12),note(880,.25,.06,'sine',0,.24)],
+ 'pump-action':[noise(1700,.075,.11),noise(800,.055,.1,.09),note(330,.035,.045,'triangle',100,.12)],
+ 'bolt-action':[noise(3300,.075,.075),noise(700,.065,.08,.12),note(850,.04,.045,'sine',230,.15)],
+ 'launcher-open':[noise(430,.18,.10),note(165,.08,.06,'triangle',70,.08)],
+ 'cell-seat':[noise(900,.065,.07),note(880,.08,.035,'sine',440,.04)],
+ 'slide-scrape':[noise(580,.28,.065),noise(2200,.17,.025)],
  'ui-select':[note(660,.05,.05),note(990,.07,.04,'sine',0,.035)],
  'ui-back':[note(440,.07,.055,'sine',280)],
  'ui-error':[note(180,.15,.06,'triangle',90)],
@@ -92,7 +103,7 @@ export class Sound {
   gain.gain.setValueAtTime(.0001,at);gain.gain.linearRampToValueAtTime(volume,at+.004);gain.gain.exponentialRampToValueAtTime(.0001,at+p.d);
   (filter||source).connect(gain).connect(pan).connect(this.master);this.voices.add(source);
   source.onended=()=>{this.voices.delete(source);source.disconnect();filter?.disconnect();gain.disconnect();pan.disconnect();};
-  source.start(at);source.stop(at+p.d+.01);
+  source.start(at);source.stop(at+p.d+.01);return source;
  }
  cue(id,position=null,scale=1){
   const preset=SOUND_CUES[id];if(!preset)return;
@@ -103,12 +114,22 @@ export class Sound {
   preset.forEach(p=>this.layer(p,position?{...position,radius}:null,category,scale));
  }
  tone(freq,duration=.09,type='sine',volume=.15,end=0){this.layer(note(freq,duration,volume,type,end));}
- shot(id,distance=0,position=null){if(!position&&distance>160)return;if(position)position={...position,radius:id==='thumper'?190:['needle','anchor','peeper'].includes(id)?170:125};const [f,filter,d]=SHOT_PALETTE[id]||SHOT_PALETTE.sprinter;const scale=position?1:1/(1+distance/15);this.layer(note(f,d,.16,id==='comet'?'sine':'triangle',id==='comet'?180:35),position,'effects',scale);this.layer(noise(filter,d*.65,.15),position,'effects',scale);this.layer(note(filter*.65,.045,.025,'square',140),position,'effects',scale);if(distance<15)this.cue('shell-casing',position,.7);}
+ shot(id,distance=0,position=null){
+  if(!this.ctx||!this.enabled||this.voices.size>=56||distance>190)return;
+  const spec=FIREARM_SOUNDS[id]||FIREARM_SOUNDS.sprinter,sp=this.spatial(position?{...position,radius:id==='thumper'?190:['needle','anchor','peeper'].includes(id)?170:125}:null),volume=.5*this.effectsVolume*sp.gain/(position?1:1+distance/15);if(volume<.0002)return;
+  this.shotBuffers??=new Map();const variant=(this.shotCounter=(this.shotCounter||0)+1)%3,key=id+':'+variant;
+  if(!this.shotBuffers.has(key)){const wave=synthesizeShot(id,this.ctx.sampleRate,variant),buffer=this.ctx.createBuffer(1,wave.length,this.ctx.sampleRate);buffer.getChannelData(0).set(wave);this.shotBuffers.set(key,buffer);}
+  const source=this.ctx.createBufferSource(),gain=this.ctx.createGain(),pan=this.ctx.createStereoPanner(),filter=this.ctx.createBiquadFilter();source.buffer=this.shotBuffers.get(key);gain.gain.value=volume;pan.pan.value=sp.pan;filter.type='lowpass';filter.frequency.value=Math.max(1800,16000-distance*80);
+  source.connect(filter).connect(gain).connect(pan).connect(this.master);this.voices.add(source);source.onended=()=>{this.voices.delete(source);source.disconnect();filter.disconnect();gain.disconnect();pan.disconnect();};source.start();source.stop(this.ctx.currentTime+spec.duration+.01);
+  if(distance<12&&!spec.energy&&!spec.rocket)this.cue('shell-casing',position,.4);
+  if(id==='doubleyolk'&&distance<30)for(const p of SOUND_CUES['pump-action'])this.layer({...p,at:(p.at||0)+.35},position,'effects',.55);
+ }
  death(distance=0,position=null){if(distance>38)return;this.cue('operator-down',position,1/(1+distance/12));}
  hit(){this.layer(note(950,.065,.11,'sine',1400));}
  pop(distance=0,position=null){if(distance>190)return;const source=position?{...position,radius:190}:null,scale=source?1:1/(1+distance/18);this.layer(noise(160,.38,.25),source,'effects',scale);this.layer(note(70,.4,.17,'triangle',25),source,'effects',scale);}
  pickup(){this.cue('pickup-1');}eliminate(){this.cue('elimination');}
- reload(duration=1.2){this.cue('reload-out');for(const p of SOUND_CUES['reload-in'])this.layer({...p,at:Math.max(.1,duration*.68)+(p.at||0)});}
+ reload(duration=1.2,id='sprinter'){this.cancelReload();this.reloadVoices=[];for(const e of reloadSequence(id,duration))for(const p of SOUND_CUES[e.cue]||[]){const voice=this.layer({...p,at:e.at+(p.at||0)},null,'effects',e.scale);if(voice)this.reloadVoices.push(voice);}}
+ cancelReload(){for(const source of this.reloadVoices||[])try{source.stop();}catch{}this.reloadVoices=[];}
  loop(id,target,{freq=300,volume=.06,noise:useNoise=true}={}){
   if(!this.ctx)return;
   let loop=this.loops.get(id);
@@ -125,23 +146,26 @@ export class Sound {
    // Personal inventory cues are local, spatial actions are audible to nearby operators.
    if(e.player&&e.player!==me?.id&&e.x===undefined)return;
    if(e.cue==='victory')this.cue(state.royale?.winnerId===me?.id?'victory':'defeat');
+   else if(e.cue==='weapon-swap'){const actor=state.players.find(p=>p.id===e.player);this.cue(['needle','peeper'].includes(gun(actor||me).id)?'bolt-action':'weapon-swap',e.x===undefined?null:e,.7);}
    else this.cue(e.cue,e.x===undefined?null:e);
   }
   if(e.type==='royale-eliminated'&&e.player===me?.id)this.cue('defeat');
-  if(e.type==='impact')this.cue(e.tag?'health-hit':e.y>2?'impact-wood':'impact-stone',e,.55);
+  if(e.type==='impact')this.cue(e.tag?'health-hit':e.surface==='metal'?'ricochet':e.surface==='wood'?'impact-wood':'impact-stone',e,.55);
   if(e.type==='shot'&&e.player!==me?.id&&me&&e.origin){const dx=me.x-e.origin.x,dz=me.z-e.origin.z;const d=Math.hypot(dx,dz);if(d<30)this.cue('bullet-flyby',e.origin,.4);}
   if(e.type==='bounce')this.cue('ricochet',e,.4);
  }
  update(state,me,dt,playing){
   this.clock+=dt;this.listener=me;
+  if(!playing||!me||me.downed||!(me.reloadEnd>state?.time))this.cancelReload();
   if(!playing||!state||!me){if(this.loops.size)this.stopWorld();return;}
   const royale=state.royale,ground=me.flight==='ground'||!royale;
   this.stepClocks??=new Map();
   const map=getMap(state.options?.map);
-  for(const p of state.players||[]){if(p.health<=0||!p.grounded||p.flight&&p.flight!=='ground'||Math.hypot(p.x-me.x,p.z-me.z)>18)continue;
+  for(const p of state.players||[]){if(p.health<=0||p.sliding||p.downed||!p.grounded||p.flight&&p.flight!=='ground'||Math.hypot(p.x-me.x,p.z-me.z)>18)continue;
    const speed=Math.hypot(p.vx||0,p.vz||0),previous=this.stepClocks.get(p.id)||0,next=previous+speed*dt/(p.sprinting?1:.85);this.stepClocks.set(p.id,next);
-   if(Math.floor(next)>Math.floor(previous)&&speed>.8){const support=map?.boxes?.find(b=>Math.abs(b.y+b.h-p.y)<.08&&Math.abs(b.x-p.x)<b.w/2&&Math.abs(b.z-p.z)<b.d/2),surface=support?(['wood','metal'].includes(support.material)?support.material:'stone'):'soil';this.cue('step-'+surface,p,p.id===me.id?.75:.6);}
+   if(Math.floor(next)>Math.floor(previous)&&speed>.8){const support=map?.boxes?.find(b=>Math.abs(b.y+b.h-p.y)<.08&&Math.abs(b.x-p.x)<b.w/2&&Math.abs(b.z-p.z)<b.d/2),surface=support?(['wood','metal'].includes(support.material)?support.material:'stone'):'soil';this.cue('step-'+surface,p,(p.id===me.id?.75:.6)*(p.crouching?.45:1));}
   }
+  if(me.sliding&&this.clock>(this.nextSlideSound||0)){this.nextSlideSound=this.clock+.25;this.cue('slide-scrape',me,.7);}
   if(this.stepClocks.size>48)this.stepClocks=new Map([...this.stepClocks].filter(([id])=>state.players.some(p=>p.id===id)));
   if(ground&&me.grounded&&this.wasAirborne&&!royale)this.cue('land',me,.7);this.wasAirborne=!me.grounded;
 

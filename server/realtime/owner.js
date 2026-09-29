@@ -82,7 +82,7 @@ export class OwnerService {
         if(!this.authorized(req,body)){json(res,401,{error:'Unauthorized'},origin);return;}
         this.sweep();const peers=[...relay.peers.values()];
         json(res,200,{visits:this.totals.visits,online:this.active.size,relayConnections:peers.filter(p=>p.ws).length,
-          activeRooms:peers.filter(p=>p.ws&&p.listing&&Date.now()-p.listedAt<15000).map(p=>({mode:p.listing.mode,map:p.listing.map,players:p.listing.players,capacity:p.listing.capacity,phase:p.listing.phase})),
+          activeRooms:peers.filter(p=>(p.ws||p.virtualRoom)&&p.listing&&Date.now()-p.listedAt<15000).map(p=>({mode:p.listing.mode,map:p.listing.map,players:p.listing.players,capacity:p.listing.capacity,phase:p.listing.phase})),
           active:[...this.active.values()].sort((a,b)=>b.seen-a.seen).slice(0,100),
           past:this.past.slice(-100).reverse(),historyPersistent:Boolean(this.storePath),at:Date.now()},origin);return;
       }

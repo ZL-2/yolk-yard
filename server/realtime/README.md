@@ -1,5 +1,12 @@
 # Persistent gameplay relay
 
+Protocol 21 also owns the actual online Simulation/RoyaleSimulation instances.
+Browsers submit bounded input and interaction intent, including the room leader.
+Clients cannot publish authoritative combat snapshots or reward frames. The
+server validates stance movement, hits, DBNO, revives and private Duo markers.
+Room leadership transfer does not move simulation into a browser. Use
+`npm run test:field` for the current authority and feature release checks.
+
 Replaces the D1-polling relay with **one persistent Node process**, direct WebSocket delivery, bounded queues, public/private listings, authenticated 10-second resume windows, and sequenced replay in both directions. No game data is written to a database. Client recovery lasts 8 seconds, then normal host-transfer/error handling resumes.
 
 ## Deploy

@@ -5,14 +5,15 @@ import {makeBlaster} from '../src/weapons.js';
 import {makeEgg} from '../src/view.js';
 import {WEAPONS,ROYALE_WEAPONS} from '../src/data.js';
 import {DRAW_POSES,beginEquip,equipPose} from '../src/equip.js';
-import {VIEWMODEL} from '../src/physics.js';
+import {viewmodelProfile} from '../src/weapon-presentation.js';
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(800,560);
 window.checks=[];
 for(const w of [...WEAPONS,...ROYALE_WEAPONS]) for(const kind of ['Idle','Reload','Aim','Other player','Draw']) {
  const scene=new THREE.Scene();scene.background=new THREE.Color('#c9d6d6');
  scene.add(new THREE.HemisphereLight(0xffffff,0x657785,2.6));
  const light=new THREE.DirectionalLight(0xffffff,2.4);light.position.set(-2,4,3);scene.add(light);
- const camera=new THREE.PerspectiveCamera(85,400/280,.03,20);
+ const VIEWMODEL=viewmodelProfile(w.id,800/560);
+ const camera=new THREE.PerspectiveCamera(VIEWMODEL.fov,400/280,.008,20);
  let model,rig;
  if(kind==='Other player') {
   const egg=makeEgg({weapon:w.id,color:'#f9b74a',hat:0,pattern:0,eyewear:6},-1,true);
@@ -22,7 +23,7 @@ for(const w of [...WEAPONS,...ROYALE_WEAPONS]) for(const kind of ['Idle','Reload
   const group=new THREE.Group();group.scale.setScalar(VIEWMODEL.scale);scene.add(group);
   group.position.set(VIEWMODEL.x,VIEWMODEL.y,VIEWMODEL.z);
   model=makeBlaster(w.id);rig=makeArms(w.id,'#f9b74a',true);group.add(model,rig);
-  if(kind==='Aim') {group.position.set(0,-w.sightY*VIEWMODEL.scale,VIEWMODEL.z);camera.fov=65;camera.updateProjectionMatrix();}
+  if(kind==='Aim') {group.position.set(0,-w.sightY*VIEWMODEL.scale,VIEWMODEL.z);camera.updateProjectionMatrix();}
   if(kind==='Reload'){const pose=updateArms(rig,.45,model);group.position.y-=pose.dip;group.rotation.set(...pose.rotation);}
  }
  if(kind==='Draw'){

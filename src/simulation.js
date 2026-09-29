@@ -1,5 +1,6 @@
 import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
 import {RemoteInputBuffer} from './remote-input.js';
+import {resetStance,eyeHeight} from './stance.js';
 import {updateCombatAccuracy,firedAccuracy,pelletOffsets,criticalHit,falloffAt} from './combat.js';
 import {arenaBonuses,resetBonuses,updateBonuses,awardBonus} from './streaks.js';
 import {botInput as tacticalBotInput} from './bots.js';
@@ -176,7 +177,12 @@ export class Simulation {
   }
   moveWithCommands(p,input,dt,commands) {
     if(!commands){movePlayer(p,input,this.map,dt);p.ack=Math.max(p.ack,input.seq||0);return;}
-    for(const step of commands.steps){movePlayer(p,step,this.map,1/60);p.ack=Math.max(p.ack,step.seq);}
+    p.motionFresh=this.time-(p.motionAt??-100)<.4;
+    for(const step of commands.steps){
+      const x=p.x,z=p.z;movePlayer(p,step,this.map,1/60);
+      p.motionVX=(p.x-x)*60;p.motionVZ=(p.z-z)*60;p.motionAt=this.time;p.motionFresh=true;
+      p.ack=Math.max(p.ack,step.seq);
+    }
     // After an actual interruption, keep gravity running without inventing input acknowledgements.
     if(!commands.steps.length&&this.time-p.lastInput>.4)movePlayer(p,input,this.map,dt);
   }
@@ -285,6 +291,7 @@ export class Simulation {
     this.emit("player-action", {player: id, action});
   }
   spawn(p) {
+    resetStance(p);
     resetBonuses(p);
     if (p.spectating) { p.health = 0; return; }
     if (p.nextProfile) {
@@ -334,7 +341,7 @@ export class Simulation {
       const a=p.activity??=newActivity(this.time);
       // Reconnects, loading/entry, the transport and eliminated spectators are
       // controlled by the game. They never accrue participation or idle debt.
-      if(p.connected===false||p.awaitingEntry||p.spectating||p.health<=0||p.flight==='transport'||this.recovering){a.last=this.time;p.afkRemaining=59;continue;}
+      if(p.loading||p.connected===false||p.awaitingEntry||p.spectating||p.health<=0||p.flight==='transport'||this.recovering){a.last=this.time;p.afkRemaining=59;continue;}
       observeMotion(a,p,dt,this.time);p.afkRemaining=Math.ceil(activityRemaining(a,this.time));
       if(p.afkRemaining<=0){p.afkRemoved=true;p.spectating=true;p.contestant=false;p.health=0;p.activity.active=0;this.inputs.delete(p.id);this.remoteInputs.delete(p.id);this.emit('afk-removed',{player:p.id});}
     }
@@ -437,11 +444,11 @@ export class Simulation {
       return;
     p.reloadEnd = this.time + (p.ammo[p.slot] === 0 ? gun(p).reloadEmpty : gun(p).reload);
     p.burstLeft = 0;
-    this.emit("reload", { player: p.id });
+    this.emit("reload", { player: p.id, weapon:gun(p).id });
   }
   recordPoses(){
     this.poseHistory??=new Map();
-    for(const p of this.players.values()){let h=this.poseHistory.get(p.id);if(!h){h=[];this.poseHistory.set(p.id,h);}if(h.at(-1)?.time>this.time-1/30)continue;h.push({time:this.time,x:p.x,y:p.y,z:p.z,yaw:p.yaw,flight:p.flight,vx:p.vx,vz:p.vz,sprinting:p.sprinting});while(h.length>10)h.shift();}
+    for(const p of this.players.values()){let h=this.poseHistory.get(p.id);if(!h){h=[];this.poseHistory.set(p.id,h);}if(h.at(-1)?.time>this.time-1/30)continue;h.push({time:this.time,x:p.x,y:p.y,z:p.z,yaw:p.yaw,flight:p.flight,vx:p.vx,vz:p.vz,sprinting:p.sprinting,crouching:p.crouching,lowCrouch:p.lowCrouch,sliding:p.sliding,downed:p.downed});while(h.length>10)h.shift();}
     for(const id of this.poseHistory.keys())if(!this.players.has(id))this.poseHistory.delete(id);
   }
   shotPose(target,shooter,w){
@@ -451,7 +458,7 @@ export class Simulation {
     if(!history?.length)return target;
     const after=history.find(v=>v.time>=time)||history.at(-1),before=history.findLast(v=>v.time<=time)||history[0],f=clamp((time-before.time)/(after.time-before.time||1),0,1);
     if(Math.hypot(target.x-before.x,target.y-before.y,target.z-before.z)>5)return target;
-    return {...target,yaw:before.yaw??target.yaw,flight:before.flight??target.flight,vx:before.vx??target.vx,vz:before.vz??target.vz,sprinting:before.sprinting??target.sprinting,x:before.x+(after.x-before.x)*f,y:before.y+(after.y-before.y)*f,z:before.z+(after.z-before.z)*f};
+    return {...target,yaw:before.yaw??target.yaw,flight:before.flight??target.flight,vx:before.vx??target.vx,vz:before.vz??target.vz,sprinting:before.sprinting??target.sprinting,crouching:before.crouching??target.crouching,lowCrouch:before.lowCrouch??target.lowCrouch,sliding:before.sliding??target.sliding,downed:before.downed??target.downed,x:before.x+(after.x-before.x)*f,y:before.y+(after.y-before.y)*f,z:before.z+(after.z-before.z)*f};
   }
   updateAccuracy(p, previous, dt) {
     const w=gun(p),a=p.accuracyState[p.slot]??={};
@@ -459,7 +466,7 @@ export class Simulation {
     p.recoilPitch=a.recoilPitch;p.recoilYaw=a.recoilYaw;
   }
   shotPath(p, w, directionOverride = null) {
-    const eye = { x: p.x, y: p.y + EYE, z: p.z },
+    const eye = { x: p.x, y: p.y + eyeHeight(p), z: p.z },
       aim = directionOverride || direction(p.yaw, p.pitch);
     let distance = wallDistance(this.map, eye, aim, (w.flightRange??w.range));
     for (const target of this.players.values())
@@ -514,7 +521,7 @@ export class Simulation {
     for(const offset of offsets){
       const aim=direction(p.yaw+yaw+offset.yaw,p.pitch+pitch+offset.pitch),path=this.shotPath(p,w,aim);
       origin=path.origin;
-      if(path.blocked){blocked=true;if(path.blocked.box)this.damageWorld?.(path.blocked.box,w.buildDamage);this.emit('impact',{...path.blocked.point,normal:path.blocked.normal,weapon:w.id});continue;}
+      if(path.blocked){blocked=true;if(path.blocked.box)this.damageWorld?.(path.blocked.box,w.buildDamage);this.emit('impact',{...path.blocked.point,normal:path.blocked.normal,surface:path.blocked.box?.material||'stone',weapon:w.id});continue;}
       if(w.hitscan){
         const hit=worldHit(this.map,origin,path.d,w.range);
         let distance=hit?.distance??w.range,victim=null,pose=null,region=null;
@@ -527,7 +534,7 @@ export class Simulation {
         if(victim){const critical=w.critical>1&&region==='head';this.damage(victim,p,w.damage*falloffAt(w,distance)*(critical?w.critical:1),w.name,critical,p.shotGroup);}
         else if(hit?.box)this.damageWorld?.(hit.box,w.buildDamage);
         shots.push({id:++this.projectileId,vx:path.d.x*180,vy:path.d.y*180,vz:path.d.z*180,end:point});
-        if(victim||hit)this.emit('impact',{...point,normal:victim?{x:-path.d.x,y:-path.d.y,z:-path.d.z}:hit.normal,weapon:w.id,tag:!!victim});
+        if(victim||hit)this.emit('impact',{...point,normal:victim?{x:-path.d.x,y:-path.d.y,z:-path.d.z}:hit.normal,weapon:w.id,surface:hit?.box?.material||'stone',tag:!!victim});
       }else{
         const b={id:++this.projectileId,owner:p.id,shotId:p.shotGroup,weapon:w.id,kind:'bolt',...origin,vx:path.d.x*w.boltSpeed,vy:path.d.y*w.boltSpeed,vz:path.d.z*w.boltSpeed,gravity:w.gravity,damage:w.damage,critical:w.critical,buildDamage:w.buildDamage,range:w.flightRange,born:this.time,fuse:w.flightRange/w.boltSpeed,travelled:0,popper:false};
         this.projectiles.push(b);shots.push({id:b.id,vx:b.vx,vy:b.vy,vz:b.vz});
@@ -541,7 +548,7 @@ export class Simulation {
       path = this.shotPath(p, w, aim),
       d = popper ? direction(p.yaw, p.pitch) : path.d;
     const origin = popper
-      ? { x: p.x, y: p.y + EYE - 0.15, z: p.z }
+      ? { x: p.x, y: p.y + eyeHeight(p) - 0.15, z: p.z }
       : path.origin;
     if (!popper && path.blocked) {
       this.emit("impact", {
@@ -653,6 +660,7 @@ export class Simulation {
             z: b.z,
             normal: victim ? { x: -d.x, y: -d.y, z: -d.z } : hit.normal,
             weapon: b.weapon,
+            surface:hit?.box?.material||'stone',
             tag: !!victim,
           });
           this.projectiles.splice(i, 1);
@@ -732,6 +740,7 @@ export class Simulation {
     });
     }
     if (victim.health > 0) return;
+    attacker=this.eliminationCredit?.(victim,attacker)||attacker;
     victim.killerId = attacker && attacker !== victim ? attacker.id : null;
     for(const [id,time] of Object.entries(victim.damageLedger||{})){const helper=this.players.get(id);if(helper&&id!==victim.killerId&&this.time-time<12)helper.assists=(helper.assists||0)+1;}victim.damageLedger={};
     victim.deaths++;
@@ -852,6 +861,7 @@ export class Simulation {
   }
   snapshot() {
     const keys = [
+      'crouching','lowCrouch','sliding','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','downed','lifeState','downedAt','revivedAt','downCount','reviving','reviverId','reviveProgress','revives',
       "afkRemaining", "afkRemoved", "lastDamage", "assists", "quickstep", "focus",
       "id", "joinedOrder", "vx", "vz", "place",
       "name",

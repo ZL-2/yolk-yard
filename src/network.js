@@ -73,6 +73,12 @@ export class Network {
       },
     });
     for(const type of ['reward','afk','afk-enforce'])this.peer.on(type,event=>this.callbacks.onProgress?.(type,event));
+    this.peer.on('authority-state',s=>{
+      if(s?.version!==VERSION||!Array.isArray(s.players))return;this.serverAuthority=true;this.snapshot=s;this.visibility=s.visibility;this.chatEnabled=s.chatEnabled;this.chatMuted=s.chatMuted||[];this.hostId=s.network.hostId;this.members=s.network.members;const wasHost=this.isHost;this.isHost=this.id===this.hostId;this.lastState=performance.now();this.hostHeartbeat.contact(this.lastState);
+      this.callbacks.onState?.(s);if(wasHost!==this.isHost)this.callbacks.onAuthorityOwner?.();this.authorityResolve?.(s);this.authorityResolve=null;
+    });
+    this.peer.on('authority-owner',m=>{this.hostId=m.id;this.isHost=this.id===m.id;this.callbacks.onAuthorityOwner?.();});
+    this.peer.on('authority-notice',m=>{if(m.event==='chat-message')this.callbacks.onChat?.(m.data);else if(m.event==='chat-status')this.callbacks.onChatStatus?.(m.data);else if(m.event==='chat-report')this.callbacks.onChatReport?.(m.data);else if(m.event==='name-required')this.callbacks.onNameRequired?.();else if(m.event==='name-accepted')this.callbacks.onNameAccepted?.();else if(m.event==='kicked')this.callbacks.onError?.('You were removed from this room.');});
     this.peer.on("error", (err) => {
       if (this.closed) return;
       const message = errorText(err);
@@ -113,6 +119,11 @@ export class Network {
         resolve(id);
       });
     });
+  }
+  authorityCommand(command){this.peer?.control?.({type:'authority-command',command});}
+  createAuthority(options,profile,visibility,ticket){
+    this.serverAuthority=true;
+    return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('The match server did not initialize.')),20000);this.authorityResolve=s=>{clearTimeout(timer);resolve(s);};this.peer.control({type:'authority-create',options,profile,visibility,ticket});});
   }
   async host(reservedCode) {
     this.isHost = true;
@@ -203,7 +214,7 @@ export class Network {
       }
       if (!accepted) return;
       if (msg.type === "input") this.callbacks.onInput?.(conn.peer, msg.input);
-      else if (msg.type === "player-action" && (["respawn", "spectate", "rejoin", "team-entry-0", "team-entry-1"].includes(msg.action)||/^inventory-(select-[0-5]|drop-[1-5]|drop-one-[1-5]|split-[1-5]|swap-[1-5]-[1-5])$/.test(msg.action)||typeof msg.action==='string'&&msg.action.length<350&&(msg.action==='build-repair'||msg.action.startsWith('build-change:'))))
+      else if (msg.type === "player-action" && (["respawn", "spectate", "rejoin", "team-entry-0", "team-entry-1"].includes(msg.action)||/^inventory-(select-[0-5]|drop-[1-5]|drop-one-[1-5]|split-[1-5]|swap-[1-5]-[1-5])$/.test(msg.action)||typeof msg.action==='string'&&msg.action.length<350&&(msg.action==='build-repair'||msg.action.startsWith('build-change:')||msg.action.startsWith('ping-'))))
         this.callbacks.onPlayerAction?.(conn.peer, msg.action);
       else if (msg.type === "profile") {
         const profile=safeProfile(msg.profile);
@@ -274,7 +285,7 @@ export class Network {
           clearTimeout(timer);
           this.timers.delete(timer);
           connectionReport.set("host","Passed","Host accepted the game handshake.");
-          this.id = msg.id;
+          this.id = msg.id;this.serverAuthority=!!msg.serverAuthority;
           this.hostId=msg.hostId||"host";this.members=msg.members||[];if(msg.checkpoint)this.lastCheckpoint=msg.checkpoint;
           this.ready = true;
           this.lastState = performance.now();
@@ -362,6 +373,7 @@ export class Network {
     }, 2000);
   }
   send(msg) {
+    if(this.serverAuthority&&['input','player-action','profile','chat-send','chat-report'].includes(msg.type)){this.authorityCommand(msg);return;}
     if (this.hostConnection?.open) this.hostConnection.send(msg);
   }
   input(input) {
@@ -388,6 +400,7 @@ export class Network {
     return {ok:true};
   }
   relayChat(id,payload) {
+    if(this.serverAuthority){this.authorityCommand({...payload,type:'chat-send'});return {ok:true};}
     const result=this.chatRoom.submit(id,payload,this.chatState());
     if(!result.ok) {
       if(id===this.id)this.callbacks.onChatStatus?.(result);
@@ -404,12 +417,14 @@ export class Network {
     return {ok:true};
   }
   setChatMuted(id,muted) {
+    if(this.serverAuthority){if(this.isHost)this.authorityCommand({type:'chat-muted',id,muted});return;}
     if(!this.isHost || id===this.id || !this.connections.has(id))return;
     if(muted)this.chatRoom.muted.add(id); else this.chatRoom.muted.delete(id);
     this.chatMuted=[...this.chatRoom.muted];
   }
-  setChatEnabled(enabled) { if(this.isHost)this.chatEnabled=this.chatRoom.enabled=!!enabled; }
+  setChatEnabled(enabled) { if(this.serverAuthority){if(this.isHost)this.authorityCommand({type:'chat-enabled',enabled});return;} if(this.isHost)this.chatEnabled=this.chatRoom.enabled=!!enabled; }
   reportChat(target,reason) {
+    if(this.serverAuthority){this.authorityCommand({type:'chat-report',target,reason});return;}
     if(this.isHost) {
       const report=this.chatRoom.report(this.id,target,reason,this.chatState());
       if(report)this.callbacks.onChatReport?.(report);
@@ -418,9 +433,11 @@ export class Network {
   setVisibility(value) {
     if (!this.isHost) return;
     this.visibility = value === "public" ? "public" : "private";
+    if(this.serverAuthority){this.authorityCommand({type:'visibility',value:this.visibility});return;}
     this.publishRoom();
   }
   publishRoom() {
+    if(this.serverAuthority)return;
     const s = this.snapshot;
     const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
     const capacity=s?.royale?Math.min(s.options.capacity,MAX_HUMANS):(s?.options.capacity||8);
@@ -429,6 +446,7 @@ export class Network {
     else directory.publish(this.visibility==='public'?listing:null);
   }
   broadcast(state) {
+    if(this.serverAuthority)return;
     this.snapshot = state;
     this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+(state.royale?MAX_SPECTATORS:0);
     if (performance.now() - (this.lastPublish || 0) > 2000) { this.lastPublish = performance.now(); this.publishRoom(); }
@@ -476,6 +494,7 @@ export class Network {
     else this.send(this.nameJoining?{type:'hello',version:VERSION,profile:this.joinProfile,ticket:this.ticket}:{type:'profile',profile:this.joinProfile});
   }
   beginMigration(){
+    if(this.serverAuthority)return;
     if(this.closed||this.isHost||this.migrating)return;
     if(!this.lastCheckpoint?.simulation){this.callbacks.onError?.('The host left before the room could synchronize. Please join another room.');return;}
     this.migrating=true;this.failedHosts.add(this.hostId);
@@ -541,6 +560,7 @@ export class Network {
     alias.on('disconnected',()=>{if(!alias.destroyed&&!this.closed){if(relayURL()){alias.destroy();this.later(()=>this.claimRoomAddress(),2500);}else alias.reconnect();}});
   }
   kick(id) {
+    if(this.serverAuthority){this.authorityCommand({type:'kick',id});return;}
     const conn = this.connections.get(id);
     if (conn) {
       if(this.kicked.size<128)this.kicked.add(id);

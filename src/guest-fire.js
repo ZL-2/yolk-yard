@@ -11,7 +11,7 @@ export class GuestFire {
   this.sent=this.sent.filter(s=>s.seq>player.ack&&now-s.at<1);
   this.echoes=this.echoes.filter(s=>now-s.at<1).slice(-64);
   const pressed=input.fire&&!this.held;this.held=!!input.fire&&time>=(player.equipUntil||0);
-  const w=gun(player),eligible=player.health>0&&(!player.inventory||player.flight==='ground'&&player.inventory?.[player.slot]?.weapon)&&input.slot===player.slot&&!input.buildMode&&!input.reload&&!player.reloadEnd&&!player.use;
+  const w=gun(player),eligible=player.health>0&&!player.downed&&!player.reviving&&(!player.inventory||player.flight==='ground'&&player.inventory?.[player.slot]?.weapon)&&input.slot===player.slot&&!input.buildMode&&!input.reload&&!player.reloadEnd&&!player.use;
   if(!this.accuracy||player.ack!==this.lastAck&&!this.sent.length){this.accuracy={...player.combatState};this.lastAck=player.ack;}
   player.aim=!!input.aim;
   updateCombatAccuracy(player,w,this.accuracy,1/60,time,Math.hypot(player.vx||0,player.vz||0));

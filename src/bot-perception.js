@@ -1,9 +1,10 @@
 import {mode,gun,weapon} from './data.js';
 import {teammates,teamMode} from './teams.js';
-import {wallDistance,dist,EYE} from './physics.js';
+import {wallDistance,dist} from './physics.js';
+import {eyeHeight,bodyHeight} from './stance.js';
 import {wrapAngle,BOT_WORLD_SENSES} from './bot-config.js';
 export const hostile=(sim,p,t)=>t!==p&&t.health>0&&!t.spectating&&t.flight!=='transport'&&!teammates(sim.options,p,t);
-export function seesPoint(sim,p,t){const o={x:p.x,y:p.y+EYE,z:p.z},d={x:t.x-o.x,y:t.y+1.22-o.y,z:t.z-o.z},len=Math.hypot(d.x,d.y,d.z)||1;return wallDistance(sim.map,o,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.08;}
+export function seesPoint(sim,p,t){const o={x:p.x,y:p.y+eyeHeight(p),z:p.z},d={x:t.x-o.x,y:t.y+bodyHeight(t)*.66-o.y,z:t.z-o.z},len=Math.hypot(d.x,d.y,d.z)||1;return wallDistance(sim.map,o,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.08;}
 export function newBrain(sim,p){return {memory:{},eventId:Math.max(0,sim.eventId-32),perceiveAt:0,decision:0,aimAt:0,nextBurst:0,burstUntil:0,turnAt:sim.time,checkAt:sim.time+1,lastX:p.x,lastZ:p.z,side:sim.random()<.5?-1:1,visited:{},lootMemory:{},objective:'survey',target:null,targetUntil:0};}
 function hear(sim,p,brain,id,point,kind,damage=0){
  if(damage){brain.attackedAt=sim.time;brain.decision=0;brain.perceiveAt=0;}
@@ -32,7 +33,7 @@ export function observe(sim,p,brain,skill){
   if(dist(p,source)<skill.hearing){
    const id=e.player||'sound-'+e.id;hear(sim,p,brain,id,source,'sound');
    // A heard shot aimed into our vicinity is an active threat, even before it hits.
-   const dx=p.x-source.x,dy=p.y+1.22-source.y,dz=p.z-source.z,len=Math.hypot(dx,dy,dz)||1;
+   const dx=p.x-source.x,dy=p.y+bodyHeight(p)*.66-source.y,dz=p.z-source.z,len=Math.hypot(dx,dy,dz)||1;
    if(e.type==='shot'&&e.shots?.some(s=>(s.vx*dx+s.vy*dy+s.vz*dz)/(Math.hypot(s.vx,s.vy,s.vz)*len)>.965)){
     brain.memory[id].engagedAt=sim.time;brain.decision=0;brain.perceiveAt=0;
    }
@@ -45,7 +46,8 @@ export function observe(sim,p,brain,skill){
   if(!hostile(sim,p,enemy))continue;const d=dist(p,enemy),angle=wrapAngle(Math.atan2(p.x-enemy.x,p.z-enemy.z)-p.yaw);
   if(d<skill.vision&&(Math.abs(angle)<skill.fov||d<20&&sim.time-(brain.memory[enemy.id]?.engagedAt??brain.memory[enemy.id]?.damageAt??-100)<2)&&seesPoint(sim,p,enemy)){
    const previous=brain.memory[enemy.id];brain.memory[enemy.id]={id:enemy.id,x:enemy.x,y:enemy.y,z:enemy.z,vx:enemy.vx||0,vz:enemy.vz||0,vy:enemy.vy||0,bodyScale:enemy.bodyScale||1,visible:true,seenAt:sim.time,updated:sim.time,confidence:1,health:enemy.health,weapon:gun(enemy).id,engagedAt:previous?.engagedAt,damageAt:previous?.damageAt,damage:(previous?.damage||0)*.8,kind:'visual'};
-  }else if(BOT_WORLD_SENSES.footsteps&&d<skill.steps&&enemy.moving&&sim.time>(brain.footstepAt?.[enemy.id]||0)){
+   Object.assign(brain.memory[enemy.id],{crouching:enemy.crouching,sliding:enemy.sliding,lowCrouch:enemy.lowCrouch,downed:enemy.downed});
+  }else if(BOT_WORLD_SENSES.footsteps&&d<skill.steps*(enemy.crouching?.45:1)&&enemy.moving&&sim.time>(brain.footstepAt?.[enemy.id]||0)){
    brain.footstepAt??={};brain.footstepAt[enemy.id]=sim.time+.7;hear(sim,p,brain,enemy.id,enemy,'footstep');
   }
  }
@@ -72,7 +74,7 @@ export function threatScore(sim,p,brain,m){
  const help=[...sim.players.values()].some(t=>teammates(sim.options,t,p)&&t.health>0&&t.brain?.target===m.id&&dist(t,p)<25)?6:0;
  const storm=sim.storm?.active&&d>20&&Math.hypot(m.x-sim.storm.nextX,m.z-sim.storm.nextZ)>sim.storm.nextRadius?16:0;
  const allyDanger=sim.time-(m.allyThreatAt??-100)<3?14:0;
- return exposed+(m.confidence||0)*22+Math.min(40,m.damage||0)+incoming+matchup+vulnerable+weaponFit+help+allyDanger+(m.health<40?6:0)-Math.log1p(d)*8-age*3-storm;
+ return exposed+(m.confidence||0)*22+Math.min(40,m.damage||0)+incoming+matchup+vulnerable+weaponFit+help+allyDanger+(m.health<40?6:0)-Math.log1p(d)*8-age*3-storm-(m.downed?35:0);
 }
 export function selectThreat(sim,p,brain,skill){
  const memories=Object.values(brain.memory).filter(m=>!sim.players.has(m.id)||hostile(sim,p,sim.players.get(m.id)));

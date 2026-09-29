@@ -1,5 +1,18 @@
 export const RELEASE_NOTES = [
   {
+    number: "62",
+    title: "Fieldcraft & Firepower",
+    changes: [
+      "All eleven firearms have refined metal/polymer geometry, one canonical name, and regenerated images projected from the actual model factory. Separate category-tuned viewmodel cameras fix camera clipping across screen sizes. Original firing and handling sound designs distinguish every firearm; short accepted-path tracers replace long yellow beams.",
+      "Operators gain fuller heads, fitted clothing detail, articulated gloves and refined stance poses. A shared humanoid rig blends crouching, sliding, crawling, reviving and weapon actions. Decorative equipment never enlarges standardized combat regions. The lobby now uses an independent cinematic walking and scanning loop, with no pointer-following behavior.",
+      "Hold Crouch to lower your body, camera and combat hit regions. Sprint into a crouch to slide with bounded momentum, slope response, limited steering and a cooldown. Standing requires overhead clearance. Input prediction and server validation keep movement smooth and fair.",
+      "Frontier Royale Duos now supports Downed players, slow crawling, finishing and bleed-out. Hold Interact beside an eligible teammate for ten seconds to restore 30 health. Walls, range, movement and combat damage interrupt revival; abandoned progress decays. Teams with no active survivor resolve immediately, including storm and disconnect cases.",
+      "Middle mouse places a world marker and Y marks danger; both controls can be rebound. Your Duo sees ownership, distance, map markers and a short notification. Server validation, replacement, expiry and rate limits prevent marker spam.",
+      "Online matches now run on the relay. Browsers submit movement and interaction intent; the server owns hits, critical damage, downing, revives, teams, markers and rewards. Room leadership can transfer without transferring combat authority. The 30-second Spawn Island countdown and existing accounts, cosmetics, Marks and settings are preserved.",
+      "Sprinter no longer has an extra ADS dot; intentional reflex optics retain their reticles. Seven presses on the Ravel Front logo open owner authentication correctly, and failed attempts can be retried. The private owner key remains server-only. Refresh to join protocol 21 matches."
+    ]
+  },
+  {
     "number": "51",
     "title": "Ravelfront: A New Frontier",
     "changes": [

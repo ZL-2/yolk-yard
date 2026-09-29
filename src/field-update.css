@@ -1,0 +1,11 @@
+#downed-status{position:absolute;left:50%;bottom:28%;transform:translateX(-50%);padding:13px 22px;border:1px solid #ff795f;background:#162329ec;color:#ffd3bf;letter-spacing:.08em;font:700 13px var(--font-body,system-ui);border-radius:4px;text-align:center}
+.is-downed .ammo-card,.is-downed .royale-hotbar,.is-downed .royale-tools{opacity:.25;pointer-events:none}
+.is-downed .health-bar>span{background:#ff795f}
+.duo-world-marker{position:absolute;transform:translate(-50%,-50%);display:grid;justify-items:center;color:#72e8d6;pointer-events:none;text-shadow:0 2px 3px #0a1722}
+.duo-world-marker b{display:grid;place-items:center;width:29px;height:29px;background:#152c34dc;border:2px solid currentColor;border-radius:5px;font:900 20px system-ui;box-shadow:0 3px 12px #07171c66}
+.duo-world-marker span{margin-top:4px;font:800 10px system-ui;background:#152c34dc;padding:3px 5px;border-radius:3px;white-space:nowrap}
+.duo-world-marker small{font:600 10px system-ui;color:#eff8f8}
+.duo-world-marker.danger{color:#ff795f}
+.duo-world-marker.danger b{border-radius:50%}
+.royale-mobile{gap:5px}
+@media(max-width:700px){.duo-world-marker span{font-size:9px}#downed-status{width:70%;font-size:11px}.royale-mobile button{font-size:9px;padding:8px}}

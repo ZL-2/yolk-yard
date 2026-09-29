@@ -1,6 +1,7 @@
 import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon } from "./data.js";
 import {groundAt,terrainHit} from './terrain.js';
+import {STANCE,bodyHeight,eyeHeight,regionPose} from './stance.js';
 export const RADIUS = 0.32,
   HEIGHT = 1.85,
   EYE = 1.70;
@@ -62,7 +63,7 @@ export function wallDistance(map, o, d, max = 200) {
 // Fixed anatomical regions, independent of cosmetics and visual animation.
 // Torso/limbs all deal body damage. Only the head region is critical.
 export const HUMAN_HIT=[
- {region:'head',x:0,y:1.68,z:0,rx:.145,ry:.18,rz:.145},
+ {region:'head',x:0,y:1.68,z:0,rx:.157,ry:.18,rz:.155},
  {region:'body',x:0,y:1.24,z:0,rx:.26,ry:.30,rz:.17},
  {region:'body',x:0,y:.92,z:0,rx:.20,ry:.19,rz:.17},
  ...[-1,1].flatMap(side=>[
@@ -75,11 +76,10 @@ export const humanFlightPitch=p=>p.flight==='dive'?.78:p.flight==='glide'?.09+Ma
 export function humanHit(o,d,p){
  const yaw=p.yaw||0,c=Math.cos(yaw),s=Math.sin(yaw),dx=o.x-p.x,dz=o.z-p.z;
  const origin={x:dx*c-dz*s,y:o.y-p.y,z:dx*s+dz*c},v={x:d.x*c-d.z*s,y:d.y,z:d.x*s+d.z*c};
- const lower=(.15+(p.sprinting?.03:0))*Math.min(1,Math.hypot(p.vx||0,p.vz||0)/2);
  const pitch=humanFlightPitch(p),cp=Math.cos(pitch),sp=Math.sin(pitch);for(const vector of [origin,v]){const y=vector.y,z=vector.z;vector.y=y*cp+z*sp;vector.z=-y*sp+z*cp;}
  let result={distance:Infinity,region:null};
- for(const h of HUMAN_HIT){
-  const a=[(origin.x-h.x)/h.rx,(origin.y-h.y+(h.y>=.9?lower:h.y>=.5?lower*.5:0))/h.ry,(origin.z-h.z)/h.rz],b=[v.x/h.rx,v.y/h.ry,v.z/h.rz];
+ for(const base of HUMAN_HIT){
+  const h=regionPose(base,p),a=[(origin.x-h.x)/h.rx,(origin.y-h.y)/h.ry,(origin.z-h.z)/h.rz],b=[v.x/h.rx,v.y/h.ry,v.z/h.rz];
   const A=b.reduce((n,x)=>n+x*x,0),B=2*a.reduce((n,x,i)=>n+x*b[i],0),C=a.reduce((n,x)=>n+x*x,0)-1,D=B*B-4*A*C;
   if(A<1e-12||D<0)continue;const t=C<=0?0:(-B-Math.sqrt(D))/(2*A);
   if(t>=0&&t<result.distance)result={distance:t,region:h.region};
@@ -91,24 +91,27 @@ export const rayHuman=rayEgg;
 function overlaps(p, b) {
   return (
     p.y < b.y + b.h - 0.015 &&
-    p.y + HEIGHT > b.y + 0.02 &&
+    p.y + bodyHeight(p) > b.y + 0.02 &&
     Math.abs(p.x - b.x) < b.w / 2 + RADIUS &&
     Math.abs(p.z - b.z) < b.d / 2 + RADIUS
   );
 }
 export function canStand(map,p,margin=RADIUS) {
+ return canOccupy(map,p,HEIGHT,margin);
+}
+export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS) {
  if(Math.abs(p.x)>map.size-margin||Math.abs(p.z)>map.size-margin)return false;
- return ![...candidates(map,p,null,0,margin)].some(b=>p.y+.035<b.y+b.h&&p.y+HEIGHT>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin);
+ return ![...candidates(map,p,null,0,margin)].some(b=>p.y+.035<b.y+b.h&&p.y+height>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin);
 }
 function pushAxis(p,map,axis,delta) {
  if(Math.abs(delta)<1e-10)return;
  const start=p[axis],base=p.y,other=axis==='x'?'z':'x',size=axis==='x'?'w':'d';
  let target=start+delta;
  const nearby=[...candidates(map,{...p,[axis]:target})];
- const hits=nearby.filter(b=>p.y<b.y+b.h-.015&&p.y+HEIGHT>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(target-b[axis])<b[size]/2+RADIUS);
+ const hits=nearby.filter(b=>p.y<b.y+b.h-.015&&p.y+bodyHeight(p)>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(target-b[axis])<b[size]/2+RADIUS);
  // One stair rise per axis. Never stack multiple step corrections in one move.
  const top=Math.max(base,...hits.map(b=>b.y+b.h));
- if(hits.length&&p.grounded&&top-base>0&&top-base<=.43&&canStand(map,{...p,[axis]:target,y:top})) {
+ if(hits.length&&p.grounded&&top-base>0&&top-base<=.43&&canOccupy(map,{...p,[axis]:target,y:top})) {
   p[axis]=target;p.y=top;return;
  }
  for(const b of hits){
@@ -142,6 +145,7 @@ function movePlayerStep(p, input, map, dt) {
   );
   if (p.flight === 'transport') return;
   if (p.flight === 'dive' || p.flight === 'glide' || p.flight === 'launch') {
+    p.crouching=false;p.sliding=false;p.crouchLatch=!!input.crouch;
     const toggle=input.jump&&!p.flightLatch;p.flightLatch=!!input.jump;
     const f=clamp(input.forward || 0,-1,1),s=clamp(input.strafe || 0,-1,1),length=Math.max(1,Math.hypot(f,s));
     const speed=p.flight==='glide'?24:p.flight==='launch'?26:17;
@@ -163,7 +167,7 @@ function movePlayerStep(p, input, map, dt) {
   if (p.inventory) {
     p.stamina ??= 100; p.sprintRest ??= 0;
     if(p.stamina>=20)p.exhausted=false;
-    p.sprinting=!!input.sprint && !p.exhausted && p.stamina>0 && !input.aim && !input.fire && !p.use && Math.hypot(input.forward||0,input.strafe||0)>.1 && p.grounded;
+    p.sprinting=!!input.sprint && !p.downed && !p.reviving && !p.crouching && !p.sliding && !p.exhausted && p.stamina>0 && !input.aim && !input.fire && !p.use && Math.hypot(input.forward||0,input.strafe||0)>.1 && p.grounded;
     if(p.sprinting){p.stamina=Math.max(0,p.stamina-22*dt);p.sprintRest=0;if(p.stamina===0)p.exhausted=true;}
     else {p.sprintRest+=dt;if(p.sprintRest>1.3)p.stamina=Math.min(100,p.stamina+18*dt);}
   }
@@ -174,13 +178,44 @@ function movePlayerStep(p, input, map, dt) {
     f /= len;
     s /= len;
   }
+  p.slideCooldown=Math.max(0,(p.slideCooldown||0)-dt);
+  // Packet gaps are not a physical stop. Use the most recently executed move,
+  // bounded by server freshness, so crouch edges can initiate slides under jitter.
+  const momentumX=p.motionFresh?p.motionVX:p.vx,momentumZ=p.motionFresh?p.motionVZ:p.vz;
+  const speedBefore=Math.hypot(momentumX||0,momentumZ||0),crouchEdge=!!input.crouch&&!p.crouchLatch;
+  if(!p.downed&&!p.reviving&&crouchEdge&&p.grounded&&speedBefore>=5.5&&p.slideCooldown===0){
+    p.sliding=true;p.slideAge=0;const boost=Math.min(9,speedBefore+.35)/Math.max(.01,speedBefore);p.slideVX=momentumX*boost;p.slideVZ=momentumZ*boost;
+  }
+  p.crouchLatch=!!input.crouch;
+  if(p.sliding){
+    p.slideAge=(p.slideAge||0)+dt;
+    if(!input.crouch||input.jump||p.downed||p.reviving||p.slideAge>=3.4||Math.hypot(p.slideVX,p.slideVZ)<2.6){p.sliding=false;p.slideCooldown=.65;}
+  }
+  p.crouching=!p.downed&&(p.sliding||!!p.reviving||!!input.crouch||!canStand(map,p));
+  p.lowCrouch=!!p.crouching&&!p.sliding&&!canOccupy(map,p,STANCE.crouching.height);
+  if(p.crouching||p.downed||p.reviving)p.sprinting=false;
+  if(p.downed){input={...input,jump:false,aim:false};p.crouching=false;p.sliding=false;}
+  if(p.reviving){f=0;s=0;}
   const speed =
     (p.inventory ? ROYALE_MOVEMENT[p.sprinting ? 'sprint' : 'walk'] : weapon(p.weapon).speed) *
     (input.aim ? 0.7 : 1) *
-    (p.crown != null ? 0.88 : 1)*(p.quickstep?1.12:1);
-  const dx = (-Math.sin(p.yaw) * f + Math.cos(p.yaw) * s) * speed * dt,
-    dz = (-Math.cos(p.yaw) * f - Math.sin(p.yaw) * s) * speed * dt;
-  if (input.jump && p.grounded && !p.jumpLatch) {
+    (p.crown != null ? 0.88 : 1)*(p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
+  let mx=(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)*speed,mz=(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)*speed;
+  if(p.sliding){
+    let vx=p.slideVX||0,vz=p.slideVZ||0,v=Math.hypot(vx,vz);
+    if(p.grounded){
+      const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;
+      vx-=gx*8*dt;vz-=gz*8*dt;
+      const loss=Math.max(0,1-3.8*dt/Math.max(v,.01));vx*=loss;vz*=loss;
+    }
+    v=Math.hypot(vx,vz);const wanted=Math.hypot(mx,mz);
+    if(wanted>.1){const blend=Math.min(.055,dt*.85);vx=vx*(1-blend)+mx/wanted*v*blend;vz=vz*(1-blend)+mz/wanted*v*blend;const n=Math.hypot(vx,vz)||1;vx*=v/n;vz*=v/n;}
+    const cap=Math.min(1,10.5/(Math.hypot(vx,vz)||1));p.slideVX=mx=vx*cap;p.slideVZ=mz=vz*cap;
+  }else if(!p.grounded&&p.slideAge>0&&!p.downed){mx=mx*.2+(p.slideVX||0)*.8;mz=mz*.2+(p.slideVZ||0)*.8;}
+  else if(p.grounded&&!p.sliding)p.slideAge=0;
+  const dx=mx*dt,dz=mz*dt;
+  if (input.jump && p.grounded && !p.jumpLatch && !p.reviving && !p.downed && canStand(map,p)) {
+    p.crouching=false;p.sliding=false;
     p.vy = 8.6;
     p.grounded = false;
   }
@@ -196,7 +231,7 @@ function movePlayerStep(p, input, map, dt) {
   if(wasGrounded){
     let support=ground;
     for(const b of candidates(map,p))if(b.y+b.h<=p.y+.001&&Math.abs(p.x-b.x)<b.w/2+RADIUS&&Math.abs(p.z-b.z)<b.d/2+RADIUS)support=Math.max(support,b.y+b.h);
-    if(p.y-support<=.43&&canStand(map,{...p,y:support})){p.y=support;p.vy=0;}
+    if(p.y-support<=.43&&canOccupy(map,{...p,y:support})){p.y=support;p.vy=0;}
   }
   const oldY = p.y;
   p.vy -= 24 * dt;
@@ -212,8 +247,8 @@ function movePlayerStep(p, input, map, dt) {
       p.y = b.y + b.h;
       p.vy = 0;
       p.grounded = true;
-    } else if (p.vy > 0 && oldY + HEIGHT <= b.y + 0.03 && p.y + HEIGHT >= b.y) {
-      p.y = b.y - HEIGHT;
+    } else if (p.vy > 0 && oldY + bodyHeight(p) <= b.y + 0.03 && p.y + bodyHeight(p) >= b.y) {
+      p.y = b.y - bodyHeight(p);
       p.vy = 0;
     }
   }
@@ -241,7 +276,7 @@ export function sanitizeInput(i = {}) {
     popper: !!i.popper,
     slot: Number.isInteger(i.slot) && i.slot>=0 && i.slot<6 ? i.slot : 0,
     buildAnchor:typeof i.buildAnchor==='string'&&/^[0-9.,-]{1,80}$/.test(i.buildAnchor)?i.buildAnchor:null, editing:!!i.editing, buildMode: !!i.buildMode, buildType: ["wall","floor","stairs","roof"].includes(i.buildType)?i.buildType:"wall", buildMaterial:["wood","brick","metal"].includes(i.buildMaterial)?i.buildMaterial:"wood", buildRotation:Number.isInteger(i.buildRotation)?((i.buildRotation%4)+4)%4:0,
-    sprint: !!i.sprint, interact: !!i.interact, drop: !!i.drop,
+    sprint: !!i.sprint, crouch:!!i.crouch, interact: !!i.interact, drop: !!i.drop,
     swapSlot: Number.isInteger(i.swapSlot) && i.swapSlot>=1 && i.swapSlot<6 ? i.swapSlot : -1,
   };
 }
@@ -260,7 +295,7 @@ export function muzzleOrigin(p, w) {
     forward = -VIEWMODEL.z + w.muzzle * VIEWMODEL.scale;
   return {
     x: p.x + right.x * side + up.x * height + f.x * forward,
-    y: p.y + EYE + up.y * height + f.y * forward,
+    y: p.y + eyeHeight(p) + up.y * height + f.y * forward,
     z: p.z + right.z * side + up.z * height + f.z * forward,
   };
 }

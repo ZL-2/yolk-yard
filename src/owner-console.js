@@ -1,5 +1,5 @@
 // A discoverability gesture, never an authorization mechanism. Only the relay knows the owner code.
-const gesture=['KeyY','KeyO','KeyL','KeyK','KeyA','KeyR','KeyD'];
+const gesture=['KeyR','KeyA','KeyV','KeyE','KeyL','KeyF','KeyR','KeyO','KeyN','KeyT'];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const api=()=>{
   const endpoint=globalThis.window?.YOLK_NETWORK?.relay;
@@ -11,9 +11,9 @@ export class OwnerConsole {
     this.dialog.addEventListener('submit',e=>{if(e.target.id==='owner-eggs-form'){e.preventDefault();void this.addEggs(e.target);}});
     document.addEventListener('keydown',e=>this.key(e));
     document.addEventListener('click',e=>{
-      if(this.screen()!=='menu'||this.dialog.open||!e.target.closest('.topbar .brand'))return;
+      if(this.screen()!=='menu'||this.dialog.open||!e.target.closest('.yard-logo, [data-owner-trigger]'))return;
       const now=Date.now();this.taps=now-this.lastTap<1200?this.taps+1:1;this.lastTap=now;
-      if(this.taps===7){this.taps=0;this.open();}
+      if(this.taps===7){this.taps=0;e.preventDefault();e.stopImmediatePropagation();this.open();}
     });
   }
   key(event){

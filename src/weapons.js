@@ -101,13 +101,15 @@ function plate(g, points, thickness, c, x = 0) {
   });
   return part(g, geo, color(c), [x, 0, 0]);
 }
-const dark = 0x253444,
-  black = 0x132331,
-  steel = 0x667c88,
-  cream = 0xf5edd5;
+const dark = 0x30383c,
+  black = 0x151c20,
+  steel = 0x748087,
+  cream = 0xb4b6aa;
+const finishes={sprinter:0x4a5558,scatter:0x555a5a,needle:0x586762,zipper:0x444d50,thumper:0x66705c,anchor:0x556064,duet:0x6b695b,pip:0x626d73,peeper:0x647168,doubleyolk:0x495459,comet:0x455b65};
 function grip(g, z = 0.12) {
-  const m = box(g, 0, -0.24, z, 0.14, 0.3, 0.18, dark);
-  m.rotation.x = -0.18;
+  plate(g,[[z-.08,-.07],[z+.065,-.08],[z+.115,-.18],[z+.135,-.35],[z+.08,-.405],[z-.06,-.39],[z-.09,-.33],[z-.065,-.23],[z-.10,-.15]],.135,dark);
+  // Radiused backstrap and inset textured palm panels, not a rectangular handle.
+  for(const side of [-1,1])plate(g,[[z-.048,-.17],[z+.065,-.17],[z+.102,-.34],[z+.06,-.369],[z-.05,-.35]],.009,black,side*.075);
   for (let i = 0; i < 4; i++)
     box(g, 0, -0.14 - i * 0.052, z + 0.055, 0.15, 0.014, 0.08, black, 0.004);
   box(g, 0, -0.2, z - 0.145, 0.14, 0.032, 0.18, steel, 0.01, true);
@@ -213,13 +215,17 @@ function optic(g, kind, frontZ = -0.7) {
       [0, 0.285, 0.068],
     );
     glass.userData.ownedMaterial = true;
+    if(weapon(g.userData.weaponId).reticle==='ring'){
+      const reticle=part(g,cached('launcher-reticle',()=>new THREE.RingGeometry(.021,.024,20)),new THREE.MeshBasicMaterial({color:0xd8e9d4,side:THREE.DoubleSide,toneMapped:false}),[0,.285,.071]);reticle.userData.ownedMaterial=true;g.userData.reticle=reticle;
+    }else if(weapon(g.userData.weaponId).reticle==='reflex-dot'){
     const dot = part(
       g,
       cached("dot", () => new THREE.CircleGeometry(0.006, 16)),
       new THREE.MeshBasicMaterial({ color: 0xff593c, toneMapped: false }),
       [0, 0.285, 0.071],
     );
-    dot.userData.ownedMaterial = true;
+    dot.userData.ownedMaterial = true;g.userData.reticle=dot;
+    }
     g.userData.sightY = sightY;
     g.userData.optic = "reflex";
   }
@@ -227,8 +233,8 @@ function optic(g, kind, frontZ = -0.7) {
 export function makeBlaster(id,wrap='') {
   const w = weapon(id),
     g = new THREE.Group(),
-    c = w.color;
-  g.name = `${w.name} blaster`;
+    c = finishes[id]||finishes.sprinter;
+  g.name = w.name;
   g.userData.weaponId=id;
   const wood=0x896044;
   const receiver=(length=.58,width=.25)=>{plate(g,[[.31,-.11],[-length+.31,-.11],[-length+.24,.03],[-length+.35,.145],[.25,.145],[.34,.06]],width,c);tube(g,0,.075,.03,.072,.4,dark);};
@@ -311,6 +317,21 @@ export function makeBlaster(id,wrap='') {
     token.visible = false;
     g.userData.reloadToken = token;
   }
+  // Machined ejection recess, chamfered bolt face, safety lever and receiver
+  // pins use the same sockets on every representation. No texture-only artwork.
+  if(!['thumper','comet','scatter'].includes(id)){
+    const width=id==='pip'?.108:id==='duet'?.148:id==='anchor'?.15:.137;
+    box(g,width,.053,id==='duet'?.38:-.07,.008,.053,.16,black,.008);
+    box(g,width+.006,.041,id==='duet'?.40:-.06,.008,.029,.105,steel,.006,true);
+    const selector=box(g,-width-.008,-.044,.17,.017,.025,.065,dark,.01,true);selector.rotation.x=.35;
+    for(const z of [.12,.22]){const pin=part(g,cached('receiver-pin',()=>new THREE.CylinderGeometry(.014,.014,.014,8)),color(steel,true),[-width-.005,-.04,z]);pin.rotation.z=Math.PI/2;}
+  }
+  if(!['pip','thumper','comet','scatter','doubleyolk'].includes(id)){
+    const z=id==='duet'?.35:-.14;box(g,0,-.115,z,.207,.066,.236,dark,.024);
+  }
+  // Subtle finish accents and sling attachment; mass remains dark metal/polymer.
+  box(g,-.137,.015,.16,.009,.025,.095,0x8c9188,.004);
+  if(id!=='pip'){const sling=ring(g,-.12,-.09,.53,.031,.008,steel);sling.rotation.y=Math.PI/2;}
   // Small construction details break up broad surfaces while keeping readable silhouettes.
   const detailX =
     {

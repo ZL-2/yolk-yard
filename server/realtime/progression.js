@@ -60,6 +60,7 @@ export class ProgressionService{
   }
  }
  sweep(){const now=this.clock();for(const [key,m]of this.matches){if(now-m.last>3600){this.matches.delete(key);continue;}if(m.finished||now-m.last>5)continue;
+  if(this.relay.authority?.rooms.has(m.room))continue; // The authoritative simulation owns AFK removal.
   for(const p of m.players.values()){if(!p.controlled||p.bot||p.afkRemoved||!p.peer?.ws)continue;const remaining=Math.ceil(activityRemaining(p.activity,now));if(remaining<=12)this.relay.send(p.peer,{type:'afk',remaining});if(remaining<=0){p.afkRemoved=true;p.controlled=false;const host=this.relay.peers.get(m.room);if(host)this.relay.send(host,{type:'afk-enforce',player:p.id});}}
  }if(this.dirty){this.dirty=false;void this.save();}}
  save(){if(!this.path)return Promise.resolve();const json=JSON.stringify([...this.accounts].slice(-5000));this.saveChain=this.saveChain.then(async()=>{await mkdir(dirname(this.path),{recursive:true});await writeFile(this.path+'.tmp',json);await rename(this.path+'.tmp',this.path);}).catch(()=>{this.dirty=true;});return this.saveChain;}

@@ -1,3 +1,4 @@
+import {MatchAuthority} from './authority.js';
 import {randomUUID} from 'node:crypto';
 import {mergeRelayMessage} from '../../src/relay-queue.js';
 import {ProgressionService} from './progression.js';
@@ -6,7 +7,7 @@ const MAX_FRAME=2_000_000, MAX_QUEUE=4_000_000, GRACE=10_000;
 const address=/^yolk-yard-v\d+-[A-Z2-9]{8}$/;
 // One persistent process owns every connected socket. No database in the data path.
 export class RealtimeRelay {
-  constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.progression=new ProgressionService(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
+  constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.progression=new ProgressionService(this);this.authority=new MatchAuthority(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
   attach(ws){
     let peer; const started=Date.now();
     // Browser networking can answer native pings while a costly render blocks JS.
@@ -20,7 +21,7 @@ export class RealtimeRelay {
           if(m.type!=='register')throw Error('Register first');
           if(m.resume){
             peer=this.peers.get(m.id);
-            if(!peer||peer.token!==m.resume||!Number.isSafeInteger(m.cursor)||m.cursor<peer.acked||m.cursor>peer.seq||peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)throw Error('Expired resume');
+            if(!peer||peer.virtualRoom||peer.token!==m.resume||!Number.isSafeInteger(m.cursor)||m.cursor<peer.acked||m.cursor>peer.seq||peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)throw Error('Expired resume');
             const old=peer.ws;peer.ws=null;old?.close(1000,'Resumed elsewhere');
             this.ack(peer,m.cursor);peer.ws=ws;
           }else{
@@ -31,7 +32,7 @@ export class RealtimeRelay {
             peer={id,token:randomUUID(),ws,links:new Map(),pending:[],pendingBytes:0,seq:0,acked:0,clientSeq:0,history:[],historyBytes:0,lastSeen:Date.now(),rateAt:Date.now(),frames:0,bytes:0};
             this.peers.set(id,peer);this.sessions.add(peer);void this.progression.register(peer,m.progressToken);
           }
-          clearTimeout(registration);peer.detachedAt=0;peer.lastSeen=Date.now();
+          clearTimeout(registration);peer.detachedAt=0;peer.lastSeen=Date.now();this.authority.connection(peer,true);
           ws.send(JSON.stringify({type:'ready',id:peer.id,resumed:!!m.resume,resume:peer.token,protocol:2}));
           for(const item of peer.history)ws.send(item.raw);
           this.flush(peer);return;
@@ -49,7 +50,7 @@ export class RealtimeRelay {
         if(ws.readyState===1)ws.send(JSON.stringify({type:'command-ack',seq:peer.clientSeq}));
       }catch(error){ws.close(1008,['Rate limit','Command sequence','Expired resume','Register first'].includes(error.message)?error.message:'Invalid relay message');}
     });
-    ws.on('close',()=>{clearTimeout(registration);if(peer?.ws===ws){peer.ws=null;peer.detachedAt=Date.now();}});
+    ws.on('close',()=>{clearTimeout(registration);if(peer?.ws===ws){peer.ws=null;peer.detachedAt=Date.now();this.authority.connection(peer,false);}});
     ws.on('error',()=>{});
     return ()=>peer;
   }
@@ -76,12 +77,14 @@ export class RealtimeRelay {
     }
   }
   handle(peer,m){
-    if(m.type==='progress'){this.progression.frame(peer,m.state);return;}
+    if(m.type==='authority-create'||m.type==='authority-command'){this.authority.command(peer,m);return;}
+    if(m.type==='progress')return; // Currency settlement accepts server simulation only.
     if(m.type==='list'){
-      const rooms=[...this.peers.values()].filter(p=>p.ws&&p.listing&&p.listing.public!==false&&Date.now()-p.listedAt<15000).map(p=>p.listing).slice(0,100);
+      const rooms=[...this.peers.values()].filter(p=>(p.ws||p.virtualRoom)&&p.listing&&p.listing.public!==false&&Date.now()-p.listedAt<15000).map(p=>p.listing).slice(0,100);
       this.send(peer,{type:'rooms',request:m.request,rooms});return;
     }
     if(m.type==='publish'){
+      if(this.authority.rooms.has(peer.id))return;
       if(!address.test(peer.id))throw Error('Not a room');
       const r=m.room;
       if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!Number.isInteger(r.players)||r.players<1||r.players>20))throw Error('Invalid room');
@@ -94,7 +97,7 @@ export class RealtimeRelay {
       if(!other||other===peer||other.links.size>=20){this.send(peer,{type:'error',channel:m.channel,error:'peer-unavailable'});return;}
       if(peer.links.has(m.channel)||other.links.has(m.channel))throw Error('Duplicate channel');
       peer.links.set(m.channel,other);other.links.set(m.channel,peer);
-      this.send(other,{type:'incoming',channel:m.channel,peer:peer.id});return;
+      if(!this.authority.connect(peer,other,m.channel))this.send(other,{type:'incoming',channel:m.channel,peer:peer.id});return;
     }
     if(m.type==='batch'){
       if(!Array.isArray(m.messages)||m.messages.length>128)throw Error('Invalid batch');
@@ -102,6 +105,7 @@ export class RealtimeRelay {
         if(!entry||!['accept','data','close'].includes(entry.type)||typeof entry.channel!=='string')throw Error('Invalid entry');
         const other=peer.links.get(entry.channel);
         if(!other){this.send(peer,{type:'closed',channel:entry.channel});continue;}
+        if(entry.type==='data'&&this.authority.data(peer,other,entry))continue;
         if(entry.type==='data'&&entry.data?.type==='input')this.progression.input(peer,entry.data.input||entry.data);
         if(entry.type==='data'&&entry.data?.type==='hello'){
           const admission=entry.data.ticket?this.parties.claim(entry.data.ticket,peer.id,other.id):null;
@@ -117,6 +121,7 @@ export class RealtimeRelay {
   }
   remove(peer,code=1000,reason='Session ended'){
     if(!this.peers.has(peer.id))return;
+    if(this.authority.disconnect(peer))return;
     this.peers.delete(peer.id);this.sessions.delete(peer);peer.ws?.close(code,reason);peer.ws=null;
     for(const [channel,other] of peer.links){other.links.delete(channel);this.send(other,{type:'closed',channel});}
     peer.links.clear();peer.history=[];peer.pending=[];
@@ -126,5 +131,5 @@ export class RealtimeRelay {
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
-  close(){void this.progression.close();this.parties.close();clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');}
+  close(){this.authority.close();void this.progression.close();this.parties.close();clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');}
 }

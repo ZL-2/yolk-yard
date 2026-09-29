@@ -8,7 +8,8 @@ assert.match(expected,/^[a-f0-9]{40}$/,'Provide the published game commit to ver
 let version;
 for(let i=0;i<18;i++){try{const r=await fetch(base+'version.json?t='+Date.now(),{signal:AbortSignal.timeout(10000)});version=await r.json();if(!expected||version.build===expected)break;}catch{}await new Promise(r=>setTimeout(r,5000));}
 assert.equal(version?.build,expected,'Pages must serve this exact release');
-const health=await fetch('https://yolk-yard-relay.onrender.com/health',{signal:AbortSignal.timeout(30000)}).then(r=>r.json());assert.equal(health.gameVersion,VERSION);assert.equal(health.brand,'Ravelfront');for(const feature of ['parties','marks-rewards','afk-59','humanoids'])assert.ok(health.features.includes(feature));
+let health;for(let i=0;i<36;i++){try{health=await fetch('https://yolk-yard-relay.onrender.com/health',{signal:AbortSignal.timeout(10000)}).then(r=>r.json());if(health.gameVersion===VERSION)break;}catch{}await new Promise(r=>setTimeout(r,5000));}
+assert.equal(health?.gameVersion,VERSION);assert.equal(health.brand,'Ravelfront');for(const feature of ['parties','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings'])assert.ok(health.features.includes(feature));
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']}),pages=[];
 await mkdir('test-results/live-lobby',{recursive:true});
 async function player(name){const c=await browser.newContext({viewport:{width:1365,height:768}}),p=await c.newPage();p.setDefaultTimeout(90000);await p.addInitScript(name=>{localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));},name);await p.goto(base+'?build='+version.build);pages.push(p);await p.locator('#menu [data-action="find-public"]:enabled').waitFor();return p;}
@@ -17,6 +18,7 @@ try{
  assert.equal(safeName(nameA),nameA);assert.equal(safeName(nameB),nameB);
  const a=await player(nameA),b=await player(nameB);assert.match(await a.title(),/Ravelfront/);assert.doesNotMatch(await a.locator('#menu').innerText(),/\beggs?\b|yolk|shell shockers/i);
  assert.equal(await a.getByText('Play Offline With Bots',{exact:true}).count(),0);
+ for(let i=0;i<7;i++)await a.locator('.yard-logo').click();await a.locator('#owner-code').fill('000000000000');await a.locator('#owner-form button').click();await a.locator('#owner-error').filter({hasText:/Incorrect|not configured/i}).waitFor();assert.equal(await a.locator('.owner-metrics').count(),0);await a.locator('#dialog [data-action="close"]').click();
  await a.locator('#menu [data-action="play"]').click();await a.locator('[data-experience="duos"]').click();await a.locator('#menu [data-action="social"]').first().click();
  await a.locator('.social-person').filter({hasText:nameB}).locator('[data-party-invite]').click();await b.locator('[data-party-accept]').click();
  await a.locator('#dialog [data-action="close"]').first().click();await a.locator('.yard-party').getByText(nameB,{exact:false}).waitFor();await b.locator('[data-action="party-ready"]').click();await a.waitForFunction(()=>!document.querySelector('.yard-queue-state').textContent.includes('Waiting for your teammate'));

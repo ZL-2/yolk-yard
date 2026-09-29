@@ -37,7 +37,7 @@ export class PartyService{
    case 'queue':{leader();idle();if(p.members.some(id=>!this.users.get(id).ws))throw Error('Wait for your teammate to reconnect.');if(p.members.some(id=>id!==u.id&&!this.users.get(id).ready))throw Error('Your teammate must ready up.');const selection=p.selection;
     if(selection.mode==='royale'&&selection.teamSize===1&&p.members.length>1)throw Error('A party of two needs Duos.');
     let options=matchOptions({...m.options,...selection,fill:m.options?.fill!==false,session:'online'}),room;
-    const rooms=[...this.relay.peers.values()].filter(peer=>peer.ws&&peer.listing&&Date.now()-peer.listedAt<15000).map(peer=>peer.listing);
+    const rooms=[...this.relay.peers.values()].filter(peer=>(peer.ws||peer.virtualRoom)&&peer.listing&&Date.now()-peer.listedAt<15000).map(peer=>peer.listing);
     const pending=roomCode=>[...this.tickets.values()].filter(t=>t.code===roomCode&&(!t.peer||t.claimedAt>(this.relay.peers.get(`yolk-yard-v${VERSION}-${roomCode}`)?.listedAt||0))&&t.expires>Date.now()).length;
     if(m.code){room=rooms.find(r=>r.code===m.code);if(!room)throw Error('That room is not accepting contestants. Check the code with its host.');}
     else if(!m.custom)room=rooms.filter(r=>r.public!==false&&r.version===VERSION&&r.mode===selection.mode&&(r.teamSize||1)===selection.teamSize&&(r.phase==='lobby'||selection.mode!=='royale'&&r.phase==='playing')&&r.capacity-r.players-pending(r.code)>=p.members.length).sort((a,b)=>b.players-a.players)[0];

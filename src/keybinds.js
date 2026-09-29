@@ -4,18 +4,21 @@ export const CONTROLS = [
   ['left', 'Move left', 'KeyA', 'ArrowLeft'],
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
   ['jump', 'Jump', 'Space', null],
+  ['crouch', 'Crouch / slide (hold)', 'ControlLeft', null],
+  ['marker', 'Duo world marker', 'Mouse1', null],
+  ['danger', 'Duo danger marker', 'KeyY', null],
   ['fire', 'Fire', 'Mouse0', null],
   ['aim', 'Aim / scope', 'Mouse2', null],
   ['reload', 'Reload', 'KeyR', null],
   ['popper', 'Throw popper', 'KeyE', 'KeyG'],
-  ['primary', 'Primary blaster / Royale slot 1', 'Digit1', null],
+  ['primary', 'Primary weapon / Royale slot 1', 'Digit1', null],
   ['sidearm', 'Sidearm / Royale slot 2', 'Digit2', null],
-  ['swap', 'Swap blaster', 'KeyQ', null],
+  ['swap', 'Swap weapon', 'KeyQ', null],
   ['nextSlot', 'Next item', 'WheelDown', null],
   ['previousSlot', 'Previous item', 'WheelUp', null],
   ['scores', 'Scoreboard', 'Tab', null],
   ['sprint','Sprint (Royale)','ShiftLeft',null],
-  ['interact','Search / pick up (Royale)','KeyF',null],
+  ['interact','Search / pick up / revive (Royale)','KeyF',null],
   ['map','Island map (Royale)','KeyM',null],
   ['inventory','Inventory (Royale)','KeyI',null],
   ['dismissFlight','Close flight tips (Royale)','KeyL',null],
@@ -37,7 +40,7 @@ export const CONTROLS = [
   ['chat', 'Open chat', 'Enter', 'KeyT'],
 ];
 export const validBinding = code => typeof code === 'string' && /^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Tab|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Mouse[0-4]|Wheel(Up|Down)|Numpad([0-9]|Add|Subtract|Multiply|Divide|Decimal|Enter)|Enter|CapsLock|Backquote|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Home|End|PageUp|PageDown|Insert|F([1-9]|1[01]))$/.test(code);
-const heldActions=new Set(['forward','back','left','right','aim','sprint','scores']);
+const heldActions=new Set(['forward','back','left','right','aim','sprint','scores','crouch','interact']);
 export const bindingAllowed=(action,code)=>validBinding(code)&&!(code.startsWith('Wheel')&&heldActions.has(action));
 // These bindings are disjoint by gameplay context; everything else stays exclusive.
 export function shareBinding(a,b,code){

@@ -1,7 +1,7 @@
 name: Test and publish Ravelfront
 on:
   push:
-    branches: [main, match-setup, better-together, ravelfront]
+    branches: [main, match-setup, better-together, ravelfront, field-update]
     paths-ignore:
       - public/room-test.html
       - public/room-test.js
@@ -29,6 +29,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+        if: "!contains(github.event.head_commit.message, '[field-update]')"
+      - name: Verify Fieldcraft movement, combat, authority, audio and owner access
+        if: contains(github.event.head_commit.message, '[field-update]')
+        run: |
+          npm run test:field
+          npx playwright install --with-deps chromium
+          npm run test:field-browser
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[field-update]')
+        with:
+          name: field-verification
+          path: test-results/field
       - name: Verify Ravelfront operators, cosmetics and populated island
         if: (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]'))
         run: |
@@ -80,13 +92,17 @@ jobs:
           path: test-results/egg-shop
           retention-days: 7
       - run: npm run test:relay
+        if: "!contains(github.event.head_commit.message, '[field-update]')"
       - run: npm run test:realtime
+        if: "!contains(github.event.head_commit.message, '[field-update]')"
       - name: Verify authoritative countdown, human-only early departure and shared Bus transition
+        if: "!contains(github.event.head_commit.message, '[field-update]')"
         run: node scripts/countdown-network-check.mjs
       - name: Verify Royale phases, spectator cutoff, falling loot and host migration
+        if: "!contains(github.event.head_commit.message, '[field-update]')"
         run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[field-update]')
         env:
           YOLK_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
         run: node scripts/relay-live-check.mjs
@@ -99,7 +115,7 @@ jobs:
   browser:
     # Relay-only releases use the real WebSocket/simulation checks in the build job.
     # Other verified releases retain the existing local-browser opt-in.
-    if: "!(contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))"
+    if: "!(contains(github.event.head_commit.message, '[field-update]') || contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -137,7 +153,7 @@ jobs:
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           BROWSER_RESULT: ${{ needs.browser.result }}
-          VERIFIED_RELEASE: ${{ (contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]'))) }}
+          VERIFIED_RELEASE: ${{ (contains(github.event.head_commit.message, '[field-update]') || contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]'))) }}
         run: |
           test "$BUILD_RESULT" = success
           if [ "$VERIFIED_RELEASE" = true ]; then
@@ -170,7 +186,7 @@ jobs:
       - uses: actions/deploy-pages@v4
         id: deployment
   verify-live:
-    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[lobby-duos]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))
+    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[field-update]') || contains(github.event.head_commit.message, '[lobby-duos]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 8

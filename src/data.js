@@ -1,9 +1,9 @@
 import { safeName } from './moderation.js';
-import {OPTICS} from './weapon-presentation.js';
+import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // The rebuilt island and movement model must not mix with older clients.
-export const VERSION = 20;
+export const VERSION = 21;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -149,7 +149,7 @@ export const ROYALE_WEAPONS = [
     "optic": "iron",
     "name": "Breach",
     "role": "TACTICAL",
-    "desc": "A quick cycling tactical scatter blaster.",
+    "desc": "A pump-action tactical shotgun built for close-range control.",
     "speed": 7.4,
     "color": 15505861,
     "size": 1.1,
@@ -171,7 +171,7 @@ export const ROYALE_WEAPONS = [
   }
 ];
 for(const w of [...WEAPONS,...ROYALE_WEAPONS])if(OPTICS[w.id]){w.ads={...OPTICS[w.id]};w.magnification=w.ads.magnification;w.sightY=w.ads.radius+.15;}
-for(const w of [...WEAPONS,...ROYALE_WEAPONS])Object.assign(w,combatProfile(w.id));
+for(const w of [...WEAPONS,...ROYALE_WEAPONS])Object.assign(w,combatProfile(w.id),{reticle:RETICLES[w.id],artRevision:4});
 const royaleStats = new Map();
 export const MODES = [
  {id:"royale",name:"Frontier Royale",short:"ROYALE",description:"Drop in, loot up, outrun the storm. Last operator standing.",limit:1,teams:false},
