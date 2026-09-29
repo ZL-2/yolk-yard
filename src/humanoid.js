@@ -137,11 +137,20 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const turn=Math.atan2(Math.sin((p.yaw||0)-h.lastYaw),Math.cos((p.yaw||0)-h.lastYaw))/Math.max(.016,dt);h.lastYaw=p.yaw||0;b.spine.rotation.z=T.MathUtils.clamp(-side*.012-turn*.007,-.09,.09);b.hips.rotation.y=T.MathUtils.clamp(turn*.008,-.07,.07);b.chest.rotation.y=Math.sin(h.phase)*.018*moving;b.chest.rotation.x=Math.sin(time*1.8)*.008+(p.lastDamage&&time-p.lastDamage<.18?-.06:0);
  b.head.rotation.x=(menu?Math.sin(time*.7)*.025:-(p.pitch||0)*.3)+h.down*1.04+h.revive*.14;
  if(menu){b.head.rotation.y=p.scan||0;b.chest.rotation.y+=(p.scan||0)*.3;}
+ const idle=menu?p.lobbyIdle:null;
+ if(idle){
+  // Weight travels through the pelvis while both boot targets stay planted.
+  b.hips.position.x+=idle.weight;b.hips.position.y+=idle.breath-.012;
+  b.hips.rotation.z=idle.lean;b.spine.rotation.z=-idle.lean*.65;
+  b.chest.rotation.x=idle.breath*1.8-idle.ready*.015;
+  b.head.rotation.x=idle.headPitch;
+ }
  const f=forward/(speed||1),s=side/(speed||1);
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R',phase=h.phase+(sideSign<0?Math.PI:0),cycle=((phase/(2*Math.PI))%1+1)%1;
   // Stance travels backward linearly at ground speed; swing lifts the foot.
   const stance=cycle<.54,u=stance?cycle/.54:(cycle-.54)/.46,stride=stance?1-u*2:-Math.cos(u*Math.PI),lift=stance?0:Math.sin(u*Math.PI)*.12*moving;
   let foot=V(sideSign*.12+s*stride*step,.09+lift,-f*stride*step);
+  if(idle)foot=V(sideSign*.155,.09,sideSign<0?.055:-.045);
   if(!grounded&&!airborne)foot=V(sideSign*.14,.17+(sideSign>0?.10:0),.10);
   if(airborne)foot=V(sideSign*.24,p.flight==='glide'?.22:.2,p.flight==='glide'?.10:.28);
   if(h.slide>.01)foot.lerp(V(sideSign*.17,.12,-.67),h.slide);

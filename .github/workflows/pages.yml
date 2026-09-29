@@ -29,9 +29,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
       - name: Verify Fieldcraft movement, combat, authority, audio and owner access
-        if: contains(github.event.head_commit.message, '[field-update]')
+        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')
         run: |
           npm run test:field
           if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" != "true" ]]; then
@@ -94,20 +94,31 @@ jobs:
           path: test-results/egg-shop
           retention-days: 7
       - run: npm run test:relay
-        if: "!contains(github.event.head_commit.message, '[field-update]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
       - run: npm run test:realtime
-        if: "!contains(github.event.head_commit.message, '[field-update]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
       - name: Verify authoritative countdown, human-only early departure and shared Bus transition
-        if: "!contains(github.event.head_commit.message, '[field-update]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
         run: node scripts/countdown-network-check.mjs
       - name: Verify Royale phases, spectator cutoff, falling loot and host migration
-        if: "!contains(github.event.head_commit.message, '[field-update]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
         run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[field-update]')
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')
         env:
           YOLK_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
         run: node scripts/relay-live-check.mjs
+      - name: Verify cinematic lobby motion
+        if: contains(github.event.head_commit.message, '[lobby-motion]')
+        run: |
+          node --test tests/lobby-motion.test.js
+          npx playwright install --with-deps chromium
+          node scripts/lobby-motion-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[lobby-motion]')
+        with:
+          name: lobby-motion
+          path: test-results/lobby-motion
       - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
@@ -208,3 +219,20 @@ jobs:
           path: test-results/live-lobby
 
 # Verified menu release: includes completed keybind capture verification.
+
+  verify-motion-live:
+    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[lobby-motion]')
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/lobby-motion-check.mjs
+        env:
+          LOBBY_MOTION_LIVE: https://zl-2.github.io/yolk-yard

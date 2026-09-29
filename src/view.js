@@ -336,7 +336,7 @@ export class View {
   setParty(profiles){
     const key=JSON.stringify(profiles);if(key===this.partyPreviewKey)return;this.partyPreviewKey=key;
     for(const egg of this.partyEggs||[]){this.scene.remove(egg);this.disposeGroup(egg);}this.partyEggs=[];
-    for(const [i,profile]of profiles.slice(0,1).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.1);egg.position.set(4.1+i*2.5,.08,-.7);egg.rotation.y=Math.PI+.35;this.scene.add(egg);this.partyEggs.push(egg);}
+    for(const [i,profile]of profiles.slice(0,1).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.1);egg.position.set(4.1+i*2.5,.08,-.7);egg.rotation.y=Math.PI+.35;egg.userData.lobbyMotion=new LobbyMotion(11.3+i*5.7);this.scene.add(egg);this.partyEggs.push(egg);}
   }
   preview(profile) {
     const signature = JSON.stringify(profile);
@@ -358,6 +358,15 @@ export class View {
     const v=new THREE.Vector3(point.x,point.y+.7,point.z),local=this.camera.worldToLocal(v.clone()),behind=local.z>0;
     v.project(this.camera);if(behind){v.x=-v.x;v.y=-v.y;}
     return {x:THREE.MathUtils.clamp((v.x+1)*50,7,93),y:THREE.MathUtils.clamp((1-v.y)*50,16,78),offscreen:behind||Math.abs(v.x)>1||Math.abs(v.y)>1};
+  }
+  animateLobbyCharacter(model,motion,dt,yawOffset=0){
+    const pose=motion.update(dt),held=model.userData.held;
+    model.rotation.y=pose.yaw+yawOffset;
+    held.position.set(.10+pose.weaponSide,1.36+pose.breath+pose.grip,-.22+pose.weaponDepth);
+    held.rotation.set(pose.pitch,pose.weaponYaw,pose.roll,'YXZ');
+    updateArms(model.userData.arms,-1,model.userData.blaster);
+    animateHumanoid(model,{health:100,grounded:true,yaw:model.rotation.y,pitch:pose.pitch,
+      scan:pose.scan,lobbyIdle:pose},dt,motion.time,{menu:true});
   }
   diagnostics() {
     return {
@@ -692,13 +701,8 @@ export class View {
     if (!playing) {
       this.clearOutgoing(this);
       this.preview(profile);
-      const pose=this.lobbyMotion.update(dt),held=this.menuEgg.userData.held;
-      this.menuEgg.rotation.y=pose.yaw;
-      held.position.set(.10+pose.grip*.3,1.36+Math.sin(this.clock*3.5)*.006+pose.grip,-.22);held.rotation.set(pose.pitch,pose.scan*.12,pose.roll+pose.grip,'YXZ');
-      const blaster=this.menuEgg.userData.blaster;
-      updateArms(this.menuEgg.userData.arms,-1,blaster);
-      animateHumanoid(this.menuEgg,{health:100,grounded:true,yaw:pose.yaw,scan:pose.scan,pitch:pose.pitch,vx:-Math.sin(pose.yaw)*pose.speed,vz:-Math.cos(pose.yaw)*pose.speed},dt,this.clock,{menu:true});
-      for(const teammate of this.partyEggs||[])animateHumanoid(teammate,{health:100,grounded:true,yaw:teammate.rotation.y,vx:-Math.sin(teammate.rotation.y)*.92,vz:-Math.cos(teammate.rotation.y)*.92,scan:-pose.scan*.7},dt,this.clock+1.2,{menu:true});
+      this.animateLobbyCharacter(this.menuEgg,this.lobbyMotion,dt);
+      for(const teammate of this.partyEggs||[])this.animateLobbyCharacter(teammate,teammate.userData.lobbyMotion,dt,.17);
       const partyOffset=this.partyEggs?.length?1:0,narrow=this.camera.aspect<.85;
       this.camera.position.set(5.8+partyOffset,4.3,narrow?(partyOffset?22.5:19):12.5);
       this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):1.8, 0);
