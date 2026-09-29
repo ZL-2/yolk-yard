@@ -1,3 +1,4 @@
+import {arenaSpawnPoints} from './arena-spawns.js';
 import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
 import {RemoteInputBuffer} from './remote-input.js';
 import {resetStance,eyeHeight} from './stance.js';
@@ -331,6 +332,7 @@ export class Simulation {
     p.brain = null;
     p.botPath = [];
     p.botThink = 0;
+    p.arenaIntent = null;
     p.botTarget = null;
     this.emit("spawn", { player: p.id, x: p.x, y: p.y, z: p.z });
   }
@@ -811,7 +813,20 @@ export class Simulation {
     }
     this.emit("finish", { winner: this.winner });
   }
-  botInput(p) { return tacticalBotInput(this,p); }
+  botInput(p) {
+    // Tactical sensing/navigation does not need the 60 Hz physics cadence.
+    // Keep combat decisions at 20 Hz and roaming at 10 Hz, staggered per bot.
+    // Damage interrupts the cache; movement and weapon cooldowns still tick at 60 Hz.
+    if(p.arenaIntent&&this.time<p.arenaThinkAt&&p.arenaDamageAt===p.lastDamage){
+      const input={...p.arenaIntent},target=this.players.get(p.brain?.target);
+      if(input.fire&&(this.time>=p.brain.burstUntil||!target||target.health<=0||target.spectating))input.fire=false;
+      return input;
+    }
+    const intent=tacticalBotInput(this,p);
+    p.arenaIntent={...intent};p.arenaDamageAt=p.lastDamage;
+    p.arenaThinkAt=this.time+(p.brain?.target ? .05 : .09)+(p.botSeed%1)*.01;
+    return intent;
+  }
   uniqueBotName(base) {
     let name=base,i=2;while([...this.players.values()].some(p=>nameKey(p.name)===nameKey(name)))name=base+' '+i++;
     return name;
@@ -831,19 +846,14 @@ export class Simulation {
   leavePlayer(id) { this.removePlayer(id); if(this.phase==='playing')this.addBots(); }
   safeSpawn(p) {
     const living=[...this.players.values()].filter(e=>e!==p&&e.health>0&&!e.spectating);
-    const candidates=this.map.spawns.map(([x,z])=>({x,z,y:surfaceAt(this.map,x,z)}));
-    const spacing=Math.max(5,this.map.size/12);
-    for(let x=-this.map.size+4;x<this.map.size-3;x+=spacing)for(let z=-this.map.size+4;z<this.map.size-3;z+=spacing)candidates.push({x,z,y:surfaceAt(this.map,x,z)});
     const teams=mode(this.options.mode).teams;
     let best=null,score=-Infinity;
-    for(const q of candidates){
-      if(!canStand(this.map,q,.8)||living.some(e=>dist(q,e)<7))continue;
-      let clear=0,yaw=0;
-      for(let i=0;i<12;i++){const a=i*Math.PI/6,d=wallDistance(this.map,{...q,y:q.y+EYE},direction(a),10);if(d>clear){clear=d;yaw=a;}}
-      if(clear<4)continue;
+    for(const q of arenaSpawnPoints(this.map)){
+      if(living.some(e=>dist(q,e)<7))continue;
+      const {clear,yaw}=q;
       const nearest=Math.min(45,...living.map(e=>dist(q,e)));
       const value=nearest+clear+(teams&&((q.x<0)===(p.team===0))?8:0)+this.random()*3;
-      if(value>score){score=value;best={...q,yaw};}
+      if(value>score){score=value;best={x:q.x,y:q.y,z:q.z,yaw};}
     }
     return best;
   }

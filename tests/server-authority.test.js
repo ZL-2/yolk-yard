@@ -39,3 +39,15 @@ test('FFA and Team Scramble use server-owned entry, room controls and combat sta
   host.destroy();guest.destroy();
  }}finally{for(const n of nets)n.destroy();await app.close();}
 });
+
+
+test('a short burst of queued client heartbeats does not disconnect the socket',async()=>{
+ const app=await startRealtimeServer({port:0,host:'127.0.0.1'});
+ const ws=new WebSocket(`ws://127.0.0.1:${app.server.address().port}/game`,{origin:'https://zl-2.github.io'});let replies=0;
+ ws.on('message',raw=>{if(JSON.parse(raw).type==='alive')replies++;});
+ try{
+  await new Promise((resolve,reject)=>{ws.once('error',reject);ws.once('open',()=>ws.send(JSON.stringify({type:'register'})));ws.once('message',resolve);});
+  for(let i=0;i<280;i++)ws.send(JSON.stringify({type:'heartbeat'}));
+  await until(()=>replies===280);assert.equal(ws.readyState,WebSocket.OPEN);
+ }finally{ws.terminate();await app.close();}
+});

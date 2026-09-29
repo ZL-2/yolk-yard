@@ -25,7 +25,8 @@ test('populated authority broadcasts sleep unchanged world data and respect sock
  }finally{authority.close();}
 });
 
-test('a 600ms scheduling stall is recovered across bounded callbacks',()=>{
+test('a 600ms scheduling stall is recovered across bounded callbacks',t=>{
+ t.mock.method(performance,'now',()=>0);
  const authority=new MatchAuthority({});clearInterval(authority.timer);let ticks=0;
  authority.broadcast=()=>{};authority.rooms.set('test',{age:0,frameAt:0,sim:{tick(){ticks++;}}});
  const start=authority.last;authority.tick(start+600);assert.equal(ticks,6);
@@ -129,4 +130,34 @@ test('movement-only snapshots skip world copying without changing full snapshots
  assert.equal('loot' in sparse.royale,false);assert.equal('builds' in sparse.royale,false);
  assert.deepEqual(sparse.players,full.players);assert.deepEqual(s.snapshot().royale.loot,full.royale.loot);
  full.players[0].materials.wood=999;assert.notEqual(s.snapshot().players[0].materials.wood,999);
+});
+
+
+test('a costly simulation step yields before replaying the remaining time debt',t=>{
+ let clock=0,ticks=0;t.mock.method(performance,'now',()=>clock);
+ const authority=new MatchAuthority({});clearInterval(authority.timer);authority.broadcast=()=>{};
+ try{
+  authority.rooms.set('slow',{age:0,frameAt:0,sim:{tick(){ticks++;clock+=5;}}});
+  authority.tick(100);assert.equal(ticks,1);assert.ok(authority.accumulator>.08);assert.ok(authority.catchup);
+ }finally{authority.close();}
+});
+
+test('rate budget tolerates queued traffic but bounds bursts and sustained throughput',async()=>{
+ const {acceptFrame}=await import('../server/realtime/rate-budget.js');const peer={};
+ for(let i=0;i<280;i++)assert.equal(acceptFrame(peer,100,0),true);
+ for(let i=0;i<120;i++)assert.equal(acceptFrame(peer,100,0),true);
+ assert.equal(acceptFrame(peer,100,0),false);
+ for(let i=0;i<200;i++)assert.equal(acceptFrame(peer,100,1000),true);
+ assert.equal(acceptFrame(peer,100,1000),false);
+ const large={};assert.equal(acceptFrame(large,16_000_000,0),true);assert.equal(acceptFrame(large,1,0),false);assert.equal(acceptFrame(large,1,1),true);
+});
+
+test('arena respawn clearance stays cached while live player separation remains enforced',async()=>{
+ const {Simulation}=await import('../src/simulation.js'),{MAPS}=await import('../src/maps.js'),{arenaSpawnPoints}=await import('../src/arena-spawns.js');
+ const s=new Simulation({bots:0,seed:21}),p=s.addPlayer('host',{name:'Host'}),enemy=s.addPlayer('other',{name:'Other'});
+ const points=arenaSpawnPoints(s.map);assert.ok(points.length>10);assert.equal(arenaSpawnPoints(s.map),points);
+ for(const q of points){assert.ok(q.clear>=4);assert.ok(Number.isFinite(q.yaw));}
+ const first=s.safeSpawn(p);Object.assign(enemy,first,{health:100,spectating:false});const second=s.safeSpawn(p);
+ assert.ok(Math.hypot(first.x-second.x,first.y-second.y,first.z-second.z)>=7);
+ const dynamic={...MAPS[0],boxes:[]};assert.notEqual(arenaSpawnPoints(dynamic),arenaSpawnPoints(dynamic));
 });

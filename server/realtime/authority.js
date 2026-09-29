@@ -116,15 +116,21 @@ export class MatchAuthority{
   if(peer===room.hostPeer){peer.virtualRoom=true;peer.detachedAt=0;peer.ws?.close(1000,'Session ended');peer.ws=null;}
   room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));this.broadcast(room);return peer===room.hostPeer;
  }
- tick(now=performance.now()){const elapsed=Math.max(0,(now-this.last)/1000);this.last=now;this.accumulator=Math.min(.75,this.accumulator+elapsed);let steps=0;
+ tick(now=performance.now()){
+  if(this.catchup){clearImmediate(this.catchup);this.catchup=null;}
+  const sliceStarted=performance.now();
+  const elapsed=Math.max(0,(now-this.last)/1000);this.last=now;this.accumulator=Math.min(.75,this.accumulator+elapsed);let steps=0;
   for(const room of this.rooms.values()){
    recordTiming(room,timingPhase(room.sim),'gapMaxMs',elapsed*1000);
   }
-  while(this.accumulator+1e-8>=1/60&&steps++<6){this.accumulator=Math.max(0,this.accumulator-1/60);for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;const phase=timingPhase(room.sim),start=startTiming();room.sim.tick(1/60);const cost=finishTiming(start);recordTiming(room,phase==='spawn'&&timingPhase(room.sim)==='bus'?'departure':phase,'stepMaxMs',cost.wallMs,cost.cpuMs);}}
+  while(this.accumulator+1e-8>=1/60&&steps++<6){this.accumulator=Math.max(0,this.accumulator-1/60);for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;const phase=timingPhase(room.sim),start=startTiming();room.sim.tick(1/60);const cost=finishTiming(start);recordTiming(room,phase==='spawn'&&timingPhase(room.sim)==='bus'?'departure':phase,'stepMaxMs',cost.wallMs,cost.cpuMs);}
+   if(performance.now()-sliceStarted>=4)break;
+  }
   // One fresh broadcast after catch-up, never several obsolete broadcasts in a burst.
   for(const room of this.rooms.values())if(room.age-room.frameAt>=.05){room.frameAt=room.age;this.broadcast(room);}
-  // Retain bounded time debt for subsequent callbacks; never discard a short stall.
-  // Six steps per callback leave room for sockets and prevent an unbounded catch-up loop.
+  // A throttled tick must not be followed by five more ticks before socket IO.
+  // Yield between catch-up slices while retaining earned simulation time.
+  if(this.accumulator+1e-8>=1/60&&this.rooms.size){this.catchup=setImmediate(()=>{this.catchup=null;this.tick();});this.catchup.unref?.();}
  }
- close(){clearInterval(this.timer);this.rooms.clear();}
+ close(){clearInterval(this.timer);clearImmediate(this.catchup);this.rooms.clear();}
 }

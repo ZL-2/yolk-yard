@@ -1,3 +1,4 @@
+import {acceptFrame} from './rate-budget.js';
 import {MatchAuthority} from './authority.js';
 import {randomUUID} from 'node:crypto';
 import {mergeRelayMessage} from '../../src/relay-queue.js';
@@ -39,8 +40,7 @@ export class RealtimeRelay {
         }
         if(peer.ws!==ws)return;
         peer.lastSeen=Date.now();
-        if(Date.now()-peer.rateAt>=1000){peer.rateAt=Date.now();peer.frames=0;peer.bytes=0;}
-        peer.bytes+=raw.length;if(++peer.frames>200||peer.bytes>16_000_000)throw Error('Rate limit');
+        if(!acceptFrame(peer,raw.length))throw Error('Rate limit');
         if(m.type==='heartbeat'){ws.send(JSON.stringify({type:'alive'}));return;}
         if(m.type==='ack'){this.ack(peer,m.seq);return;}
         if(m.type==='bye'){this.remove(peer);return;}
