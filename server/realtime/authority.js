@@ -106,7 +106,7 @@ export class MatchAuthority{
   room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));this.broadcast(room);return peer===room.hostPeer;
  }
  tick(now=performance.now()){const elapsed=Math.max(0,(now-this.last)/1000);this.last=now;this.accumulator=Math.min(.75,this.accumulator+elapsed);let steps=0;
-  while(this.accumulator>=1/60&&steps++<6){this.accumulator-=1/60;for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;room.sim.tick(1/60);}}
+  while(this.accumulator+1e-8>=1/60&&steps++<6){this.accumulator=Math.max(0,this.accumulator-1/60);for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;room.sim.tick(1/60);}}
   // One fresh broadcast after catch-up, never several obsolete broadcasts in a burst.
   for(const room of this.rooms.values())if(room.age-room.frameAt>=.05){room.frameAt=room.age;this.broadcast(room);}
   // Retain bounded time debt for subsequent callbacks; never discard a short stall.
