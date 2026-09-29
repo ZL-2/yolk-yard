@@ -1,4 +1,6 @@
-# Quality Update 62 — Fieldcraft & Firepower (3.1.0)
+# Quality Updates 62–63 — Fieldcraft & Firepower (3.1.1)
+
+Update 62 introduced the features below. Update 63 completes the release by clearing the compact crouch state on flight entry, preventing reduced airborne combat regions after a low-ceiling slide.
 
 Protocol 21 moves online match simulation into the relay. A room leader controls lobby settings, but cannot submit combat state. Each authenticated socket owns only its input and interaction intent. The server validates elapsed movement, standardized stance hit regions, damage, team membership, knocks, revival and marker audiences. No animation bones are transmitted. Room leadership can change while the simulation stays in place; socket recovery retains identity and excludes disconnected time from activity.
 
