@@ -1,3 +1,4 @@
+import {predictionCorrection} from './network-stats.js';
 import {InputClock} from './input-clock.js';
 import {RemoteSimulation} from './remote-simulation.js';
 import {canFight} from './stance.js';
@@ -473,7 +474,7 @@ function callbacks() {
     onProfile: (id, p) => sim?.setProfile(id, p),
     onAuthorityOwner:()=>{sim=net.isHost?new RemoteSimulation(net,()=>state):null;toast(net.isHost?'You now lead this room. The match continues on the server.':'Room leadership updated.');},
     onState: (s) => {
-      const updateStarted=performance.now(),previousPrediction=predicted;
+      const updateStarted=performance.now(),previousPrediction=predicted,previousState=state;
       if(s.royale&&!s.royale.builds&&state?.royale)s.royale={...s.royale,builds:state.royale.builds,worldDamage:state.royale.worldDamage};
       if(s.royale)applyBuildState(getMap(s.options.map),s.royale);
       if(s.royale&&!s.royale.loot&&state?.royale)s.royale={...s.royale,loot:state.royale.loot,chests:state.royale.chests};
@@ -491,7 +492,7 @@ function callbacks() {
         pendingInputs = [];
       }
       guestPresentation.receive(s,previousPrediction,predicted,performance.now());
-      connectionReport.network.update({now:performance.now(),time:s.time,ack:me.ack,rtt:net?.latency||null,relayRtt:net?.peer?.relayLatency,received:net?.peer?.receivedBytes||0,sent:net?.peer?.sentBytes||0,queued:net?.peer?.bufferedAmount||0,batches:net?.peer?.unacked?.size||0,hostQueue:me.inputQueue,correction:previousPrediction&&previousPrediction.health>0&&me.health>0?Math.hypot(previousPrediction.x-predicted.x,previousPrediction.y-predicted.y,previousPrediction.z-predicted.z):0});
+      connectionReport.network.update({now:performance.now(),time:s.time,ack:me.ack,rtt:net?.latency||null,relayRtt:net?.peer?.relayLatency,received:net?.peer?.receivedBytes||0,sent:net?.peer?.sentBytes||0,queued:net?.peer?.bufferedAmount||0,batches:net?.peer?.unacked?.size||0,hostQueue:me.inputQueue,serverTiming:s.network?.timing,correction:predictionCorrection(previousPrediction,predicted,previousState,s)});
       lastHealth = me.health;
       handleState();
       connectionReport.performance.update(performance.now()-updateStarted,pendingInputs.length);

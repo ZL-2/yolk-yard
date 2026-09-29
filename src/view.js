@@ -1,3 +1,4 @@
+import {authoredBoxes} from './building.js';
 import {makeHumanoid,animateHumanoid,humanoidDiagnostics} from './humanoid.js';
 import {lobbyScene} from './lobby-scene.js';
 import {lootModel,gliderModel} from './royale-art.js';
@@ -284,6 +285,8 @@ export class View {
     if(this.mapId==='sunnybreak'||this.preparedBattle?.done)return;
     if(!this.preparedBattle){
       const map=getMap('sunnybreak'),group=new THREE.Group();
+      // Use the same IDs as prediction/destruction when the first battle packet arrives.
+      map.authored??=authoredBoxes(map);
       this.preparedBattle={group,steps:buildIslandSteps(group,map.authored?{...map,boxes:map.authored}:map,{block,ball,cylinder,mat,palette}),done:false};
     }
     const pending=this.preparedBattle,deadline=performance.now()+4;

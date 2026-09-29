@@ -1,19 +1,19 @@
 import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates} from './physics.js';
 import {bodyHeight,eyeHeight,canFight} from './stance.js';
 import {groundAt} from './terrain.js';
-import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
+import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,propAt,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
 import {PIECES,pieceBoxes,validEdit,editRay,wallPattern} from './building-shapes.js';
 export {MATERIALS,GRID,COST,CAP,PIECES,pieceBoxes};
 export const pickaxe=()=>({id:'pickaxe',pickaxe:true,count:1,rarity:0});
 export const inventory=()=>[pickaxe(),null,null,null,null,null];
 export function materialFor(b,map){
- const prop=map?.props?.find(p=>p.x===b.x&&p.z===b.z);
+ const prop=propAt(map,b.x,b.z);
  if(b.kind==='tree'||['crate','bench'].includes(prop?.kind)||b.kind==='shelter')return 'wood';
  if(['lamp','barrels'].includes(prop?.kind)||['steel','gold'].includes(b.color)||map?.buildings?.[b.building]?.kind==='factory')return 'metal';
  if(['farm','camp','park'].includes(map?.buildings?.[b.building]?.kind))return 'wood';
  return b.color==='crate'?'wood':'brick';
 }
-export function authoredBoxes(map){return (map.authored||map.boxes).filter(b=>!b.buildId).map((b,i)=>({...b,objectId:b.objectId||'world-'+i,material:b.material||materialFor(b,map),harvestType:b.harvestType||harvestDefinition({...b,material:b.material||materialFor(b,map)},map).type}));}
+export function authoredBoxes(map){return (map.authored||map.boxes).filter(b=>!b.buildId).map((b,i)=>{const box={...b,objectId:b.objectId||'world-'+i,material:b.material||materialFor(b,map)};box.harvestType=b.harvestType||harvestDefinition(box,map).type;return box;});}
 export function placement(p,type,rotation=0,material='wood'){
  const d=direction(p.yaw,0),reach=4.3;
  let x=Math.round((p.x+d.x*reach)/4)*4,z=Math.round((p.z+d.z*reach)/4)*4,y=Math.max(0,Math.round((p.y+(p.pitch>.45?2:p.pitch<-.5?-1:0))/4)*4);

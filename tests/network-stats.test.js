@@ -12,3 +12,14 @@ test('diagnostics measure input age, queue, corrections and bounded samples',()=
  for(let n=0;n<500;n++)stats.update({now:n,time:n,correction:0});assert.equal(stats.samples.length,120);assert.equal(stats.corrections.length,120);
  stats.reset();assert.match(stats.text(),/no guest gameplay sample/);
 });
+
+test('normal transport and phase changes are not prediction corrections',async()=>{
+ const {predictionCorrection}=await import('../src/network-stats.js');
+ const state={round:1,options:{map:'sunnybreak'},royale:{matchId:'a'}};
+ const before={id:'host',health:100,flight:'transport',x:0,y:100,z:0},after={...before,x:2};
+ assert.equal(predictionCorrection(before,after,state,state),null);
+ const a={...before,flight:'ground'},b={...after,flight:'ground'};
+ assert.equal(predictionCorrection(a,b,state,state),2);
+ assert.equal(predictionCorrection(a,b,state,{...state,round:2}),null);
+ assert.equal(predictionCorrection(a,after,state,state),null);
+});

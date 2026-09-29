@@ -22,8 +22,16 @@ export const HARVEST_TYPES={
  metalWall:{material:'metal',health:650,resources:32,volume:30},
  metalFixture:{material:'metal',health:800,resources:48,volume:90},
 };
+const propIndexes=new WeakMap();
+// Authored prop arrays are immutable; preserve the first coordinate match.
+export function propAt(map,x,z){
+ const props=map?.props;if(!props)return undefined;
+ let index=propIndexes.get(props);
+ if(!index){index=new Map();for(const prop of props){let row=index.get(prop.x);if(!row){row=new Map();index.set(prop.x,row);}if(!row.has(prop.z))row.set(prop.z,prop);}propIndexes.set(props,index);}
+ return index.get(x)?.get(z);
+}
 export function harvestDefinition(box,map){
- const prop=map?.props?.find(p=>p.x===box.x&&p.z===box.z);
+ const prop=box.harvestType?null:propAt(map,box.x,box.z);
  const key=box.harvestType||(box.kind==='tree'?'tree':HARVEST_TYPES[prop?.kind]?prop.kind:box.material==='wood'?'woodWall':box.material==='metal'?(box.kind==='landmark'?'metalFixture':'metalWall'):'stoneWall');
  const def=HARVEST_TYPES[key]||HARVEST_TYPES.stoneWall;
  const volume=Math.max(.01,(box.w||1)*(box.h||1)*(box.d||1));

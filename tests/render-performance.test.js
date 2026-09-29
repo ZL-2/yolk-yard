@@ -28,11 +28,15 @@ test('warmup construction preserves the full island and departure adopts prepare
  globalThis.document={createElement:()=>({getContext:()=>({strokeText(){},fillText(){}})})};
  try{
   const make=()=>Object.assign(Object.create(View.prototype),{world:new THREE.Group(),scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),scopeCamera:new THREE.PerspectiveCamera(),pickupMeshes:new Map(),renderer:{compileAsync:async()=>{}}});
-  const direct=make();direct.loadMap('sunnybreak');
+  const direct=make();
   const prepared=make();let batches=0;
   while(!prepared.preparedBattle?.done){prepared.prepareBattleMap();assert.ok(++batches<3000);}
   assert.ok(batches>1,'construction yields across frames');
-  const meshes=prepared.preparedBattle.group.children.slice();prepared.loadMap('sunnybreak');
+  const meshes=prepared.preparedBattle.group.children.slice();
+  const {applyBuildState}=await import('../src/building.js'),{getMap}=await import('../src/maps.js');
+  applyBuildState(getMap('sunnybreak'),{matchId:'transition-test',round:1,builds:[],worldDamage:{}});
+  direct.loadMap('sunnybreak');prepared.loadMap('sunnybreak');
+  assert.ok(meshes.some(mesh=>mesh.userData.objectRanges?.some(range=>range.id)),'prepared scenery has destruction IDs');
   assert.equal(prepared.preparedBattle,null);assert.equal(prepared.world.children.length,direct.world.children.length);
   meshes.forEach(mesh=>assert.equal(mesh.parent,prepared.world));
   for(let i=0;i<direct.world.children.length;i++){

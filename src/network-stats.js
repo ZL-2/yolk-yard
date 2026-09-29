@@ -18,6 +18,12 @@ export class NetworkStats {
   const incoming=seconds>0?Math.max(0,last.received-first.received)/seconds/1024:0;
   const outgoing=seconds>0?Math.max(0,last.sent-first.sent)/seconds/1024:0;
   const ms=n=>Number.isFinite(n)?Math.round(n)+' ms':'n/a';
-  return `Network: host RTT ${ms(last.rtt)}; relay RTT ${ms(last.relayRtt)}; input acknowledgement p95 ${ms(p95(this.acks))}; update gap p95 ${ms(p95(gaps))}, max ${ms(gaps.length?Math.max(...gaps):0)}.\nTraffic: down ${incoming.toFixed(1)} KB/s, up ${outgoing.toFixed(1)} KB/s; outgoing queue ${Math.round((last.queued||0)/1024)} KB; unacknowledged batches ${last.batches||0}; host input queue ${last.hostQueue??'n/a'} steps; host clock ${rate.toFixed(2)}× real time.\nPrediction: correction p95 ${p95(this.corrections).toFixed(3)} units; corrections over 0.1 units ${this.corrections.filter(n=>n>.1).length}/${this.corrections.length}.`;
+  return `Network: host RTT ${ms(last.rtt)}; relay RTT ${ms(last.relayRtt)}; input acknowledgement p95 ${ms(p95(this.acks))}; update gap p95 ${ms(p95(gaps))}, max ${ms(gaps.length?Math.max(...gaps):0)}.\nTraffic: down ${incoming.toFixed(1)} KB/s, up ${outgoing.toFixed(1)} KB/s; outgoing queue ${Math.round((last.queued||0)/1024)} KB; unacknowledged batches ${last.batches||0}; host input queue ${last.hostQueue??'n/a'} steps; host clock ${rate.toFixed(2)}× real time.\nServer: slowest simulation step ${ms(last.serverTiming?.stepMaxMs)}; longest callback gap ${ms(last.serverTiming?.gapMaxMs)} (match maxima).\nPrediction: correction p95 ${p95(this.corrections).toFixed(3)} units; corrections over 0.1 units ${this.corrections.filter(n=>n>.1).length}/${this.corrections.length}.`;
  }
+}
+
+// Compare only continuously predicted movement, not bus travel or phase resets.
+export function predictionCorrection(before,after,previous,state){
+ if(!before||!after||before.health<=0||after.health<=0||before.flight!==after.flight||after.flight==='transport'||before.id!==after.id||previous?.round!==state?.round||previous?.options?.map!==state?.options?.map||previous?.royale?.matchId!==state?.royale?.matchId)return null;
+ return Math.hypot(before.x-after.x,before.y-after.y,before.z-after.z);
 }
