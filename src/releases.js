@@ -1,4 +1,5 @@
 export const RELEASE_NOTES = [
+  {number:'64',title:'Maintenance: Administrator Access Only',changes:['Public access is paused while performance and connection issues are repaired. The maintenance page offers administrator authentication using the existing server-only owner code. Production game and party connections require a valid, expiring administrator session.']},
   {
     number: "63",
     title: "Fieldcraft & Firepower: Performance Hotfix",

@@ -27,7 +27,7 @@ export class RelayPeer extends Events {
  get bufferedAmount(){return (this.socket?.bufferedAmount||0)+this.queueBytes;}
  start(){
   if(this.destroyed)return;
-  try{this.socket=new WebSocket(relayURL());}catch{this.emit('error',{type:'socket-error'});return;}
+  try{this.socket=new WebSocket(relayURL(),globalThis.window?.RAVEL_OWNER_SESSION?['ravelfront',`owner.${window.RAVEL_OWNER_SESSION}`]:[]);}catch{this.emit('error',{type:'socket-error'});return;}
   const ws=this.socket;this.transportHeartbeat=new HostHeartbeat(Date.now(),{silence:18000,grace:0});
   ws.addEventListener('open',()=>ws.send(JSON.stringify({type:'register',progressToken:progressToken(),...(this.id?{id:this.id}:{}),...this.resume,...(this.protocol===2?{cursor:this.cursor}:{})})));
   ws.addEventListener('message',event=>{
