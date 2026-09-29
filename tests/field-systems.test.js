@@ -41,5 +41,6 @@ test('finishing, bleed-out, storm and disconnected teammate cannot leave immorta
 });
 test('marker intent is bounded, rate-limited, expiring and visible only to its Duo',()=>{
  const s=room(),p=s.players.get('p0');s.playerAction(p.id,'ping-'+JSON.stringify({kind:'map',x:10,z:20,team:1}));assert.equal(s.markers.length,1);assert.equal(s.markers[0].team,0);assert.equal(visibleMarkers(s.snapshot(),s.players.get('p1')).length,1);assert.equal(visibleMarkers(s.snapshot(),s.players.get('p2')).length,0);
- s.playerAction(p.id,'ping-'+JSON.stringify({kind:'danger'}));assert.equal(s.markers[0].kind,'normal');s.time+=1;s.playerAction(p.id,'ping-'+JSON.stringify({kind:'danger'}));assert.equal(s.markers[0].kind,'danger');assert.equal(s.markers.length,1);s.time+=13;assert.equal(visibleMarkers(s.snapshot(),p).length,0);
+ const event=s.events.at(-1);assert.equal(event.id,s.eventId);assert.equal(event.markerId,s.markers[0].id);
+ s.playerAction(p.id,'ping-'+JSON.stringify({kind:'danger'}));assert.equal(s.markers[0].kind,'normal');s.time+=1;s.playerAction(p.id,'ping-'+JSON.stringify({kind:'danger'}));assert.equal(s.events.at(-1).id,event.id+1);assert.equal(s.markers[0].kind,'danger');assert.equal(s.markers.length,1);s.time+=13;assert.equal(visibleMarkers(s.snapshot(),p).length,0);
 });

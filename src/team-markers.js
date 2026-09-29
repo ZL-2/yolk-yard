@@ -30,5 +30,6 @@ export function markerAction(sim,p,action){
  p.lastPingAt=sim.time;p.pingTimes.push(sim.time);
  const marker={...point,player:p.id,team:p.team,name:p.name,kind,label,until:sim.time+(kind==='danger'?12:payload.kind==='map'?90:45),id:++sim.markerId||1};
  sim.markerId=marker.id;sim.markers=sim.markers.filter(m=>m.player!==p.id);sim.markers.push(marker);
- sim.emit('duo-marker',{...marker});return true;
+ // Marker identity is not the global event sequence used for exactly-once audio.
+ const {id:markerId,...event}=marker;sim.emit('duo-marker',{...event,markerId});return true;
 }
