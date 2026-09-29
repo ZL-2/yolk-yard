@@ -1,8 +1,9 @@
 export const RELEASE_NOTES = [
   {
     number: "63",
-    title: "Fieldcraft & Firepower: Flight Safety",
+    title: "Fieldcraft & Firepower: Performance Hotfix",
     changes: [
+      "Urgent performance pass: bounded render resolution, adaptive GPU load, automatic expensive-shadow reduction on slow devices, and capped secondary scope rendering reduce stalls and input delay. Supersampling and multisample overhead no longer overwhelm high-resolution laptop screens.",
       "Completes the Fieldcraft & Firepower release with a guarded stance transition: entering glide or skydive clears compact crouch collision and restores the correct airborne combat silhouette.",
       "Update 62's server-owned combat, crouch/slide, Duo downing/revives, private danger pings, eleven refreshed weapons and images, original firearm audio, cinematic operator lobby and repaired owner access remain integrated. Focused browser and server checks verify this final build."
     ]

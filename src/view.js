@@ -130,7 +130,7 @@ export class View {
     this.settings = settings;
     this.renderer = makeRenderer({
       canvas,
-      antialias: true,
+      antialias: false,
       powerPreference: "high-performance",
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -238,8 +238,9 @@ export class View {
     this.renderer.setPixelRatio(
       Math.min(
         devicePixelRatio || 1,
-        this.settings.quality === "low" ? 1 : 1.6,
-      ),
+        this.settings.quality === "low" ? 1 : 1.25,
+        Math.sqrt(1500000 / Math.max(1, innerWidth * innerHeight)),
+      ) * (this.renderScale || 1),
     );
     this.renderer.setSize(innerWidth, innerHeight, false);
     this.camera.aspect = innerWidth / innerHeight;
@@ -247,6 +248,7 @@ export class View {
     if(this.viewmodelCamera){this.viewmodelCamera.aspect=this.camera.aspect;this.viewmodelCamera.updateProjectionMatrix();}
   }
   setQuality() {
+    this.renderScale=1;this.frameAverage=1/60;
     this.renderer.shadowMap.enabled = this.settings.quality !== "low";
     this.resize();
   }
@@ -667,6 +669,15 @@ export class View {
     this.pendingShots.length = 0;
   }
   update(state, local, predicted, dt, playing, aim, profile) {
+    // Reduce GPU work when rendering itself delays input and socket processing.
+    this.frameAverage=(this.frameAverage||1/60)*.9+dt*.1;
+    this.budgetClock=(this.budgetClock||0)+dt;
+    if(this.budgetClock>.75){
+      this.budgetClock=0;const previous=this.renderScale||1;
+      if(this.frameAverage>1/32){this.renderScale=Math.max(.5,previous-.15);this.renderer.shadowMap.enabled=false;}
+      else if(this.frameAverage<1/55)this.renderScale=Math.min(1,previous+.05);
+      if(this.renderScale!==previous)this.resize();
+    }
     this.clock += dt;
     this.recoil = Math.max(0, this.recoil - dt * 7);
     this.loadMap(state?.options.map || "yard");
@@ -1018,7 +1029,8 @@ export class View {
         this.opticLens.material.needsUpdate = true;
       }
     }
-    if (playing && this.scopeActive && this.opticLens && !gun(local).ads?.overlay) {
+    if (playing && this.scopeActive && this.opticLens && !gun(local).ads?.overlay && this.clock-(this.lastScopeRender||-1) >= 1/30) {
+      this.lastScopeRender=this.clock;
       this.scopeCamera.position.copy(this.camera.position);
       this.scopeCamera.quaternion.copy(this.camera.quaternion);
       const aperture = gun(local).id === "needle" ? 0.125 : 0.103;

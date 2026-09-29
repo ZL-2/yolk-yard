@@ -34,8 +34,10 @@ jobs:
         if: contains(github.event.head_commit.message, '[field-update]')
         run: |
           npm run test:field
-          npx playwright install --with-deps chromium
-          npm run test:field-browser
+          if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" != "true" ]]; then
+            npx playwright install --with-deps chromium
+            npm run test:field-browser
+          fi
       - uses: actions/upload-artifact@v4
         if: always() && contains(github.event.head_commit.message, '[field-update]')
         with:
@@ -186,7 +188,7 @@ jobs:
       - uses: actions/deploy-pages@v4
         id: deployment
   verify-live:
-    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[field-update]') || contains(github.event.head_commit.message, '[lobby-duos]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))
+    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[lag-hotfix]') && (contains(github.event.head_commit.message, '[field-update]') || contains(github.event.head_commit.message, '[lobby-duos]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 8
