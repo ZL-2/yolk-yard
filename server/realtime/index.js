@@ -1,3 +1,4 @@
+import {CpuQuotaMonitor} from './cpu-quota.js';
 import {MAPS,navigation} from '../../src/maps.js';
 import {ROYALE_MAP} from '../../src/royale-map.js';
 import {SPAWN_ISLAND} from '../../src/spawn-island.js';
@@ -10,11 +11,12 @@ import {VERSION} from '../../src/data.js';
 export async function startRealtimeServer({port=Number(process.env.PORT)||3000,host='0.0.0.0',origins=(process.env.ALLOWED_ORIGINS||'https://zl-2.github.io').split(','),maintenance=host!=='127.0.0.1'}={}){
   // Build immutable navigation before accepting sockets or starting the match clock.
   for(const map of [...MAPS,ROYALE_MAP,SPAWN_ISLAND])navigation(map);
-  const relay=new RealtimeRelay();
+  const cpuQuota=new CpuQuotaMonitor();await cpuQuota.start();
+  const relay=new RealtimeRelay();relay.cpuQuota=cpuQuota;
   const owner=new OwnerService();await owner.ready;
   const server=createServer((req,res)=>{
     if(req.url?.startsWith('/owner/')){void owner.handle(req,res,{origins,relay});return;}
-    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',performanceRevision:76,features:['parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
+    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',performanceRevision:78,cpu:cpuQuota.snapshot(),features:['parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
   });
   const sockets=new WebSocketServer({noServer:true,maxPayload:2_000_000,perMessageDeflate:false});
   server.on('upgrade',(req,socket,head)=>{
@@ -27,7 +29,7 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
     });
   });
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,host,resolve);});
-  return {server,relay,owner,async close(){relay.close();for(const ws of sockets.clients)ws.terminate();await new Promise(r=>sockets.close(r));await new Promise(r=>server.close(r));await owner.close();}};
+  return {server,relay,owner,async close(){cpuQuota.close();relay.close();for(const ws of sockets.clients)ws.terminate();await new Promise(r=>sockets.close(r));await new Promise(r=>server.close(r));await owner.close();}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const app=await startRealtimeServer();console.log(`Ravelfront relay listening on ${app.server.address().port}`);

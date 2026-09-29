@@ -74,3 +74,15 @@ test('CPU timings stay paired with the slowest elapsed sample',async()=>{
  recordTiming(room,'bus','stepMaxMs',900,15);assert.equal(room.timing.phases.bus.stepCpuAtMaxMs,15);
  const measured=finishTiming(startTiming());assert.ok(measured.wallMs>=0);assert.ok(measured.cpuMs>=0);
 });
+
+test('CPU quota monitor handles v2/v1 units, unavailable data and counter deltas',async()=>{
+ const {parseCpuQuota,CpuQuotaMonitor}=await import('../server/realtime/cpu-quota.js');
+ assert.equal(parseCpuQuota(2,'15000 100000','', 'nr_periods 20\nnr_throttled 10\nthrottled_usec 500000').quotaCores,.15);
+ assert.equal(parseCpuQuota(1,'-1','100000','nr_periods 20\nnr_throttled 10\nthrottled_time 500000000').throttledMs,500);
+ assert.equal(parseCpuQuota(2,'max 100000','','usage_usec 10'),null);
+ let periods=20;
+ const files={'/proc/self/cgroup':'0::/','/sys/fs/cgroup/cpu.max':'15000 100000'};
+ const monitor=new CpuQuotaMonitor(async name=>{if(name.endsWith('/cpu.stat'))return `nr_periods ${periods}\nnr_throttled ${periods/2}\nthrottled_usec ${periods*1000}`;if(name in files)return files[name];throw Error('missing');});
+ try{await monitor.start();periods=30;await monitor.sample();const s=monitor.snapshot();assert.equal(s.periods,10);assert.equal(s.throttledPeriods,5);assert.equal(s.throttledMs,10);assert.equal(s.quotaCores,.15);assert.ok(!JSON.stringify(s).includes('/sys/'));}finally{monitor.close();}
+ const missing=new CpuQuotaMonitor(async()=>{throw Error('missing');});await missing.start();assert.equal(missing.snapshot().available,false);missing.close();
+});

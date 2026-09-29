@@ -72,7 +72,7 @@ export class MatchAuthority{
  }
  publish(room){const s=room.sim,p=room.hostPeer;const humans=[...s.players.values()].filter(p=>!p.bot&&!p.lateSpectator);p.listedAt=Date.now();p.listing={code:room.code,version:VERSION,host:s.players.get(room.owner)?.name||'Operator',map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize,players:humans.length,capacity:Math.min(16,s.options.capacity),contestantCapacity:s.options.capacity,public:room.visibility==='public',phase:s.stage&&['spawn-island','starting','waiting'].includes(s.stage)?'lobby':s.phase};}
  broadcast(room){
-  const broadcastStarted=startTiming();roomTiming(room);
+  const broadcastStarted=startTiming();roomTiming(room);room.timing.cpuQuota=this.relay.cpuQuota?.snapshot();
   const state=room.sim.snapshot();state.visibility=room.visibility;state.chatEnabled=room.chat.enabled;state.chatMuted=[...room.chat.muted];state.network={hostId:room.owner,members:this.members(room),chatSequence:room.chat.sequence,authority:'server',timing:room.timing};
   const groups=new Map();
   for(const [id,peer]of room.members){
