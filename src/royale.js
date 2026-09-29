@@ -132,7 +132,7 @@ export class RoyaleSimulation extends Simulation {
  dropAmmo(point,type,count){return this.dropLoot(point,{id:type,ammoType:type,count,rarity:0});}
  removeLoot(item){const i=this.loot.indexOf(item);if(i>=0){this.loot.splice(i,1);this.lootVersion++;}}
  accessible(p,item,range=3){
-  if(dist(p,item)>range || item.landAt>this.time)return false;
+  if((p.x-item.x)**2+(p.y-item.y)**2+(p.z-item.z)**2>range*range || item.landAt>this.time)return false;
   const from={x:p.x,y:p.y+.9,z:p.z},to={x:item.x-from.x,y:item.y+.6-from.y,z:item.z-from.z},len=Math.hypot(to.x,to.y,to.z)||1;
   return wallDistance(this.map,from,{x:to.x/len,y:to.y/len,z:to.z/len},len)>=len-.15;
  }
@@ -174,7 +174,7 @@ export class RoyaleSimulation extends Simulation {
   if(input.editing)return;
   if(input.interact&&!p.interactLatch&&toggleDoor(this,p)){p.interactLatch=true;return;}
   for(const item of [...this.loot])if((item.ammoType||item.resource)&&this.accessible(p,item,1.6))this.takeLoot(p,item);
-  const chest=this.chests.filter(c=>!c.opened&&this.accessible(p,c,3.3)).sort((a,b)=>dist(p,a)-dist(p,b))[0];
+  const chest=input.interact?this.chests.filter(c=>!c.opened&&this.accessible(p,c,3.3)).sort((a,b)=>dist(p,a)-dist(p,b))[0]:null;
   if(input.interact&&chest){
    if(p.chestId!==chest.id){p.chestId=chest.id;p.chestProgress=0;this.emit('royale-cue',{player:p.id,cue:'chest-search'});}
    p.chestProgress+=dt;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {Simulation} from '../src/simulation.js';
 import {RoyaleSimulation} from '../src/royale.js';
 import {movePlayer,sanitizeInput} from '../src/physics.js';
-import {RemoteInputBuffer} from '../src/remote-input.js';
+import {RemoteInputBuffer,MAX_INPUT_BACKLOG} from '../src/remote-input.js';
 
 for(const Type of [Simulation,RoyaleSimulation])test(Type.name+' prediction matches acknowledgements under burst delivery',()=>{
  // Keep this movement fixture on Spawn Island: a full human roster now departs immediately.
@@ -26,8 +26,21 @@ for(const Type of [Simulation,RoyaleSimulation])test(Type.name+' prediction matc
 });
 test('remote catch-up cannot simulate more time than the host grants',()=>{
  const buffer=new RemoteInputBuffer();for(let seq=1;seq<=120;seq++)assert.equal(buffer.push({seq}),true);
- assert.equal(buffer.push({seq:121}),false);
+ assert.equal(buffer.push({seq:121}),true);
+ assert.equal(buffer.queue.length,MAX_INPUT_BACKLOG);
+ assert.equal(buffer.queue[0].seq,116);
  assert.equal(buffer.take(1/60).length,1);
  assert.equal(buffer.take(1/60).length,1);
- assert.equal(buffer.take(10).length,30);
+ assert.equal(buffer.take(10).length,4);
+});
+
+test('a server running at 74 percent speed stays on current input without a speed boost',()=>{
+ const buffer=new RemoteInputBuffer();let executed=0,ack=0,ticks=0;
+ for(let seq=1;seq<=3600;seq++){
+  buffer.push({seq,forward:seq<3500?1:0,fire:false});
+  if(Math.floor(seq*.74)>ticks){ticks++;const steps=buffer.take(1/60);executed+=steps.length;ack=steps.at(-1)?.seq||ack;}
+  assert.ok(buffer.queue.length<=MAX_INPUT_BACKLOG);
+  assert.ok(seq-ack<=MAX_INPUT_BACKLOG+1);
+ }
+ assert.ok(executed<=ticks);assert.equal(buffer.last.forward,0);
 });

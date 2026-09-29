@@ -1,10 +1,12 @@
 import {INPUT_RECOVERY} from './input-clock.js';
+// Keep ordinary packet jitter lossless, but never replay seconds of stale controls.
+export const MAX_INPUT_BACKLOG=6;
 // Remote commands represent fixed 60 Hz steps, not replaceable positions.
 // Budget is earned from host time, so a burst cannot accelerate a player.
 export class RemoteInputBuffer {
   constructor() { this.queue=[]; this.credit=0; this.last=null; }
   push(input) {
-    if(this.queue.length>=120)return false;
+    if(this.queue.length>=MAX_INPUT_BACKLOG)this.queue.shift();
     this.queue.push({...input});return true;
   }
   take(dt) {

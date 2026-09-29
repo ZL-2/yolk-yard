@@ -43,6 +43,15 @@ export function candidates(map,o,d=null,max=0,radius=RADIUS){
  if(map.theme!=='royale')return map.boxes;
  let grid=collisionIndex.get(map);
  if(!grid){grid=new Map();for(const b of map.boxes){for(let x=Math.floor((b.x-b.w/2)/16);x<=Math.floor((b.x+b.w/2)/16);x++)for(let z=Math.floor((b.z-b.d/2)/16);z<=Math.floor((b.z+b.d/2)/16);z++){const k=x+','+z;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(b);}}collisionIndex.set(map,grid);}
+ // Reuse point-query buckets while movement stays in the same cells. Geometry
+ // invalidation discards this cache together with the spatial index.
+ if(!d){
+  const x0=Math.floor((o.x-radius)/16),x1=Math.floor((o.x+radius)/16),z0=Math.floor((o.z-radius)/16),z1=Math.floor((o.z+radius)/16),key=[x0,x1,z0,z1].join(':');
+  grid.pointQueries??=new Map();const cached=grid.pointQueries.get(key);if(cached)return cached;
+  const nearby=new Set();for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++)for(const b of grid.get(x+','+z)||[])nearby.add(b);
+  if(grid.pointQueries.size>=256)grid.pointQueries.delete(grid.pointQueries.keys().next().value);
+  grid.pointQueries.set(key,nearby);return nearby;
+ }
  const found=new Set(),visited=new Set(),length=d?Math.min(Number.isFinite(max)?max:1600,1600):0,steps=Math.max(1,Math.ceil(length*Math.hypot(d?.x||0,d?.z||0)/16));
  // Query the swept segment's actual buckets, including the full player/bolt
  // radius. Nine whole neighboring buckets per point used to dominate bot cost.

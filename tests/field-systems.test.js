@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {RoyaleSimulation} from '../src/royale.js';
-import {movePlayer,humanHit,canStand,invalidateCollision} from '../src/physics.js';
+import {movePlayer,humanHit,canStand,invalidateCollision,candidates} from '../src/physics.js';
 import {bodyHeight,eyeHeight} from '../src/stance.js';
 import {REVIVE_RULES,reviveAccessible} from '../src/team-survival.js';
 import {visibleMarkers} from '../src/team-markers.js';
@@ -44,4 +44,12 @@ test('marker intent is bounded, rate-limited, expiring and visible only to its D
  const s=room(),p=s.players.get('p0');s.playerAction(p.id,'ping-'+JSON.stringify({kind:'map',x:10,z:20,team:1}));assert.equal(s.markers.length,1);assert.equal(s.markers[0].team,0);assert.equal(visibleMarkers(s.snapshot(),s.players.get('p1')).length,1);assert.equal(visibleMarkers(s.snapshot(),s.players.get('p2')).length,0);
  const event=s.events.at(-1);assert.equal(event.id,s.eventId);assert.equal(event.markerId,s.markers[0].id);
  s.playerAction(p.id,'ping-'+JSON.stringify({kind:'danger'}));assert.equal(s.markers[0].kind,'normal');s.time+=1;s.playerAction(p.id,'ping-'+JSON.stringify({kind:'danger'}));assert.equal(s.events.at(-1).id,event.id+1);assert.equal(s.markers[0].kind,'danger');assert.equal(s.markers.length,1);s.time+=13;assert.equal(visibleMarkers(s.snapshot(),p).length,0);
+});
+
+test('cached collision buckets cover cell boundaries and invalidate after geometry edits',()=>{
+ const a={x:15.8,y:0,z:0,w:.2,h:2,d:1},b={x:17,y:0,z:0,w:1,h:2,d:1},map={theme:'royale',boxes:[a,b]};
+ assert.ok(candidates(map,{x:16,y:0,z:0}).has(a));assert.ok(candidates(map,{x:16,y:0,z:0}).has(b));
+ const before=candidates(map,{x:16,y:0,z:0});map.boxes=[b];invalidateCollision(map);
+ const after=candidates(map,{x:16,y:0,z:0});assert.notEqual(before,after);assert.ok(!after.has(a));assert.ok(after.has(b));
+ assert.ok(!candidates(map,{x:80,y:0,z:80}).has(b));
 });
