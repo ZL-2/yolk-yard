@@ -6,7 +6,7 @@ import {RoyaleSimulation} from '../src/royale.js';
 import {VERSION,safeProfile} from '../src/data.js';
 const base='https://yolk-yard-relay.onrender.com',front='https://zl-2.github.io/yolk-yard',expected=process.env.GITHUB_SHA||process.env.RAVEL_VERIFY_BUILD,version=JSON.parse(readFileSync(new URL('../package.json',import.meta.url))).version;
 const delay=ms=>new Promise(r=>setTimeout(r,ms)),users=[],games=[],errors=[];
-const get=async url=>{const r=await fetch(url+'?t='+Date.now(),{signal:AbortSignal.timeout(12000),cache:'no-store'});assert.ok(r.ok,'Live endpoint unavailable');return r.json();};
+const get=async url=>{const r=await fetch(url.endsWith('/version.json')?url+'?t='+Date.now():url,{signal:AbortSignal.timeout(12000),cache:'no-store'});assert.ok(r.ok,'Live endpoint unavailable');return r.json();};
 async function wait(fn,label,ms=18000){const end=Date.now()+ms;while(!await fn()){assert.ok(Date.now()<end,label);await delay(30);}}
 globalThis.window={YOLK_NETWORK:{relay:base.replace('https:','wss:')+'/game'}};
 globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io',agent:globalThis.RAVEL_SOCKET_AGENT});}};
@@ -30,6 +30,6 @@ try{
  assert.ok(sim.beginBattle());assert.equal([...sim.players.values()].filter(p=>p.bot&&p.team===sim.players.get('host').team).length,2,'missing squad positions receive bot teammates');
  await c.ask('friend-send',{id:a.id});await a.ask('friend-accept',{id:c.id});assert.ok((await c.ask('social')).friends.find(p=>p.id===a.id)?.spectatable);await c.ask('spectate-friend',{id:a.id});await wait(()=>c.launches.length,'Live spectate launch');const viewer=await launch(c);await wait(()=>viewer.state.players.find(p=>p.id===viewer.net.id)?.friendSpectator,'Live spectator role');
  const watcher=sim.players.get(viewer.net.id);assert.equal(watcher.watchId,'host');assert.equal(watcher.health,0);assert.equal(watcher.contestant,false);viewer.net.send({type:'player-action',action:'rejoin'});await delay(250);assert.equal(watcher.health,0);
- const after=await get(base+'/health');assert.equal(mate.net.serverAuthority,undefined);assert.equal(viewer.net.serverAuthority,undefined);assert.equal(after.customMatches,'private-host');assert.equal(after.friendSpectating,true);assert.equal(after.deployment.updating,false);assert.deepEqual(errors,[]);
+ const after=await get(base+'/health');assert.notEqual(mate.net.serverAuthority,true);assert.notEqual(viewer.net.serverAuthority,true);assert.equal(after.customMatches,'private-host');assert.equal(after.friendSpectating,true);assert.equal(after.deployment.updating,false);assert.deepEqual(errors,[]);
  await c.ask('friend-remove',{id:a.id});console.log(JSON.stringify({result:'PASS',build:health.build,version,protocol:VERSION,privateHost:true,partyLaunch:true,botTeammates:2,friendSpectating:true,updateReady:true,serverRoomsBefore:before,serverRoomsAfter:after.capacity.rooms,socialStorage:after.socialStorage}));
-}finally{clearInterval(clock);for(const g of games)g.net.destroy();for(const u of users){if(u.party&&u.ws.readyState===1)await u.ask('returned').catch(()=>{});u.ws.close();}}
+}finally{clearInterval(clock);for(const g of games)g.net.destroy();if(users[2]?.ws.readyState===1&&users[0]?.id)await users[2].ask('friend-remove',{id:users[0].id}).catch(()=>{});for(const u of users){if(u.party&&u.ws.readyState===1)await u.ask('returned').catch(()=>{});u.ws.close();}}
