@@ -1026,6 +1026,7 @@ async function selectExperience(id){
 }
 let socialTab='friends',socialModel=null,socialOffset=0,socialRefreshTimer=null,socialFetching=false;
 async function socialMenu(){
+ if(party?.identityBlocked){modal('Restore Friend Code',`<p>${esc(party.identityBlocked)}</p><p>Retry to reconnect to your saved identity. Creating a new code starts a separate friend list.</p><div class="actions"><button class="primary" data-action="social-retry-identity">RETRY RESTORATION</button><button data-action="social-new-identity">CREATE A NEW FRIEND CODE…</button><button data-action="close">CLOSE</button></div>`,'social-recovery');return;}
  if(!party?.ready){toast('Social is connecting. Try again in a moment.');return;}
  if(socialFetching)return;socialFetching=true;
  const model=await partyRequest('social',{offset:socialOffset});socialFetching=false;if(!model)return;
@@ -1096,6 +1097,9 @@ const actions = {
  'social':socialMenu,
  'add-friend':addFriendMenu,
  'copy-friend-code':()=>copy(party.code),
+ 'social-retry-identity':()=>{party.retryIdentity();closeDialog();},
+ 'social-new-identity':()=>modal('Create New Friend Code?',`<p>This creates a separate identity with an empty friend list. It does not restore your old friendships. Your previous browser credential will be kept for recovery.</p><div class="actions"><button class="primary" data-action="social-confirm-new-identity">CREATE NEW CODE</button><button data-action="social">GO BACK</button></div>`,'social-new-identity'),
+ 'social-confirm-new-identity':()=>{party.newIdentity();closeDialog();},
  'career':()=>modal('Career',`<div class="account-stats"><span>Matches <b>${stats.matches}</b></span><span>Eliminations <b>${stats.kills}</b></span><span>Wins <b>${stats.wins}</b></span><span>Assists <b>${stats.assists||0}</b></span></div><p>Verified online matches contribute to progression. Spawn Island and practice do not count. Existing career history is preserved.</p><div class="career-modes">${Object.entries(stats.modes||{}).map(([id,m])=>`<p><b>${id==='royale'?'Frontier Royale':id==='teams'?'Team Scramble':'Free for All'}</b> · ${m.matches} matches · ${m.wins} wins · ${m.kills} eliminations${m.placements.length?' · Best placement #'+Math.min(...m.placements.filter(n=>n>0)):''}</p>`).join('')}</div><p>Stats and Marks are saved on this device.</p><button class="primary" data-action="close">DONE</button>`),
  'find-public':()=>queueParty(),
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},

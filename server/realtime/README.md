@@ -28,12 +28,19 @@ never grants access. Tabs sharing a browser identity consolidate into one online
 player. This is a device identity, not an account with cross-device recovery.
 
 Friendships, requests, block relationships, display profiles and public codes are
-stored atomically in `RAVEL_SOCIAL_DATA_PATH`. Set this to a file on a persistent
-volume. If unset, it uses a sibling of `YOLK_OWNER_DATA_PATH`, or
-`/tmp/ravelfront-social.json`; an ephemeral container filesystem cannot preserve
-relationships through service replacement. Clearing browser site data also loses
-access to that device identity. No secrets, IPs or private match identifiers are
-exposed in social lookup cards. Health advertises social revision and party limit.
+stored in synced schema-versioned primary/backup files. An explicit
+`RAVEL_SOCIAL_DATA_PATH` takes precedence. Otherwise, a verified mounted disk at
+`/var/data/ravelfront` selects `social.json` there; without it, the legacy owner-file
+sibling or `/tmp/ravelfront-social.json` remains ephemeral on Render. Paid compute
+does not attach this disk. See `docs/social-storage.md` for the approved migration
+order and no-overwrite utility before deploying over temporary social data.
+Clearing browser site data loses access to that device identity. Unknown saved
+credentials now stay saved and are refused instead of being silently reset; Social
+offers retry or an explicitly confirmed new code. Corruption can recover a valid
+backup, while unreadable or newer snapshots cannot initialize an empty replacement.
+Friend-action success and identity handshakes follow completed persistence. No
+secrets, IPs or private match identifiers are exposed in social lookup cards. Health
+reports actual mount durability, social availability, social revision and party limit.
 
 Presence is centralized in PartyService, combining authenticated socket heartbeats,
 server-owned party state and claimed match peer/contestant state. Browser and
