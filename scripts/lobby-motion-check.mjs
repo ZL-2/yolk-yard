@@ -20,7 +20,12 @@ try{
  if(live){
   const version=await(await p.request.get(origin+'/version.json?motion='+Date.now())).json();
   assert.equal(version.build,process.env.GITHUB_SHA);
-  assert.equal(version.release,process.env.LOBBY_MOTION_RELEASE||RELEASE_NOTES[0].number);
+  const history=await(await p.request.get(origin+'/release-history.json?motion='+Date.now())).json();
+  assert.equal(history.build,version.build);
+  assert.equal(version.release,history.releases[0].number);
+  assert.equal(history.releases[0].title,RELEASE_NOTES[0].title);
+  assert.deepEqual(history.releases[0].changes,RELEASE_NOTES[0].changes);
+  if(process.env.LOBBY_MOTION_RELEASE)assert.equal(version.release,process.env.LOBBY_MOTION_RELEASE);
   const html=await(await p.request.get(origin+'/?motion='+Date.now())).text();
   const entry=html.match(/<script[^>]*src="([^"]*assets\/[^"]+\.js)"/);assert.ok(entry);
   const entryUrl=new URL(entry[1],origin+'/').href;
