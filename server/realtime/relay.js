@@ -95,7 +95,7 @@ export class RealtimeRelay {
       if(!address.test(peer.id))throw Error('Not a room');
       const r=m.room;
       if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!Number.isInteger(r.players)||r.players<1||r.players>20))throw Error('Invalid room');
-      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:String(r.mode||'').slice(0,24),players:r.players,capacity:Math.max(2,Math.min(16,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(32,Number(r.contestantCapacity)||8)),teamSize:r.teamSize===2?2:1,public:r.public!==false,phase:r.phase}:null;
+      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:String(r.mode||'').slice(0,24),players:r.players,capacity:Math.max(2,Math.min(16,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(32,Number(r.contestantCapacity)||8)),teamSize:[2,4].includes(r.teamSize)?r.teamSize:1,public:r.public!==false,phase:r.phase}:null;
       peer.listedAt=Date.now();return;
     }
     if(m.type==='connect'){

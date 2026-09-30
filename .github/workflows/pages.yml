@@ -29,9 +29,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]')"
       - name: Verify Fieldcraft movement, combat, authority, audio and owner access
-        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')
+        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]')
         run: |
           npm run test:field
           if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" != "true" ]]; then
@@ -94,17 +94,17 @@ jobs:
           path: test-results/egg-shop
           retention-days: 7
       - run: npm run test:relay
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]')"
       - run: npm run test:realtime
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]')"
       - name: Verify authoritative countdown, human-only early departure and shared Bus transition
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]')"
         run: node scripts/countdown-network-check.mjs
       - name: Verify Royale phases, spectator cutoff, falling loot and host migration
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]')"
         run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]')
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]')
         env:
           YOLK_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
         run: node scripts/relay-live-check.mjs
@@ -119,6 +119,18 @@ jobs:
         with:
           name: lobby-motion
           path: test-results/lobby-motion
+      - name: Verify Social, four-player parties and authoritative Squads
+        if: contains(github.event.head_commit.message, '[social-squads]')
+        run: |
+          node scripts/social-squads-check.mjs
+          node --test --test-name-pattern='authority delivers|populated authority|scheduling stall|catch-up|rate budget' tests/authority-performance.test.js
+          npx playwright install --with-deps chromium
+          node scripts/social-squads-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[social-squads]')
+        with:
+          name: social-squads-verification
+          path: test-results/social-squads
       - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
@@ -236,3 +248,15 @@ jobs:
       - run: node scripts/lobby-motion-check.mjs
         env:
           LOBBY_MOTION_LIVE: https://zl-2.github.io/yolk-yard
+
+  verify-social-live:
+    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[social-squads]')
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/social-squads-live-check.mjs

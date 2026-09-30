@@ -8,7 +8,7 @@ import {SnapshotEncoder} from '../../src/snapshot-codec.js';
 import {ChatRoom} from '../../src/chat.js';
 import {rewardFrame} from '../../src/rewards.js';
 import {visibleMarkers} from '../../src/team-markers.js';
-import {isDuos} from '../../src/teams.js';
+import {isTeamRoyale} from '../../src/teams.js';
 const address=new RegExp('^yolk-yard-v'+VERSION+'-([A-Z2-9]{8})$');
 // The relay owns simulation and persistent room lifetime. Browsers submit bounded
 // input/interaction intent only; even the room leader cannot submit game state.
@@ -21,7 +21,7 @@ export class MatchAuthority{
   const match=address.exec(peer.id);if(!match||this.rooms.has(peer.id)||this.rooms.size>=24)return;
   const options={...matchOptions({...m.options,session:'online'}),seed:randomInt(1,2147483647)},sim=options.mode==='royale'?new RoyaleSimulation(options):new Simulation(options);
   const p=sim.addPlayer('host',safeProfile(m.profile));p.loading=true;peer.controlReady=false;const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,peer.id):null;
-  if(m.ticket&&!admission)return;sim.assignTeam?.(p,admission);
+  if(m.ticket&&!admission||admission&&(admission.teamSize!==options.teamSize||options.mode==='royale'&&admission.partySize>options.teamSize))return;sim.assignTeam?.(p,admission);
   const room={key:peer.id,code:match[1],owner:'host',hostPeer:peer,sim,visibility:m.visibility==='private'?'private':'public',members:new Map([['host',peer]]),chat:new ChatRoom(),encoders:new Map(),eventCursors:new Map(),age:0,frameAt:0,progressAt:0,kicked:new Set()};
   this.rooms.set(peer.id,room);peer.authorityRoom=peer.id;peer.authorityId='host';
   if(options.mode==='royale')sim.startRound();this.publish(room);this.send(peer,{type:'authority-ready',id:'host',room:room.key});this.broadcast(room);
@@ -90,10 +90,10 @@ export class MatchAuthority{
    const r=state.royale,worldKey=r?`${r.matchId}:${state.options.map}:${state.round}`:null;
    const lootKey=r?`${worldKey}:${r.lootVersion}`:null,buildKey=r?`${worldKey}:${r.buildVersion}`:null;
    const cursor=room.eventCursors.get(id)||0,privateMarkers=r?.markers?.length||state.events.some(e=>e.id>cursor&&e.type==='duo-marker');
-   const key=JSON.stringify([cursor,encoder.lootKey===lootKey,encoder.buildKey===buildKey,privateMarkers?(isDuos(state.options)?p.team:id):'public']);
+   const key=JSON.stringify([cursor,encoder.lootKey===lootKey,encoder.buildKey===buildKey,privateMarkers?(isTeamRoyale(state.options)?p.team:id):'public']);
    let outgoing=groups.get(key);
    if(!outgoing){
-    outgoing={...state,events:state.events.filter(e=>e.id>(room.eventCursors.get(id)||0)&&(e.type!=='duo-marker'||e.player===id||isDuos(state.options)&&e.team===p.team))};
+    outgoing={...state,events:state.events.filter(e=>e.id>(room.eventCursors.get(id)||0)&&(e.type!=='duo-marker'||e.player===id||isTeamRoyale(state.options)&&e.team===p.team))};
     if(r){outgoing.royale={...r,markers:visibleMarkers(state,p)};
      if(encoder.lootKey===lootKey){delete outgoing.royale.loot;delete outgoing.royale.chests;}
      if(encoder.buildKey===buildKey){delete outgoing.royale.builds;delete outgoing.royale.worldDamage;}

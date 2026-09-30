@@ -358,7 +358,7 @@ export class View {
   setParty(profiles){
     const key=JSON.stringify(profiles);if(key===this.partyPreviewKey)return;this.partyPreviewKey=key;
     for(const egg of this.partyEggs||[]){this.scene.remove(egg);this.disposeGroup(egg);}this.partyEggs=[];
-    for(const [i,profile]of profiles.slice(0,1).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.3);egg.position.set(4.1+i*2.5,.08,-.7);egg.rotation.y=Math.PI+.35;egg.userData.lobbyMotion=new LobbyMotion(11.3+i*5.7);this.scene.add(egg);this.partyEggs.push(egg);}
+    for(const [i,profile]of profiles.slice(0,3).entries()){const egg=makeEgg(profile,-1);egg.scale.setScalar(2.3);egg.position.set([3.2,-3.2,6.4][i],.08,-1.4);egg.rotation.y=Math.PI+.35;egg.userData.lobbyMotion=new LobbyMotion(11.3+i*5.7);this.scene.add(egg);this.partyEggs.push(egg);}
   }
   preview(profile) {
     const signature = JSON.stringify(profile);
@@ -727,8 +727,8 @@ export class View {
       this.animateLobbyCharacter(this.menuEgg,this.lobbyMotion,dt);
       this.lobbyStage.userData.update?.(dt);
       for(const teammate of this.partyEggs||[])this.animateLobbyCharacter(teammate,teammate.userData.lobbyMotion,dt,.17);
-      const partyOffset=this.partyEggs?.length?1:0,narrow=this.camera.aspect<.85;
-      this.camera.position.set(5.8+partyOffset,4.3,narrow?(partyOffset?22.5:19):12.5);
+      const partyCount=this.partyEggs?.length||0,partyOffset=partyCount===1?1.4:partyCount===3?1.5:0,narrow=this.camera.aspect<.85;
+      this.camera.position.set(narrow&&partyCount>1?partyOffset:5.8+partyOffset,4.3,narrow?(partyCount>1?29:partyCount?22.5:19):partyCount>1?19:12.5);
       this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):1.8, 0);
       this.camera.fov = narrow?47:48;
       this.camera.updateProjectionMatrix();
@@ -843,7 +843,7 @@ export class View {
         const sig =
           p.color +
           p.hat + JSON.stringify([p.pattern,p.finish,p.eyewear,p.accent,p.outfit,p.wrap,p.backbling,p.pickaxe]) +
-          p.team +
+          (p.team+":"+p.teamSlot) +
           mode(state.options.mode).teams;
         let model = this.models.get(p.id);
         if (!model || model.userData.signature !== sig) {
@@ -861,7 +861,7 @@ export class View {
           const name = label(
             p.name,
             teammates(state.options,p,local)
-              ? "#b3f2ff"
+              ? teamStyle(state.players,p).color
               : "#ffffff",
           );
           name.position.y = 2.15;model.userData.nameplate=name;
@@ -1097,4 +1097,4 @@ export class View {
     if(playing&&(this.gunGroup.visible||this.outgoing?.group.visible)){this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.viewmodelScene,this.viewmodelCamera);this.renderer.autoClear=true;}
   }
 }
-import {teammates} from './teams.js';
+import {teammates,teamStyle} from './teams.js';

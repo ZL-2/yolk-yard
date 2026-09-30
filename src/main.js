@@ -6,7 +6,7 @@ import {canFight} from './stance.js';
 import {StreakUI} from './streak-ui.js';
 import {PartyClient} from './party-client.js';
 import {lobbyMarkup,modeMarkup,socialMarkup,EXPERIENCES} from './lobby-ui.js';
-import {teammates,wonRoyale,isDuos} from './teams.js';
+import {teammates,wonRoyale,isTeamRoyale} from './teams.js';
 import {arrangeSettings} from './settings-layout.js';
 import {eggsMarkup,formatEggs} from './currency-ui.js';
 import {GuestPresentation} from './guest-presentation.js';
@@ -297,7 +297,7 @@ function customizeMenu(tab='shop') {
 function helpMenu() {
   modal(
     "How to play",
-    `<p>Move, aim, and tag the other operators. Arena modes allow respawns. Frontier Royale gives each contestant one life: in Duos, watch your teammate after elimination and share your team’s final placement.</p><p>Head hits receive a critical bonus on most blasters. The reticle shows your current spread; a mint reticle marks a settled first shot. ADS improves accuracy, while each blaster has its own recoil, range and recovery. Scopes keep precise aiming stable. Explosive blasters have no critical bonus.</p><table class="controls-table">${[
+    `<p>Move, aim, and tag the other operators. Arena modes allow respawns. Frontier Royale gives each contestant one life: in Duos or Squads, revive and watch your teammates after elimination and share your team’s final placement.</p><p>Head hits receive a critical bonus on most blasters. The reticle shows your current spread; a mint reticle marks a settled first shot. ADS improves accuracy, while each blaster has its own recoil, range and recovery. Scopes keep precise aiming stable. Explosive blasters have no critical bonus.</p><table class="controls-table">${[
       ...CONTROLS.map(([id, label]) => [controlLabel(id), label]),
       ["Mouse", "Look"],
       ["Escape", "Menu"],
@@ -310,7 +310,7 @@ function helpMenu() {
   );
 }
 function ruleSummary(o) {
-  if(o.mode==='royale')return `${o.teamSize===2?'Duos':'Solo'} · ${o.capacity} contestants · ${o.fill?"Fill with bots":o.bots+" bots"} · ${o.storm==='quick'?'Quick':'Normal'} storm · One life`;
+  if(o.mode==='royale')return `${o.teamSize===4?'Squads':o.teamSize===2?'Duos':'Solo'} · ${o.capacity} contestants · ${o.fill?"Fill with bots":o.bots+" bots"} · ${o.storm==='quick'?'Quick':'Normal'} storm · One life`;
   return `${o.minutes} min · ${o.scoreLimit} eliminations to win · ${o.bots} bots · ${BOT_DIFFICULTIES[o.difficulty-1]}`;
 }
 function setupMenu(editing = false, draft = null) {
@@ -319,13 +319,13 @@ function setupMenu(editing = false, draft = null) {
   const nextRound = editing && state.phase === "results";
   const select = (id,label,items,value) => `<label>${label}<select class="field" id="setup-${id}">${items.map(([key,text])=>`<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
   modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Create Match",
-    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
+    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("teamSize","ROYALE TEAM MODE",[[1,"Solo"],[2,"Duos"],[4,"Squads"]],o.teamSize||1)}${select("teamFill","HUMAN TEAMMATES",[["on","Fill"],["off","No Fill"]],o.teamFill===false?"off":"on")}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===4?'Last squad standing wins. Eight contestant positions minimum.':o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
   if(editing && !net) $("#setup-visibility").disabled=true;
   const royale=o.mode==='royale';
   if(!editing)$('#setup-mode').disabled=true;
-  if(royale&&o.teamSize===2){$('#setup-capacity').querySelector('option[value="2"]')?.remove();if(o.capacity<4)$('#setup-capacity').value='4';}
+  if(royale){for(const option of $('#setup-capacity').options)option.disabled=Number(option.value)<(o.teamSize||1)*2;if(o.capacity<(o.teamSize||1)*2)$('#setup-capacity').value=String((o.teamSize||1)*2);for(const option of $('#setup-teamSize').options)option.disabled=Number(option.value)<(party?.party?.members.length||1);$('#setup-teamSize').onchange=()=>{const next={...getOptions(),visibility:$('#setup-visibility').value};setupMenu(editing,next);};}
   for(const key of ['minutes','scoreLimit']){$(`#setup-${key}`).closest('label').hidden=royale;$(`#setup-${key}`).disabled=royale;}
-  for(const key of ['capacity','storm'])$(`#setup-${key}`).closest('label').hidden=!royale;
+  for(const key of ['capacity','storm','teamSize','teamFill'])$(`#setup-${key}`).closest('label').hidden=!royale;
   $('#setup-map').disabled=royale;
   $('#setup-mode').onchange=e=>{
     const visibility=$('#setup-visibility').value;
@@ -336,7 +336,7 @@ function setupMenu(editing = false, draft = null) {
 }
 function getOptions() {
   if (![...document.querySelectorAll('#dialog input[type="number"]')].every(input=>input.disabled||input.reportValidity())) return null;
-  return matchOptions({...options,...party?.party?.selection,...Object.fromEntries(["map","mode","bots","difficulty","minutes","scoreLimit","capacity","storm","fill"].map(key=>[key,$(`#setup-${key}`).value])),fill:$("#setup-fill").value==='on',session:net?'online':sim?.options.session});
+  return matchOptions({...options,...party?.party?.selection,...Object.fromEntries(["map","mode","bots","difficulty","minutes","scoreLimit","capacity","storm","fill"].map(key=>[key,$(`#setup-${key}`).value])),teamSize:Number($("#setup-teamSize").value),teamFill:$("#setup-teamFill").value==='on',fill:$("#setup-fill").value==='on',session:net?'online':sim?.options.session});
 }
 function saveMatchSettings(start = false) {
   if (!sim || state?.phase === "playing") return;
@@ -435,7 +435,7 @@ function roundIntro(){
   const place=state.royale?p?.place:p?1+ranked.filter(other=>other.kills>p.kills||other.kills===p.kills&&other.deaths<p.deaths).length:0;
   const win=state.royale?wonRoyale(state,localId):mode(state.options.mode).teams?state.scores[p?.team]>state.scores[1-p?.team]:place===1;
   const title=state.royale?(win?'FRONTIER SECURED':place?'YOU PLACED #'+place:'ROUND COMPLETE'):mode(state.options.mode).teams?(state.scores[0]===state.scores[1]?'TEAM DRAW':win?'TEAM VICTORY':'ROUND COMPLETE'):'YOU PLACED #'+place;
-  const banner=$('#round-banner');banner.className=win?'victory':'placement';banner.innerHTML=`<span>${state.royale?(isDuos(state.options)?'LAST DUO STANDING':'LAST OPERATOR STANDING'):mode(state.options.mode).name.toUpperCase()}</span><strong>${esc(title)}</strong><p>${!state.royale&&place?'YOUR PLACE #'+place+' · ':''}${p?.kills||0} ELIMINATIONS</p>`;banner.hidden=false;
+  const banner=$('#round-banner');banner.className=win?'victory':'placement';banner.innerHTML=`<span>${state.royale?(state.options.teamSize===4?'LAST SQUAD STANDING':isTeamRoyale(state.options)?'LAST DUO STANDING':'LAST OPERATOR STANDING'):mode(state.options.mode).name.toUpperCase()}</span><strong>${esc(title)}</strong><p>${!state.royale&&place?'YOUR PLACE #'+place+' · ':''}${p?.kills||0} ELIMINATIONS</p>`;banner.hidden=false;
   if(!state.royale)sound.cue(win?'victory':'round-start');
   resultAt=performance.now()+4200;
 }
@@ -774,7 +774,7 @@ function leave(confirm = false,notifyParty=true) {
   void updates.check();
 }
 function scoresHTML(s = state) {
-  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Operator</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isDuos(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
+  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Operator</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isTeamRoyale(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
 
   return `<table class="scores"><thead><tr><th>Operator</th><th>Elims</th><th>Downs</th><th>Score</th></tr></thead><tbody>${[
     ...(s?.players || []),
@@ -1019,24 +1019,29 @@ async function partyRequest(type,data={}){
 function playMenu(){modal('Choose your experience',modeMarkup(party?.party?.selection,party?.party?.leader!==party?.id),'play');}
 async function selectExperience(id){
  const e=EXPERIENCES.find(e=>e.id===id);if(!e)return;
- if(await partyRequest('select',{mode:e.mode,teamSize:e.teamSize,duoFill:party.party.selection.duoFill})){closeDialog();renderMenu();}
+ if(await partyRequest('select',{mode:e.mode,teamSize:e.teamSize,teamFill:party.party.selection.teamFill})){closeDialog();renderMenu();}
 }
+let socialTab='friends',socialModel=null,socialOffset=0,socialRefreshTimer=null,socialFetching=false;
 async function socialMenu(){
- if(!party?.ready){toast('The party service is connecting. Try again in a moment.');return;}
- const players=await partyRequest('online');if(!players)return;
- modal('Social & Party',socialMarkup(party.party,party.id,players),'social');
+ if(!party?.ready){toast('Social is connecting. Try again in a moment.');return;}
+ if(socialFetching)return;socialFetching=true;
+ const model=await partyRequest('social',{offset:socialOffset});socialFetching=false;if(!model)return;
+ socialModel=model;modal('Social & Party',socialMarkup(party.party,party.id,model,socialTab),'social');
 }
+function scheduleSocialRefresh(){clearTimeout(socialRefreshTimer);if(dialogType==='social')socialRefreshTimer=setTimeout(()=>{if(dialogType==='social')void socialMenu();},750);}
+function addFriendMenu(){modal('Add Friend',`<p>Enter another player’s public Friend Code. You can send a request even when they are offline.</p><form id="friend-find-form"><label for="friend-code">FRIEND CODE</label><input class="field" id="friend-code" placeholder="AB7KQ-4M2QX" maxlength="16" autocomplete="off" spellcheck="false"><button class="primary" type="submit">FIND PLAYER</button></form><div id="friend-lookup" role="status"></div>`,'add-friend');$('#friend-code').focus();$('#friend-find-form').onsubmit=async e=>{e.preventDefault();const node=$('#friend-lookup');node.textContent='Finding player…';try{const found=await party.request('lookup',{code:$('#friend-code').value});if(!node.isConnected)return;node.innerHTML=`<article class="social-person"><div><strong>${esc(found.name)}</strong><small>${esc(found.code)} · ${esc(found.presence.replaceAll('-',' '))}</small></div>${found.relationship==='none'?`<button class="primary" data-social-action="friend-send" data-player-id="${found.id}">SEND FRIEND REQUEST</button>`:found.relationship==='incoming'?`<button data-social-action="friend-accept" data-player-id="${found.id}">ACCEPT REQUEST</button>`:`<span class="social-pending">${found.relationship==='friends'?'Already friends':'Request already pending'}</span>`}</article>`;}catch(error){node.textContent=error.message;node.className='social-error';}};}
 function receiveInvite(invite){
- document.querySelector('.party-invitation')?.remove();
- const node=document.createElement('aside');node.className='party-invitation';node.setAttribute('role','status');
- node.innerHTML=`<strong>${esc(invite.name)} invited you to their party</strong><button data-party-accept="${invite.id}">ACCEPT</button><button data-party-decline="${invite.id}">DECLINE</button>`;
- document.body.append(node);setTimeout(()=>node.remove(),Math.max(0,invite.expires-Date.now()));sound.cue('queue-found');
+ if(document.querySelector(`[data-invitation-id="${invite.id}"]`))return;
+ let tray=document.querySelector('.social-notifications');if(!tray){tray=document.createElement('div');tray.className='social-notifications';document.body.append(tray);}
+ const node=document.createElement('aside');node.className='party-invitation';node.dataset.invitationId=invite.id;node.setAttribute('role','status');
+ node.innerHTML=`<small>PARTY INVITATION · ${invite.size} / 4</small><strong>${esc(invite.name)} invited you</strong><button data-party-accept="${invite.id}">ACCEPT</button><button data-party-decline="${invite.id}">DECLINE</button>`;
+ tray.append(node);while(tray.children.length>3)tray.firstChild.remove();setTimeout(()=>node.remove(),Math.max(0,invite.expires-Date.now()));sound.cue('queue-found');
 }
 async function queueParty(custom=false,code=null){
  if(state){toast('Return to the lobby before finding another match.');return;}
  const selected=custom?getOptions():matchOptions({...party?.party?.selection,fill:true,bots:party?.party?.selection.mode==='royale'?31:7});
  if(!selected)return;
- if(custom&&(selected.mode!==party.party.selection.mode||selected.teamSize!==party.party.selection.teamSize)){
+ if(custom&&(selected.mode!==party.party.selection.mode||selected.teamSize!==party.party.selection.teamSize||selected.teamFill!==party.party.selection.teamFill)){
   if(!await partyRequest('select',{...selected}))return;
  }
  if(await partyRequest('queue',{custom,code,options:selected,visibility:$('#setup-visibility')?.value||'public'})){dialog.close();dialogType='';renderMenu();}
@@ -1057,9 +1062,12 @@ async function launchParty(launch){
 function initializeParty(){
  party=new PartyClient(profile,{
   status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'&&screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');},
-  change:p=>{if(screen==='menu')renderMenu();if(dialogType==='social')void socialMenu();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
+  change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
-  cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing';activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);toast(m.message);if(screen==='menu')renderMenu();}
+  'social-changed':scheduleSocialRefresh,
+  'party-notice':m=>toast(m.message),
+  'friend-request':m=>{toast(m.name+' sent a friend request. Open Social to accept or decline.');sound.cue('queue-found');scheduleSocialRefresh();},
+  cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing'||activeLaunch&&m.launchId===activeLaunch;activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);toast(m.message);if(screen==='menu')renderMenu();}
  });
 }
 function royaleMap(){if(!state?.royale)return;modal('Ravel Coast',royaleUI.mapHTML(),'royale-map');royaleUI.drawMap($('#royale-fullmap'),state,state.players.find(p=>p.id===localId),true);}
@@ -1083,11 +1091,13 @@ const actions = {
  'locker':()=>customizeMenu('locker'),
  'item-shop':()=>customizeMenu('shop'),
  'social':socialMenu,
+ 'add-friend':addFriendMenu,
+ 'copy-friend-code':()=>copy(party.code),
  'career':()=>modal('Career',`<div class="account-stats"><span>Matches <b>${stats.matches}</b></span><span>Eliminations <b>${stats.kills}</b></span><span>Wins <b>${stats.wins}</b></span><span>Assists <b>${stats.assists||0}</b></span></div><p>Verified online matches contribute to progression. Spawn Island and practice do not count. Existing career history is preserved.</p><div class="career-modes">${Object.entries(stats.modes||{}).map(([id,m])=>`<p><b>${id==='royale'?'Frontier Royale':id==='teams'?'Team Scramble':'Free for All'}</b> · ${m.matches} matches · ${m.wins} wins · ${m.kills} eliminations${m.placements.length?' · Best placement #'+Math.min(...m.placements.filter(n=>n>0)):''}</p>`).join('')}</div><p>Stats and Marks are saved on this device.</p><button class="primary" data-action="close">DONE</button>`),
  'find-public':()=>queueParty(),
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
- 'duo-fill':()=>partyRequest('select',{...party.party.selection,duoFill:true}),
- 'duo-no-fill':()=>partyRequest('select',{...party.party.selection,duoFill:false}),
+ 'duo-fill':()=>partyRequest('select',{...party.party.selection,teamFill:true,duoFill:true}),
+ 'duo-no-fill':()=>partyRequest('select',{...party.party.selection,teamFill:false,duoFill:false}),
  'party-ready':()=>partyRequest('ready',{value:!party.party.members.find(m=>m.id===party.id)?.ready}),
  'party-cancel':()=>partyRequest('cancel'),
  'party-leave':()=>partyRequest('leave'),
@@ -1177,13 +1187,16 @@ const actions = {
   about: () =>
     modal(
       "Welcome to the frontier",
-      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. The Social panel lists connected browser-session nicknames. Party invitations, membership and readiness are held by the relay; reconnect tokens stay in this tab, invitations expire after one minute, and disconnected parties expire after 90 seconds. There is no permanent friend list. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.0 · All gameplay code is included in the project.</p>`,
+      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.2 · All gameplay code is included in the project.</p>`,
       "about",
     ),
 };
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button,[data-action]");
   if (!b) return;
+  if(b.dataset.socialTab){socialTab=b.dataset.socialTab;void socialMenu();}
+  if(b.dataset.socialPage!==undefined){socialOffset=Number(b.dataset.socialPage);void socialMenu();}
+  if(b.dataset.socialAction){b.disabled=true;void partyRequest(b.dataset.socialAction,{id:b.dataset.playerId}).then(ok=>{b.disabled=false;if(ok){toast(b.dataset.socialAction==='friend-send'?(ok.status==='friends'?'Friend request accepted.':'Friend request sent.'):'Social list updated.');void socialMenu();}});}
   if(b.dataset.experience)void selectExperience(b.dataset.experience);
   for(const [key,type]of [['partyInvite','invite'],['partyAccept','accept'],['partyDecline','decline'],['partyKick','kick'],['partyJoin','join']])if(b.dataset[key]){
     void partyRequest(type,{id:b.dataset[key]}).then(ok=>{if(ok){if(type==='accept'||type==='decline')b.closest('.party-invitation')?.remove();if(type==='invite')toast('Invitation sent.');if(dialogType==='social')void socialMenu();}});

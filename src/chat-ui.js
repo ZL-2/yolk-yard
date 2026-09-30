@@ -112,7 +112,7 @@ export class ChatPanel {
     if(!ctx.connected){this.hud.hidden=true;return;}
     const me=ctx.state?.players.find(p=>p.id===ctx.localId);
     const spectator=me?.spectating&&ctx.state?.phase==='playing';
-    const teams=(ctx.state?.options.mode==='teams'||ctx.state?.options.mode==='royale'&&ctx.state.options.teamSize===2)&&!me?.spectating;
+    const teams=(ctx.state?.options.mode==='teams'||ctx.state?.options.mode==='royale'&&[2,4].includes(ctx.state.options.teamSize))&&!me?.spectating;
     this.channel.options[1].hidden=!teams;this.channel.options[1].disabled=!teams;
     if(!teams)this.channel.value='room';
     this.channel.options[0].textContent=spectator?'Spectators':'Room';

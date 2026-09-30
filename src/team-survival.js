@@ -1,4 +1,4 @@
-import {isDuos,teammates} from './teams.js';
+import {isTeamRoyale,teammates} from './teams.js';
 import {dist,wallDistance} from './physics.js';
 import {eyeHeight} from './stance.js';
 import {navigate} from './bot-navigation.js';
@@ -6,7 +6,7 @@ import {newBrain} from './bot-perception.js';
 import {skillFor} from './bot-config.js';
 export const REVIVE_RULES=Object.freeze({seconds:10,range:2.6,health:30,vitality:100,bleed:2,decay:1,damageDelay:.75});
 export const activeMember=p=>!!p&&p.contestant&&p.health>0&&!p.downed&&!p.spectating&&!p.afkRemoved;
-export function mayDown(sim,p,source){return isDuos(sim.options)&&!p.downed&&!['Left round','Team eliminated','Disconnected'].includes(source)&&[...sim.players.values()].some(o=>teammates(sim.options,p,o)&&activeMember(o));}
+export function mayDown(sim,p,source){return isTeamRoyale(sim.options)&&!p.downed&&!['Left round','Team eliminated','Disconnected'].includes(source)&&[...sim.players.values()].some(o=>teammates(sim.options,p,o)&&activeMember(o));}
 export function downPlayer(sim,p,attacker,source,precision,shotId){
  const applied=p.health;if(attacker&&attacker!==p){p.damageLedger??={};p.damageLedger[attacker.id]=sim.time;}
  // `health` is vitality while DOWNED, not normal combat health. All normal
@@ -21,7 +21,7 @@ export function reviveAccessible(map,reviver,target){
  const a={x:reviver.x,y:reviver.y+Math.min(1,eyeHeight(reviver)),z:reviver.z},b={x:target.x,y:target.y+.4,z:target.z},delta={x:b.x-a.x,y:b.y-a.y,z:b.z-a.z},length=Math.hypot(delta.x,delta.y,delta.z)||.001;
  return wallDistance(map,a,{x:delta.x/length,y:delta.y/length,z:delta.z/length},length)>=length-.04;
 }
-export function reviveTarget(sim,p){return [...sim.players.values()].filter(o=>o.downed&&o.health>0&&!o.spectating&&teammates(sim.options,p,o)&&reviveAccessible(sim.map,p,o)).sort((a,b)=>dist(p,a)-dist(p,b))[0];}
+export function reviveTarget(sim,p){return [...sim.players.values()].filter(o=>o.downed&&o.health>0&&!o.spectating&&(!o.reviverId||o.reviverId===p.id)&&teammates(sim.options,p,o)&&reviveAccessible(sim.map,p,o)).sort((a,b)=>dist(p,a)-dist(p,b))[0];}
 export function prepareRevive(sim,p,input){
  p.reviving=null;
  if(!activeMember(p)||p.flight!=='ground'||!input.interact||input.fire||input.jump||input.sprint||Math.hypot(input.forward||0,input.strafe||0)>.1||sim.time<(p.reviveBlockedUntil||0))return false;
@@ -42,11 +42,11 @@ export function tickRevives(sim,dt){
  }
 }
 export function resolveDownedTeams(sim){
- if(!isDuos(sim.options))return;
+ if(!isTeamRoyale(sim.options))return;
  for(const p of sim.players.values())if(p.downed&&p.health>0&&!p.spectating&&![...sim.players.values()].some(o=>teammates(sim.options,p,o)&&activeMember(o)))sim.damage(p,null,p.health+1,'Team eliminated');
 }
 export function rescueBotInput(sim,p){
- if(!activeMember(p)||!isDuos(sim.options)||p.flight!=='ground')return null;
+ if(!activeMember(p)||!isTeamRoyale(sim.options)||p.flight!=='ground')return null;
  const mate=[...sim.players.values()].find(o=>o.downed&&o.health>0&&teammates(sim.options,p,o));if(!mate||dist(p,mate)>40)return null;
  const dx=mate.x-p.x,dz=mate.z-p.z,near=reviveAccessible(sim.map,p,mate);
  const yaw=Math.atan2(-dx,-dz),brain=p.brain??=newBrain(sim,p);

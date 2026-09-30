@@ -871,7 +871,7 @@ export class Simulation {
   }
   snapshot() {
     const keys = [
-      'crouching','lowCrouch','sliding','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','downed','lifeState','downedAt','revivedAt','downCount','reviving','reviverId','reviveProgress','revives',
+      'crouching','lowCrouch','sliding','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','downed','lifeState','downedAt','revivedAt','downCount','reviving','reviverId','reviveProgress','revives','connected','teamSlot',
       "afkRemaining", "afkRemoved", "lastDamage", "assists", "quickstep", "focus",
       "id", "joinedOrder", "vx", "vz", "place",
       "name",

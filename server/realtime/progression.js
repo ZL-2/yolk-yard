@@ -48,7 +48,7 @@ export class ProgressionService{
   if(m.finished)return;m.finished=true;const now=this.clock(),elapsed=now-m.started,all=[...m.players.values()];
   for(const p of all){if(p.bot)continue;const account=this.account(p.identity);account.earned=account.earned.filter(e=>now-e.time<3600);account.pairs=account.pairs.filter(e=>now-e.time<3600);account.encounters=(account.encounters||[]).filter(e=>now-e.time<3600);
    // Team membership is evaluated independently of skin/team colors.
-   const enemy=all.filter(o=>o!==p&&!((m.state.teamSize===2||m.mode==='teams')&&o.raw?.team===p.raw?.team));
+   const enemy=all.filter(o=>o!==p&&!((m.state.teamSize>1||m.mode==='teams')&&o.raw?.team===p.raw?.team));
    const kills=m.eliminations.filter(e=>e.attacker===p.id).map(e=>{const victim=m.players.get(e.target),repeat=account.pairs.filter(x=>x.target===victim.identity).length;account.pairs.push({target:victim.identity,time:now});return {bot:victim.bot,difficulty:victim.difficulty,repeat,...(!victim.bot&&!participation({...victim.activity,elapsed:victim.activity.elapsed??elapsed,afkRemoved:victim.afkRemoved})?{repeat:9}:{})};});
    const ranked=all.filter(o=>!o.raw?.lateSpectator).sort((a,b)=>b.kills-a.kills||(a.raw?.deaths||0)-(b.raw?.deaths||0));
    const place=m.mode==='royale'?p.raw?.place:ranked.indexOf(p)+1;

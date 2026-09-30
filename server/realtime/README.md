@@ -19,28 +19,47 @@ Before switching, run `YOLK_RELAY_URL=wss://YOUR-HOST/game node scripts/relay-li
 
 Server restarts lose rooms; reconnect recovery covers transient socket/network failures within the same process. No user login is added. Origin checks restrict browser use but are not user authentication. This private-alpha service targets modest player counts; multiple instances require a shared routing/room-owner architecture.
 
-## Lobby parties
+## Social, parties and match teams (protocol 23)
 
-The same process owns `/social`, independently of gameplay rooms. Opaque per-tab
-resume tokens authenticate party membership and invitations. Mode, leader,
-readiness, privacy and admission tickets are server-controlled. Party queues
-reserve human seats, replace fill bots and preserve invited Duos. Session profiles
-appear in the Social panel; there is no permanent friend/account database. Invites
-expire after 60 seconds and disconnected identities after 90 seconds. Server
-restarts clear ephemeral parties as well as rooms.
+`/social` authenticates a durable browser identity using a random 256-bit private
+credential stored in localStorage; the server stores its SHA-256 hash. A separate
+50-bit, collision-checked public Friend Code allows case-insensitive lookup and
+never grants access. Tabs sharing a browser identity consolidate into one online
+player. This is a device identity, not an account with cross-device recovery.
 
-The container includes shared `src` modules for profile moderation and match
-options. `/health` advertises `gameVersion` and party capabilities; verify these
-alongside the game deployment. See `docs/party-combat-update.md` for team and combat
-authority. Run `node scripts/party-duos-check.mjs` for the actual relay flow.
+Friendships, requests, block relationships, display profiles and public codes are
+stored atomically in `RAVEL_SOCIAL_DATA_PATH`. Set this to a file on a persistent
+volume. If unset, it uses a sibling of `YOLK_OWNER_DATA_PATH`, or
+`/tmp/ravelfront-social.json`; an ephemeral container filesystem cannot preserve
+relationships through service replacement. Clearing browser site data also loses
+access to that device identity. No secrets, IPs or private match identifiers are
+exposed in social lookup cards. Health advertises social revision and party limit.
 
-## Owner analytics
+Presence is centralized in PartyService, combining authenticated socket heartbeats,
+server-owned party state and claimed match peer/contestant state. Browser and
+native WebSocket heartbeats run every 15 seconds (native pong keeps background
+tabs alive even when JavaScript timers are throttled); unresponsive social sockets expire after 45 seconds. Membership
+gets a 30-second reconnection grace, then roster cleanup/leadership transfer selects
+the first connected member. Live game sockets retain the existing 10-second relay
+resume window and keep their authoritative team. Persistent relationships survive
+ephemeral party and match cleanup. A second tab cannot clear another tab's match.
 
-The game contains a hidden entry gesture for the owner dashboard. The gesture is **not** authentication: the owner code is checked server-side, and neither the numeric code nor its hash belongs in the public repository or client JavaScript. To enable access, set `YOLK_OWNER_CODE` in the relay host's private environment to a randomly generated **12–32 digit** value. Do not include it in GitHub, Vite variables or `network-config.js`. No valid code exists when this variable is absent. Login is rate-limited, creates a short-lived token held only in the current browser tab's memory, and the protected summary is never returned without that token.
+Parties contain up to four members. Mode, Fill, readiness, leadership, invites,
+removal and seat reservations are validated server-side. Invites expire in 60
+seconds. Requests reconcile crossed submissions into one friendship. Blocking
+removes friendship/pending requests and prevents invitations and online discovery;
+it does not alter an already active match. Social browse is paginated (25 entries),
+with action-specific rate limits. Party removal and leaving never disconnect the
+website or unfriend the member.
 
-The dashboard shows anonymous active/recent sessions, mode, duration, visit totals and live room/relay counts. No IP addresses, player names or chat are collected. In-memory history disappears on restart. For history across redeploys, provision a persistent disk for the relay and set `YOLK_OWNER_DATA_PATH` to a writable file on that disk (for example `/data/yolk-owner.json`). Render's default filesystem is ephemeral; do not claim durable history until the disk is attached. Up to 1,000 ended sessions from the past 30 days are kept. The owner UI indicates whether persistence is configured. The server reads the file on startup, writes updates atomically and restricts the file permissions to the running user.
+Match teams are contestant records with stable team IDs and numbered member slots,
+separate from lobby party IDs. Premade sizes reserve team seats, human Fill only
+joins compatible human teams, and bots fill other match-level teams. Solo/Duos/
+Squads have sizes 1/2/4. Squad survival supports multiple DBNO and independent
+revives, squad wipes, team placement/victory and teammate-priority spectating.
+Markers are recipient-filtered, private to teams, expire, and permit at most three
+pings per player in six seconds with an 800ms minimum gap. Snapshot cadence, sparse
+world deltas, bounded catch-up and socket backpressure remain unchanged.
 
-
-## Ravelfront progression
-
-Protocol 20 adds relay-settled Marks rewards and a 59-second meaningful-activity guard. See `docs/RAVELFRONT.md` for policy and trust boundaries. Set `RAVEL_REWARD_DATA_PATH` to a file on an existing persistent disk to retain receipts, hourly budgets and opponent-pair counters across replacement deployments. When omitted, an existing `YOLK_OWNER_DATA_PATH` directory is reused; otherwise `/tmp/ravelfront-progress.json` is ephemeral. Browser wallets and ownership remain in their existing local storage. Health reports `brand: Ravelfront` and `marks-rewards`, `afk-59`, `humanoids` features.
+Run `node scripts/social-squads-check.mjs` and
+`node scripts/social-squads-browser-check.mjs` for the focused release checks.

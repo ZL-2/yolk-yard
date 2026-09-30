@@ -1,9 +1,9 @@
-import {isDuos,teammates} from './teams.js';
+import {isTeamRoyale,teammates} from './teams.js';
 import {direction,worldHit,humanHit,dist} from './physics.js';
 import {eyeHeight} from './stance.js';
 import {surfaceAt} from './maps.js';
 import {itemInfo} from './royale-data.js';
-export const visibleMarkers=(state,p)=>(state.royale?.markers||[]).filter(m=>m.until>state.time&&(m.player===p?.id||m.team===p?.team&&isDuos(state.options)));
+export const visibleMarkers=(state,p)=>(state.royale?.markers||[]).filter(m=>m.until>state.time&&(m.player===p?.id||m.team===p?.team&&isTeamRoyale(state.options)));
 // The client supplies intent, never marker ownership, expiry or a tracked enemy.
 export function markerAction(sim,p,action){
  if(!action.startsWith('ping-'))return false;
