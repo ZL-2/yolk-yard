@@ -15,6 +15,7 @@ try{
   await p.setViewportSize({width,height:800});await p.screenshot({path:`test-results/lobby-status/lobby-${width}.png`});
   const b=await p.locator('.lobby-service-status').boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width&&b.y>=0&&b.y+b.height<=800);
   const play=await p.locator('.yard-play-card').boundingBox();if(play)assert.ok(b.y+b.height<=play.y||b.x>=play.x+play.width||b.x+b.width<=play.x,'Status must not cover Play');
+  if(width>760){const party=await p.locator('.yard-party').boundingBox();assert.ok(b.y>=party.y+party.height,'Notice must be below Party');assert.ok(Math.abs(b.x+b.width-party.x-party.width)<2,'Notice must align with Party');assert.ok(Math.abs(b.y+b.height-play.y-play.height)<2,'Notice must sit across from matchmaking');}
  }
  await p.reload();await p.locator('.lobby-service-status').waitFor();assert.match(await p.locator('.service-elapsed time').textContent(),/00:01:/);
  assert.deepEqual(errors,[]);console.log('Live lobby notice, clock, refresh and desktop/mobile layout passed');
