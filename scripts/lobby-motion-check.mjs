@@ -13,7 +13,7 @@ try{
   await p.goto(origin+'/__loading-preview');
   await p.evaluate(async()=>{window.loading=await import('/src/loading-screen.js');loading.showLoading('DEPLOYING TO THE FRONT','Preparing terrain and equipment.');});
   for(const width of [1280,390]){await p.setViewportSize({width,height:800});const bounds=await p.locator('.ravel-loading').boundingBox();assert.equal(Math.round(bounds.width),width);assert.equal(Math.round(bounds.height),800);await p.screenshot({path:`test-results/lobby-motion/loading-${width}.png`});}
-  await p.evaluate(()=>loading.hideLoading());assert.equal(await p.locator('.ravel-loading').isVisible(),false);
+  await p.evaluate(()=>loading.hideLoading(true));assert.equal(await p.locator('.ravel-loading').isVisible(),false);
   await p.setViewportSize({width:1280,height:800});
  }
  if(live){

@@ -1,5 +1,8 @@
 export function loadingMarkup(status='PREPARING THE FRONT',detail='Loading terrain, operators and equipment.',cancel=false){
  return `<div class="ravel-loading"><div class="load-brand">RAVELFRONT<small>FIELD OPERATIONS / RAVEL COAST</small></div><section class="load-story"><span>ONE FRONTIER. NO SECOND CHANCES.</span><h1>HOLD THE<br>FRONT.</h1><p>Beyond the coast, the storm is closing in. Stay together. Move with purpose. Make every shot count.</p></section><div class="load-footer"><div class="load-state" role="status" aria-live="polite"><div class="load-status">${status}</div><div class="load-track" aria-hidden="true"></div><div class="load-detail">${detail}</div></div>${cancel?'<button class="load-cancel" data-action="cancel-connect">CANCEL DEPLOYMENT</button>':''}</div></div>`;
 }
-export function showLoading(status,detail){const root=document.querySelector('#loading-screen');if(root){root.className='';root.removeAttribute('role');root.innerHTML=loadingMarkup(status,detail);root.hidden=false;}}
-export function hideLoading(){const root=document.querySelector('#loading-screen');if(root)root.hidden=true;}
+export const MIN_LOADING_MS=2000;
+let shownAt=performance.now(),hideTimer=null,generation=0;
+export function showLoading(status,detail){const root=document.querySelector('#loading-screen');if(root){clearTimeout(hideTimer);hideTimer=null;generation++;shownAt=performance.now();root.className='';root.removeAttribute('role');root.innerHTML=loadingMarkup(status,detail);root.hidden=false;}}
+export function hideLoading(force=false){const root=document.querySelector('#loading-screen');if(!root||root.hidden)return;const remaining=MIN_LOADING_MS-(performance.now()-shownAt);if(force||remaining<=0){clearTimeout(hideTimer);hideTimer=null;root.hidden=true;}else if(hideTimer===null){const current=generation;hideTimer=setTimeout(()=>{hideTimer=null;if(current===generation)root.hidden=true;},remaining);}}
+export function waitForLoading(){return new Promise(resolve=>setTimeout(resolve,Math.max(0,MIN_LOADING_MS-(performance.now()-shownAt))));}

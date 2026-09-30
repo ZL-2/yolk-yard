@@ -14,5 +14,5 @@ document.querySelector('#maintenance-login').onsubmit=async e=>{
   setTimeout(()=>location.reload(),Math.max(0,result.expires-Date.now()));
   showLoading('PREPARING FIELD OPERATIONS','Loading operators, terrain and equipment.');
   document.body.style.cssText='';document.querySelector('#world').hidden=false;app.innerHTML='';await import('./main.js');
- }catch(error){hideLoading();field.value='';status.textContent=error.message||'Cannot verify access. Please try again.';button.disabled=false;}
+ }catch(error){hideLoading(true);field.value='';status.textContent=error.message||'Cannot verify access. Please try again.';button.disabled=false;}
 };

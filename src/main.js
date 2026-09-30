@@ -1,4 +1,4 @@
-import {loadingMarkup,showLoading,hideLoading} from './loading-screen.js';
+import {loadingMarkup,showLoading,hideLoading,waitForLoading} from './loading-screen.js';
 import {predictionCorrection} from './network-stats.js';
 import {InputClock} from './input-clock.js';
 import {RemoteSimulation} from './remote-simulation.js';
@@ -226,7 +226,8 @@ function modal(title, body, type = "generic") {
   input.aim = false;
   paused = true;
   if (document.pointerLockElement) document.exitPointerLock();
-  if(type==='error')hideLoading();
+  if(type==='error')hideLoading(true);
+  if(type==='connecting')showLoading('ESTABLISHING MATCH UPLINK','Connecting to the room service.');
   dialog.innerHTML = type==='connecting'?loadingMarkup('ESTABLISHING MATCH UPLINK','Connecting to the room service. You can cancel at any time.',true):`<div class="dialog-head"><h2>${title}</h2><button class="close-btn" data-action="close" aria-label="Close dialog">×</button></div><div class="dialog-body">${body}</div>`;
   if (!dialog.open) dialog.showModal();
 }
@@ -547,6 +548,8 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     if(attempt.peer?.control){state=await attempt.createAuthority(options,profile,visibility,launch?.ticket);sim=new RemoteSimulation(attempt,()=>state);}
     else {if(sim instanceof RoyaleSimulation)sim.startRound();state=sim.snapshot();attempt.broadcast(state);attempt.publishRoom();}
     localId = attempt.id;
+    await waitForLoading();
+    if(attempt!==net)return;
     screen = "lobby";
     paused = true;
     dialog.close();
@@ -597,6 +600,7 @@ async function joinRoom(publicCode, quiet=false, ticket=null) {
   pendingInputs = [];
   try {
     localId = await attempt.join(code, profile, ticket);
+    await waitForLoading();
     if (attempt !== net) return;
     screen = "lobby";
     paused = true;
@@ -734,7 +738,7 @@ function pauseMenu() {
   );
 }
 function leave(confirm = false,notifyParty=true) {
-  hideLoading();
+  hideLoading(true);
   if(notifyParty){activeLaunch=null;void partyRequest("returned");}
   earnMatch++;
   buildControls.buildMode=false;buildUI.cancel();
@@ -1653,7 +1657,7 @@ function loop(now) {
     profile,
   );
   // Keep the screen through map construction and asynchronous shader preparation.
-  if(!view.mapCompile)hideLoading();
+  if(!busy&&!view.mapCompile)hideLoading();
   if (hudClock > 0.06) {
     chat.update();
     hud();
@@ -1686,7 +1690,7 @@ try {
   const invite = new URL(location.href).searchParams.get("room");
   if (invite) joinMenu(formatCode(cleanCode(invite)));
 } catch (e) {
-  hideLoading();
+  hideLoading(true);
   console.error(e);
   $("#menu").innerHTML =
     `<section class="panel lobby-panel"><h2>3D graphics unavailable</h2><p style="margin-top:15px">This game needs WebGL 2. Try a current Chrome or Safari with graphics acceleration enabled.</p><p class="hint">${esc(e.message)}</p></section>`;
