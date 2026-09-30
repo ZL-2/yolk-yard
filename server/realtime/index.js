@@ -1,3 +1,4 @@
+import {BALANCE_REVISION} from '../../src/weapon-balance.js';
 import {arenaSpawnPoints} from '../../src/arena-spawns.js';
 import {ServiceStatus} from './service-status.js';
 import {CpuQuotaMonitor} from './cpu-quota.js';
@@ -21,7 +22,7 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
     if(req.url?.split('?')[0]==='/status'){const origin=req.headers.origin;res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store',...(origins.includes(origin)?{'Access-Control-Allow-Origin':origin,'Vary':'Origin'}:{})});res.end(JSON.stringify(relay.serviceStatus.snapshot()));return;}
     if(req.url?.startsWith('/owner/')){void owner.handle(req,res,{origins,relay});return;}
     const social=relay.parties.store.storage();
-    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',performanceRevision:83,socialRevision:92,statusRevision:89,reopeningRevision:87,maintenance,partyLimit:4,socialStorage:social.mode,socialAvailable:social.available,cpu:cpuQuota.snapshot(),features:['friends','friend-codes','presence','blocking','four-player-parties','squads','human-team-fill','parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
+    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,weaponBalanceRevision:BALANCE_REVISION,build:process.env.RENDER_GIT_COMMIT||null,brand:'Ravelfront',performanceRevision:83,socialRevision:92,statusRevision:89,reopeningRevision:87,maintenance,partyLimit:4,socialStorage:social.mode,socialAvailable:social.available,cpu:cpuQuota.snapshot(),features:['central-weapon-balance','friends','friend-codes','presence','blocking','four-player-parties','squads','human-team-fill','parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
   });
   const sockets=new WebSocketServer({noServer:true,maxPayload:2_000_000,perMessageDeflate:false});
   server.on('upgrade',(req,socket,head)=>{

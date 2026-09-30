@@ -1,10 +1,11 @@
+import {AMMO_RULES} from './weapon-balance.js';
 import {weapon} from './data.js';
 import {ammoType} from './royale-data.js';
 import {groundAt} from './terrain.js';
 import {canStand,wallDistance,candidates} from './physics.js';
 // One host-only table for authored floor sockets, chests and supply rewards.
 const sources=['ground','chest','high','supply'];
-export const AMMO_DROPS={light:{weight:28,min:18,max:36},medium:{weight:36,min:20,max:40},shells:{weight:24,min:6,max:12},heavy:{weight:9,min:4,max:8},rockets:{weight:3,min:1,max:3}};
+export const AMMO_DROPS=AMMO_RULES;
 export const LOOT_TABLE=[
  ...[['sprinter',28,'assault'],['pip',18,'sidearm'],['zipper',23,'smg'],['scatter',20,'shotgun'],['doubleyolk',16,'shotgun'],['duet',13,'assault'],['anchor',8,'marksman'],['peeper',8,'marksman'],['needle',4,'sniper'],['comet',9,'energy'],['thumper',2,'launcher']].map(([id,weight,category])=>({id,weight,category,weapon:true,ammoType:ammoType(id),sources,rarities:id==='thumper'?[0,0,65,30,5]:[53,30,13,3.5,.5]})),
  ...[['bandage',18,0],['medkit',10,1],['mini',30,1],['flask',16,2],['splash',9,2],['popper',8,1],['impulse',6,2],['launchpad',3,3]].map(([id,weight,rarity])=>({id,weight,rarity,category:['bandage','medkit'].includes(id)?'health':['mini','flask','splash'].includes(id)?'shield':'utility',sources:id==='launchpad'?['chest','high','supply']:sources,counts:id==='mini'?[2,3]:id==='bandage'?[2,3]:[1,2]})),

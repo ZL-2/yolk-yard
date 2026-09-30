@@ -1,0 +1,19 @@
+import assert from 'node:assert/strict';
+import {chromium,request} from 'playwright';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {RELEASE_NOTES} from '../src/releases.js';
+import {VERSION} from '../src/data.js';
+import {BALANCE_REVISION} from '../src/weapon-balance.js';
+const origin='https://zl-2.github.io/yolk-yard',api=await request.newContext(),expected=process.env.GITHUB_SHA;assert.ok(expected,'Expected deployed commit SHA is required');
+const json=async url=>{const res=await api.get(url,{timeout:20000});assert.ok(res.ok(),url+' HTTP '+res.status());return res.json();};
+const version=await json(origin+'/version.json?weapons='+Date.now()),history=await json(origin+'/release-history.json?weapons='+Date.now());
+assert.equal(version.build,expected);assert.equal(history.build,expected);assert.equal(version.release,history.releases[0].number);assert.equal(history.releases[0].title,RELEASE_NOTES[0].title);assert.deepEqual(history.releases[0].changes,RELEASE_NOTES[0].changes);
+const html=await(await api.get(origin+'/?weapons='+Date.now())).text(),entry=html.match(/<script[^>]*src="([^"]*assets\/[^\"]+\.js)"/);assert.ok(entry);
+const entryUrl=new URL(entry[1],origin+'/').href;let js=await(await api.get(entryUrl)).text();const main=js.match(/["'](\.\/main-[^"']+\.js)["']/);if(main)js=await(await api.get(new URL(main[1],entryUrl).href)).text();
+for(const value of ['scope-spread','weaponCooldowns','shotgunReadyAt','Earned long-range headshot eliminations','Mobile medium-range all-rounder'])assert.ok(js.includes(value),'Missing deployed weapon feature: '+value);
+let health;const deadline=Date.now()+480000;while(true){try{health=await json('https://yolk-yard-relay.onrender.com/health');if(health.gameVersion===VERSION&&health.weaponBalanceRevision===BALANCE_REVISION&&health.build===expected)break;}catch(e){console.log('Waiting for existing relay deployment:',e.message);}assert.ok(Date.now()<deadline,'Existing relay did not finish deploying the weapon revision');await new Promise(r=>setTimeout(r,15000));}
+assert.equal(health.maintenance,false);assert.equal(health.socialRevision,92);assert.ok(health.socialAvailable);
+const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']}),errors=[];
+await mkdir('test-results/weapon-balance-live',{recursive:true});
+try{const page=await browser.newPage({viewport:{width:1280,height:800}});page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/?verified-weapons='+Date.now(),{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.body.textContent.includes('QUALITY UPDATE'),{timeout:60000});assert.match(await page.locator('[data-action="updates"]').first().innerText(),new RegExp('QUALITY UPDATE.*'+version.release));if(await page.locator('.welcome-close').isVisible()){await page.locator('.welcome-close').click();if(await page.locator('[data-dismiss="once"]').isVisible())await page.locator('[data-dismiss="once"]').click();}await page.locator('[data-action="updates"]').first().click();await page.waitForFunction(title=>document.querySelector('.release-note h3')?.textContent===title,RELEASE_NOTES[0].title);await page.screenshot({path:'test-results/weapon-balance-live/live-release.png'});assert.deepEqual(errors,[]);}finally{await browser.close();await api.dispose();}
+const result={build:expected,release:version.release,title:history.releases[0].title,version:'3.4.0',weapons:11,gameProtocol:health.gameVersion,balanceRevision:health.weaponBalanceRevision,relayBuild:health.build,socialStorage:health.socialStorage,published:true,verifiedLive:true};await writeFile('test-results/weapon-balance-live/live.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));

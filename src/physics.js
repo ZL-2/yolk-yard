@@ -1,5 +1,5 @@
 import {beginFallStep,finishFallStep} from "./airborne.js";
-import { clamp, weapon } from "./data.js";
+import { clamp, weapon, gun } from "./data.js";
 import {groundAt,terrainHit} from './terrain.js';
 import {STANCE,bodyHeight,eyeHeight,regionPose} from './stance.js';
 export const RADIUS = 0.32,
@@ -75,13 +75,13 @@ export const HUMAN_HIT=[
   {region:'body',x:side*.12,y:.25,z:0,rx:.08,ry:.23,rz:.1}])
 ];
 export const humanFlightPitch=p=>p.flight==='dive'?.78:p.flight==='glide'?.09+Math.max(-.06,Math.min(.11,(-(p.vx||0)*Math.sin(p.yaw||0)-(p.vz||0)*Math.cos(p.yaw||0))*.005)):0;
-export function humanHit(o,d,p){
+export function humanHit(o,d,p,radius=0){
  const yaw=p.yaw||0,c=Math.cos(yaw),s=Math.sin(yaw),dx=o.x-p.x,dz=o.z-p.z;
  const origin={x:dx*c-dz*s,y:o.y-p.y,z:dx*s+dz*c},v={x:d.x*c-d.z*s,y:d.y,z:d.x*s+d.z*c};
  const pitch=humanFlightPitch(p),cp=Math.cos(pitch),sp=Math.sin(pitch);for(const vector of [origin,v]){const y=vector.y,z=vector.z;vector.y=y*cp+z*sp;vector.z=-y*sp+z*cp;}
  let result={distance:Infinity,region:null};
  for(const base of HUMAN_HIT){
-  const h=regionPose(base,p),a=[(origin.x-h.x)/h.rx,(origin.y-h.y)/h.ry,(origin.z-h.z)/h.rz],b=[v.x/h.rx,v.y/h.ry,v.z/h.rz];
+  const posed=regionPose(base,p),h={...posed,rx:posed.rx+radius,ry:posed.ry+radius,rz:posed.rz+radius},a=[(origin.x-h.x)/h.rx,(origin.y-h.y)/h.ry,(origin.z-h.z)/h.rz],b=[v.x/h.rx,v.y/h.ry,v.z/h.rz];
   const A=b.reduce((n,x)=>n+x*x,0),B=2*a.reduce((n,x,i)=>n+x*b[i],0),C=a.reduce((n,x)=>n+x*x,0)-1,D=B*B-4*A*C;
   if(A<1e-12||D<0)continue;const t=C<=0?0:(-B-Math.sqrt(D))/(2*A);
   if(t>=0&&t<result.distance)result={distance:t,region:h.region};
@@ -201,7 +201,7 @@ function movePlayerStep(p, input, map, dt) {
   if(p.reviving){f=0;s=0;}
   const speed =
     (p.inventory ? ROYALE_MOVEMENT[p.sprinting ? 'sprint' : 'walk'] : weapon(p.weapon).speed) *
-    (input.aim ? 0.7 : 1) *
+    (input.aim ? gun(p).adsMove : 1) *
     (p.crown != null ? 0.88 : 1)*(p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
   let mx=(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)*speed,mz=(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)*speed;
   if(p.sliding){

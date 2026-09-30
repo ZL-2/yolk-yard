@@ -45,7 +45,7 @@ test('reload uses empty and tactical times and never creates reserve ammo', () =
   assert.ok(Math.abs(player.reloadEnd-sim.time-weapon('sprinter').reloadEmpty)<1e-9);
   sim.time=player.reloadEnd;
   sim.tick(1/60);
-  assert.deepEqual([player.ammo[0],player.reserve[0]],[30,210]);
+  assert.deepEqual([player.ammo[0],player.reserve[0]],[30,weapon('sprinter').reserve-30]);
   player.ammo[0]=29;
   sim.reload(player);
   assert.ok(Math.abs(player.reloadEnd-sim.time-weapon('sprinter').reload)<1e-9);
@@ -63,9 +63,9 @@ test('ammo pickup adds class-specific amounts and stays available at capacity', 
   sim.pickups=[item];
   sim.collect(player);
   assert.equal(item.availableAt,0);
-  player.reserve=[190,20];
+  player.reserve=[100,20];
   sim.collect(player);
-  assert.deepEqual(player.reserve,[220,35]);
+  assert.deepEqual(player.reserve,[130,44]);
   assert.ok(item.availableAt>sim.time);
 });
 test('rocket only explodes after arming and uses the configured damage', () => {
@@ -73,9 +73,9 @@ test('rocket only explodes after arming and uses the configured damage', () => {
   const rocket={owner:player.id,weapon:'thumper',x:0,y:0.85,z:0,popper:false,travelled:2.9};
   sim.explode(rocket);
   assert.equal(player.health,100);
-  rocket.travelled=3;
+  rocket.travelled=weapon('thumper').minRange;
   sim.explode(rocket);
-  assert.ok(Math.abs(player.health-(100-weapon('thumper').damage*.55))<1e-9);
+  assert.ok(Math.abs(player.health-(100-weapon('thumper').damage*weapon('thumper').selfDamage))<1e-9);
 });
 test('ordinary shell hits have no limb or edge multiplier',()=>{const w=weapon('sprinter');for(const x of [0,.4,.6])assert.equal(criticalHit({x,y:.9,z:0},{y:0},w),false);});
 
@@ -94,7 +94,7 @@ test('replicated crosshair spread widens on movement and recovers at rest', () =
   assert.ok(Math.abs(readSpread() - idle) < 1e-9);
 });
 
-test('long-range scopes remain stable when moving and jumping', () => {
+test('long-range scopes remain stable on ground and penalize airborne firing', () => {
   for (const id of ['needle','anchor']) {
     const { sim, player } = arena(id);
     const moving = structuredClone(player), still = structuredClone(player);
@@ -106,8 +106,10 @@ test('long-range scopes remain stable when moving and jumping', () => {
       moving.x += 0.2; moving.y += 0.1;
       sim.updateAccuracy(moving, previous, 1/60);
       sim.updateAccuracy(still, still, 1/60);
-      assert.equal(moving.accuracyState[moving.slot].spread, still.accuracyState[still.slot].spread, id);
     }
+    assert.equal(moving.accuracyState[moving.slot].spread,still.accuracyState[still.slot].spread,id);
+    moving.grounded=false;sim.updateAccuracy(moving,moving,1/60);
+    assert.ok(moving.accuracyState[moving.slot].spread>0,id);
     moving.aim = false;
     sim.updateAccuracy(moving, {...moving, x:moving.x-0.2}, 1/30);
     assert.ok(moving.accuracyState[moving.slot].spread > still.accuracyState[still.slot].spread, id);

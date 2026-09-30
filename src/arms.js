@@ -36,7 +36,7 @@ function path(points, t) {
 }
 export function reloadProgress(player, time) {
   if(!player || player.health<=0 || !(player.reloadEnd>time)) return -1;
-  const w=gun(player),duration=player.ammo[player.slot]===0?w.reloadEmpty:w.reload;
+  const w=gun(player),duration=player.reloadDuration||(player.ammo[player.slot]===0?w.reloadEmpty:w.reload);
   return clamp(1-(player.reloadEnd-time)/duration,0,1);
 }
 export function armPose(id, progress=-1) {
