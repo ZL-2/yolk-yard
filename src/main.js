@@ -1,3 +1,4 @@
+import {loadingMarkup,showLoading,hideLoading} from './loading-screen.js';
 import {predictionCorrection} from './network-stats.js';
 import {InputClock} from './input-clock.js';
 import {RemoteSimulation} from './remote-simulation.js';
@@ -225,7 +226,8 @@ function modal(title, body, type = "generic") {
   input.aim = false;
   paused = true;
   if (document.pointerLockElement) document.exitPointerLock();
-  dialog.innerHTML = `<div class="dialog-head"><h2>${title}</h2><button class="close-btn" data-action="close" aria-label="Close dialog">×</button></div><div class="dialog-body">${body}</div>`;
+  if(type==='error')hideLoading();
+  dialog.innerHTML = type==='connecting'?loadingMarkup('ESTABLISHING MATCH UPLINK','Connecting to the room service. You can cancel at any time.',true):`<div class="dialog-head"><h2>${title}</h2><button class="close-btn" data-action="close" aria-label="Close dialog">×</button></div><div class="dialog-body">${body}</div>`;
   if (!dialog.open) dialog.showModal();
 }
 function closeDialog() {
@@ -643,6 +645,7 @@ function launchRound(){
   state=sim.snapshot();net?.broadcast(state);enterGame(true);return true;
 }
 function enterGame(capture = false) {
+  showLoading('DEPLOYING TO THE FRONT','Preparing the battlefield and your operator.');
   guestFire.reset();
   connectionReport.network.reset();
   resultAt=0;$("#round-banner").hidden=true;
@@ -731,6 +734,7 @@ function pauseMenu() {
   );
 }
 function leave(confirm = false,notifyParty=true) {
+  hideLoading();
   if(notifyParty){activeLaunch=null;void partyRequest("returned");}
   earnMatch++;
   buildControls.buildMode=false;buildUI.cancel();
@@ -1648,6 +1652,8 @@ function loop(now) {
     !paused && !chat.opened && !buildControls.editing && (actionDown("aim") || touch.aim),
     profile,
   );
+  // Keep the screen through map construction and asynchronous shader preparation.
+  if(!view.mapCompile)hideLoading();
   if (hudClock > 0.06) {
     chat.update();
     hud();
@@ -1680,6 +1686,7 @@ try {
   const invite = new URL(location.href).searchParams.get("room");
   if (invite) joinMenu(formatCode(cleanCode(invite)));
 } catch (e) {
+  hideLoading();
   console.error(e);
   $("#menu").innerHTML =
     `<section class="panel lobby-panel"><h2>3D graphics unavailable</h2><p style="margin-top:15px">This game needs WebGL 2. Try a current Chrome or Safari with graphics acceleration enabled.</p><p class="hint">${esc(e.message)}</p></section>`;
