@@ -63,3 +63,36 @@ world deltas, bounded catch-up and socket backpressure remain unchanged.
 
 Run `node scripts/social-squads-check.mjs` and
 `node scripts/social-squads-browser-check.mjs` for the focused release checks.
+
+
+## Performance incidents and owner email monitoring
+
+`GET /status` provides a cache-disabled, CORS-readable feed of current incidents
+and the last 100 incidents from seven days. It exposes predefined messages and
+start/detection/end timestamps, never player names, session credentials or room
+codes. Confirmed incidents retain their start time through lobby refreshes.
+Numeric, rate-limited reports are accepted only from connected match members.
+Client-reported low FPS or update delays are labeled as reports rather than as
+proof of a server fault. Server CPU incidents use recent kernel counter deltas.
+
+Problems must persist for 15 seconds; notices clear after 60 seconds without
+further evidence. Client reports expire after 45 seconds of silence. A cleared
+notice means the problem is no longer being observed, not a claim that a repair
+was deployed. The public lobby asks players to allow the team time to restore
+smooth gameplay.
+
+Incident history is stored in `RAVEL_STATUS_PATH` (default
+`/tmp/ravelfront-status.json`). This survives ordinary process restarts in the
+same filesystem but Render's ephemeral filesystem can be wiped by redeploys.
+No paid disk is provisioned automatically. For durable history, set that variable
+to an already-provisioned persistent mount.
+
+Owner email alerts are a separate hourly ChatGPT monitoring automation using the
+connected Resend account. Recipient and sender are held in its private task, not
+in browser code or this public endpoint. It checks active incidents and recent
+history, deduplicates against sent email subjects, and uses incident idempotency
+keys. Email can arrive up to an hour after detection. A complete outage is checked
+externally by the automation; a sleeping free service is given a cold-start retry
+before being classified as unavailable. The server itself does not contain a
+Resend credential or send emails. Deploys that erase incident history between
+checks can prevent short resolved incidents from being emailed.

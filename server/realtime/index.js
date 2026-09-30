@@ -1,4 +1,5 @@
 import {arenaSpawnPoints} from '../../src/arena-spawns.js';
+import {ServiceStatus} from './service-status.js';
 import {CpuQuotaMonitor} from './cpu-quota.js';
 import {MAPS,navigation} from '../../src/maps.js';
 import {ROYALE_MAP} from '../../src/royale-map.js';
@@ -14,11 +15,12 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
   for(const map of [...MAPS,ROYALE_MAP,SPAWN_ISLAND])navigation(map);
   for(const map of MAPS)arenaSpawnPoints(map);
   const cpuQuota=new CpuQuotaMonitor();await cpuQuota.start();
-  const relay=new RealtimeRelay();relay.cpuQuota=cpuQuota;
+  const relay=new RealtimeRelay();relay.cpuQuota=cpuQuota;relay.serviceStatus=new ServiceStatus(relay,{path:host==='127.0.0.1'?null:undefined});await relay.serviceStatus.ready;
   const owner=new OwnerService();await owner.ready;
   const server=createServer((req,res)=>{
+    if(req.url?.split('?')[0]==='/status'){const origin=req.headers.origin;res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store',...(origins.includes(origin)?{'Access-Control-Allow-Origin':origin,'Vary':'Origin'}:{})});res.end(JSON.stringify(relay.serviceStatus.snapshot()));return;}
     if(req.url?.startsWith('/owner/')){void owner.handle(req,res,{origins,relay});return;}
-    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',performanceRevision:83,socialRevision:85,partyLimit:4,socialStorage:process.env.RAVEL_SOCIAL_DATA_PATH||process.env.YOLK_OWNER_DATA_PATH?'configured-file':'ephemeral-file',cpu:cpuQuota.snapshot(),features:['friends','friend-codes','presence','blocking','four-player-parties','squads','human-team-fill','parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
+    res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.writeHead(req.url==='/health'?200:404);res.end(JSON.stringify(req.url==='/health'?{ok:true,protocol:'yolk-realtime-v2',gameVersion:VERSION,brand:'Ravelfront',performanceRevision:83,socialRevision:85,statusRevision:86,partyLimit:4,socialStorage:process.env.RAVEL_SOCIAL_DATA_PATH||process.env.YOLK_OWNER_DATA_PATH?'configured-file':'ephemeral-file',cpu:cpuQuota.snapshot(),features:['friends','friend-codes','presence','blocking','four-player-parties','squads','human-team-fill','parties','duos','party-reservations','marks-rewards','afk-59','humanoids','server-authority','crouch-slide','dbno-revive','duo-pings']}:{error:'Not found'}));
   });
   const sockets=new WebSocketServer({noServer:true,maxPayload:2_000_000,perMessageDeflate:false});
   server.on('upgrade',(req,socket,head)=>{
@@ -31,7 +33,7 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
     });
   });
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,host,resolve);});
-  return {server,relay,owner,async close(){cpuQuota.close();relay.close();for(const ws of sockets.clients)ws.terminate();await new Promise(r=>sockets.close(r));await new Promise(r=>server.close(r));await owner.close();await relay.parties.store.flush();}};
+  return {server,relay,owner,async close(){await relay.serviceStatus.close();cpuQuota.close();relay.close();for(const ws of sockets.clients)ws.terminate();await new Promise(r=>sockets.close(r));await new Promise(r=>server.close(r));await owner.close();await relay.parties.store.flush();}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const app=await startRealtimeServer();console.log(`Ravelfront relay listening on ${app.server.address().port}`);

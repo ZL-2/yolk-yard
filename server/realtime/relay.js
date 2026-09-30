@@ -84,6 +84,7 @@ export class RealtimeRelay {
     }
   }
   handle(peer,m){
+    if(m.type==='performance-report'){this.serviceStatus?.report(peer,m.metrics);return;}
     if(m.type==='authority-create'||m.type==='authority-command'){this.authority.command(peer,m);return;}
     if(m.type==='progress')return; // Currency settlement accepts server simulation only.
     if(m.type==='list'){

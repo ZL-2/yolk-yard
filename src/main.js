@@ -31,6 +31,8 @@ import "./lobby.css";
 import './settings-layout.css';
 import {PerformanceHUD,PERFORMANCE_DEFAULTS} from './performance-hud.js';
 import './performance-hud.css';
+import {LobbyStatus} from './lobby-status.js';
+import './lobby-status.css';
 import './egg-shop.css';
 import './ravelfront.css';
 import {EggShop} from './egg-shop.js';
@@ -1597,7 +1599,9 @@ function pumpNetworkInput(now=performance.now()) {
   net.inputBatch(commands);
 }
 const performanceHUD=new PerformanceHUD(document.body);
+const lobbyStatus=new LobbyStatus();
 function loop(now) {
+  lobbyStatus.update(now,now-lastTime,net,screen);
   performanceHUD.update(now,now-lastTime,net,settings,screen==='game'&&!document.hidden);
   pumpNetworkInput(now);
   if(state?.royale){view.buildMap=getMap(state.options.map);applyBuildState(view.buildMap,state.royale);}
