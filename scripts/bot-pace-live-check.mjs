@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {VERSION} from '../src/data.js';
 import {RELEASE_NOTES} from '../src/releases.js';
 const expected=process.env.GITHUB_SHA;assert.ok(expected);
-const json=async url=>{const r=await fetch(url,{signal:AbortSignal.timeout(20000)});assert.ok(r.ok(),url+' '+r.status);return r.json();};
+const json=async url=>{const r=await fetch(url,{signal:AbortSignal.timeout(20000)});assert.ok(r.ok,url+' '+r.status);return r.json();};
 const origin='https://zl-2.github.io/yolk-yard',stamp=Date.now();
 const v=await json(origin+'/version.json?bot-pace='+stamp),history=await json(origin+'/release-history.json?bot-pace='+stamp);
 assert.equal(v.build,expected);assert.equal(history.build,expected);assert.equal(history.releases[0].title,RELEASE_NOTES[0].title);assert.deepEqual(history.releases[0].changes,RELEASE_NOTES[0].changes);
