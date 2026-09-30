@@ -17,12 +17,15 @@ test('confirmed incidents preserve their start, deduplicate, recover and survive
  }finally{await monitor.close();await rm(dir,{recursive:true,force:true});}
 });
 test('reports require a match, valid bounded numbers and sustained observations',async()=>{
- let time=100000;const room={},relay={authority:{rooms:new Map([['match',room]]),roomFor:p=>p.inMatch?room:null}},monitor=new ServiceStatus(relay,{now:()=>time,path:null,automatic:false});await monitor.ready;
+ let time=100000;const room={},otherRoom={},relay={authority:{rooms:new Map([['match',room],['other',otherRoom]]),roomFor:p=>p.inMatch?(p.room||room):null}},monitor=new ServiceStatus(relay,{now:()=>time,path:null,automatic:false});await monitor.ready;
  const peer={ws:{},inMatch:true};
  monitor.report({ws:{}},{fps:10,rtt:0,gap:0});assert.equal(monitor.reports.size,0);
  monitor.report(peer,{fps:NaN,rtt:0,gap:0});assert.equal(monitor.reports.size,0);
  for(let i=0;i<4;i++){monitor.report(peer,{fps:20,rtt:40,gap:600});monitor.tick();time+=5000;}
- assert.deepEqual(monitor.snapshot().active.map(i=>i.kind),['client-rendering','client-connection']);
+ assert.equal(monitor.snapshot().active.length,0,'A single player must not create a widespread notice');
+ const peers=[peer,{ws:{},inMatch:true,room},{ws:{},inMatch:true,room:otherRoom}];
+ for(let i=0;i<4;i++){for(const p of peers)monitor.report(p,{fps:20,rtt:40,gap:600});monitor.tick();time+=5000;}
+ assert.deepEqual(monitor.snapshot().active.map(i=>i.kind),['client-rendering','client-connection']);assert.equal(monitor.snapshot().notice.scope,'widespread');
  const publicData=JSON.stringify(monitor.snapshot());assert.ok(!publicData.includes('inMatch')&&!publicData.includes('ws'));
  monitor.report(peer,{fps:60,rtt:20,gap:50});time+=60000;monitor.tick();assert.equal(monitor.reports.size,0);await monitor.close();
 });
@@ -35,4 +38,15 @@ test('public service status is readable cross-origin and contains no credentials
   const response=await fetch(`http://127.0.0.1:${app.server.address().port}/status`,{headers:{Origin:'http://localhost:5199'}});
   assert.equal(response.status,200);assert.equal(response.headers.get('access-control-allow-origin'),'http://localhost:5199');const data=await response.json();assert.ok(Array.isArray(data.history)&&Array.isArray(data.active));assert.equal(data.monitoring.emailCheckIntervalMinutes,60);assert.ok(!JSON.stringify(data).includes('token'));
  }finally{await app.close();}
+});
+
+test('one shared clock continues as issue types change and persists across restart',async()=>{
+ const dir=await mkdtemp('/tmp/ravel-shared-clock-');let time=100000;const options={now:()=>time,path:dir+'/status.json',automatic:false};
+ const monitor=new ServiceStatus({},options);await monitor.ready;
+ try{monitor.observe('cpu-pressure',true);time+=15000;monitor.observe('cpu-pressure',true);const first=monitor.snapshot().notice;
+ time+=5000;monitor.observe('server-delay',true);time+=15000;monitor.observe('server-delay',true);monitor.observe('cpu-pressure',false);time+=60000;monitor.observe('cpu-pressure',false);
+ assert.equal(monitor.snapshot().notice.id,first.id);assert.equal(monitor.snapshot().notice.startedAt,first.startedAt);assert.equal(monitor.snapshot().active.length,1);
+ await monitor.close();const restored=new ServiceStatus({},options);await restored.ready;assert.equal(restored.snapshot().notice.startedAt,first.startedAt);assert.equal(restored.snapshot().notice.id,first.id);
+ restored.observe('server-delay',false);time+=60000;restored.observe('server-delay',false);assert.equal(restored.snapshot().notice,null);await restored.close();
+ }finally{await monitor.close();await rm(dir,{recursive:true,force:true});}
 });
