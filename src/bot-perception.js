@@ -15,7 +15,8 @@ function hear(sim,p,brain,id,point,kind,damage=0){
 }
 export function observe(sim,p,brain,skill){
  // Events interrupt a strategic action immediately; visual scans are staggered.
- for(const e of sim.events){if(e.id<=brain.eventId)continue;brain.eventId=e.id;if(sim.time-e.time>2)continue;
+ let first=sim.events.length;while(first>0&&sim.events[first-1].id>brain.eventId)first--;
+ for(let index=first;index<sim.events.length;index++){const e=sim.events[index];brain.eventId=e.id;if(sim.time-e.time>2)continue;
   if(e.type==='elimination'){delete brain.memory[e.target];continue;}
   if(e.type==='hit'&&e.target===p.id&&e.player!==p.id&&Number.isFinite(e.sourceX)){
    hear(sim,p,brain,e.player||'unknown', {x:e.sourceX,y:e.sourceY,z:e.sourceZ},'damage',e.amount||0);continue;
@@ -71,7 +72,7 @@ export function threatScore(sim,p,brain,m){
  const matchup=enemyWeapon?.pellets>1&&d<12?12:enemyWeapon?.projectile&&d<9?-10:0;
  const vulnerable=p.health<40&&active?10:0;
  const exposed=m.visible?45:6,weaponFit=own.pellets>1?(d<12?9:-6):own.optic==='scope'?(d>22?5:-3):0;
- const help=[...sim.players.values()].some(t=>teammates(sim.options,t,p)&&t.health>0&&t.brain?.target===m.id&&dist(t,p)<25)?6:0;
+ let help=0;if(teamMode(sim.options))for(const t of sim.players.values())if(teammates(sim.options,t,p)&&t.health>0&&t.brain?.target===m.id&&dist(t,p)<25){help=6;break;}
  const storm=sim.storm?.active&&d>20&&Math.hypot(m.x-sim.storm.nextX,m.z-sim.storm.nextZ)>sim.storm.nextRadius?16:0;
  const allyDanger=sim.time-(m.allyThreatAt??-100)<3?14:0;
  return exposed+(m.confidence||0)*22+Math.min(40,m.damage||0)+incoming+matchup+vulnerable+weaponFit+help+allyDanger+(m.health<40?6:0)-Math.log1p(d)*8-age*3-storm-(m.downed?35:0);

@@ -1,6 +1,12 @@
 import {wallDistance,dist,candidates,canStand} from './physics.js';
 import {groundAt} from './terrain.js';
 const clear=(sim,p,q)=>{const dx=q.x-p.x,dz=q.z-p.z,d=Math.hypot(dx,dz)||1;return Math.abs(q.y-p.y)<.45&&wallDistance(sim.map,{x:p.x,y:p.y+.7,z:p.z},{x:dx/d,y:0,z:dz/d},d)>=d-.1;};
+const sight=new WeakMap();
+function directRoute(sim,p,brain,goal){
+ const previous=sight.get(brain),revision=sim.navigationRevision??sim.buildVersion??0;
+ if(previous&&previous.map===sim.map&&previous.boxes===sim.map.boxes&&previous.revision===revision&&sim.time-previous.time<.15&&dist(p,previous.from)<.5&&dist(goal,previous.goal)<.5)return previous.clear;
+ const value=clear(sim,p,goal);sight.set(brain,{map:sim.map,boxes:sim.map.boxes,revision,time:sim.time,from:{x:p.x,y:p.y,z:p.z},goal:{x:goal.x,y:goal.y,z:goal.z},clear:value});return value;
+}
 // Bounded live collision search for edits, ramps and destroyed walls. The large
 // authored graph remains cached; obstruction does not rebuild the entire map.
 function walkEdge(map,from,x,z){
@@ -30,12 +36,12 @@ export function navigate(sim,p,brain,goal,skill){
  if(arrived){if(brain.task?.id)brain.visited[brain.task.id]=now;if(p.inventory||brain.task?.kind!=='fight')brain.decision=Math.min(brain.decision,now+.2);}
  // Brake before the exact peek point so smoothed combat movement cannot overshoot and oscillate.
  if(arrived&&!p.inventory&&brain.task?.kind==='fight')return {mx:0,mz:0,jump:false,interact:false};
- const revision=sim.navigationRevision||0,movedGoal=!brain.pathGoal||dist(goal,brain.pathGoal)>4;
+ const revision=sim.navigationRevision??sim.buildVersion??0,movedGoal=!brain.pathGoal||dist(goal,brain.pathGoal)>4;
  if((movedGoal||now>(brain.pathAt||0)||revision!==brain.navRevision)&&!arrived){
-  if(pathBudget(sim)){brain.navRevision=revision;brain.pathGoal={...goal};brain.pathAt=now+1.8+sim.random()*.7;p.botPath=clear(sim,p,goal)?[]:sim.nav.path(p,goal);}
+  if(pathBudget(sim)){brain.navRevision=revision;brain.pathGoal={...goal};brain.pathAt=now+1.8+sim.random()*.7;p.botPath=directRoute(sim,p,brain,goal)?[]:sim.nav.path(p,goal);}
  }
  while(p.botPath?.length&&dist(p,p.botPath[0])<.65)p.botPath.shift();
- const direct=clear(sim,p,goal),step=direct?goal:p.botPath?.[0]||goal;
+ const direct=directRoute(sim,p,brain,goal),step=direct?goal:p.botPath?.[0]||goal;
  let dx=step.x-p.x,dz=step.z-p.z,len=Math.hypot(dx,dz),mx=len>.4?dx/len:0,mz=len>.4?dz/len:0,jump=false,interact=false;
  if(mx||mz){
   const o={x:p.x,y:p.y+.55,z:p.z},d={x:mx,y:0,z:mz};

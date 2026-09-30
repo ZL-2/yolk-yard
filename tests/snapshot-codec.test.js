@@ -1,9 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
+import {SnapshotEncoder,SnapshotDecoder,SnapshotBatch} from '../src/snapshot-codec.js';
 import {Simulation} from '../src/simulation.js';
 import {RoyaleSimulation} from '../src/royale.js';
 const wire=value=>JSON.parse(JSON.stringify(value));
+test('batched encoding shares work while staggered baselines, team events and skipped recipients stay independent',()=>{
+ const sim=new RoyaleSimulation({capacity:16,fill:true,seed:42});sim.addPlayer('host',{name:'Host'});sim.addPlayer('guest',{name:'Guest'});sim.startRound();
+ const encoders=Array.from({length:16},()=>new SnapshotEncoder()),decoders=encoders.map(()=>new SnapshotDecoder());
+ for(let tick=0;tick<30;tick++){
+  sim.tick(1/60);const state=sim.snapshot({includeLoot:tick===0||tick===9,includeBuilds:tick===0});
+  const batch=new SnapshotBatch();
+  for(let i=0;i<16;i++){
+   if(i===15&&tick<9||i===3&&tick%3)continue;
+   const message={type:'authority-state',state:{...state,events:[{id:tick,team:i%2,optional:undefined,value:Infinity}],royale:{...state.royale,markers:[{player:'team-'+i%2}]}}};
+   const compact=encoders[i].encode(message,batch),serialized=JSON.parse(batch.serialize(compact.frame));
+   assert.deepEqual(serialized,{type:'authority-frame',frame:wire(compact.frame)});
+   assert.deepEqual(decoders[i].decode(serialized.frame),wire(message));
+  }
+ }
+});
 test('snapshot deltas retain removals, nested inventory, events and recovery data',()=>{
  const encoder=new SnapshotEncoder(),decoder=new SnapshotDecoder();
  const first={type:'state',state:{players:[{id:'a',x:1,inventory:[{id:'gun'}]},{id:'b',x:2}],projectiles:[{id:1,x:4}],events:[{id:1}]},checkpoint:{simulation:{players:[{id:'a',x:1}],time:1}}};

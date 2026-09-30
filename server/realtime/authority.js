@@ -4,24 +4,32 @@ import {Simulation} from '../../src/simulation.js';
 import {RoyaleSimulation} from '../../src/royale.js';
 import {VERSION,safeProfile,nameKey} from '../../src/data.js';
 import {matchOptions} from '../../src/match-options.js';
-import {SnapshotEncoder} from '../../src/snapshot-codec.js';
+import {SnapshotEncoder,SnapshotBatch} from '../../src/snapshot-codec.js';
 import {ChatRoom} from '../../src/chat.js';
 import {rewardFrame} from '../../src/rewards.js';
 import {visibleMarkers} from '../../src/team-markers.js';
 import {isTeamRoyale} from '../../src/teams.js';
+import {acceptsContestants} from '../../src/royale-phases.js';
+import {MatchCapacity} from './capacity.js';
 const address=new RegExp('^yolk-yard-v'+VERSION+'-([A-Z2-9]{8})$');
 // The relay owns simulation and persistent room lifetime. Browsers submit bounded
 // input/interaction intent only; even the room leader cannot submit game state.
 export class MatchAuthority{
- constructor(relay){this.relay=relay;this.rooms=new Map();this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),1000/60);this.timer.unref?.();}
+ constructor(relay){this.relay=relay;this.rooms=new Map();this.capacity=new MatchCapacity(this);this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),1000/60);this.timer.unref?.();}
  roomFor(peer){return this.rooms.get(peer.authorityRoom);}
  connection(peer,connected){const room=this.roomFor(peer),p=room?.sim.players.get(peer.authorityId);if(p){p.connected=connected;if(p.activity)p.activity.last=room.sim.time;}}
- send(peer,message){if(this.relay.peers.has(peer.id))this.relay.send(peer,message);}
+ send(peer,message,serialized){if(this.relay.peers.has(peer.id))this.relay.send(peer,message,serialized);}
  create(peer,m){
-  const match=address.exec(peer.id);if(!match||this.rooms.has(peer.id)||this.rooms.size>=24)return;
-  const options={...matchOptions({...m.options,session:'online'}),seed:randomInt(1,2147483647)},sim=options.mode==='royale'?new RoyaleSimulation(options):new Simulation(options);
-  const p=sim.addPlayer('host',safeProfile(m.profile));p.loading=true;peer.controlReady=false;const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,peer.id):null;
-  if(m.ticket&&!admission||admission&&(admission.teamSize!==options.teamSize||options.mode==='royale'&&admission.partySize>options.teamSize))return;sim.assignTeam?.(p,admission);
+  const reject=reason=>this.send(peer,{type:'authority-error',reason});
+  const match=address.exec(peer.id);if(!match||this.rooms.has(peer.id))return reject('This match address is unavailable.');
+  if(this.rooms.size>=24)return reject('The game server is at its safe match capacity. Try again shortly.');
+  const options={...matchOptions({...m.options,session:'online'}),seed:randomInt(1,2147483647)};
+  const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,peer.id):null;
+  if(m.ticket&&!admission||admission&&(admission.teamSize!==options.teamSize||options.mode==='royale'&&admission.partySize>options.teamSize))return reject('Party reservation expired. Return to the lobby and try again.');
+  const reserved=admission&&this.capacity.reservations.get(admission.partyId);
+  const plan=this.capacity.plan(options,{key:peer.id,humans:admission?.partySize||1,botLimit:reserved?.botLimit});if(!plan.ok)return reject(plan.reason);
+  const sim=options.mode==='royale'?new RoyaleSimulation(options):new Simulation(options);sim.botLimit=plan.botLimit;
+  const p=sim.addPlayer('host',safeProfile(m.profile));p.loading=true;peer.controlReady=false;sim.assignTeam?.(p,admission);
   const room={key:peer.id,code:match[1],owner:'host',hostPeer:peer,sim,visibility:m.visibility==='private'?'private':'public',members:new Map([['host',peer]]),chat:new ChatRoom(),encoders:new Map(),eventCursors:new Map(),age:0,frameAt:0,progressAt:0,kicked:new Set()};
   this.rooms.set(peer.id,room);peer.authorityRoom=peer.id;peer.authorityId='host';
   if(options.mode==='royale')sim.startRound();this.publish(room);this.send(peer,{type:'authority-ready',id:'host',room:room.key});this.broadcast(room);
@@ -35,6 +43,9 @@ export class MatchAuthority{
    if(m.version!==VERSION||room.kicked.has(peer.progressId))return reject('Refresh the game or choose another room.'),true;
    const profile=safeProfile(m.profile);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
    const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission)return reject('Party reservation expired.'),true;
+   const reserved=admission&&this.capacity.reservations.has(admission.partyId);
+   const spectator=room.sim.options.mode==='royale'&&!acceptsContestants(room.sim.stage),added=room.sim.players.has(peer.id)?0:1;
+   const plan=this.capacity.plan(room.sim.options,{key:room.key,humans:this.capacity.humans(room)+this.capacity.pending(room.key)+(!spectator&&!reserved?added:0),spectators:this.capacity.spectators(room)+this.capacity.pending(room.key,true)+(spectator&&!reserved?added:0),botLimit:room.sim.botLimit});if(!plan.ok)return reject(plan.reason),true;
    const p=room.sim.admitPlayer(peer.id,profile,admission);if(!p)return reject('This room is full.'),true;
    peer.authorityRoom=room.key;peer.authorityId=p.id;peer.controlReady=false;p.loading=true;room.members.set(p.id,peer);room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));
    this.send(peer,{type:'data',channel:entry.channel,data:{type:'welcome',id:p.id,hostId:room.owner,members:this.members(room),code:room.code,version:VERSION,serverAuthority:true}});this.broadcast(room);return true;
@@ -58,12 +69,13 @@ export class MatchAuthority{
   if(m.type==='chat-send'){const result=room.chat.submit(id,m,sim.snapshot());if(!result.ok)this.send(peer,{type:'authority-notice',event:'chat-status',data:result});else for(const recipient of result.recipients){const target=room.members.get(recipient);if(target)this.send(target,{type:'authority-notice',event:'chat-message',data:result.message});}return;}
   if(m.type==='chat-report'){const report=room.chat.report(id,m.target,m.reason,sim.snapshot());if(report)this.send(room.members.get(room.owner),{type:'authority-notice',event:'chat-report',data:report});return;}
   if(!leader)return;
-  if(m.type==='start'&&sim.phase!=='playing'){sim.startRound();this.broadcast(room);}
+  if(m.type==='start'&&sim.phase!=='playing'){if(peer.authorityConfigRejected){peer.authorityConfigRejected=false;return;}const plan=this.capacity.plan(sim.options,{key:room.key,humans:this.capacity.humans(room)+this.capacity.spectators(room)+this.capacity.pending(room.key)+this.capacity.pending(room.key,true),spectators:0,botLimit:sim.botLimit});if(!plan.ok){this.send(peer,{type:'authority-notice',event:'match-capacity',data:{message:plan.reason}});return;}this.capacity.rematch(room.key);sim.startRound();this.broadcast(room);}
   if(m.type==='configure'&&sim.phase!=='playing'){
    const options=matchOptions({...m.options,session:'online',seed:randomInt(1,2147483647)});
    if([...sim.players.values()].filter(p=>!p.bot).length>options.capacity)return;
+   const plan=this.capacity.plan(options,{key:room.key,humans:this.capacity.humans(room)+this.capacity.spectators(room)+this.capacity.pending(room.key)+this.capacity.pending(room.key,true),spectators:0});if(!plan.ok){peer.authorityConfigRejected=true;this.send(peer,{type:'authority-notice',event:'match-capacity',data:{message:plan.reason}});this.broadcast(room);return;}peer.authorityConfigRejected=false;
    if((options.mode==='royale')!==(sim.options.mode==='royale')){room.sim=options.mode==='royale'?new RoyaleSimulation(options):new Simulation(options);for(const [pid]of room.members){const p=sim.players.get(pid);room.sim.addPlayer(pid,p);}room.sim.round=sim.round;}
-   else sim.configure(options);this.broadcast(room);
+   else sim.configure(options);room.sim.botLimit=plan.botLimit;this.broadcast(room);
   }
   if(m.type==='visibility'){room.visibility=m.value==='private'?'private':'public';this.publish(room);}
   if(m.type==='chat-enabled')room.chat.enabled=!!m.enabled;
@@ -82,7 +94,7 @@ export class MatchAuthority{
    const encoder=room.encoders.get(id);includeLoot ||= !encoder||encoder.lootKey!==lootKey;includeBuilds ||= !encoder||encoder.buildKey!==buildKey;
   }
   const state=sim.snapshot({includeLoot,includeBuilds});state.visibility=room.visibility;state.chatEnabled=room.chat.enabled;state.chatMuted=[...room.chat.muted];state.network={hostId:room.owner,members:this.members(room),chatSequence:room.chat.sequence,authority:'server',timing:room.timing};
-  const groups=new Map();
+  const groups=new Map(),batch=new SnapshotBatch();
   for(const [id,peer]of room.members){
    // Do not encode dependent deltas faster than a socket can deliver them.
    if(!peer.ws||peer.ws.bufferedAmount>65536||peer.pendingBytes>0||peer.historyBytes>65536)continue;
@@ -102,7 +114,7 @@ export class MatchAuthority{
    }
    encoder.lootKey=lootKey;encoder.buildKey=buildKey;
    room.eventCursors.set(id,state.events.at(-1)?.id||room.eventCursors.get(id)||0);
-   const message=encoder.encode({type:'authority-state',state:outgoing});this.send(peer,{type:'authority-frame',frame:message.frame});
+   const message=encoder.encode({type:'authority-state',state:outgoing},batch);this.send(peer,{type:'authority-frame',frame:message.frame},batch.serialize(message.frame));
   }
   if(!room.publishedAt||room.age-room.publishedAt>=2){this.publish(room);room.publishedAt=room.age;}
   if(room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,'host',room.sim.inputs.get('host')||{}));}
@@ -111,12 +123,13 @@ export class MatchAuthority{
  disconnect(peer){
   const room=this.roomFor(peer),id=peer.authorityId;if(!room||room.members.get(id)!==peer)return false;
   room.sim.leavePlayer(id);room.members.delete(id);room.encoders.delete(id);room.eventCursors.delete(id);delete peer.authorityRoom;delete peer.authorityId;
-  if(!room.members.size){this.rooms.delete(room.key);room.hostPeer.virtualRoom=false;room.hostPeer.listing=null;if(room.hostPeer!==peer)this.relay.remove(room.hostPeer);return false;}
+  if(!room.members.size){this.rooms.delete(room.key);this.capacity.releaseRoom(room.key);room.hostPeer.virtualRoom=false;room.hostPeer.listing=null;if(room.hostPeer!==peer)this.relay.remove(room.hostPeer);return false;}
   if(id===room.owner){room.owner=room.members.keys().next().value;for(const member of room.members.values())this.send(member,{type:'authority-owner',id:room.owner});}
   if(peer===room.hostPeer){peer.virtualRoom=true;peer.detachedAt=0;peer.ws?.close(1000,'Session ended');peer.ws=null;}
   room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));this.broadcast(room);return peer===room.hostPeer;
  }
  tick(now=performance.now()){
+  this.capacity.sample(now);
   if(this.catchup){clearImmediate(this.catchup);this.catchup=null;}
   const sliceStarted=performance.now();
   const elapsed=Math.max(0,(now-this.last)/1000);this.last=now;this.accumulator=Math.min(.75,this.accumulator+elapsed);let steps=0;

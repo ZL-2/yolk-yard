@@ -1,6 +1,6 @@
 {
   "name": "ravelfront",
-  "version": "3.4.4",
+  "version": "3.4.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,7 +18,9 @@
     "test:field": "node --test tests/render-performance.test.js tests/ravel-arenas.test.js tests/social-persistence.test.js tests/rewards-afk.test.js tests/input-clock.test.js tests/snapshot-codec.test.js tests/authority-performance.test.js tests/performance-hud.test.js tests/service-status.test.js tests/public-access.test.js tests/relay-compact.test.js tests/field-systems.test.js tests/server-authority.test.js tests/weapon-presentation.test.js tests/hitbox.test.js tests/arms.test.js tests/audio.test.js tests/owner.test.js tests/remote-input.test.js tests/keybinds.test.js tests/weapon-stats.test.js",
     "test:field-browser": "node scripts/field-browser-check.mjs",
     "art:weapons": "node scripts/render-weapon-previews.mjs",
-    "test:weapons": "node --test tests/weapon-balance.test.js tests/weapon-stats.test.js tests/equip.test.js tests/hitbox.test.js tests/arms.test.js tests/weapon-presentation.test.js tests/remote-input.test.js tests/audio.test.js && node --test --test-name-pattern=\"fictional|head is|hitscan|cover|pellets|FSA|lag compensation\" tests/combat-overhaul.test.js && node scripts/weapon-balance-network-check.mjs"
+    "test:weapons": "node --test tests/weapon-balance.test.js tests/weapon-stats.test.js tests/equip.test.js tests/hitbox.test.js tests/arms.test.js tests/weapon-presentation.test.js tests/remote-input.test.js tests/audio.test.js && node --test --test-name-pattern=\"fictional|head is|hitscan|cover|pellets|FSA|lag compensation\" tests/combat-overhaul.test.js && node scripts/weapon-balance-network-check.mjs",
+    "test:capacity": "node --test tests/capacity.test.js tests/bot-runtime.test.js tests/bot-movement-speed.test.js tests/rewards-afk.test.js tests/snapshot-codec.test.js tests/authority-performance.test.js tests/server-authority.test.js tests/social-persistence.test.js tests/input-clock.test.js tests/relay-liveness.test.js tests/relay-compact.test.js tests/weapon-balance.test.js tests/remote-input.test.js tests/service-status.test.js && node --test --test-name-pattern=\"fictional|head is|hitscan|cover|pellets|FSA|lag compensation|remote shot|bots respond\" tests/combat-overhaul.test.js && node scripts/social-squads-check.mjs && node scripts/weapon-balance-network-check.mjs",
+    "test:capacity-load": "node scripts/capacity-check.mjs"
   },
   "dependencies": {
     "compromise": "14.17.0",

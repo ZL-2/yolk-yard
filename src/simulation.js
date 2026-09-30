@@ -6,6 +6,7 @@ import {resetStance,eyeHeight,canFight} from './stance.js';
 import {updateCombatAccuracy,firedAccuracy,pelletOffsets,falloffAt,structureDamage,weaponReadyAt,rememberShot,triggerRequested} from './combat.js';
 import {arenaBonuses,resetBonuses,updateBonuses,awardBonus} from './streaks.js';
 import {botInput as tacticalBotInput} from './bots.js';
+import {scheduledBotInput} from './bot-runtime.js';
 import {beginEquip} from './equip.js';
 import {matchOptions} from "./match-options.js";
 import {
@@ -194,7 +195,7 @@ export class Simulation {
     let i = 0;
     while (
       [...this.players.values()].filter((p) => p.bot).length <
-        (this.options.fill ? (this.options.capacity||8) : this.options.bots) &&
+        Math.min(this.options.fill ? (this.options.capacity||8) : this.options.bots,this.botLimit??Infinity) &&
       this.players.size < (this.maxPlayers || 8)
     ) {
       const id = "bot-" + i++;
@@ -804,18 +805,7 @@ export class Simulation {
     this.emit("finish", { winner: this.winner });
   }
   botInput(p) {
-    // Tactical sensing/navigation does not need the 60 Hz physics cadence.
-    // Keep combat decisions at 20 Hz and roaming at 10 Hz, staggered per bot.
-    // Damage interrupts the cache; movement and weapon cooldowns still tick at 60 Hz.
-    if(p.arenaIntent&&this.time<p.arenaThinkAt&&p.arenaDamageAt===p.lastDamage){
-      const input={...p.arenaIntent},target=this.players.get(p.brain?.target);
-      if(input.fire&&(this.time>=p.brain.burstUntil||!target||target.health<=0||target.spectating))input.fire=false;
-      return input;
-    }
-    const intent=tacticalBotInput(this,p);
-    p.arenaIntent={...intent};p.arenaDamageAt=p.lastDamage;
-    p.arenaThinkAt=this.time+(p.brain?.target ? .05 : .09)+(p.botSeed%1)*.01;
-    return intent;
+    return scheduledBotInput(this,p,()=>tacticalBotInput(this,p));
   }
   uniqueBotName(base) {
     let name=base,i=2;while([...this.players.values()].some(p=>nameKey(p.name)===nameKey(name)))name=base+' '+i++;

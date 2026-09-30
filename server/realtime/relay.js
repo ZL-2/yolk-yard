@@ -60,11 +60,11 @@ export class RealtimeRelay {
     while(peer.history[0]?.seq<=seq){peer.historyBytes-=peer.history.shift().raw.length;}
     this.flush(peer);
   }
-  send(peer,message){
+  send(peer,message,serialized){
     // The normal writable-socket path needs one serialization, not a queue-size
     // serialization, a dequeue serialization and then the actual wire packet.
     if(!peer.pending.length&&peer.ws?.readyState===1&&peer.ws.bufferedAmount<65536&&peer.historyBytes<262144){
-      const raw=JSON.stringify({...message,relaySeq:peer.seq+1});
+      const raw=serialized?serialized.slice(0,-1)+',"relaySeq":'+(peer.seq+1)+'}':JSON.stringify({...message,relaySeq:peer.seq+1});
       if(raw.length+peer.historyBytes>MAX_QUEUE){this.remove(peer,1013,'Connection too slow');return;}
       peer.seq++;peer.history.push({seq:peer.seq,raw});peer.historyBytes+=raw.length;peer.ws.send(raw);return;
     }

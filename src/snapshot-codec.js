@@ -5,6 +5,61 @@ function records(value,key='id'){return Object.fromEntries(value.map(row=>[row[k
 // Broadcast recipients share immutable state objects. Normalize each once;
 // per-connection baselines and recovery checkpoints remain independent.
 const normalizedStates=new WeakMap(),normalizedCheckpoints=new WeakMap();
+// A broadcast batch owns its memo, so mutable simulation objects are never
+// cached across ticks. Recipient groups share player/world clones and diffs.
+export class SnapshotBatch {
+ constructor(){this.values=new WeakMap();this.indexed=new WeakMap();this.normalized=new WeakMap();this.retained=new WeakMap();this.payloads=new WeakMap();}
+ clone(source){
+  if(source===null)return null;
+  if(typeof source==='number')return Number.isFinite(source)?source:null;
+  if(typeof source==='string'||typeof source==='boolean')return source;
+  if(typeof source!=='object')return undefined;
+  if(this.values.has(source))return this.values.get(source);
+  const value=JSON.parse(JSON.stringify(source));this.values.set(source,value);
+  return value;
+ }
+ index(rows,key='id'){
+  if(!this.indexed.has(rows))this.indexed.set(rows,records(rows,key));
+  return this.indexed.get(rows);
+ }
+ players(rows){
+  if(!this.values.has(rows))this.values.set(rows,rows.map(row=>{
+   const next={};for(const key of Object.keys(row)){const value=row[key];if(value===undefined||typeof value==='function'||typeof value==='symbol')continue;const cloned=value&&typeof value==='object'?this.clone(value):typeof value==='number'&&!Number.isFinite(value)?null:value;if(key==='__proto__')Object.defineProperty(next,key,{value:cloned,enumerable:true});else next[key]=cloned;}return next;
+  }));
+  return this.index(this.values.get(rows));
+ }
+ normalize(message){
+  const {state,checkpoint,...body}=message,value=this.clone(body);
+  for(const [key,source]of [['state',state],['checkpoint',checkpoint]])if(source){
+   if(this.normalized.has(source)){value[key]=this.normalized.get(source);continue;}
+   const cached={};value[key]=cached;this.normalized.set(source,cached);
+   const name=key==='state'?'royale':'simulation';
+   for(const field of Object.keys(source)){
+    if(field===name&&source[name]){const world={};cached[name]=world;
+     for(const collection of Object.keys(source[name])){if(collection==='players'&&Array.isArray(source[name][collection])){world[collection]=this.players(source[name][collection]);continue;}const cloned=this.clone(source[name][collection]);if(cloned!==undefined)world[collection]=Array.isArray(cloned)&&['loot','chests','builds'].includes(collection)?this.index(cloned,collection==='loot'?'uid':'id'):cloned;}
+    }else if(field==='players'&&Array.isArray(source[field]))cached[field]=this.players(source[field]);else{const cloned=this.clone(source[field]);if(cloned!==undefined)cached[field]=recordKeys.includes(field)&&Array.isArray(cloned)?this.index(cloned):cloned;}
+   }
+  }
+  return value;
+ }
+ retain(state,previous){
+  let pairs=this.retained.get(state);if(!pairs){pairs=new WeakMap();this.retained.set(state,pairs);}
+  if(pairs.has(previous.royale))return pairs.get(previous.royale);
+  const next={...state,royale:{...state.royale}};
+  for(const key of ['loot','chests','builds','worldDamage'])if(!Object.hasOwn(next.royale,key)&&previous.royale[key])next.royale[key]=previous.royale[key];
+  pairs.set(previous.royale,next);return next;
+ }
+ json(value){
+  if(!value||typeof value!=='object')return JSON.stringify(value);
+  if(!this.payloads.has(value))this.payloads.set(value,JSON.stringify(value));
+  return this.payloads.get(value);
+ }
+ serialize(frame){
+  const kind=frame.full?'full':'patch',payload=frame[kind];
+  const raw='{'+Object.keys(payload).map(key=>JSON.stringify(key)+':'+this.json(payload[key])).join(',')+'}';
+  return '{"type":"authority-frame","frame":{"base":'+frame.base+',"seq":'+frame.seq+',"'+kind+'":'+raw+(frame.omitWorld?',"omitWorld":'+JSON.stringify(frame.omitWorld):'')+'}}';
+ }
+}
 function normalize(message){
  const {state,checkpoint,...body}=message,value=JSON.parse(JSON.stringify(body));
  for(const [key,source,cache]of [['state',state,normalizedStates],['checkpoint',checkpoint,normalizedCheckpoints]])if(source){
@@ -46,7 +101,7 @@ function patch(previous,next){
  if(Array.isArray(previous)||Array.isArray(next))return equalJson(previous,next)?undefined:[next];
  const changes=Object.create(null);
  for(const key of Object.keys(previous))if(!Object.hasOwn(next,key))changes[key]=[];
- for(const key of Object.keys(next)){const change=(key==='players'||key==='projectiles'||key==='loot'||key==='chests'||key==='builds'||key==='worldDamage'?sharedPatch:patch)(previous[key],next[key]);if(change!==undefined)changes[key]=change;}
+ for(const key of Object.keys(next)){const change=(['state','royale','simulation','players','projectiles','loot','chests','builds','worldDamage'].includes(key)?sharedPatch:patch)(previous[key],next[key]);if(change!==undefined)changes[key]=change;}
  return Object.keys(changes).length?changes:undefined;
 }
 function apply(previous,changes){
@@ -61,16 +116,16 @@ function apply(previous,changes){
 export class SnapshotEncoder {
  constructor(){this.reset();}
  reset(){this.previous=null;this.seq=0;}
- encode(message){
+ encode(message,batch){
   // Keep the recovery checkpoint in the baseline so its unchanged fields also
   // disappear from the wire. The receiver retains it for host migration.
-  const next=normalize(message);
+  const next=batch?batch.normalize(message):normalize(message);
   if(!next.checkpoint&&this.previous?.checkpoint)next.checkpoint=this.previous.checkpoint;
   // Retain sparse world baselines across movement-only frames. Otherwise the
   // next pickup would retransmit every remaining item after an omitted frame.
   const omitWorld=[];
-  if(next.state?.royale)next.state={...next.state,royale:{...next.state.royale}};
-  for(const key of ['loot','chests','builds','worldDamage'])if(next.state?.royale&&!Object.hasOwn(next.state.royale,key)&&this.previous?.state?.royale?.[key]){next.state.royale[key]=this.previous.state.royale[key];omitWorld.push(key);}
+  for(const key of ['loot','chests','builds','worldDamage'])if(next.state?.royale&&!Object.hasOwn(next.state.royale,key)&&this.previous?.state?.royale?.[key])omitWorld.push(key);
+  if(omitWorld.length){if(batch)next.state=batch.retain(next.state,this.previous.state);else{next.state={...next.state,royale:{...next.state.royale}};for(const key of omitWorld)next.state.royale[key]=this.previous.state.royale[key];}}
   const frame=this.previous?{base:this.seq,seq:this.seq+1,patch:patch(this.previous,next)||{}}:{base:0,seq:1,full:next};
   if(omitWorld.length)frame.omitWorld=omitWorld;
   this.previous=next;this.seq=frame.seq;return {type:'snapshot-v1',frame};

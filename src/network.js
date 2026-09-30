@@ -78,6 +78,8 @@ export class Network {
       this.callbacks.onState?.(s);if(wasHost!==this.isHost)this.callbacks.onAuthorityOwner?.();this.authorityResolve?.(s);this.authorityResolve=null;
     });
     this.peer.on('authority-owner',m=>{this.hostId=m.id;this.isHost=this.id===m.id;this.callbacks.onAuthorityOwner?.();});
+    this.peer.on('authority-error',m=>{this.authorityReject?.(Error(m.reason||'The match server is at capacity.'));});
+    this.peer.on('authority-notice',m=>{if(m.event==='match-capacity')this.callbacks.onStatus?.(m.data.message);});
     this.peer.on('authority-notice',m=>{if(m.event==='chat-message')this.callbacks.onChat?.(m.data);else if(m.event==='chat-status')this.callbacks.onChatStatus?.(m.data);else if(m.event==='chat-report')this.callbacks.onChatReport?.(m.data);else if(m.event==='name-required')this.callbacks.onNameRequired?.();else if(m.event==='name-accepted')this.callbacks.onNameAccepted?.();else if(m.event==='kicked')this.callbacks.onError?.('You were removed from this room.');});
     this.peer.on("error", (err) => {
       if (this.closed) return;
@@ -123,7 +125,7 @@ export class Network {
   authorityCommand(command){this.peer?.control?.({type:'authority-command',command});}
   createAuthority(options,profile,visibility,ticket){
     this.serverAuthority=true;
-    return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('The match server did not initialize.')),20000);this.authorityResolve=s=>{clearTimeout(timer);resolve(s);};this.peer.control({type:'authority-create',options,profile,visibility,ticket});});
+    return new Promise((resolve,reject)=>{const finish=(error,state)=>{clearTimeout(timer);this.timers.delete(timer);this.authorityResolve=null;this.authorityReject=null;error?reject(error):resolve(state);};const timer=setTimeout(()=>finish(Error('The match server did not initialize.')),20000);this.timers.add(timer);this.authorityResolve=s=>finish(null,s);this.authorityReject=error=>finish(error);this.peer.control({type:'authority-create',options,profile,visibility,ticket});});
   }
   async host(reservedCode) {
     this.isHost = true;
@@ -576,6 +578,7 @@ export class Network {
   destroy() {
     if (this.closed) return;
     this.closed = true;
+    this.authorityReject?.(new Error('Connection cancelled.'));
     this.rejectOpen?.(new Error("Connection cancelled."));
     this.rejectOpen = null;
     if (this.isHost && !relayURL()) directory.publish(null);

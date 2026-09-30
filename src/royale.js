@@ -5,6 +5,7 @@ import {markerAction} from './team-markers.js';
 import {newActivity,meaningfulActivity} from './activity.js';
 import {resetStance,canFight,eyeHeight} from './stance.js';
 import {REVIVE_RULES,mayDown,downPlayer,prepareRevive,tickRevives,resolveDownedTeams,rescueBotInput} from './team-survival.js';
+import {scheduledBotInput} from './bot-runtime.js';
 import {SPAWN_ISLAND,distributedSpawn} from './spawn-island.js';
 import {isTeamRoyale,teammates,livingTeams,teamKey} from './teams.js';
 import {ROYALE_PHASES as RP,isWarmup,acceptsContestants,MAX_SPECTATORS,MAX_HUMANS,WARMUP_SECONDS,OFFLINE_WARMUP_SECONDS} from './royale-phases.js';
@@ -76,7 +77,7 @@ export class RoyaleSimulation extends Simulation {
   p.bank={light:0,medium:180,shells:40,heavy:0,rockets:0};resetAirborne(p);this.syncInventory(p);
  }
  addBots(){
-  const humans=[...this.players.values()].filter(p=>!p.bot&&p.contestant).length,target=Math.max(0,Math.min(this.options.capacity-humans,this.options.fill?this.options.capacity:this.options.bots));
+  const humans=[...this.players.values()].filter(p=>!p.bot&&p.contestant).length,target=Math.max(0,Math.min(this.options.capacity-humans,this.options.fill?this.options.capacity:this.options.bots,this.botLimit??Infinity));
   let count=[...this.players.values()].filter(p=>p.bot).length,index=0;
   while(count<target){const id='bot-'+index++;if(this.players.has(id))continue;const p=this.addPlayer(id,{name:this.uniqueBotName(['Relay','Sunny','Scout','Drift','Sable'][count%5]),...randomAppearance(this.random)},true);if(!p)break;count++;}
  }
@@ -427,8 +428,8 @@ export class RoyaleSimulation extends Simulation {
   this.emit('finish',{winner:this.winner});this.emit('royale-cue',{cue:'victory'});
  }
  botInput(p){
-  if(p.flight==='ground'&&p.botIntent&&this.time<(p.botIntentAt||0))return {...p.botIntent};
-  const intent=this.thinkBot(p);if(p.flight==='ground'){p.botIntent={...intent};const engaged=[...this.players.values()].some(o=>o!==p&&o.health>0&&dist(p,o)<55),using=p.use||p.brain?.utility||p.brain?.task?.kind==='heal';p.botIntentAt=this.time+(using?.04:engaged?.11:.23)+this.random()*.025;}return intent;
+  if(p.flight!=='ground')return this.thinkBot(p);
+  return scheduledBotInput(this,p,()=>this.thinkBot(p),{combat:.16,roam:.25});
  }
  thinkBot(p){
   const rescue=rescueBotInput(this,p);if(rescue)return rescue;

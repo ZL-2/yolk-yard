@@ -564,6 +564,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     $("#menu").hidden = true;
     $("#lobby").hidden = false;
     if(state?.phase==='playing')enterGame(true);else renderLobby();
+    if(launch?.capacityNotice)toast(launch.capacityNotice);
     return true;
   } catch (e) {
     if (attempt !== net) return;

@@ -34,13 +34,16 @@ jobs:
         if: contains(github.event.head_commit.message, '[service-notices]')
         run: node --test tests/service-status.test.js
       - name: Verify Fieldcraft movement, combat, authority, audio and owner access
-        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]')
+        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[capacity-update]')
         run: |
           npm run test:field
           if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" != "true" ]]; then
             npx playwright install --with-deps chromium
             npm run test:field-browser
           fi
+      - name: Verify workload admission, batched state, bots and multiplayer continuity
+        if: contains(github.event.head_commit.message, '[capacity-update]')
+        run: npm run test:capacity
       - uses: actions/upload-artifact@v4
         if: always() && contains(github.event.head_commit.message, '[field-update]')
         with:

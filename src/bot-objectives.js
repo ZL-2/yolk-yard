@@ -10,12 +10,12 @@ import {BOT_WORLD_SENSES} from './bot-config.js';
 export function selectWeapon(p,target){
  const distance=target?dist(p,target):22;
  const options=p.inventory?p.inventory.map((item,slot)=>({item,slot})).filter(({item})=>item?.weapon&&(item.ammo>0||p.bank[ammoType(item.id)]>0)):[p.weapon,'pip'].map((id,slot)=>({item:{id,ammo:p.ammo[slot],rarity:0},slot})).filter(({slot})=>p.ammo[slot]>0||p.reserve[slot]>0);
- const score=({item,slot})=>{const w=rarityVariant(weapon(item.id),item.rarity),[near,far]=w.engage;
+ const score=({item,slot})=>{const w=p.inventory?gun({...p,slot}):weapon(item.id),[near,far]=w.engage;
   const accuracy=w.pellets>1?Math.min(1,10/Math.max(1,distance)):w.adsSpread?Math.min(1,.45/(Math.max(1,distance)*w.adsSpread)):1;
   const burst=w.damage*w.pellets*falloffAt(w,distance)*accuracy,pressure=burst*w.roundsPerSecond;
   const rangeCost=distance<near?(near-distance)*.7:distance>far?(distance-far)*.65:0;
   return pressure*.24+burst*.16+24-rangeCost+(item.ammo>0?12:-12)+(slot===p.slot?6:0)-(w.projectile&&distance<w.minRange+3?120:0)-(distance>w.range?200:0)-(w.stableScope&&distance<12?22:0);};
- options.sort((a,b)=>score(b)-score(a));return options[0]?.slot??p.slot;
+ let best=-Infinity,chosen=p.slot;for(const candidate of options){const value=score(candidate);if(value>best){best=value;chosen=candidate.slot;}}return chosen;
 }
 export function usefulLoot(p,item){
  if(item.ammoType){const used=p.inventory.some(i=>i?.weapon&&ammoType(i.id)===item.ammoType);return used&&p.bank[item.ammoType]<AMMO_CAPS[item.ammoType]*.5?35:0;}
