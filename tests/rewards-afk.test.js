@@ -27,6 +27,30 @@ test('relay binds entrants to real connections, settles once, and never trusts c
  for(now=0;now<=180;now++){service.input(guest,{yaw:now/4,pitch:0});service.frame(host,state(now));}
  service.frame(host,{...state(181),phase:'results'});const receipts=sent.filter(([,m])=>m.type==='reward');assert.equal(receipts.length,2);for(const [,m]of receipts){assert.ok(m.receipt.amount>0);assert.equal(m.receipt.population,2);assert.equal(m.receipt.eligible,true);}now++;service.frame(host,{...state(182),phase:'results'});assert.equal(sent.filter(([,m])=>m.type==='reward').length,2);await service.close();
 });
+test('movement activity stays on its authenticated socket and does not scan retained matches',async()=>{
+ let now=0;const relay={peers:new Map(),send(){}},service=new ProgressionService(relay,{clock:()=>now,path:null});await service.ready;
+ const host={id:'room',progressId:'host-account',ws:{},listing:{},links:new Map()},guest={id:'guest',progressId:'shared-account',ws:{},links:new Map([['game',host]])};
+ const other={id:'other-room',progressId:'shared-account',ws:{},listing:{},links:new Map()};host.links.set('game',guest);
+ for(const p of [host,guest,other])relay.peers.set(p.id,p);
+ const state={round:1,matchId:'m',mode:'ffa',phase:'playing',hostId:'host',input:{yaw:0,pitch:0},players:[{id:'host',health:100,x:0,z:0},{id:'guest',health:100,x:0,z:0}],events:[]};
+ const otherState={...state,players:[state.players[0]]};
+ service.frame(host,state);service.frame(other,otherState);now=1;service.frame(host,state);service.frame(other,otherState);
+ const match=service.matches.get('room:m:1'),p=match.players.get('guest'),otherPlayer=service.matches.get('other-room:m:1').players.get('host');
+ for(let i=0;i<1000;i++)service.matches.set('finished-'+i,{finished:true,players:{values(){throw Error('Retained result traversed by movement input');}}});
+ now=2;service.input(guest,{yaw:0});now=3;service.input(guest,{yaw:1});
+ assert.equal(p.inputAt,3);assert.equal(p.activity.last,3);assert.equal(otherPlayer.inputAt,undefined);assert.equal(otherPlayer.activity.last,1);
+ now=4;service.frame(host,{...state,phase:'results'});service.input(guest,{yaw:2});assert.equal(p.inputAt,3,'settled matches stop receiving input');
+ await service.close();
+});
+test('stale reward input bindings expire and a fresh frame restores the existing entrant',async()=>{
+ let now=0;const host={id:'room',progressId:'host',ws:{},listing:{},links:new Map()},relay={peers:new Map([['room',host]]),send(){}};
+ const service=new ProgressionService(relay,{clock:()=>now,path:null});await service.ready;
+ const state={round:1,matchId:'m',mode:'ffa',phase:'playing',hostId:'host',input:{yaw:0},players:[{id:'host',health:100,x:0,z:0}],events:[]};
+ service.frame(host,state);now=1;service.frame(host,state);const p=service.matches.get('room:m:1').players.get('host');
+ now=7;service.input(host,{yaw:1});assert.equal(p.inputAt,undefined);
+ service.frame(host,state);now=8;service.input(host,{yaw:1});assert.equal(p.inputAt,8);
+ now=4000;service.sweep();service.input(host,{yaw:2});assert.equal(p.inputAt,8);assert.equal(service.matches.size,0);await service.close();
+});
 test('32 contestants cover all safe island sectors without overlap',()=>{
  assert.ok(SPAWN_ISLAND.spawns.length>100);const players=[];let seed=17;const random=()=>((seed=Math.imul(seed,1664525)+1013904223|0)>>>0)/4294967296;
  for(let i=0;i<32;i++){const {point:[x,z],region}=distributedSpawn(players,random),p={x,z,y:groundAt(SPAWN_ISLAND,x,z),health:100,region};assert.ok(canStand(SPAWN_ISLAND,p));assert.ok(players.every(o=>Math.hypot(x-o.x,z-o.z)>3));players.push(p);}

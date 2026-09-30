@@ -6,12 +6,28 @@ import {calculateReward,participation} from '../../src/rewards.js';
 const warmup=new Set(['waiting','spawn-island','starting']);
 const bounded=(v,max=1e7)=>Number.isFinite(v)?Math.min(max,Math.max(-max,v)):0;
 export class ProgressionService{
- constructor(relay,{clock=()=>Date.now()/1000,path=process.env.RAVEL_REWARD_DATA_PATH||(process.env.YOLK_OWNER_DATA_PATH?dirname(process.env.YOLK_OWNER_DATA_PATH)+'/ravelfront-progress.json':'/tmp/ravelfront-progress.json')}={}){this.relay=relay;this.clock=clock;this.path=path;this.matches=new Map();this.accounts=new Map();this.ready=this.load();this.dirty=false;this.saveChain=Promise.resolve();}
+ constructor(relay,{clock=()=>Date.now()/1000,path=process.env.RAVEL_REWARD_DATA_PATH||(process.env.YOLK_OWNER_DATA_PATH?dirname(process.env.YOLK_OWNER_DATA_PATH)+'/ravelfront-progress.json':'/tmp/ravelfront-progress.json')}={}){this.relay=relay;this.clock=clock;this.path=path;this.matches=new Map();this.inputTargets=new Map();this.accounts=new Map();this.ready=this.load();this.dirty=false;this.saveChain=Promise.resolve();}
  async load(){if(!this.path)return;try{for(const [id,a]of JSON.parse(await readFile(this.path,'utf8')))this.accounts.set(id,a);}catch{}}
  identity(token){return typeof token==='string'&&/^[a-f0-9]{32,64}$/.test(token)?createHash('sha256').update(token).digest('hex'):null;}
  async register(peer,token){peer.progressId=this.identity(token)||randomUUID();await this.ready;for(const receipt of this.account(peer.progressId).receipts.slice(-30))this.relay.send(peer,{type:'reward',receipt});}
  account(id){if(!this.accounts.has(id))this.accounts.set(id,{receipts:[],pairs:[],earned:[],encounters:[]});return this.accounts.get(id);}
- input(peer,input){const now=this.clock();for(const match of this.matches.values()){const p=[...match.players.values()].find(p=>p.identity===peer.progressId);if(p&&!match.finished&&!p.afkRemoved){observeInput(p.activity,input||{},now);p.inputAt=now;}}}
+ unbindInput(peer,key){const targets=this.inputTargets.get(peer);if(!targets)return;targets.delete(key);if(!targets.size)this.inputTargets.delete(peer);}
+ bindInput(match,p,peer){
+  if(p.peer&&p.peer!==peer)this.unbindInput(p.peer,match.key);
+  if(p.bot)return;
+  let targets=this.inputTargets.get(peer);if(!targets){targets=new Map();this.inputTargets.set(peer,targets);}
+  if(targets.get(match.key)?.player!==p)targets.set(match.key,{match,player:p});
+ }
+ releaseInputs(match){for(const p of match.players.values())if(!p.bot)this.unbindInput(p.peer,match.key);}
+ input(peer,input){
+  // A 60 Hz input packet belongs to this authenticated socket's active match.
+  // Retained results and other tabs sharing an identity are not input targets.
+  const targets=this.inputTargets.get(peer);if(!targets)return;
+  const now=this.clock();for(const [key,{match,player:p}]of targets){
+   if(match.finished||p.afkRemoved||now-match.last>5){this.unbindInput(peer,key);continue;}
+   observeInput(p.activity,input||{},now);p.inputAt=now;
+  }
+ }
  frame(peer,s){
   if(!peer.listing||!Array.isArray(s?.players)||s.players.length>36||!Number.isInteger(s.round)||!['playing','results'].includes(s.phase))return;
   // A room's public/custom provenance is assigned by matchmaking, not the host.
@@ -28,7 +44,7 @@ export class ProgressionService{
    if(!bot&&!remote)continue;
    if(!bot&&!isHost&&![...remote.links.values()].some(p=>p.id===room||p.progressId===peer.progressId))continue;
    let p=m.players.get(raw.id);if(!p){if(now-m.started>15)continue;const identity=bot?raw.id:remote.progressId;if(!bot&&[...m.players.values()].some(p=>!p.bot&&p.identity===identity))continue;p={id:raw.id,identity,bot,activity:newActivity(now),joined:now,difficulty:m.difficulty,kills:0,assists:0};m.players.set(p.id,p);}
-   p.peer=remote;p.raw={...raw,x:bounded(raw.x),y:bounded(raw.y),z:bounded(raw.z)};p.afkRemoved||=!!raw.afkRemoved;
+   this.bindInput(m,p,remote);p.peer=remote;p.raw={...raw,x:bounded(raw.x),y:bounded(raw.y),z:bounded(raw.z)};p.afkRemoved||=!!raw.afkRemoved;
    p.controlled=!bot&&!p.afkRemoved&&!raw.awaitingEntry&&!raw.spectating&&raw.health>0&&raw.flight!=='transport'&&remote?.ws&&(isHost||p.inputAt!=null);
    if(!p.controlled){p.activity.last=now;p.activity.x=raw.x;p.activity.z=raw.z;continue;}
    p.activity.elapsed=(p.activity.elapsed||0)+dt;
@@ -45,7 +61,7 @@ export class ProgressionService{
   if(s.phase==='results')this.settle(m);
  }
  settle(m){
-  if(m.finished)return;m.finished=true;const now=this.clock(),elapsed=now-m.started,all=[...m.players.values()];
+  if(m.finished)return;m.finished=true;this.releaseInputs(m);const now=this.clock(),elapsed=now-m.started,all=[...m.players.values()];
   for(const p of all){if(p.bot)continue;const account=this.account(p.identity);account.earned=account.earned.filter(e=>now-e.time<3600);account.pairs=account.pairs.filter(e=>now-e.time<3600);account.encounters=(account.encounters||[]).filter(e=>now-e.time<3600);
    // Team membership is evaluated independently of skin/team colors.
    const enemy=all.filter(o=>o!==p&&!((m.state.teamSize>1||m.mode==='teams')&&o.raw?.team===p.raw?.team));
@@ -59,7 +75,7 @@ export class ProgressionService{
    account.receipts.push(receipt);account.receipts=account.receipts.slice(-60);if(result.amount)account.earned.push({time:now,amount:result.amount});this.dirty=true;if(p.peer?.ws)this.relay.send(p.peer,{type:'reward',receipt});
   }
  }
- sweep(){const now=this.clock();for(const [key,m]of this.matches){if(now-m.last>3600){this.matches.delete(key);continue;}if(m.finished||now-m.last>5)continue;
+ sweep(){const now=this.clock();for(const [key,m]of this.matches){if(now-m.last>3600){this.releaseInputs(m);this.matches.delete(key);continue;}if(m.finished||now-m.last>5)continue;
   if(this.relay.authority?.rooms.has(m.room))continue; // The authoritative simulation owns AFK removal.
   for(const p of m.players.values()){if(!p.controlled||p.bot||p.afkRemoved||!p.peer?.ws)continue;const remaining=Math.ceil(activityRemaining(p.activity,now));if(remaining<=12)this.relay.send(p.peer,{type:'afk',remaining});if(remaining<=0){p.afkRemoved=true;p.controlled=false;const host=this.relay.peers.get(m.room);if(host)this.relay.send(host,{type:'afk-enforce',player:p.id});}}
  }if(this.dirty){this.dirty=false;void this.save();}}
