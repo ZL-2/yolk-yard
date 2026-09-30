@@ -11,6 +11,10 @@ import {VERSION,safeProfile} from '../src/data.js';
 import {teammates} from '../src/teams.js';
 import {socialMarkup,lobbyMarkup} from '../src/lobby-ui.js';
 const wait=async(fn,label='Multiplayer timeout')=>{const end=Date.now()+12000;while(!fn()){assert.ok(Date.now()<end,label);await new Promise(r=>setTimeout(r,15));}};
+test('the first private snapshot is discoverable for friend admission before two seconds of uptime',()=>{
+ const savedClock=globalThis.performance,savedWindow=globalThis.window;globalThis.performance={now:()=>40};globalThis.window={YOLK_NETWORK:{relay:'ws://127.0.0.1/game'}};
+ try{const sim=new Simulation();sim.addPlayer('host',{name:'Early Host'});let listing;const net=Object.assign(Object.create(Network.prototype),{isHost:true,id:'host',code:'ABCDEFGH',visibility:'private',connections:new Map(),members:[],callbacks:{getCheckpoint:()=>sim.checkpoint()},chatRoom:{sequence:0,members:new Map(),muted:new Set(),reports:new Set()},peer:{id:`yolk-yard-v${VERSION}-ABCDEFGH`,protocol:2,publish:r=>listing=r},kicked:new Set()});net.broadcast(sim.snapshot());assert.equal(listing.host,'Early Host');assert.equal(listing.public,false);assert.equal(listing.players,1);}finally{globalThis.performance=savedClock;globalThis.window=savedWindow;}
+});
 async function fixture(){
  const path=await mkdtemp(tmpdir()+'/ravel-private-');process.env.RAVEL_SOCIAL_DATA_PATH=path+'/social.json';
  const app=await startRealtimeServer({port:0,host:'127.0.0.1'}),base=`ws://127.0.0.1:${app.server.address().port}`,users=[],games=[];
