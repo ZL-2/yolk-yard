@@ -25,6 +25,7 @@ try{
  await p.evaluate(()=>render(6200,false));assert.equal(await p.locator('.performance-hud').isVisible(),false);
  // Actual settings menu: migrate old saved settings, toggle, persist and reload.
  await p.route('**/src/maintenance.js',r=>r.fulfill({contentType:'application/javascript',body:'import "/src/main.js";'}));
+ await p.addInitScript(()=>localStorage.setItem('ravelfront-welcome-back-2026-09','dismissed'));
  await p.addInitScript(()=>localStorage.setItem('yolk-settings',localStorage.getItem('yolk-settings')||JSON.stringify({quality:'low',volume:0})));
  await p.goto(origin+'/?qa');await p.locator('#menu [data-action="settings"]').first().click();
  assert.equal(await p.locator('#showFps').isChecked(),true);await p.locator('#showFps').uncheck();

@@ -1,3 +1,4 @@
+import {showWelcomeBack} from './welcome-back.js';
 import {loadingMarkup,showLoading,hideLoading,waitForLoading} from './loading-screen.js';
 import {predictionCorrection} from './network-stats.js';
 import {InputClock} from './input-clock.js';
@@ -1710,7 +1711,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  if (invite) joinMenu(formatCode(cleanCode(invite)));
+  void showWelcomeBack().then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);

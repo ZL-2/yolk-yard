@@ -96,3 +96,8 @@ externally by the automation; a sleeping free service is given a cold-start retr
 before being classified as unavailable. The server itself does not contain a
 Resend credential or send emails. Deploys that erase incident history between
 checks can prevent short resolved incidents from being emailed.
+
+
+## Public reopening
+
+The client now opens the public lobby directly. Game and Social WebSockets default to public access with the existing origin, version, identity, rate and authority checks. Owner endpoints still require owner authentication. An explicit `RAVEL_MAINTENANCE=true` restores the server maintenance gate if needed; normal operation leaves it unset or false. The Render $7 instance was verified active (0.5 CPU / 512 MB). Runtime CPU monitoring reads the actual container allowance without a plan-specific code change. Keep one instance because live matches and parties are held in memory; independent instances would need coordinated routing and shared state. Paid compute does not make ephemeral files durable.

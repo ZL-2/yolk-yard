@@ -8,6 +8,7 @@ try{
  const p=await browser.newPage({viewport:{width:1280,height:800}});p.on('pageerror',e=>errors.push(e.message));
  await p.route('**/src/maintenance.js',r=>r.fulfill({contentType:'application/javascript',body:'import "/src/main.js";'}));
  const startedAt=Date.now()-65000;await p.route('**/status',r=>r.fulfill({contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({serverTime:Date.now(),active:[{id:'fixture',startedAt,message:'Match updates are taking longer than expected.'}]})}));
+ await p.addInitScript(()=>localStorage.setItem('ravelfront-welcome-back-2026-09','dismissed'));
  await p.addInitScript(()=>localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0})));
  await p.goto(origin+'/?qa');await p.locator('.yard-logo').waitFor();await p.locator('.lobby-service-status').waitFor();
  assert.equal(await p.locator('.service-issue').textContent(),'Match updates are taking longer than expected.');const first=await p.locator('.service-elapsed time').textContent();await p.waitForTimeout(1100);assert.notEqual(await p.locator('.service-elapsed time').textContent(),first);assert.match(await p.locator('.service-work').textContent(),/working/);
