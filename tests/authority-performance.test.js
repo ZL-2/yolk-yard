@@ -3,6 +3,22 @@ import assert from 'node:assert/strict';
 import {MatchAuthority} from '../server/realtime/authority.js';
 import {RoyaleSimulation} from '../src/royale.js';
 import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
+test('authority delivers 20 snapshots per simulated second without catch-up bursts',t=>{
+ t.mock.method(performance,'now',()=>0);
+ const authority=new MatchAuthority({});clearInterval(authority.timer);
+ const frames=[];let ticks=0;
+ const room={age:0,frameAt:0,sim:{tick(){ticks++;}}};
+ authority.rooms.set('cadence',room);authority.broadcast=()=>frames.push(ticks);
+ try{
+  const start=authority.last;
+  for(let i=1;i<=600;i++)authority.tick(start+i*1000/60);
+  assert.equal(ticks,600);assert.equal(frames.length,200);
+  assert.ok(frames.every((tick,i)=>tick===(i+1)*3));
+  authority.tick(start+10000+100);
+  assert.equal(ticks,606);assert.equal(frames.length,201);
+  authority.tick(start+10000+100);assert.equal(frames.length,201);
+ }finally{authority.close();}
+});
 test('populated authority broadcasts sleep unchanged world data and respect socket backpressure',()=>{
  const sent=[],relay={peers:new Map(),send:(p,m)=>sent.push([p.id,m]),progression:{frame(){}}};
  const authority=new MatchAuthority(relay);clearInterval(authority.timer);

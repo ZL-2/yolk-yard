@@ -127,7 +127,8 @@ export class MatchAuthority{
    if(performance.now()-sliceStarted>=4)break;
   }
   // One fresh broadcast after catch-up, never several obsolete broadcasts in a burst.
-  for(const room of this.rooms.values())if(room.age-room.frameAt>=.05){room.frameAt=room.age;this.broadcast(room);}
+  // Three 60 Hz steps can sum just below 50 ms; use the same tolerance as catch-up.
+  for(const room of this.rooms.values())if(room.age-room.frameAt+1e-8>=.05){room.frameAt=room.age;this.broadcast(room);}
   // A throttled tick must not be followed by five more ticks before socket IO.
   // Yield between catch-up slices while retaining earned simulation time.
   if(this.accumulator+1e-8>=1/60&&this.rooms.size){this.catchup=setImmediate(()=>{this.catchup=null;this.tick();});this.catchup.unref?.();}
