@@ -1,12 +1,15 @@
 const categories=[
- ['video','▣','Video',['quality','fov']],
+ ['video','▣','Video',['quality','fov','showFps']],
  ['audio','♫','Audio',['volume','effectsVolume','ambienceVolume','musicVolume']],
  ['mouse','↗','Mouse',['sensitivity','scopeSensitivity','invert']],
- ['hud','⊕','HUD',['centerDot','hitMarkers']],
+ ['hud','⊕','HUD',['centerDot','hitMarkers','netDebugStats','connectionWarnings']],
  ['gameplay','⚙','Gameplay',['confirmEditOnRelease','chatMode']],
  ['bindings','⌨','Keybinds',[]]
 ];
 const descriptions={
+ showFps:'Show your measured frames per second during gameplay.',
+ netDebugStats:'Show ping, incoming and outgoing traffic, message rates and a latency graph. Packet loss is unavailable in this browser transport.',
+ connectionWarnings:'Show a yellow connection arrow when updates are delayed and a red X when the connection is interrupted or severely delayed.',
  quality:'High enables shadows and richer graphics. Low reduces rendering work for smoother play on slower devices.',
  fov:'Adjust how much of the world is visible. A wider field of view shows more of your surroundings.',
  volume:'Controls the overall game volume. Individual sound channels are multiplied by this level.',

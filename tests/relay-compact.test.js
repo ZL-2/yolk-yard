@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {RelayPeer} from '../src/relay-peer.js';
 import {SnapshotDecoder} from '../src/snapshot-codec.js';
 function transport(compact=true){
- const frames=[],peer=Object.assign(Object.create(RelayPeer.prototype),{queue:[],queueBytes:0,connections:new Map([['a',{compact,queuedBytes:0}],['b',{compact,queuedBytes:0}]]),unacked:new Map(),sentBytes:0,protocol:1,socket:{readyState:1,bufferedAmount:0,send:raw=>frames.push(JSON.parse(raw))}});
+ const frames=[],peer=Object.assign(Object.create(RelayPeer.prototype),{queue:[],queueBytes:0,connections:new Map([['a',{compact,queuedBytes:0}],['b',{compact,queuedBytes:0}]]),unacked:new Map(),sentBytes:0,sentPackets:0,byteEncoder:new TextEncoder(),protocol:1,socket:{readyState:1,bufferedAmount:0,send:raw=>frames.push(JSON.parse(raw))}});
  return {peer,frames};
 }
 const state=(channel,time)=>({type:'data',channel,data:{type:'state',state:{time,round:1,phase:'playing',players:[{id:'guest',x:time}],projectiles:[],events:[{id:time}]}}});

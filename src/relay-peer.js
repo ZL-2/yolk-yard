@@ -22,16 +22,17 @@ export class RelayPeer extends Events {
   super();this.id=id;this.destroyed=false;this.disconnected=false;this.connections=new Map();this.waiters=new Map();this.queue=[];this.queueBytes=0;this.requestId=0;this.deferredControls=[];this.commandSeq=0;this.unacked=new Map();this.cursor=0;this.protocol=1;
   // Defer errors so Network can attach listeners before anything fires.
   queueMicrotask(()=>this.start());
-  this.sentTimes=new Map();this.receivedBytes=0;this.sentBytes=0;this.relayLatency=null;
+  this.sentTimes=new Map();this.receivedBytes=0;this.sentBytes=0;this.relayLatency=null;this.sentPackets=0;this.receivedPackets=0;this.byteEncoder=new TextEncoder();
  }
  get bufferedAmount(){return (this.socket?.bufferedAmount||0)+this.queueBytes;}
+ sendRaw(ws,raw){if(ws?.readyState!==1)return;this.sentBytes+=this.byteEncoder.encode(raw).byteLength;this.sentPackets++;ws.send(raw);}
  start(){
   if(this.destroyed)return;
   try{this.socket=new WebSocket(relayURL(),globalThis.window?.RAVEL_OWNER_SESSION?['ravelfront',`owner.${window.RAVEL_OWNER_SESSION}`]:[]);}catch{this.emit('error',{type:'socket-error'});return;}
   const ws=this.socket;this.transportHeartbeat=new HostHeartbeat(Date.now(),{silence:18000,grace:0});
-  ws.addEventListener('open',()=>ws.send(JSON.stringify({type:'register',progressToken:progressToken(),...(this.id?{id:this.id}:{}),...this.resume,...(this.protocol===2?{cursor:this.cursor}:{})})));
+  ws.addEventListener('open',()=>this.sendRaw(ws,JSON.stringify({type:'register',progressToken:progressToken(),...(this.id?{id:this.id}:{}),...this.resume,...(this.protocol===2?{cursor:this.cursor}:{})})));
   ws.addEventListener('message',event=>{
-   if(ws!==this.socket)return;this.transportHeartbeat.contact(Date.now());this.receivedBytes+=event.data.length;let data;try{data=JSON.parse(event.data);}catch{return this.destroy();}
+   if(ws!==this.socket)return;this.transportHeartbeat.contact(Date.now());this.receivedBytes+=this.byteEncoder.encode(event.data).byteLength;this.receivedPackets++;let data;try{data=JSON.parse(event.data);}catch{return this.destroy();}
    for(const m of Array.isArray(data)?data:[data]){
     if(m.relaySeq){
      if(m.relaySeq<=this.cursor){this.acknowledge();continue;}
@@ -61,7 +62,7 @@ export class RelayPeer extends Events {
  }
  control(message){
   if(this.protocol===2&&['heartbeat','ack'].includes(message.type)){
-   if(this.socket?.readyState===1)this.socket.send(JSON.stringify(message));return;
+   if(this.socket?.readyState===1)this.sendRaw(this.socket,JSON.stringify(message));return;
   }
   if(this.destroyed)return;
   if(this.rotating&&!['register','rotate'].includes(message.type)){
@@ -72,7 +73,7 @@ export class RelayPeer extends Events {
   }
   if(this.socket?.readyState===1){
    if(this.protocol===2){message={...message,seq:++this.commandSeq};this.unacked.set(message.seq,message);this.sentTimes.set(message.seq,performance.now());}
-   const raw=JSON.stringify(message);this.sentBytes+=raw.length;this.socket.send(raw);
+   const raw=JSON.stringify(message);this.sendRaw(this.socket,raw);
   }
  }
  acknowledge(){if(!this.ackTimer)this.ackTimer=setTimeout(()=>{this.ackTimer=null;this.control({type:'ack',seq:this.cursor});},16);}
@@ -88,7 +89,7 @@ export class RelayPeer extends Events {
    this.id=m.id;this.rotating=false;
    if(m.protocol===2){
     this.protocol=2;this.resume={resume:m.resume};this.reconnecting=false;this.reconnectUntil=null;clearTimeout(this.reconnectDeadline);
-    for(const message of this.unacked.values())this.socket.send(JSON.stringify(message));
+    for(const message of this.unacked.values())this.sendRaw(this.socket,JSON.stringify(message));
     if(m.resumed)this.emit('reconnected');
    }if(m.resumed){this.flush();for(const message of this.deferredControls)this.control(message);this.deferredControls=[];}else this.emit('open',this.id);return;}
   if(m.type==='rooms'){const waiter=this.waiters.get(m.request);if(waiter){this.waiters.delete(m.request);waiter.resolve(m.rooms);}return;}
@@ -151,7 +152,7 @@ export class RelayPeer extends Events {
  }
  destroy(){
   if(this.destroyed)return;this.flush();this.destroyed=true;clearTimeout(this.flushTimer);clearTimeout(this.ackTimer);clearInterval(this.heartbeat);clearTimeout(this.reconnectTimer);clearTimeout(this.reconnectDeadline);
-  if(this.protocol===2&&this.socket?.readyState===1)this.socket.send(JSON.stringify({type:'bye'}));
+  if(this.protocol===2&&this.socket?.readyState===1)this.sendRaw(this.socket,JSON.stringify({type:'bye'}));
   for(const waiter of this.waiters.values())waiter.reject();this.waiters.clear();
   for(const conn of [...this.connections.values()])conn.finish();
   this.socket?.close();

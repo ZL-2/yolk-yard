@@ -29,6 +29,8 @@ import {matchOptions, targetLabel} from "./match-options.js";
 import "./style.css";
 import "./lobby.css";
 import './settings-layout.css';
+import {PerformanceHUD,PERFORMANCE_DEFAULTS} from './performance-hud.js';
+import './performance-hud.css';
 import './egg-shop.css';
 import './ravelfront.css';
 import {EggShop} from './egg-shop.js';
@@ -89,6 +91,7 @@ let profile = safeProfile(
 );
 const settings = {
   ...SLIDER_DEFAULTS,
+  ...PERFORMANCE_DEFAULTS,
   quality: "high",
   invert: false,
   centerDot: true,
@@ -263,7 +266,7 @@ function settingsMenu() {
       )
       .join(
         "",
-      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>Low · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
+      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>Low · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
     "settings",
   );
   bindingEditor=new KeybindEditor(dialog.querySelector(".keybind-list"),settings.keybinds,bindings=>{settings.keybinds=bindings;keys.clear();queuedActions.clear();input.fire=input.aim=false;save("yolk-settings",settings);});
@@ -1580,7 +1583,9 @@ function pumpNetworkInput(now=performance.now()) {
   }
   net.inputBatch(commands);
 }
+const performanceHUD=new PerformanceHUD(document.body);
 function loop(now) {
+  performanceHUD.update(now,now-lastTime,net,settings,screen==='game'&&!document.hidden);
   pumpNetworkInput(now);
   if(state?.royale){view.buildMap=getMap(state.options.map);applyBuildState(view.buildMap,state.royale);}
   if(screen==='game'&&!document.hidden)connectionReport.performance.frame(now-lastTime,net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');
