@@ -2,8 +2,8 @@ import { safeName } from './moderation.js';
 import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
-// The rebuilt island and movement model must not mix with older clients.
-export const VERSION = 23;
+// Rebuilt arena collision geometry must not mix with older clients.
+export const VERSION = 24;
 export const WEAPONS = [
   {
     "id": "sprinter",

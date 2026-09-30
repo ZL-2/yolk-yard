@@ -105,3 +105,7 @@ The client now opens the public lobby directly. Game and Social WebSockets defau
 
 ### Shared lobby clock
 The lobby renders only `/status.notice`, scoped `widespread`. Its ID and `startedAt` are server-owned and retained until every confirmed issue recovers, including transitions between issue types. Browsers estimate current server time using a monotonic clock and half of the polling round-trip time; device wall-clock changes cannot restart or shift an incident. Clients resync every five seconds (small network-latency differences remain possible). One player’s measurements or failed fetch cannot create a shared notice. Player reports require at least three affected reporting peers across two matches, representing at least 50% of fresh reports. Server-side CPU/delay observations do not require a player quorum. Existing ephemeral-file durability limits still apply.
+
+
+## Coastal arena revision
+Protocol 24 / version 3.3.0 rebuilds every FFA/Team Scramble arena. Saved IDs (`yard`, `depot`, `courtyard`) resolve to Aster Relay, Breakwater Docks and Ironwake Foundry. Both server physics and client visuals consume the same immutable `ravel-arenas.js` solids. Real-socket checks cover all six map/mode combinations, and navigation checks verify bases and pickups from both sides. Frontier scenery bakes vertex-coloured static geometry into one opaque mesh per arena plus signage; the lobby reuses four batched road sections with the existing patrol distance. Royale gameplay and its terrain are unchanged.
