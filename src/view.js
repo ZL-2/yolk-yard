@@ -383,6 +383,7 @@ export class View {
   }
   animateLobbyCharacter(model,motion,dt,yawOffset=0){
     const pose=motion.update(dt),held=model.userData.held;
+    model.userData.lobbyPose=pose;
     model.rotation.y=pose.yaw+yawOffset;
     held.position.set(.10+pose.weaponSide,1.36+pose.breath+pose.grip+pose.weaponBob,-.22+pose.weaponDepth);
     held.rotation.set(pose.pitch,pose.weaponYaw,pose.roll,'YXZ');
@@ -728,7 +729,7 @@ export class View {
       this.lobbyStage.userData.update?.(dt);
       for(const teammate of this.partyEggs||[])this.animateLobbyCharacter(teammate,teammate.userData.lobbyMotion,dt,.17);
       const partyCount=this.partyEggs?.length||0,partyOffset=partyCount===1?1.4:partyCount===3?1.5:0,narrow=this.camera.aspect<.85;
-      this.camera.position.set(narrow&&partyCount>1?partyOffset:5.8+partyOffset,4.3,narrow?(partyCount>1?29:partyCount?22.5:19):partyCount>1?19:12.5);
+      this.camera.position.set(narrow&&partyCount>1?partyOffset:5.8+partyOffset,4.3,narrow?(partyCount===3?34:partyCount>1?29:partyCount?22.5:19):partyCount>1?19:12.5);
       this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):1.8, 0);
       this.camera.fov = narrow?47:48;
       this.camera.updateProjectionMatrix();

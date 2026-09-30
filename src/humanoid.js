@@ -141,10 +141,13 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  if(patrol){
   h.phase=patrol.phase;h.speed=patrol.speed;
   b.hips.position.x+=patrol.bodySway;b.hips.position.y=b.hips.userData.rest.y-.13+patrol.bodyBob;
-  b.hips.rotation.x=-.025;b.hips.rotation.y=Math.sin(patrol.phase)*.032;
+  b.hips.rotation.x=-.025;b.hips.rotation.y=patrol.hipYaw;
   b.hips.rotation.z=patrol.lean;b.spine.rotation.z=-patrol.lean*.65;
-  b.chest.rotation.y=(p.scan||0)*.26-Math.sin(patrol.phase)*.025;
-  b.chest.rotation.x=patrol.breath*1.8-patrol.ready*.025;
+  b.spine.rotation.y=patrol.spineYaw;b.spine.rotation.x=-patrol.ready*.025;
+  b.chest.rotation.y=patrol.chestYaw;
+  b.chest.rotation.x=patrol.breath*1.8-patrol.ready*.045;
+  b.head.rotation.y=patrol.headYaw;b.head.rotation.z=patrol.headRoll;
+  b.head.position.x+=patrol.ready*.018;
   b.head.rotation.x=patrol.headPitch;
  }
  const f=forward/(speed||1),s=side/(speed||1);
@@ -159,7 +162,9 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
    const halfStride=patrol.cycleDistance*stanceFraction/2;
    const travel=onGround?1-2*u:-Math.cos(u*Math.PI);
    const travelZ=-travel*halfStride,heading=(p.yaw||Math.PI)-Math.PI;
-   foot=V(sideSign*.135+Math.sin(heading)*travelZ,.09+(onGround?0:Math.sin(u*Math.PI)*.105),Math.cos(heading)*travelZ);
+   // Counter the root turn so the planted boot keeps following the straight road.
+   foot=V(Math.cos(heading)*sideSign*.135-Math.sin(heading)*travelZ,
+    .09+(onGround?0:Math.sin(u*Math.PI)*.105),Math.sin(heading)*sideSign*.135+Math.cos(heading)*travelZ);
   }
   if(!grounded&&!airborne)foot=V(sideSign*.14,.17+(sideSign>0?.10:0),.10);
   if(airborne)foot=V(sideSign*.24,p.flight==='glide'?.22:.2,p.flight==='glide'?.10:.28);
