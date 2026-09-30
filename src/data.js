@@ -3,39 +3,32 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Rebuilt arena collision geometry must not mix with older clients.
-export const VERSION = 24;
+export const VERSION = 25;
 export const WEAPONS = [
   {
     "id": "sprinter",
-    "ammoPickup": 30,
     "muzzle": 0.9,
     "sightY": 0.285,
     "optic": "reflex",
     "name": "Sprinter",
     "role": "ASSAULT",
     "desc": "A steady all-rounder. Fast, accurate, dependable.",
-    "speed": 7.4,
     "color": 16300073,
     "size": 1,
-    "zoom": 65
   },
   {
     "id": "scatter",
-    "ammoPickup": 8,
     "muzzle": 0.9,
     "sightY": 0.22,
     "optic": "iron",
     "name": "Scatter",
     "role": "SCATTER",
     "desc": "Get close. One wide burst, plenty of punch.",
-    "speed": 7.4,
     "color": 16022359,
     "size": 1.1,
-    "zoom": 70
   },
   {
     "id": "needle",
-    "ammoPickup": 4,
     "muzzle": 1.1,
     "sightY": 0.33499999999999996,
     "optic": "scope",
@@ -43,43 +36,33 @@ export const WEAPONS = [
     "name": "Needle",
     "role": "PRECISION",
     "desc": "One powerful scoped shot, then reload.",
-    "speed": 7.4,
     "color": 5753311,
     "size": 1.35,
-    "zoom": 27,
-    "stableScope": true
   },
   {
     "id": "zipper",
-    "ammoPickup": 40,
     "muzzle": 0.68,
     "sightY": 0.285,
     "optic": "reflex",
     "name": "Zipper",
     "role": "RAPID",
     "desc": "Move quickly and keep a stream of shots flying.",
-    "speed": 7.4,
     "color": 11983702,
     "size": 0.78,
-    "zoom": 68
   },
   {
     "id": "thumper",
-    "ammoPickup": 1,
     "muzzle": 0.74,
     "sightY": 0.285,
     "optic": "reflex",
     "name": "Thumper",
     "role": "LAUNCHER",
     "desc": "A straight rocket that arms after three units of flight.",
-    "speed": 7.4,
     "color": 13339884,
     "size": 1.3,
-    "zoom": 65
   },
   {
     "id": "anchor",
-    "ammoPickup": 15,
     "muzzle": 0.94,
     "sightY": 0.316,
     "optic": "scope",
@@ -87,15 +70,11 @@ export const WEAPONS = [
     "name": "Anchor",
     "role": "MARKSMAN",
     "desc": "A scoped semi-automatic rifle for deliberate follow-up shots.",
-    "speed": 7.4,
     "color": 7188431,
     "size": 1.3,
-    "zoom": 35,
-    "stableScope": true
   },
   {
     "id": "duet",
-    "ammoPickup": 24,
     "muzzle": 0.92,
     "sightY": 0.275,
     "optic": "prism",
@@ -103,31 +82,25 @@ export const WEAPONS = [
     "name": "Duet",
     "role": "BURST",
     "desc": "Three precise shots with each trigger press.",
-    "speed": 7.4,
     "color": 15848296,
     "size": 0.95,
-    "zoom": 58
   },
   {
     "id": "pip",
-    "ammoPickup": 15,
     "muzzle": 0.45,
     "sightY": 0.22,
     "optic": "iron",
     "name": "Pip",
     "role": "SIDEARM",
     "desc": "A dependable backup for every loadout.",
-    "speed": 7.4,
     "color": 15918522,
     "size": 0.6,
-    "zoom": 65,
     "secondary": true
   }
 ];
 export const ROYALE_WEAPONS = [
   {
     "id": "peeper",
-    "ammoPickup": 4,
     "muzzle": 1.1,
     "sightY": 0.32399999999999995,
     "optic": "scope",
@@ -135,43 +108,37 @@ export const ROYALE_WEAPONS = [
     "name": "Sentry",
     "role": "MARKSMAN",
     "desc": "A repeating rifle for long-range reconnaissance.",
-    "speed": 7.4,
     "color": 9756314,
     "size": 1.35,
-    "zoom": 27,
-    "stableScope": true
   },
   {
     "id": "doubleyolk",
-    "ammoPickup": 8,
     "muzzle": 0.9,
     "sightY": 0.22,
     "optic": "iron",
     "name": "Breach",
     "role": "TACTICAL",
     "desc": "A pump-action tactical shotgun built for close-range control.",
-    "speed": 7.4,
     "color": 15505861,
     "size": 1.1,
-    "zoom": 70
   },
   {
     "id": "comet",
-    "ammoPickup": 30,
     "muzzle": 0.9,
     "sightY": 0.285,
     "optic": "reflex",
     "name": "Comet",
     "role": "ENERGY",
     "desc": "A precise energy carbine with luminous rounds.",
-    "speed": 7.4,
     "color": 9154559,
     "size": 1,
-    "zoom": 65
   }
 ];
-for(const w of [...WEAPONS,...ROYALE_WEAPONS])if(OPTICS[w.id]){w.ads={...OPTICS[w.id]};w.magnification=w.ads.magnification;w.sightY=w.ads.radius+.15;}
-for(const w of [...WEAPONS,...ROYALE_WEAPONS])Object.assign(w,combatProfile(w.id),{reticle:RETICLES[w.id],artRevision:4});
+for(const w of [...WEAPONS,...ROYALE_WEAPONS]){
+ Object.assign(w,combatProfile(w.id),{reticle:RETICLES[w.id],artRevision:4});
+ w.desc=w.purpose+'. '+w.weakness+'.';
+ if(OPTICS[w.id]){w.ads={...OPTICS[w.id],magnification:w.scopeMagnification,sensitivity:w.scopeSensitivity};w.magnification=w.scopeMagnification;w.sightY=w.ads.radius+.15;}
+}
 const royaleStats = new Map();
 export const MODES = [
  {id:"royale",name:"Frontier Royale",short:"ROYALE",description:"Drop in, loot up, outrun the storm. Last operator standing.",limit:1,teams:false},
