@@ -9,4 +9,4 @@ assert.equal(v.build,expected);assert.equal(history.build,expected);assert.equal
 let health;const deadline=Date.now()+480000;
 while(true){try{health=await json('https://yolk-yard-relay.onrender.com/health');if(health.build===expected&&health.gameVersion===VERSION)break;}catch(e){console.log('Waiting for relay:',e.message);}assert.ok(Date.now()<deadline,'Relay did not deploy this build');await new Promise(r=>setTimeout(r,15000));}
 assert.equal(health.maintenance,false);assert.ok(health.socialAvailable);assert.equal(health.weaponBalanceRevision,1);
-console.log(JSON.stringify({build:expected,relayBuild:health.build,release:v.release,version:'3.4.1',title:history.releases[0].title,arenaBotSpeedScale:.8,arenaBotSpeed:5.92,playerMovementUnchanged:true,royaleMovementUnchanged:true,published:true,verifiedLive:true}));
+console.log(JSON.stringify({build:expected,relayBuild:health.build,release:v.release,version:'3.4.2',title:history.releases[0].title,arenaBotSpeed:7.4,arenaCombatLateralInput:.6,smoothCombatReversals:true,playerMovementUnchanged:true,royaleMovementUnchanged:true,published:true,verifiedLive:true}));

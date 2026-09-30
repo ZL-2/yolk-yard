@@ -6,6 +6,7 @@ import {BOT_SKILL,skillFor,wrapAngle} from './bot-config.js';
 import {newBrain,observe,selectThreat,seesPoint} from './bot-perception.js';
 import {selectWeapon,chooseObjective,coverPoint} from './bot-objectives.js';
 import {navigate} from './bot-navigation.js';
+import {ARENA_BOT_COMBAT,smoothArenaCombatMovement} from './bot-movement.js';
 export {BOT_SKILL};
 function combatGoal(sim,p,brain,target,w,skill){
  const d=dist(p,target),desired=(w.engage[0]+w.engage[1])*.5;
@@ -43,8 +44,8 @@ export function botInput(sim,p){
  let slot=selectWeapon(p,target),w=gun({...p,slot});
  if(p.use){brain.utility=null;if(visible||now-(brain.attackedAt??-100)<.6)sim.cancelUse?.(p);else return {yaw:p.yaw,pitch:p.pitch,slot:p.use.slot,forward:0,strafe:0,swapSlot:-1};}
  if(now>=brain.decision||!brain.task||brain.weapon!==w.id){
-  brain.weapon=w.id;brain.decision=now+skill.decision*(.85+r()*.3);brain.task=chooseObjective(sim,p,brain,skill,target);brain.objective=brain.task.kind;
-  if(brain.task.kind==='fight'&&target){brain.side=r()<.5?-1:1;brain.task.goal=combatGoal(sim,p,brain,target,w,skill);}
+  brain.weapon=w.id;brain.decision=now+Math.max(!p.inventory&&target?ARENA_BOT_COMBAT.decisionMinimum:0,skill.decision*(.85+r()*.3));brain.task=chooseObjective(sim,p,brain,skill,target);brain.objective=brain.task.kind;
+  if(brain.task.kind==='fight'&&target){if(p.inventory||now>=(brain.sideUntil||0)){brain.side=r()<.5?-1:1;brain.sideUntil=now+ARENA_BOT_COMBAT.sideHoldMin+r()*ARENA_BOT_COMBAT.sideHoldExtra;}brain.task.goal=combatGoal(sim,p,brain,target,w,skill);}
  }
  if(visible){if(now-(brain.lastVisibleAt??-100)>skill.perception*2)brain.aimAt=Math.max(brain.aimAt,now+skill.reaction*.6);brain.lastVisibleAt=now;}
  const task=brain.task,goal=task.goal;
@@ -86,9 +87,13 @@ export function botInput(sim,p){
  }else if(target&&task.kind==='investigate'){yaw=Math.atan2(p.x-target.x,p.z-target.z);if(dist(p,target)<2){delete brain.memory[target.id];brain.decision=0;}}
  if(brain.utility&&brain.utility.until>now&&['popper','impulse','launchpad'].includes(p.inventory?.[brain.utility.slot]?.id)&&!p.use){slot=brain.utility.slot;yaw=brain.utility.yaw;pitch=brain.utility.pitch;fire=!p.useLatch;}
  const turnDt=clamp(now-brain.turnAt,0,.1);brain.turnAt=now;
- const desiredYaw=yaw;yaw=p.yaw+clamp(wrapAngle(yaw-p.yaw),-skill.turn*turnDt,skill.turn*turnDt);
+ const arenaCombat=!p.inventory&&visible;
+ const turn=arenaCombat?Math.min(skill.turn,ARENA_BOT_COMBAT.turnRate):skill.turn;
+ const desiredYaw=yaw;yaw=p.yaw+clamp(wrapAngle(yaw-p.yaw),-turn*turnDt,turn*turnDt);
+ if(arenaCombat)pitch=p.pitch+clamp(pitch-p.pitch,-ARENA_BOT_COMBAT.pitchRate*turnDt,ARENA_BOT_COMBAT.pitchRate*turnDt);
  if(visible&&Math.abs(wrapAngle(desiredYaw-yaw))>.2)fire=false;
+ const movement=smoothArenaCombatMovement(brain,move,yaw,now,arenaCombat);
  const moving=Math.hypot(move.mx,move.mz)>.1;
- return {yaw,pitch,forward:-Math.sin(yaw)*move.mx-Math.cos(yaw)*move.mz,strafe:Math.cos(yaw)*move.mx-Math.sin(yaw)*move.mz,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room'].includes(task.kind)};
+ return {yaw,pitch,forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room'].includes(task.kind)};
 }
 import {teammates} from './teams.js';
