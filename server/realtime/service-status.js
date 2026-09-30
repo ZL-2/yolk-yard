@@ -4,8 +4,8 @@ const RETENTION=7*86400000;
 export const ISSUE_MESSAGES={
  'server-delay':'Match updates are taking longer than expected.',
  'cpu-pressure':'The match server is hitting its CPU allowance and may deliver uneven updates.',
- 'client-rendering':'Low frame rates are being reported across multiple matches.',
- 'client-connection':'Delayed updates or high latency are being reported across multiple matches.'
+ 'client-rendering':'Low frame rates are being reported by multiple players.',
+ 'client-connection':'Delayed updates or high latency are being reported by multiple players.'
 };
 // Only bounded numeric observations are retained. No player identifiers enter public history.
 export class ServiceStatus{
@@ -43,13 +43,14 @@ export class ServiceStatus{
   const periods=cpu?.available&&prev?.available?cpu.periods-prev.periods:0;
   const throttled=periods>0&&(cpu.throttledPeriods-prev.throttledPeriods)/periods>=.3;
   this.previousCpu=cpu;
-  const playing=!!this.relay.authority?.rooms.size;
+  // Count connected humans, including those in the lobby; bots never qualify.
+  const playing=[...(this.relay.peers?.values()||[])].filter(p=>p.ws&&!p.virtualRoom).length>=2;
   this.observe('cpu-pressure',playing&&throttled,now);
   this.observe('server-delay',playing&&gap>5500,now);
-  const widespread=predicate=>{const bad=reports.filter(predicate);return bad.length>=3&&bad.length>=reports.length*.5&&new Set(bad.map(r=>r.room)).size>=2;};
+  const widespread=predicate=>{const bad=reports.filter(predicate);return bad.length>=2;};
   this.observe('client-rendering',widespread(r=>r.fps>0&&r.fps<30),now);
   this.observe('client-connection',widespread(r=>r.rtt>180||r.gap>400),now);
  }
- snapshot(){const now=this.now();return {serverTime:now,notice:this.notice?{...this.notice,scope:'widespread',message:this.active.size===1?[...this.active.values()][0].message:'Multiple performance issues are affecting matches: '+[...this.active.keys()].map(k=>({'server-delay':'slow updates','cpu-pressure':'server CPU pressure','client-rendering':'low frame rates','client-connection':'connection delays'})[k]).join(', ')+'.'}:null,active:[...this.active.values()].map(({goodSince,...i})=>i),history:this.history.map(i=>({...i})),historyPersistent:!!this.path,monitoring:{confirmationSeconds:15,recoverySeconds:60,minimumAffectedPlayers:3,minimumAffectedMatches:2,minimumAffectedReportFraction:.5,emailCheckIntervalMinutes:60}};}
+ snapshot(){const now=this.now();return {serverTime:now,notice:this.notice?{...this.notice,scope:'widespread',message:this.active.size===1?[...this.active.values()][0].message:'Multiple performance issues are affecting matches: '+[...this.active.keys()].map(k=>({'server-delay':'slow updates','cpu-pressure':'server CPU pressure','client-rendering':'low frame rates','client-connection':'connection delays'})[k]).join(', ')+'.'}:null,active:[...this.active.values()].map(({goodSince,...i})=>i),history:this.history.map(i=>({...i})),historyPersistent:!!this.path,monitoring:{confirmationSeconds:15,recoverySeconds:60,minimumAffectedPlayers:2,minimumAffectedMatches:1,emailAlertsEnabled:false}};}
  async close(){clearInterval(this.timer);await this.saving;}
 }

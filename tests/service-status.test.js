@@ -23,7 +23,7 @@ test('reports require a match, valid bounded numbers and sustained observations'
  monitor.report(peer,{fps:NaN,rtt:0,gap:0});assert.equal(monitor.reports.size,0);
  for(let i=0;i<4;i++){monitor.report(peer,{fps:20,rtt:40,gap:600});monitor.tick();time+=5000;}
  assert.equal(monitor.snapshot().active.length,0,'A single player must not create a widespread notice');
- const peers=[peer,{ws:{},inMatch:true,room},{ws:{},inMatch:true,room:otherRoom}];
+ const peers=[peer,{ws:{},inMatch:true,room}];
  for(let i=0;i<4;i++){for(const p of peers)monitor.report(p,{fps:20,rtt:40,gap:600});monitor.tick();time+=5000;}
  assert.deepEqual(monitor.snapshot().active.map(i=>i.kind),['client-rendering','client-connection']);assert.equal(monitor.snapshot().notice.scope,'widespread');
  const publicData=JSON.stringify(monitor.snapshot());assert.ok(!publicData.includes('inMatch')&&!publicData.includes('ws'));
@@ -36,7 +36,7 @@ test('public service status is readable cross-origin and contains no credentials
  const app=await startRealtimeServer({host:'127.0.0.1',port:0,origins:['http://localhost:5199']});
  try{
   const response=await fetch(`http://127.0.0.1:${app.server.address().port}/status`,{headers:{Origin:'http://localhost:5199'}});
-  assert.equal(response.status,200);assert.equal(response.headers.get('access-control-allow-origin'),'http://localhost:5199');const data=await response.json();assert.ok(Array.isArray(data.history)&&Array.isArray(data.active));assert.equal(data.monitoring.emailCheckIntervalMinutes,60);assert.ok(!JSON.stringify(data).includes('token'));
+  assert.equal(response.status,200);assert.equal(response.headers.get('access-control-allow-origin'),'http://localhost:5199');const data=await response.json();assert.ok(Array.isArray(data.history)&&Array.isArray(data.active));assert.equal(data.monitoring.emailAlertsEnabled,false);assert.equal(data.monitoring.minimumAffectedPlayers,2);assert.ok(!JSON.stringify(data).includes('token'));
  }finally{await app.close();}
 });
 
@@ -49,4 +49,23 @@ test('one shared clock continues as issue types change and persists across resta
  await monitor.close();const restored=new ServiceStatus({},options);await restored.ready;assert.equal(restored.snapshot().notice.startedAt,first.startedAt);assert.equal(restored.snapshot().notice.id,first.id);
  restored.observe('server-delay',false);time+=60000;restored.observe('server-delay',false);assert.equal(restored.snapshot().notice,null);await restored.close();
  }finally{await monitor.close();await rm(dir,{recursive:true,force:true});}
+});
+
+
+test('server issues need two connected humans and ignore virtual hosts',async()=>{
+ let time=100000,periods=0;const peers=new Map([['one',{ws:{}}],['virtual',{ws:{},virtualRoom:true}]]);
+ const relay={peers,authority:{rooms:new Map()},cpuQuota:{snapshot:()=>({available:true,periods:periods+=100,throttledPeriods:periods})}};
+ const monitor=new ServiceStatus(relay,{now:()=>time,path:null,automatic:false});await monitor.ready;
+ for(let i=0;i<5;i++){monitor.tick();time+=5000;}
+ assert.equal(monitor.snapshot().active.length,0);
+ peers.set('two',{ws:{}});
+ for(let i=0;i<4;i++){monitor.tick();time+=5000;}
+ assert.equal(monitor.snapshot().active[0].kind,'cpu-pressure');await monitor.close();
+});
+
+test('two affected players qualify even when most reports are healthy',async()=>{
+ let time=100000;const room={},relay={authority:{roomFor:()=>room}},monitor=new ServiceStatus(relay,{now:()=>time,path:null,automatic:false});await monitor.ready;
+ const peers=Array.from({length:8},()=>({ws:{}}));
+ for(let i=0;i<4;i++){peers.forEach((p,j)=>monitor.report(p,{fps:j<2?20:60,rtt:j<2?200:20,gap:0}));monitor.tick();time+=5000;}
+ assert.deepEqual(monitor.snapshot().active.map(i=>i.kind),['client-rendering','client-connection']);await monitor.close();
 });
