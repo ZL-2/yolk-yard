@@ -29,7 +29,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[service-notices]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]')"
+      - name: Verify operator audio and local event gating
+        if: contains(github.event.head_commit.message, '[operator-audio]')
+        run: node --test tests/audio.test.js tests/operator-radio.test.js
       - name: Verify shared service notices and two-player detection
         if: contains(github.event.head_commit.message, '[service-notices]')
         run: node --test tests/service-status.test.js
