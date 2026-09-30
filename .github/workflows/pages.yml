@@ -37,7 +37,7 @@ jobs:
         if: contains(github.event.head_commit.message, '[service-notices]')
         run: node --test tests/service-status.test.js
       - name: Verify Fieldcraft movement, combat, authority, audio and owner access
-        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[capacity-update]')
+        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[capacity-update]') && !contains(github.event.head_commit.message, '[private-social]')
         run: |
           npm run test:field
           if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" != "true" ]]; then
@@ -47,6 +47,19 @@ jobs:
       - name: Verify workload admission, batched state, bots and multiplayer continuity
         if: contains(github.event.head_commit.message, '[capacity-update]')
         run: npm run test:capacity
+      - name: Verify private party hosts, friend spectators, teammate fill and coordinated publishing
+        if: contains(github.event.head_commit.message, '[private-social]')
+        run: |
+          npm run test:private-social
+          node --test tests/capacity.test.js tests/authority-performance.test.js tests/public-access.test.js tests/performance-hud.test.js tests/network-stats.test.js
+          npx playwright install --with-deps chromium
+          node scripts/private-social-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[private-social]')
+        with:
+          name: private-social-verification
+          path: test-results/private-social
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always() && contains(github.event.head_commit.message, '[field-update]')
         with:
@@ -287,6 +300,20 @@ jobs:
         with:
           node-version: 24
       - run: node scripts/social-squads-live-check.mjs
+
+  verify-private-live:
+    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[private-social]')
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/private-social-live-check.mjs
 
   verify-weapons-live:
     if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[weapon-balance]')

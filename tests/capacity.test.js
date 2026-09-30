@@ -67,7 +67,7 @@ test('real public matchmaking trims only new filler bots, preserves seats, and r
   social.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='hello')hello=m;if(m.type==='launch')launch=m.launch;if(m.type==='party')party=m.party;if(m.request){const waiter=requests.get(m.request);requests.delete(m.request);if(m.error)waiter.reject(Error(m.error));else waiter.resolve(m.result);}});
   await new Promise(r=>social.once('open',r));social.send(JSON.stringify({type:'hello',version:VERSION,profile:safeProfile({name:'Public Queue'})}));await wait(()=>hello&&party);
   const ask=(type,data={})=>new Promise((resolve,reject)=>{const request=++seq;requests.set(request,{resolve,reject});social.send(JSON.stringify({type,request,...data}));});
-  await assert.rejects(ask('queue',{custom:true,options:royale}),/safe match capacity/);
+  await ask('queue',{custom:true,options:royale});assert.equal(launch.hostRun,true);assert.equal(launch.visibility,'private');await ask('cancel');launch=null;
   assert.equal(app.relay.authority.capacity.reservations.size,0);
   await ask('queue',{options:royale});await wait(()=>launch);assert.ok(launch.botLimit<31&&launch.botLimit>=1);assert.equal(launch.options.capacity,32);assert.match(launch.capacityNotice,/Bot fill/);
   const limited=launch.botLimit;await newHost.host(launch.code);await newHost.createAuthority(launch.options,safeProfile({name:'Public Queue'}),'public',launch.ticket);

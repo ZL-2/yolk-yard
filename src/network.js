@@ -7,6 +7,8 @@ import { VERSION, safeProfile, nameKey } from "./data.js";
 import { ChatRoom, chatPayload } from './chat.js';
 import { FILTER_VERSION, moderateText, safeName, safeSystemText, SAFETY_MESSAGES } from './moderation.js';
 import { matchOptions } from './match-options.js';
+import {visibleMarkers} from './team-markers.js';
+import {isTeamRoyale} from './teams.js';
 import { HostHeartbeat } from './host-heartbeat.js';
 const PREFIX = `yolk-yard-v${VERSION}-`;
 const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -43,7 +45,7 @@ export class Network {
     this.callbacks = callbacks;
     this.visibility = "public";
     this.hostId="host";this.members=[];this.memberOrder=0;this.migrating=false;this.failedHosts=new Set();
-    this.maxConnections=7;
+    this.maxConnections=15;
     this.peer = null;
     this.connections = new Map();
     this.isHost = false;
@@ -73,6 +75,7 @@ export class Network {
       },
     });
     for(const type of ['reward','afk','afk-enforce'])this.peer.on(type,event=>this.callbacks.onProgress?.(type,event));
+    this.peer.on('deployment',status=>this.callbacks.onDeployment?.(status));
     this.peer.on('authority-state',s=>{
       if(s?.version!==VERSION||!Array.isArray(s.players))return;this.serverAuthority=true;this.snapshot=s;this.visibility=s.visibility;this.chatEnabled=s.chatEnabled;this.chatMuted=s.chatMuted||[];this.hostId=s.network.hostId;this.members=s.network.members;const wasHost=this.isHost;this.isHost=this.id===this.hostId;this.lastState=performance.now();this.hostHeartbeat.contact(this.lastState);
       this.callbacks.onState?.(s);if(wasHost!==this.isHost)this.callbacks.onAuthorityOwner?.();this.authorityResolve?.(s);this.authorityResolve=null;
@@ -202,7 +205,7 @@ export class Network {
         clearTimeout(timeout);
         this.timers.delete(timeout);
         this.connections.set(conn.peer, conn);
-        if(!this.members.some(m=>m.id===conn.peer))this.members.push({id:conn.peer,peerId:conn.peer,order:++this.memberOrder});
+        if(!this.members.some(m=>m.id===conn.peer))this.members.push({id:conn.peer,peerId:conn.peer,order:++this.memberOrder,spectator:!!msg.admission?.spectator||!!this.snapshot?.players.find(p=>p.id===conn.peer)?.friendSpectator});
         this.callbacks.onRoster?.([this.id,...[...this.connections].filter(([,c])=>c.open).map(([id])=>id)]);
         conn.send({
           type: "welcome",
@@ -455,7 +458,7 @@ export class Network {
   broadcast(state) {
     if(this.serverAuthority)return;
     this.snapshot = state;
-    this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+(state.royale?MAX_SPECTATORS:0);
+    this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     if (performance.now() - (this.lastPublish || 0) > 2000) { this.lastPublish = performance.now(); this.publishRoom(); }
     state = {...state, visibility:this.visibility,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,network:{hostId:this.id,members:this.members,chatSequence:this.chatRoom.sequence}};
     const worldVersion=state.royale?`${state.royale.matchId}:${state.round}:${state.royale.lootVersion}:${state.royale.buildVersion}`:null;
@@ -472,12 +475,14 @@ export class Network {
     for (let i=0;i<recipients.length;i++) {
       const conn=recipients[(i+offset)%recipients.length];
       if (!conn.open || (conn.dataChannel?.bufferedAmount || 0) >= 131072) continue;
-      const group=[conn.royaleVersion,conn.buildVersion,conn.lastEventSent].join('|'),cached=broadcasts.get(group);
+      const recipient=state.players.find(p=>p.id===conn.peer),teamGroup=isTeamRoyale(state.options)?recipient?.team:conn.peer;
+      const group=[conn.royaleVersion,conn.buildVersion,conn.lastEventSent,teamGroup].join('|'),cached=broadcasts.get(group);
       if(cached){Object.assign(conn,cached.cursor);conn.send(cached.message);continue;}
       let outgoing=state;
       if(state.royale){
+        outgoing={...state,royale:{...state.royale,markers:visibleMarkers(state,recipient)}};
         const version=state.royale.matchId+':'+state.options.map+':'+state.round+':'+state.royale.lootVersion;
-        if(conn.royaleVersion===version){const {loot,chests,...royale}=state.royale;outgoing={...state,royale};}
+        if(conn.royaleVersion===version){const {loot,chests,...royale}=outgoing.royale;outgoing={...state,royale};}
         conn.royaleVersion=version;
         const buildVersion=state.royale.matchId+':'+state.options.map+':'+state.round+':'+state.royale.buildVersion;
         if(conn.buildVersion===buildVersion){const {builds,worldDamage,...royale}=outgoing.royale;outgoing={...outgoing,royale};}
@@ -485,7 +490,7 @@ export class Network {
       }
       // Ordered delivery and reconnect replay preserve each event once. Do not
       // retransmit the last 60 events in every movement snapshot.
-      const events=outgoing.events.filter(e=>!Number.isFinite(e.id)||e.id>(conn.lastEventSent??-1));
+      const events=outgoing.events.filter(e=>(!Number.isFinite(e.id)||e.id>(conn.lastEventSent??-1))&&(e.type!=='duo-marker'||e.player===conn.peer||isTeamRoyale(state.options)&&e.team===recipient?.team));
       for(const event of events)if(Number.isFinite(event.id))conn.lastEventSent=Math.max(conn.lastEventSent??-1,event.id);
       outgoing={...outgoing,events};
       const message={type:'state',state:outgoing,...(checkpoint?{checkpoint}:{})};
@@ -510,7 +515,7 @@ export class Network {
   }
   electHost(){
     if(this.closed||!this.migrating)return;
-    const next=this.members.filter(m=>!this.failedHosts.has(m.id)).sort((a,b)=>a.order-b.order)[0];
+    const next=this.members.filter(m=>!m.spectator&&!this.failedHosts.has(m.id)).sort((a,b)=>a.order-b.order)[0];
     if(!next){this.callbacks.onError?.('No connected players remain in this room.');return;}
     if(next.id===this.id){this.promote();return;}
     const attempt=this.peer.connect(next.peerId,{reliable:true,serialization:'binary'});
@@ -550,7 +555,7 @@ export class Network {
     const checkpoint=this.lastCheckpoint;
     this.chatRoom.sequence=Math.max(checkpoint.chat?.sequence||0,this.snapshot?.network?.chatSequence||0);this.chatRoom.enabled=this.chatEnabled=checkpoint.chat?.enabled!==false;
     this.chatMuted=checkpoint.chat?.muted||[];this.chatRoom.muted=new Set(this.chatMuted);this.chatRoom.members=new Map(checkpoint.chat?.members||[]);this.chatRoom.reports=new Set(checkpoint.chat?.reports||[]);this.kicked=new Set(checkpoint.kicked||[]);
-    this.maxConnections=(checkpoint.simulation.options.mode==='royale'?Math.min(checkpoint.simulation.options.capacity,MAX_HUMANS):8)-1+(checkpoint.simulation.options.mode==='royale'?MAX_SPECTATORS:0);
+    this.maxConnections=(checkpoint.simulation.options.mode==='royale'?Math.min(checkpoint.simulation.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     this.callbacks.onHost?.(checkpoint.simulation,[...this.failedHosts]);
     this.lastPublish=0;this.lastCheckpointSent=0;this.claimRoomAddress();
     this.callbacks.onStatus?.('You are now the host. The match continues.');

@@ -3,7 +3,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Rebuilt arena collision geometry must not mix with older clients.
-export const VERSION = 27;
+export const VERSION = 28;
 export const WEAPONS = [
   {
     "id": "sprinter",

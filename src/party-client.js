@@ -8,10 +8,11 @@ export class PartyClient {
   ws.onmessage=e=>{if(ws!==this.ws)return;const m=JSON.parse(e.data);if(m.type==='identity-unavailable'){this.blockIdentity(m.message);}
    else if(m.type==='hello'){if(m.identityReset||this.helloToken&&m.token!==this.helloToken){this.blockIdentity('Your saved Friend Code could not be restored. Your browser credential has been kept.');return;}this.id=m.id;this.code=m.code;this.ready=true;try{localStorage.setItem('ravelfront-social-identity',m.token);sessionStorage.removeItem('yolk-party-token');}catch{}this.handlers.status?.('Connected');}
    else if(m.type==='reply'){const pending=this.pending.get(m.request);if(pending){clearTimeout(pending.timer);this.pending.delete(m.request);m.error?pending.reject(Error(m.error)):pending.resolve(m.result);}}
+   else if(m.type==='deployment')this.handlers.deployment?.(m.deployment);
    else if(m.type==='party'){this.party=m.party;this.handlers.change?.(m.party);}
    else this.handlers[m.type]?.(m[m.type]??m);
   };
-  ws.onerror=()=>{};ws.onclose=()=>{if(ws!==this.ws||this.closed)return;this.ready=false;for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(Error('Party connection interrupted.'));}this.pending.clear();if(this.identityBlocked)return;this.handlers.status?.('Reconnecting…');this.retry=setTimeout(()=>this.connect(),2000);};
+  ws.onerror=()=>{};ws.onclose=event=>{if(ws!==this.ws||this.closed)return;if(event?.code===1008&&/Refresh Ravelfront/.test(event.reason||''))this.handlers.deployment?.({updating:true});this.ready=false;for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(Error('Party connection interrupted.'));}this.pending.clear();if(this.identityBlocked)return;this.handlers.status?.('Reconnecting…');this.retry=setTimeout(()=>this.connect(),2000);};
  }
  blockIdentity(message){this.identityBlocked=message;this.ready=false;this.ws?.close();this.handlers.status?.('Friend identity needs restoration');this.handlers['party-notice']?.({message:message+' Open Social to retry.'});}
  retryIdentity(){this.identityBlocked=null;clearTimeout(this.retry);this.connect();}

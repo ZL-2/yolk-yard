@@ -1,3 +1,4 @@
+import {DeploymentUI} from './deployment-ui.js';
 import {crosshairRadius} from './combat.js';
 import {showWelcomeBack} from './welcome-back.js';
 import {loadingMarkup,showLoading,hideLoading,waitForLoading} from './loading-screen.js';
@@ -38,7 +39,6 @@ import './lobby-status.css';
 import './egg-shop.css';
 import './ravelfront.css';
 import {EggShop} from './egg-shop.js';
-import {rewardFrame} from './rewards.js';
 import {EggWallet,ownedLoadout} from './egg-wallet.js';
 import {KeybindEditor} from "./keybind-editor.js";
 import './field-update.css';
@@ -117,7 +117,7 @@ settings.volume = clamp(Number(settings.volume) || 0, 0, 1);
 let stats = read("yolk-stats", { matches: 0, kills: 0, wins: 0 }),
   options = matchOptions({map:"yard", mode:"ffa", fill:true});
 const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},stats.eggs||0),matchEarnings={total:0,status:'Match verification pending'};
-let lastProgress=0,progressMatch='';
+let progressMatch='';
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
 let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
 let view,
@@ -322,11 +322,11 @@ function setupMenu(editing = false, draft = null) {
   const o = draft || (editing ? state.options : options);
   const nextRound = editing && state.phase === "results";
   const select = (id,label,items,value) => `<label>${label}<select class="field" id="setup-${id}">${items.map(([key,text])=>`<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
-  modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Create Match",
-    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your arena, invite friends, and add bots to fill the match."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",[["public","Public · listed for everyone"],["private","Private · invite code only"]],o.visibility || net?.visibility || "public")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("teamSize","ROYALE TEAM MODE",[[1,"Solo"],[2,"Duos"],[4,"Squads"]],o.teamSize||1)}${select("teamFill","HUMAN TEAMMATES",[["on","Fill"],["off","No Fill"]],o.teamFill===false?"off":"on")}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===4?'Last squad standing wins. Eight contestant positions minimum.':o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Bots fill the remaining seats. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
-  if(editing && !net) $("#setup-visibility").disabled=true;
+  modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Custom Private Match",
+    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your rules and invite friends. This private match runs on your computer; keep this tab open."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",net?.serverAuthority?[["public","Public matchmaking"]]:[["private","Private · invite code only"]],net?.serverAuthority?"public":"private")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("teamSize","ROYALE TEAM MODE",[[1,"Solo"],[2,"Duos"],[4,"Squads"]],o.teamSize||1)}${select("teamFill","TEAMMATES",[["on","Fill"],["off","No Fill"]],o.teamFill===false?"off":"on")}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===4?'Last squad standing wins. Eight contestant positions minimum.':o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Fill teams get bot teammates in any remaining positions at departure. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
+  $('#setup-visibility').disabled=true;
   const royale=o.mode==='royale';
-  if(!editing)$('#setup-mode').disabled=true;
+  if(!editing)$('#setup-mode').disabled=false;
   if(royale){for(const option of $('#setup-capacity').options)option.disabled=Number(option.value)<(o.teamSize||1)*2;if(o.capacity<(o.teamSize||1)*2)$('#setup-capacity').value=String((o.teamSize||1)*2);for(const option of $('#setup-teamSize').options)option.disabled=Number(option.value)<(party?.party?.members.length||1);$('#setup-teamSize').onchange=()=>{const next={...getOptions(),visibility:$('#setup-visibility').value};setupMenu(editing,next);};}
   for(const key of ['minutes','scoreLimit']){$(`#setup-${key}`).closest('label').hidden=royale;$(`#setup-${key}`).disabled=royale;}
   for(const key of ['capacity','storm','teamSize','teamFill'])$(`#setup-${key}`).closest('label').hidden=!royale;
@@ -351,9 +351,9 @@ function saveMatchSettings(start = false) {
   if(sim.remote){sim.configure(next);if(start)sim.startRound();closeDialog();return;}
   if((sim.options.mode==='royale')!==(next.mode==='royale')){
     const old=sim;sim=next.mode==='royale'?new RoyaleSimulation(next):new Simulation(next);
-    for(const p of old.players.values())if(!p.bot)sim.addPlayer(p.id,p);sim.round=old.round;sim.phase=old.phase;
+    for(const p of old.players.values())if(!p.bot)sim.admitPlayer(p.id,p,p.friendSpectator?{...p,spectator:true}:null);sim.round=old.round;sim.phase=old.phase;
   }else if(!sim.configure(next))return;
-  if(net)net.maxConnections=(next.mode==='royale'?Math.min(next.capacity,MAX_HUMANS):8)-1+(next.mode==='royale'?MAX_SPECTATORS:0);
+  if(net)net.maxConnections=(next.mode==='royale'?Math.min(next.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
   if(autoQueue&&next.mode==='royale'&&!start)sim.queueEnds=sim.time+WARMUP_SECONDS;
   options=sim.options;
   net?.setVisibility($("#setup-visibility").value);
@@ -366,7 +366,7 @@ function visibilityLabel() {
   return `Room: ${net?.visibility === "public" ? "public" : "private"} · Make ${net?.visibility === "public" ? "private" : "public"}`;
 }
 function visibilityButton() {
-  return net?.isHost ? `<button class="plain" data-action="toggle-visibility" style="margin:12px 0">${visibilityLabel()}</button>` : "";
+  return ''; // Custom rooms stay private; public rooms belong to matchmaking.
 }
 
 let checkingConnection = false;
@@ -505,9 +505,12 @@ function callbacks() {
       connectionReport.network.update({now:performance.now(),time:s.time,ack:me.ack,rtt:net?.latency||null,relayRtt:net?.peer?.relayLatency,received:net?.peer?.receivedBytes||0,sent:net?.peer?.sentBytes||0,queued:net?.peer?.bufferedAmount||0,batches:net?.peer?.unacked?.size||0,hostQueue:me.inputQueue,serverTiming:s.network?.timing,correction:predictionCorrection(previousPrediction,predicted,previousState,s)});
       lastHealth = me.health;
       handleState();
+      processEvents();
       connectionReport.performance.update(performance.now()-updateStarted,pendingInputs.length);
     },
-    onError: (message) => {
+    onError: async (message) => {
+      await deployment.check();
+      if(deployment.active){leave(false,false);return;}
       leave(false);
       modal(
         "Connection ended",
@@ -516,6 +519,7 @@ function callbacks() {
       );
     },
     onStatus: (message) => toast(message),
+    onDeployment: status=>deployment.accept(status),
   };
 }
 function beginSim() {
@@ -536,7 +540,8 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   const next = preset?.mode ? matchOptions(preset) : getOptions();
   if (!next) return;
   options=matchOptions({...next,session:'online'});autoQueue=automatic;
-  const visibility=visibilityOverride||$('#setup-visibility')?.value||'public';
+  if(launch?.hostRun||!launch){matchEarnings.total=0;matchEarnings.status='Private custom · No Marks';progressMatch='';}
+  const visibility=launch?.hostRun||!launch?'private':visibilityOverride||'public';
   beginSim();
   if(launch?.admission)sim.assignTeam?.(sim.players.get("host"),launch.admission);
   busy = true;
@@ -546,13 +551,13 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     "connecting",
   );
   const attempt = new Network(callbacks());
-  attempt.maxConnections=(options.mode==='royale'?Math.min(options.capacity,MAX_HUMANS):8)-1+(options.mode==='royale'?MAX_SPECTATORS:0);
+  attempt.maxConnections=(options.mode==='royale'?Math.min(options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
   net = attempt;
   try {
     await attempt.host(launch?.code);
     if (attempt !== net) return;
     attempt.setVisibility(visibility);
-    if(attempt.peer?.control){state=await attempt.createAuthority(options,profile,visibility,launch?.ticket);sim=new RemoteSimulation(attempt,()=>state);}
+    if(attempt.peer?.control&&!launch?.hostRun&&launch){state=await attempt.createAuthority(options,profile,visibility,launch?.ticket);sim=new RemoteSimulation(attempt,()=>state);}
     else {if(sim instanceof RoyaleSimulation)sim.startRound();state=sim.snapshot();attempt.broadcast(state);attempt.publishRoom();}
     localId = attempt.id;
     await waitForLoading();
@@ -727,6 +732,7 @@ function sendMarker(kind,point=null){
  if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});
 }
 function playerAction(action) {
+  if(state?.players.find(p=>p.id===localId)?.friendSpectator)return;
   if(state?.options.mode==='teams' && action==='rejoin') {chooseTeam();return;}
   spawnIntentUntil = action === "spectate" ? 0 : performance.now() + 5000;
   if (sim) { sim.playerAction(localId, action); state = sim.snapshot(); }
@@ -830,7 +836,7 @@ function processEvents() {
     const me = state.players.find((p) => p.id === localId);
     sound.event(e,me,state);
     if(e.type==='duo-marker')sound.cue(e.kind==='danger'?'danger-ping':'world-ping',null,.75);
-    if(e.type==='knocked')notice(`${e.targetName} downed`,1800);
+    if(e.type==='knocked'&&teammates(state.options,me,state.players.find(p=>p.id===e.target)))notice(`Teammate downed · ${e.targetName}`,1800);
     if(e.type==='revived'&&(e.player===localId||e.target===localId))notice(e.target===localId?'Back in the fight · 30 health':'Teammate revived',2200);
     if(e.type==='streak-bonus'&&e.player===localId){streakUI.announce(e,state.options.mode);sound.pickup();}
     if(e.type==='royale-eliminated'&&e.player===localId){spectateTarget=state.players.find(p=>teammates(state.options,me,p)&&p.health>0)?.id||me?.killerId;pendingInputs=[];predicted=null;}
@@ -962,6 +968,7 @@ function hud() {
   const watching = !!p.spectating && state.phase === "playing";
   $("#spectate-panel").hidden = !watching;
   $("#hud").classList.toggle("spectating", watching);
+  $('#spectate-panel [data-action=rejoin]').hidden=!!p.friendSpectator||!!state.royale;
   const target = state.players.find(k => k.id === spectateTarget);
   $("#spectate-info").textContent = target && watching
     ? `${target.name} · Health ${Math.ceil(target.health)} · ${state.royale?itemInfo(target.inventory?.[target.slot]).name:gun(target).name} · ${target.kills} K / ${target.deaths} D`
@@ -1045,13 +1052,12 @@ function receiveInvite(invite){
  tray.append(node);while(tray.children.length>3)tray.firstChild.remove();setTimeout(()=>node.remove(),Math.max(0,invite.expires-Date.now()));sound.cue('queue-found');
 }
 async function queueParty(custom=false,code=null){
+ if(deployment.active)return;
  if(state){toast('Return to the lobby before finding another match.');return;}
  const selected=custom?getOptions():matchOptions({...party?.party?.selection,fill:true,bots:party?.party?.selection.mode==='royale'?31:7});
  if(!selected)return;
- if(custom&&(selected.mode!==party.party.selection.mode||selected.teamSize!==party.party.selection.teamSize||selected.teamFill!==party.party.selection.teamFill)){
-  if(!await partyRequest('select',{...selected}))return;
- }
- if(await partyRequest('queue',{custom,code,options:selected,visibility:$('#setup-visibility')?.value||'public'})){dialog.close();dialogType='';renderMenu();}
+ // The custom launch applies its selection atomically, retaining party readiness.
+ if(await partyRequest('queue',{custom,code,options:selected,visibility:custom?'private':'public'})){dialog.close();dialogType='';renderMenu();}
 }
 async function launchParty(launch){
  if(activeLaunch===launch.id)return;activeLaunch=launch.id;
@@ -1059,18 +1065,18 @@ async function launchParty(launch){
  let ok=false;
  try{
   if(launch.host)ok=await createRoom(launch.options,launch.visibility,true,launch);
-  else ok=await joinRoom(launch.code,false,launch.ticket);
+  else {spectateTarget=launch.watchId||null;ok=await joinRoom(launch.code,false,launch.ticket);}
   if(activeLaunch!==launch.id)return;
   if(!ok)throw Error('Your party could not enter that match together.');
   if(launch.host)await party.request('host-ready',{id:launch.id});
   await party.request('joined',{id:launch.id});
- }catch(error){await partyRequest('failed',{id:launch.id,reason:error.message});}
+ }catch(error){await partyRequest('failed',{id:launch.id,reason:error.message});if(activeLaunch===launch.id)activeLaunch=null;}
 }
 function initializeParty(){
  party=new PartyClient(profile,{
   status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'&&screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
-  invite:receiveInvite,launch:launchParty,
+  invite:receiveInvite,launch:launchParty,deployment:status=>deployment.accept(status),
   'social-changed':scheduleSocialRefresh,
   'party-notice':m=>toast(m.message),
   'friend-request':m=>{toast(m.name+' sent a friend request. Open Social to accept or decline.');sound.cue('queue-found');scheduleSocialRefresh();},
@@ -1206,10 +1212,11 @@ document.addEventListener("click", (e) => {
   if (!b) return;
   if(b.dataset.socialTab){socialTab=b.dataset.socialTab;void socialMenu();}
   if(b.dataset.socialPage!==undefined){socialOffset=Number(b.dataset.socialPage);void socialMenu();}
+  if(b.dataset.spectateFriend){if(state){toast('Return to the lobby before spectating a friend.');return;}b.disabled=true;void partyRequest('spectate-friend',{id:b.dataset.spectateFriend}).then(()=>{b.disabled=false;});}
   if(b.dataset.socialAction){b.disabled=true;void partyRequest(b.dataset.socialAction,{id:b.dataset.playerId}).then(ok=>{b.disabled=false;if(ok){toast(b.dataset.socialAction==='friend-send'?(ok.status==='friends'?'Friend request accepted.':'Friend request sent.'):'Social list updated.');void socialMenu();}});}
   if(b.dataset.experience)void selectExperience(b.dataset.experience);
   for(const [key,type]of [['partyInvite','invite'],['partyAccept','accept'],['partyDecline','decline'],['partyKick','kick'],['partyJoin','join']])if(b.dataset[key]){
-    void partyRequest(type,{id:b.dataset[key]}).then(ok=>{if(ok){if(type==='accept'||type==='decline')b.closest('.party-invitation')?.remove();if(type==='invite')toast('Invitation sent.');if(dialogType==='social')void socialMenu();}});
+    void partyRequest(type,{id:b.dataset[key]}).then(ok=>{if(ok){if(type==='accept'||type==='decline'){document.querySelector(`[data-invitation-id="${b.dataset[key]}"]`)?.remove();b.closest('.party-invitation')?.remove();}if(type==='invite')toast('Invitation sent.');if(dialogType==='social')void socialMenu();}});
   }
   if (b.dataset.action) {
     sound.unlock();
@@ -1653,11 +1660,8 @@ function loop(now) {
   }
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
-  if(net?.isHost&&!net.serverAuthority&&state&&now-lastProgress>=750){
-    lastProgress=now;(net.aliasPeer?.id?net.aliasPeer:net.peer)?.control?.({type:'progress',state:rewardFrame(state,localId,input)});
-  }
   const currentProgress=(state?.royale?.matchId||net?.code||'local')+':'+state?.round;
-  if(currentProgress!==progressMatch){progressMatch=currentProgress;matchEarnings.total=0;matchEarnings.status=net?'Match verification pending':'Practice · No currency rewards';}
+  if(currentProgress!==progressMatch){progressMatch=currentProgress;matchEarnings.total=0;matchEarnings.status=me?.friendSpectator?'Spectating · No Marks':net?.serverAuthority?'Match verification pending':net?'Private custom · No Marks':'Practice · No currency rewards';}
 
   if (me?.spectating && !state.players.some(p => p.id === spectateTarget && p.health > 0 && !p.spectating))
     switchSpectator(1);
@@ -1792,11 +1796,15 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   };
 
 
+const deployment=new DeploymentUI({build:__BUILD_ID__,onStart:()=>{paused=true;keys.clear();queuedActions.clear();input.fire=input.aim=false;},onReady:build=>{
+ if(build){const url=new URL(location.href);url.searchParams.set('build',build);url.searchParams.set('refresh',Date.now());location.replace(url.href);}else if(screen==='menu')renderMenu();else if(screen==='game')pauseMenu();
+}});
 // Each deployment emits its build identifier next to index.html.
 const updates = new UpdateWatcher({
   build: __BUILD_ID__,
   isInMatch: () => screen === "game" || state?.phase === "playing",
   fetchVersion: async () => {
+    if(deployment.active)return null;
     const url = new URL("version.json", location.href);
     url.searchParams.set("t", Date.now());
     const response = await fetch(url, { cache: "no-store" });

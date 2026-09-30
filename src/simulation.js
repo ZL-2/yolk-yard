@@ -72,11 +72,11 @@ export class Simulation {
     if (this.events.length > 120) this.events.shift();
     return e;
   }
-  addPlayer(id, profile, bot = false) {
+  addPlayer(id, profile, bot = false, spectator = false) {
     if (this.players.has(id)) return this.players.get(id);
-    if (this.players.size >= (this.maxPlayers || 8)) return null;
+    if (spectator ? [...this.players.values()].filter(p=>p.lateSpectator).length>=8 : [...this.players.values()].filter(p=>!p.lateSpectator).length >= (this.maxPlayers || 8)) return null;
     const count = [0, 0];
-    for (const p of this.players.values()) count[p.team]++;
+    for (const p of this.players.values()) if(!p.lateSpectator&&p.team>=0)count[p.team]++;
     const p = {
       id,
       ...safeProfile(profile),
@@ -121,6 +121,7 @@ export class Simulation {
     this.players.set(id, p);
     this.spawn(p);
     if (!p.bot) this.waitForEntry(p);
+    if(spectator)Object.assign(p,{friendSpectator:true,lateSpectator:true,contestant:false,spectating:true,health:0,awaitingEntry:false,team:-1});
     this.emit("join", { player: id, name: p.name });
     return p;
   }
@@ -196,7 +197,7 @@ export class Simulation {
     while (
       [...this.players.values()].filter((p) => p.bot).length <
         Math.min(this.options.fill ? (this.options.capacity||8) : this.options.bots,this.botLimit??Infinity) &&
-      this.players.size < (this.maxPlayers || 8)
+      [...this.players.values()].filter(p=>!p.lateSpectator).length < (this.maxPlayers || 8)
     ) {
       const id = "bot-" + i++;
       if (this.players.has(id)) continue;
@@ -239,6 +240,7 @@ export class Simulation {
     this.addBots();
     for (const p of this.players.values()) {
       p.activity=newActivity(this.time);p.afkRemoved=false;
+      if(p.friendSpectator){Object.assign(p,{health:0,spectating:true,lateSpectator:true,awaitingEntry:false});continue;}
       p.eggs = 0;
       p.kills = 0;
       p.deaths = 0;
@@ -264,6 +266,7 @@ export class Simulation {
   }
   playerAction(id, action) {
     const p = this.players.get(id);
+    if(p?.friendSpectator)return;
     if (!p || p.bot || this.phase !== "playing" ||
         this.time < (p.nextPlayerAction || 0)) return;
     if(/^team-entry-[01]$/.test(action)) {
@@ -818,9 +821,10 @@ export class Simulation {
   admitPlayer(id,profile,admission=null) {
     if(this.players.has(id))return this.players.get(id);
     if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;
+    if(admission?.spectator){const p=this.addPlayer(id,profile,false,true);if(p)Object.assign(p,{watchId:admission.watchId,partyId:admission.partyId,memberId:admission.memberId});return p;}
     for(const p of this.players.values())if(p.bot&&nameKey(p.name)===nameKey(profile.name))p.name=this.uniqueBotName(p.name+' Bot');
     const capacity=this.options.capacity||8;
-    if(this.players.size>=capacity){const bot=[...this.players.values()].find(p=>p.bot);if(!bot)return null;this.players.delete(bot.id);this.inputs.delete(bot.id);}
+    if([...this.players.values()].filter(p=>!p.lateSpectator).length>=capacity){const bot=[...this.players.values()].find(p=>p.bot);if(!bot)return null;this.players.delete(bot.id);this.inputs.delete(bot.id);}
     const p=this.addPlayer(id,profile);if(p)this.assignTeam(p,admission);return p;
   }
   leavePlayer(id) { this.removePlayer(id); if(this.phase==='playing')this.addBots(); }
@@ -851,6 +855,7 @@ export class Simulation {
   }
   snapshot() {
     const keys = [
+      'friendSpectator','lateSpectator','watchId',
       'crouching','lowCrouch','sliding','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','downed','lifeState','downedAt','revivedAt','downCount','reviving','reviverId','reviveProgress','revives','connected','teamSlot',
       "afkRemaining", "afkRemoved", "lastDamage", "assists", "quickstep", "focus",
       "id", "joinedOrder", "vx", "vz", "place",

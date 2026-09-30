@@ -1,6 +1,6 @@
 # Ravelfront workload admission and simulation optimization
 
-Quality Update 98 / version 3.4.5 / gameplay protocol 27. Server simulation stays authoritative. No hosting, disk, identity, or payment configuration changes are required.
+Quality Update 98 baseline, extended by version 3.5.0 / gameplay protocol 28. Public simulation stays authoritative. Custom matches run on their private player host and use the relay only for connections and messages. No hosting, disk, identity, or payment configuration changes are required. See [private customs and updates](private-customs-and-updates.md).
 
 ## Admission policy
 
@@ -8,7 +8,7 @@ Quality Update 98 / version 3.4.5 / gameplay protocol 27. Server simulation stay
 * Weighted estimates: arena = 30 + 8 × humans + 11 × bots; Royale = 52 + 9 × humans + 7 × bots. Spectators reserve 4 units each. These are conservative local workload estimates, not certified hardware capacity or actual CPU readings.
 * Reserve peak playing cost during lobby/warmup; results reserve 40% with a minimum 22-unit floor. Recheck before starts, rematches, mode changes and new arrivals. Existing contestants are never kicked or removed to make room.
 * Sample actual process CPU and cgroup throttle deltas each second. Three seconds above 85% of the available core allocation or 20% throttled periods pauses additional workload. Five seconds of recovery reopens admission. Reservations in existing rooms can complete when their work is already included in the room budget; uncreated rooms still recheck current pressure.
-* Public matchmaking prefers a compatible populated room. If a new public room cannot fit its normal fill, lower its initial server-owned bot limit, preserve human seats and retain enough opponents for the team format. Show an explicit bot-fill notice. Custom requests get an immediate capacity explanation instead of a 20-second initialization timeout.
+* Public matchmaking prefers a compatible populated room, including a pending launch. FFA and Team Scramble cannot open another public arena while an existing compatible arena has a real human seat available. Bots and spectators do not fill those seats. If a party cannot fit the remaining seats, ask it to wait. If a new public room cannot fit its normal bot fill, lower its initial server-owned bot limit, preserve human seats and retain enough opponents for the team format. Private host customs reserve no server simulation budget.
 * Party reservations are atomic and account for the whole party, including late spectator parties. Claims do not double-count members. Cancellation, expiry and an empty room release reserved capacity. Spectators cannot masquerade as bot replacements.
 * RAVEL_CPU_BUDGET_MS can explicitly lower or tune the budget, capped at 90% of detected allocation. It is not needed for the existing service. Further hosting capacity increases still require measured validation.
 

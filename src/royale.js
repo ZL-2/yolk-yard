@@ -30,13 +30,13 @@ export class RoyaleSimulation extends Simulation {
   super({...options,mode:'royale'});this.map={...ROYALE_MAP,boxes:(ROYALE_MAP.authored||ROYALE_MAP.boxes).map(b=>({...b}))};resetBuilding(this);this.nav=navigation(ROYALE_MAP);this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.maxPlayers=this.options.capacity;
   this.loot=[];this.chests=[];this.pads=[];this.lootId=0;this.lootVersion=0;this.startedAt=0;this.elapsed=0;this.alive=0;this.placements=[];this.supplyAt=135;this.queueEnds=0;this.stage=RP.WAITING;this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
  }
- addPlayer(id,profile,bot=false){
+ addPlayer(id,profile,bot=false,forceSpectator=false){
   if(this.players.has(id))return this.players.get(id);
-  const spectator=!acceptsContestants(this.stage),capacity=this.options.capacity;
+  const spectator=forceSpectator||!acceptsContestants(this.stage),capacity=this.options.capacity;
   if(!bot&&!spectator&&[...this.players.values()].filter(p=>!p.bot&&p.contestant).length>=Math.min(capacity,MAX_HUMANS))return null;
   if(spectator? [...this.players.values()].filter(p=>p.lateSpectator).length>=MAX_SPECTATORS : [...this.players.values()].filter(p=>p.contestant).length>=capacity)return null;
   this.maxPlayers=capacity+MAX_SPECTATORS;
-  const p=super.addPlayer(id,profile,bot);if(!p)return null;
+  const p=super.addPlayer(id,profile,bot,spectator);if(!p)return null;p.friendSpectator=forceSpectator;
   p.materials={wood:0,brick:0,metal:0};p.slot=0;p.inventory=inventory();p.ammo=Array(6).fill(0);p.reserve=Array(6).fill(0);p.accuracyState=Array.from({length:6},()=>({}));
   p.bank={light:0,medium:0,shells:0,heavy:0,rockets:0};p.shield=0;p.stamina=100;p.flight=spectator?'out':'ground';p.use=null;p.place=0;p.eliminated=false;p.spectating=spectator;p.lateSpectator=spectator;p.contestant=!spectator;p.awaitingEntry=false;p.health=spectator?0:100;
   if(!spectator&&this.map.id===SPAWN_ISLAND.id)this.spawnWarmup(p);
@@ -49,8 +49,8 @@ export class RoyaleSimulation extends Simulation {
   if(!isTeamRoyale(this.options)||!p.contestant){p.team=-1;return;}
   p.teamFill??=this.options.teamFill;p.duoFill=p.teamFill;
   const others=[...this.players.values()].filter(o=>o!==p&&o.contestant&&o.team>=0),mates=t=>others.filter(o=>o.team===t),size=this.options.teamSize;
-  // Reserve the entire premade before admitting Fill players. Bots only join
-  // bot teams; match-level population fill never inserts bots into human squads.
+  // Human Fill has first priority during warmup. Missing teammate slots receive
+  // existing bots when the departure roster is committed.
   const reserved=t=>{const groups=new Map();for(const o of mates(t))groups.set(o.partyId||o.id,Math.max(groups.get(o.partyId||o.id)||0,o.partySize||1));return [...groups.values()].reduce((a,b)=>a+b,0);};
   let partner=p.partyId&&others.find(o=>o.partyId===p.partyId&&!o.bot&&mates(o.team).length<size);
   if(!partner&&(p.bot||p.teamFill))partner=others.find(o=>o.bot===p.bot&&(p.bot||o.teamFill)&&mates(o.team).every(m=>m.bot===p.bot&&(p.bot||m.teamFill))&&reserved(o.team)+(p.partySize||1)<=size);
@@ -81,6 +81,29 @@ export class RoyaleSimulation extends Simulation {
   let count=[...this.players.values()].filter(p=>p.bot).length,index=0;
   while(count<target){const id='bot-'+index++;if(this.players.has(id))continue;const p=this.addPlayer(id,{name:this.uniqueBotName(['Relay','Sunny','Scout','Drift','Sable'][count%5]),...randomAppearance(this.random)},true);if(!p)break;count++;}
  }
+ fillBotTeammates(){
+  if(!isTeamRoyale(this.options))return;
+  const humans=[...this.players.values()].filter(p=>!p.bot&&p.contestant),groups=new Map();
+  for(const p of humans){if(!groups.has(p.team))groups.set(p.team,[]);groups.get(p.team).push(p);}
+  let bots=[...this.players.values()].filter(p=>p.bot&&p.contestant);
+  const needed=[...groups.values()].reduce((n,team)=>n+(team.every(p=>p.teamFill!==false)?this.options.teamSize-team.length:0),0);
+  if(!needed)return;
+  while(bots.length<needed&&bots.length<(this.botLimit??Infinity)&&humans.length+bots.length<this.options.capacity){
+   const p=this.addPlayer('bot-teammate-'+this.joinOrder++,{name:this.uniqueBotName('Vanguard'),...randomAppearance(this.random)},true);if(!p)break;bots.push(p);
+  }
+  for(const team of Object.values(this.matchTeams||{}))team.members=team.members.filter(id=>!this.players.get(id)?.bot);
+  for(const p of bots){p.team=-1;delete p.teamSlot;}
+  for(const [team,members]of groups){
+   if(!members.every(p=>p.teamFill!==false))continue;
+   const used=new Set(members.map(p=>p.teamSlot));
+   for(let count=members.length;count<this.options.teamSize&&bots.length;count++){
+    const p=bots.shift(),slot=Array.from({length:this.options.teamSize},(_,i)=>i).find(i=>!used.has(i));used.add(slot);
+    Object.assign(p,{team,teamSlot:slot,teamFill:true,duoFill:true});this.matchTeams[team].members.push(p.id);
+   }
+  }
+  for(const p of bots)this.assignTeam(p);
+  for(const [id,team]of Object.entries(this.matchTeams))if(!team.members.length)delete this.matchTeams[id];
+ }
  setProfile(id,profile){
   return super.setProfile(id,profile);
  }
@@ -96,7 +119,7 @@ export class RoyaleSimulation extends Simulation {
   const humans=[...this.players.values()];
   this.stage=RP.WAITING;
   const humanSeats=Math.min(this.options.capacity,MAX_HUMANS);
-  humans.forEach((p,index)=>Object.assign(p,{contestant:index<humanSeats,lateSpectator:index>=humanSeats,spectating:index>=humanSeats,team:-1}));
+  let seated=0;for(const p of humans){const contestant=!p.friendSpectator&&seated++<humanSeats;Object.assign(p,{contestant,lateSpectator:!contestant,spectating:!contestant,team:-1});}
   this.matchTeams={};for(const p of humans)this.assignTeam(p);
   this.startReason=null;this.maxPlayers=this.options.capacity+MAX_SPECTATORS;this.addBots();
   this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.round++;this.phase='playing';this.stage=RP.ISLAND;this.queueEnds=this.time+(this.options.session==='offline'?OFFLINE_WARMUP_SECONDS:WARMUP_SECONDS);this.startedAt=0;this.elapsed=0;this.winner='';this.winnerId=null;this.winnerTeam=-1;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.chests=[];this.lootId=0;this.lootVersion++;this.pads=[];this.alive=0;this.remaining=0;
@@ -124,7 +147,7 @@ export class RoyaleSimulation extends Simulation {
   // Commit only complete invited groups. An invitation arriving at the cutoff
   // never sends one party member into combat and the other into spectating.
   for(const p of this.players.values())if(p.contestant&&p.partyId&&p.partySize>1&&[...this.players.values()].filter(o=>!o.bot&&o.connected!==false&&o.partyId===p.partyId).length<p.partySize)Object.assign(p,{contestant:false,spectating:true,lateSpectator:true,health:0,flight:'out'});
-  this.addBots();
+  this.addBots();this.fillBotTeammates();
   const seats=[...this.players.values()].filter(p=>p.contestant);
   if(seats.length<2||isTeamRoyale(this.options)&&livingTeams(this.options,seats).size<2){this.queueEnds=this.time+10;this.stage=RP.ISLAND;return false;}
   this.stage=RP.BUS;
@@ -280,6 +303,7 @@ export class RoyaleSimulation extends Simulation {
  eliminationCredit(victim,attacker){return victim.downed&&this.players.get(victim.knockedBy)||attacker;}
  admitPlayer(id,profile,admission=null){
   if(this.players.has(id))return this.players.get(id);
+  if(admission?.spectator){const p=this.addPlayer(id,profile,false,true);if(p)Object.assign(p,{watchId:admission.watchId,partyId:admission.partyId,memberId:admission.memberId});return p;}
   if(admission&&(admission.teamSize!==this.options.teamSize||this.options.teamSize<(admission.partySize||1)))return null;
   if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;
   if(acceptsContestants(this.stage)){
@@ -311,6 +335,7 @@ export class RoyaleSimulation extends Simulation {
  removePlayer(id){const p=this.players.get(id);if(p&&this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant&&p.health>0){p.connected=false;this.damage(p,null,p.health+p.shield+1,'Disconnected');}super.removePlayer(id);if(this.matchTeams?.[p?.team]){const team=this.matchTeams[p.team];team.members=team.members.filter(member=>member!==id);if(!team.members.length)delete this.matchTeams[p.team];}if(!isWarmup(this.stage))resolveDownedTeams(this);}
  playerAction(id,action){
   const p=this.players.get(id);if(!p||this.phase!=='playing')return;
+  if(p.friendSpectator)return;
   if(markerAction(this,p,action))return;
   if((p.downed||p.reviving)&&action!=='spectate'&&!action.startsWith('ping-'))return;
   if(p.health>0&&!p.spectating&&p.flight==='ground'&&action.startsWith('build-')){editBuilding(this,p,action);return;}

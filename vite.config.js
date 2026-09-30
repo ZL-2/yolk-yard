@@ -1,3 +1,5 @@
+import {readFileSync} from "node:fs";
+import {VERSION} from "./src/data.js";
 import { defineConfig } from "vite";
 import { RELEASE_NOTES } from "./src/releases.js";
 import { nextReleaseHistory, migrateReleaseBranding } from "./src/release-history.js";
@@ -11,7 +13,7 @@ export default defineConfig(async ({ command }) => {
     else if (response.status !== 404) throw new Error(`Cannot read published release history: ${response.status}`);
   }
   const history = migrateReleaseBranding(nextReleaseHistory(build, RELEASE_NOTES, previous));
-  const version = JSON.stringify({ build, release: history.releases[0].number });
+  const version = JSON.stringify({ build, protocol:VERSION, appVersion:JSON.parse(readFileSync(new URL("./package.json",import.meta.url),"utf8")).version, release: history.releases[0].number });
   return {
     base: "./",
     define: { __BUILD_ID__: JSON.stringify(build), __RELEASE_HISTORY__: JSON.stringify(history.releases) },

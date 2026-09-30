@@ -79,6 +79,7 @@ export class RelayPeer extends Events {
  acknowledge(){if(!this.ackTimer)this.ackTimer=setTimeout(()=>{this.ackTimer=null;this.control({type:'ack',seq:this.cursor});},16);}
  message(m){
   if(!m||typeof m!=='object')return;
+  if(m.type==='deployment'){this.emit('deployment',m.deployment);return;}
   if(m.type==='authority-frame'){this.authorityDecoder??=new SnapshotDecoder();const message=this.authorityDecoder.decode(m.frame);if(message)this.emit('authority-state',message.state);return;}
   if(['authority-ready','authority-owner','authority-notice','authority-error'].includes(m.type)){this.emit(m.type,m);return;}
   if(['reward','afk','afk-enforce'].includes(m.type)){this.emit(m.type,m);return;}

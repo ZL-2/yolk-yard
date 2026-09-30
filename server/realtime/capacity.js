@@ -46,10 +46,16 @@ export class MatchCapacity {
   }
   return {ok:false,reason:busyMessage};
  }
- reserve(partyId,key,options,humans,botLimit,spectator=false){this.reservations.set(partyId,{partyId,key,options,humans,botLimit,spectator,expires:Date.now()+90000});}
+ reserve(partyId,key,options,humans,botLimit,spectator=false,friendSpectator=false){this.reservations.set(partyId,{partyId,key,options,humans,botLimit,spectator,friendSpectator,expires:Date.now()+90000});}
  release(partyId){this.reservations.delete(partyId);}
  releaseRoom(key){for(const [id,r]of this.reservations)if(r.key===key)this.reservations.delete(id);}
- rematch(key){for(const r of this.reservations.values())if(r.key===key)r.spectator=false;}
+ roundPlan(room,options=room.sim.options){
+  let spectators=[...room.sim.players.values()].filter(p=>!p.bot&&p.friendSpectator).length;
+  for(const r of this.reservations.values())if(r.key===room.key&&r.friendSpectator){const joined=[...room.sim.players.values()].filter(p=>!p.bot&&p.partyId===r.partyId).length;spectators+=Math.max(0,r.humans-joined);}
+  const humans=this.humans(room)+this.spectators(room)+this.pending(room.key)+this.pending(room.key,true)-spectators;
+  return this.plan(options,{key:room.key,humans,spectators,botLimit:options===room.sim.options?room.sim.botLimit:Infinity});
+ }
+ rematch(key){for(const r of this.reservations.values())if(r.key===key&&!r.friendSpectator)r.spectator=false;}
  sample(now=performance.now()){
   const elapsed=now-this.sampleAt;if(elapsed<1000)return;
   const cpu=process.cpuUsage(this.cpuAt);this.cpuAt=process.cpuUsage();this.sampleAt=now;
