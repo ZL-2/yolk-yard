@@ -6,6 +6,8 @@ export const RADIUS = 0.32,
   HEIGHT = 1.85,
   EYE = 1.70;
 export const ROYALE_MOVEMENT = Object.freeze({walk:5, sprint:7.4});
+// Arena bots deliberately use a calmer pace; Royale and human movement stay unchanged.
+export const ARENA_BOT_MOVEMENT = Object.freeze({speedScale:.80});
 export const dist = (a, b) =>
   Math.hypot(a.x - b.x, (a.y || 0) - (b.y || 0), a.z - b.z);
 export function direction(yaw, pitch = 0) {
@@ -201,6 +203,7 @@ function movePlayerStep(p, input, map, dt) {
   if(p.reviving){f=0;s=0;}
   const speed =
     (p.inventory ? ROYALE_MOVEMENT[p.sprinting ? 'sprint' : 'walk'] : weapon(p.weapon).speed) *
+    (p.bot && !p.inventory ? ARENA_BOT_MOVEMENT.speedScale : 1) *
     (input.aim ? gun(p).adsMove : 1) *
     (p.crown != null ? 0.88 : 1)*(p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
   let mx=(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)*speed,mz=(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)*speed;

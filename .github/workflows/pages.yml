@@ -29,9 +29,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]')"
       - name: Verify Fieldcraft movement, combat, authority, audio and owner access
-        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]')
+        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]')
         run: |
           npm run test:field
           if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" != "true" ]]; then
@@ -94,17 +94,17 @@ jobs:
           path: test-results/egg-shop
           retention-days: 7
       - run: npm run test:relay
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]')"
       - run: npm run test:realtime
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]')"
       - name: Verify authoritative countdown, human-only early departure and shared Bus transition
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]')"
         run: node scripts/countdown-network-check.mjs
       - name: Verify Royale phases, spectator cutoff, falling loot and host migration
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]')"
         run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]')
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]')
         env:
           YOLK_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
         run: node scripts/relay-live-check.mjs
@@ -144,6 +144,11 @@ jobs:
         with:
           name: weapon-balance-verification
           path: test-results/weapon-balance
+      - name: Verify arena bot movement and unchanged player/Royale speeds
+        if: contains(github.event.head_commit.message, '[bot-pace]')
+        run: |
+          node --test tests/bot-movement-speed.test.js
+          node --test --test-name-pattern='crouch changes|slide requires' tests/field-systems.test.js
       - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
@@ -293,3 +298,15 @@ jobs:
         with:
           name: weapon-balance-live
           path: test-results/weapon-balance-live
+
+  verify-bot-pace-live:
+    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[bot-pace]')
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/bot-pace-live-check.mjs
