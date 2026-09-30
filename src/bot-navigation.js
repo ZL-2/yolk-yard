@@ -28,6 +28,8 @@ export function navigate(sim,p,brain,goal,skill){
  if(!goal)return {mx:0,mz:0,jump:false};
  const now=sim.time,arrived=dist(p,goal)<1.3;
  if(arrived){if(brain.task?.id)brain.visited[brain.task.id]=now;if(p.inventory||brain.task?.kind!=='fight')brain.decision=Math.min(brain.decision,now+.2);}
+ // Brake before the exact peek point so smoothed combat movement cannot overshoot and oscillate.
+ if(arrived&&!p.inventory&&brain.task?.kind==='fight')return {mx:0,mz:0,jump:false,interact:false};
  const revision=sim.navigationRevision||0,movedGoal=!brain.pathGoal||dist(goal,brain.pathGoal)>4;
  if((movedGoal||now>(brain.pathAt||0)||revision!==brain.navRevision)&&!arrived){
   if(pathBudget(sim)){brain.navRevision=revision;brain.pathGoal={...goal};brain.pathAt=now+1.8+sim.random()*.7;p.botPath=clear(sim,p,goal)?[]:sim.nav.path(p,goal);}
