@@ -42,8 +42,8 @@ export function botInput(sim,p){
  const visible=!!target?.visible&&now-target.seenAt<skill.perception+.08&&seesPoint(sim,p,target);
  let slot=selectWeapon(p,target),w=gun({...p,slot});
  if(p.use){brain.utility=null;if(visible||now-(brain.attackedAt??-100)<.6)sim.cancelUse?.(p);else return {yaw:p.yaw,pitch:p.pitch,slot:p.use.slot,forward:0,strafe:0,swapSlot:-1};}
- if(now>=brain.decision||!brain.task){
-  brain.decision=now+skill.decision*(.85+r()*.3);brain.task=chooseObjective(sim,p,brain,skill,target);brain.objective=brain.task.kind;
+ if(now>=brain.decision||!brain.task||brain.weapon!==w.id){
+  brain.weapon=w.id;brain.decision=now+skill.decision*(.85+r()*.3);brain.task=chooseObjective(sim,p,brain,skill,target);brain.objective=brain.task.kind;
   if(brain.task.kind==='fight'&&target){brain.side=r()<.5?-1:1;brain.task.goal=combatGoal(sim,p,brain,target,w,skill);}
  }
  if(visible){if(now-(brain.lastVisibleAt??-100)>skill.perception*2)brain.aimAt=Math.max(brain.aimAt,now+skill.reaction*.6);brain.lastVisibleAt=now;}
@@ -89,6 +89,6 @@ export function botInput(sim,p){
  const desiredYaw=yaw;yaw=p.yaw+clamp(wrapAngle(yaw-p.yaw),-skill.turn*turnDt,skill.turn*turnDt);
  if(visible&&Math.abs(wrapAngle(desiredYaw-yaw))>.2)fire=false;
  const moving=Math.hypot(move.mx,move.mz)>.1;
- return {yaw,pitch,forward:-Math.sin(yaw)*move.mx-Math.cos(yaw)*move.mz,strafe:Math.cos(yaw)*move.mx-Math.sin(yaw)*move.mz,fire,aim:visible&&!popper&&sim.options.difficulty>=2,reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room'].includes(task.kind)};
+ return {yaw,pitch,forward:-Math.sin(yaw)*move.mx-Math.cos(yaw)*move.mz,strafe:Math.cos(yaw)*move.mx-Math.sin(yaw)*move.mz,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room'].includes(task.kind)};
 }
 import {teammates} from './teams.js';

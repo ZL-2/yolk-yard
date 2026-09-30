@@ -1,8 +1,9 @@
+import {COMBAT_LIMITS,UTILITY_WEAPONS} from './weapon-balance.js';
 import {arenaSpawnPoints} from './arena-spawns.js';
 import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
 import {RemoteInputBuffer} from './remote-input.js';
-import {resetStance,eyeHeight} from './stance.js';
-import {updateCombatAccuracy,firedAccuracy,pelletOffsets,criticalHit,falloffAt} from './combat.js';
+import {resetStance,eyeHeight,canFight} from './stance.js';
+import {updateCombatAccuracy,firedAccuracy,pelletOffsets,falloffAt,structureDamage,weaponReadyAt,rememberShot,triggerRequested} from './combat.js';
 import {arenaBonuses,resetBonuses,updateBonuses,awardBonus} from './streaks.js';
 import {botInput as tacticalBotInput} from './bots.js';
 import {beginEquip} from './equip.js';
@@ -90,7 +91,7 @@ export class Simulation {
       pitch: 0,
       grounded: true,
       jumpLatch: false,
-      health: 100,
+      health: COMBAT_LIMITS.arenaHealth,
       kills: 0,
       deaths: 0,
       assists: 0,
@@ -150,6 +151,7 @@ export class Simulation {
     // Track the raw edge before coalescing. A release followed by another tap
     // can share one host tick; OR-ing the buttons alone would erase that edge.
     if(p.activity&&!p.afkRemoved)observeInput(p.activity,safe,this.time);
+    safe.fireHeld=safe.fire;safe.firePress=safe.fire&&!previous?.fireHeld?safe.seq:previous?.firePress||0;
     safe.jumpHeld = safe.jump;
     safe.jumpPress = safe.jump && !previous?.jumpHeld ? safe.seq : previous?.jumpPress || 0;
     if(remote) {
@@ -171,6 +173,7 @@ export class Simulation {
     if(!buffer)return null;
     const steps=buffer.take(dt,!!this.recoveringTick);
     let input={...(steps.at(-1)||buffer.last||{yaw:p.yaw,pitch:p.pitch,slot:p.slot})};
+    input.firePress=Math.max(input.firePress||0,...steps.map(step=>step.firePress||0));
     for(const key of ['fire','reload','popper','interact','drop'])
       if(steps.some(step=>step[key]))input[key]=true;
     if(this.time-p.lastInput>.4)input={yaw:p.yaw,pitch:p.pitch,slot:p.slot};
@@ -308,14 +311,14 @@ export class Simulation {
       pitch: 0,
       grounded: true,
       jumpLatch: false,
-      health: 100,
+      health: COMBAT_LIMITS.arenaHealth,
       awaitingEntry: false,
       spawnRequested: false,
       slot: 0,
       ammo: [weapon(p.weapon).magazine, weapon("pip").magazine],
       reserve: [weapon(p.weapon).reserve, weapon("pip").reserve],
       reloadEnd: 0,
-      nextShot: this.time + 0.3,
+      nextShot: 0,weaponCooldowns:{},shotgunReadyAt:0,pendingFireUntil:0,lastFirePress:0,burstWeapon:null,
       burstLeft: 0,
       fireLatch: false,
       accuracyState: [{}, {}],
@@ -390,28 +393,7 @@ export class Simulation {
         p.reserve[p.slot] -= add;
         p.reloadEnd = 0;
       }
-      if (this.time >= (p.equipUntil || 0) && (input.reload || (input.fire && p.ammo[p.slot] === 0))) this.reload(p);
-      if (p.burstLeft && this.time >= p.burstTime) {
-        this.fire(p, true);
-        p.burstLeft--;
-        p.burstTime += gun(p).burstInterval;
-      }
-      if (
-        input.fire &&
-        this.time + 1e-9 >= p.nextShot &&
-        (gun(p).automatic || !p.fireLatch || p.bot) &&
-        !p.burstLeft &&
-        !p.reloadEnd &&
-        p.ammo[p.slot] > 0
-      ) {
-        this.fire(p);
-        const w = gun(p);
-        p.nextShot = this.time + w.interval;
-        if (w.burst) {
-          p.burstLeft = w.burst - 1;
-          p.burstTime = this.time + w.burstInterval;
-        }
-      }
+      this.combatInput(p,input);
       p.fireLatch = !!input.fire && this.time >= (p.equipUntil || 0);
       if (
         input.popper &&
@@ -420,7 +402,7 @@ export class Simulation {
         this.time >= p.nextPopper
       ) {
         p.poppers--;
-        p.nextPopper = this.time + 1;
+        p.nextPopper = this.time + UTILITY_WEAPONS.popper.interval;
         this.launch(p, true);
         p.shieldUntil = 0;
       }
@@ -437,16 +419,21 @@ export class Simulation {
     )
       this.finish();
   }
-  reload(p) {
-    if (
-      p.reloadEnd ||
-      p.reserve[p.slot] <= 0 ||
-      p.ammo[p.slot] >= gun(p).magazine
-    )
-      return;
-    p.reloadEnd = this.time + (p.ammo[p.slot] === 0 ? gun(p).reloadEmpty : gun(p).reload);
-    p.burstLeft = 0;
-    this.emit("reload", { player: p.id, weapon:gun(p).id });
+  combatInput(p,input){
+    const w=gun(p),requested=triggerRequested(p,w,input,this.time);
+    if(input.reload||input.fire&&p.ammo[p.slot]===0)this.reload(p);
+    if(p.burstLeft&&this.time+1e-9>=p.burstTime){
+      if(this.fire(p,true)){p.burstLeft--;p.burstTime=this.time+w.burstInterval;}
+      else if(p.reloadEnd||p.ammo[p.slot]<=0)p.burstLeft=0;
+    }
+    if(requested&&!p.burstLeft)this.fire(p);
+  }
+  reload(p){
+    const w=gun(p);
+    if(!canFight(p)||this.time<(p.equipUntil||0)||p.reloadEnd||p.reserve[p.slot]<=0||p.ammo[p.slot]>=w.magazine)return false;
+    p.reloadStarted=this.time;p.reloadDuration=p.ammo[p.slot]===0?w.reloadEmpty:w.reload;
+    p.reloadEnd=this.time+p.reloadDuration;p.burstLeft=0;p.burstWeapon=null;
+    this.emit('reload',{player:p.id,weapon:w.id,duration:p.reloadDuration});return true;
   }
   recordPoses(){
     this.poseHistory??=new Map();
@@ -456,7 +443,7 @@ export class Simulation {
   shotPose(target,shooter,w){
     const requested=shooter.executedShotTime??this.inputs.get(shooter.id)?.shotTime;
     if(!w.hitscan||shooter.bot||!this.remoteInputs.has(shooter.id)||!Number.isFinite(requested))return target;
-    const time=clamp(requested,this.time-.18,this.time),history=this.poseHistory?.get(target.id);
+    const time=clamp(requested,this.time-COMBAT_LIMITS.lagCompensation,this.time),history=this.poseHistory?.get(target.id);
     if(!history?.length)return target;
     const after=history.find(v=>v.time>=time)||history.at(-1),before=history.findLast(v=>v.time<=time)||history[0],f=clamp((time-before.time)/(after.time-before.time||1),0,1);
     if(Math.hypot(target.x-before.x,target.y-before.y,target.z-before.z)>5)return target;
@@ -464,7 +451,7 @@ export class Simulation {
   }
   updateAccuracy(p, previous, dt) {
     const w=gun(p),a=p.accuracyState[p.slot]??={};
-    updateCombatAccuracy(p,w,a,dt,this.time,Math.hypot(p.x-previous.x,p.z-previous.z)/Math.max(dt,1e-9));
+    updateCombatAccuracy(p,w,a,dt,this.time,p.motionFresh?Math.hypot(p.motionVX||0,p.motionVZ||0):Math.hypot(p.x-previous.x,p.z-previous.z)/Math.max(dt,1e-9));
     p.recoilPitch=a.recoilPitch;p.recoilYaw=a.recoilYaw;
   }
   shotPath(p, w, directionOverride = null) {
@@ -512,18 +499,23 @@ export class Simulation {
     };
   }
   fire(p, burst = false) {
-    const w=gun(p);if(p.ammo[p.slot]<=0||p.reloadEnd)return;
-    if(!burst)p.shotGroup=++this.shotId;p.ammo[p.slot]--;p.shieldUntil=0;
+    const w=gun(p);
+    if(!canFight(p)||p.ammo[p.slot]<=0||p.reloadEnd||this.time+1e-9<(p.equipUntil||0))return false;
+    if(burst){if(!w.burst||p.burstWeapon!==w.id||!p.burstLeft||this.time+1e-9<p.burstTime||this.time-(p.lastBurstShotAt??-100)+1e-9<w.burstInterval)return false;}
+    else {if(p.burstLeft||this.time+1e-9<Math.max(p.nextShot||0,weaponReadyAt(p,w)))return false;
+      p.shotGroup=++this.shotId;rememberShot(p,w,this.time);p.pendingFireUntil=0;
+      if(w.burst){p.burstWeapon=w.id;p.burstLeft=w.burst-1;p.burstTime=this.time+w.burstInterval;}}
+    p.lastBurstShotAt=this.time;p.ammo[p.slot]--;p.shieldUntil=0;
     const accuracy=p.accuracyState[p.slot]??={},spread=accuracy.spread??(p.aim?w.adsSpread:w.spread);
     const pitch=accuracy.recoilPitch||0,yaw=accuracy.recoilYaw||0,serial=firedAccuracy(p,w,accuracy,this.time);
     p.recoilPitch=accuracy.recoilPitch;p.recoilYaw=accuracy.recoilYaw;
-    if(w.projectile){this.launch(p,false,spread,{pitch,yaw});return;}
-    const shots=[],offsets=pelletOffsets(w.pellets,spread,serial*7919+(p.joinedOrder||0)*31);
+    if(w.projectile){this.launch(p,false,spread,{pitch,yaw});return true;}
+    const shots=[],offsets=pelletOffsets(w.pellets,spread,serial*7919+(p.joinedOrder||0)*31,w.patternFixed);
     let origin=muzzleOrigin(p,w),blocked=false;
     for(const offset of offsets){
       const aim=direction(p.yaw+yaw+offset.yaw,p.pitch+pitch+offset.pitch),path=this.shotPath(p,w,aim);
       origin=path.origin;
-      if(path.blocked){blocked=true;if(path.blocked.box)this.damageWorld?.(path.blocked.box,w.buildDamage);this.emit('impact',{...path.blocked.point,normal:path.blocked.normal,surface:path.blocked.box?.material||'stone',weapon:w.id});continue;}
+      if(path.blocked){blocked=true;if(path.blocked.box)this.damageWorld?.(path.blocked.box,structureDamage(w,path.blocked.distance||0));this.emit('impact',{...path.blocked.point,normal:path.blocked.normal,surface:path.blocked.box?.material||'stone',weapon:w.id});continue;}
       if(w.hitscan){
         const hit=worldHit(this.map,origin,path.d,w.range);
         let distance=hit?.distance??w.range,victim=null,pose=null,region=null;
@@ -534,15 +526,15 @@ export class Simulation {
         }
         const point={x:origin.x+path.d.x*distance,y:origin.y+path.d.y*distance,z:origin.z+path.d.z*distance};
         if(victim){const critical=w.critical>1&&region==='head';this.damage(victim,p,w.damage*falloffAt(w,distance)*(critical?w.critical:1),w.name,critical,p.shotGroup);}
-        else if(hit?.box)this.damageWorld?.(hit.box,w.buildDamage);
-        shots.push({id:++this.projectileId,vx:path.d.x*180,vy:path.d.y*180,vz:path.d.z*180,end:point});
+        else if(hit?.box)this.damageWorld?.(hit.box,structureDamage(w,distance));
+        shots.push({id:++this.projectileId,vx:path.d.x*w.tracerSpeed,vy:path.d.y*w.tracerSpeed,vz:path.d.z*w.tracerSpeed,end:point});
         if(victim||hit)this.emit('impact',{...point,normal:victim?{x:-path.d.x,y:-path.d.y,z:-path.d.z}:hit.normal,weapon:w.id,surface:hit?.box?.material||'stone',tag:!!victim});
       }else{
-        const b={id:++this.projectileId,owner:p.id,shotId:p.shotGroup,weapon:w.id,kind:'bolt',...origin,vx:path.d.x*w.boltSpeed,vy:path.d.y*w.boltSpeed,vz:path.d.z*w.boltSpeed,gravity:w.gravity,damage:w.damage,critical:w.critical,buildDamage:w.buildDamage,range:w.flightRange,born:this.time,fuse:w.flightRange/w.boltSpeed,travelled:0,popper:false};
+        const b={id:++this.projectileId,owner:p.id,shotId:p.shotGroup,weapon:w.id,kind:'bolt',...origin,vx:path.d.x*w.boltSpeed,vy:path.d.y*w.boltSpeed,vz:path.d.z*w.boltSpeed,gravity:w.gravity,hitRadius:w.hitRadius,buildFalloff:w.buildFalloff,damage:w.damage,critical:w.critical,buildDamage:w.buildDamage,range:w.flightRange,born:this.time,fuse:w.flightRange/w.boltSpeed,travelled:0,popper:false};
         this.projectiles.push(b);shots.push({id:b.id,vx:b.vx,vy:b.vy,vz:b.vz});
       }
     }
-    this.emit('shot',{player:p.id,weapon:w.id,origin,shots,blocked});
+    this.emit('shot',{player:p.id,weapon:w.id,origin,shots,blocked});return true;
   }
   launch(p, popper, spread = 0, recoil = {}) {
     const w = gun(p),
@@ -567,7 +559,7 @@ export class Simulation {
       });
       return;
     }
-    const speed = popper ? 15 : w.boltSpeed;
+    const config=popper?UTILITY_WEAPONS.popper:w,speed=popper?config.speed:w.boltSpeed;
     this.projectiles.push({
       id: ++this.projectileId,
       owner: p.id,
@@ -576,13 +568,13 @@ export class Simulation {
       kind: "shell",
       ...origin,
       vx: d.x * speed,
-      vy: d.y * speed + (popper ? 4 : 0),
+      vy: d.y * speed + (popper ? config.lift : 0),
       vz: d.z * speed,
-      gravity: popper ? 13 : w.gravity,
-      damage: popper ? 150 : w.damage,buildDamage:popper?100:w.buildDamage,
-      range: w.flightRange??w.range,
+      gravity:config.gravity,hitRadius:config.hitRadius,
+      damage:config.damage,buildDamage:config.buildDamage,
+      range: config.flightRange??config.range,
       born: this.time,
-      fuse: popper ? 2.5 : (w.flightRange??w.range) / w.boltSpeed,
+      fuse: popper ? config.fuse : (w.flightRange??w.range) / speed,
       travelled: 0,
       popper,
       bounces: 0,
@@ -620,7 +612,7 @@ export class Simulation {
         b,
         d,
         length,
-        b.kind === "bolt" ? 0 : 0.14,
+        b.hitRadius??(b.popper?UTILITY_WEAPONS.popper.hitRadius:weapon(b.weapon).hitRadius),
       );
       let distance = hit?.distance ?? length,
         victim = null,region=null;
@@ -629,11 +621,11 @@ export class Simulation {
         for (const p of this.players.values()) {
           if (
             p.id === b.owner ||
-            p.health <= 0 ||
+            p.health <= 0 ||p.spectating||p.flight==='transport'||
             teammates(this.options,p,attacker)
           )
             continue;
-          const contact=humanHit(b,d,p),t=contact.distance;
+          const contact=humanHit(b,d,p,b.hitRadius??weapon(b.weapon).hitRadius),t=contact.distance;
           if (Number.isFinite(t) && t <= distance + 1e-9 && t <= length + 1e-9) {
             distance = t;
             victim = p;region=contact.region;
@@ -646,7 +638,7 @@ export class Simulation {
       if (victim || hit) {
         if (b.kind === "bolt") {
           if (victim) {
-            const w=weapon(b.weapon),precision=w.critical>1&&region==='head',hitFactor=falloffAt(w,b.travelled)*(precision?(b.critical??w.critical):1);
+            const w=weapon(b.weapon),precision=(b.critical??w.critical)>1&&region==='head',hitFactor=falloffAt(w,b.travelled)*(precision?(b.critical??w.critical):1);
             this.damage(
               victim,
               attacker,
@@ -655,7 +647,7 @@ export class Simulation {
               precision, b.shotId,
             );
           }
-          if(!victim&&hit?.box)this.damageWorld?.(hit.box,b.buildDamage??weapon(b.weapon).buildDamage);
+          if(!victim&&hit?.box)this.damageWorld?.(hit.box,(b.buildDamage??weapon(b.weapon).buildDamage)*((b.buildFalloff??weapon(b.weapon).buildFalloff)?falloffAt(weapon(b.weapon),b.travelled):1));
           this.emit("impact", {
             x: b.x,
             y: b.y,
@@ -690,12 +682,12 @@ export class Simulation {
   }
   explode(b) {
     const attacker = this.players.get(b.owner),
-      radius = b.popper ? 3 : weapon(b.weapon).splashRadius;
-    if (!b.popper && (b.travelled || 0) < weapon(b.weapon).minRange) return;
+      config=b.popper?UTILITY_WEAPONS.popper:weapon(b.weapon),radius=config.splashRadius;
+    if (!b.popper && (b.travelled || 0) < config.minRange) return;
     this.emit("explosion", { x: b.x, y: b.y, z: b.z, popper: b.popper });
     for (const p of this.players.values()) {
       if (
-        p.health <= 0 ||
+        p.health <= 0 ||p.spectating||p.flight==='transport'||
         teammates(this.options,p,attacker)
       )
         continue;
@@ -711,9 +703,7 @@ export class Simulation {
       this.damage(
         p,
         attacker,
-        (b.popper ? 150 : (b.damage ?? weapon(b.weapon).damage)) *
-          (1 - distance / (radius * 1.2)) *
-          (p === attacker ? 0.55 : 1),
+        (b.damage??config.damage)*Math.max(0,1-distance/(radius*config.splashFalloff))*(p===attacker?config.selfDamage:1),
         b.popper ? "Popper" : "Thumper", false, b.shotId,
       );
     }
@@ -893,7 +883,7 @@ export class Simulation {
       "pitch",
       "grounded",
       "jumpLatch",
-      "lastJumpPress", "nextShot", "fireLatch",
+      "lastJumpPress", "nextShot", "fireLatch", "weaponCooldowns", "shotgunReadyAt", "pendingFireUntil", "lastFirePress", "burstWeapon", "burstLeft", "burstTime",
       "health",
       "kills",
       "deaths",
@@ -902,7 +892,7 @@ export class Simulation {
       "slot",
       "ammo",
       "reserve",
-      "reloadEnd",
+      "reloadEnd", "reloadStarted", "reloadDuration",
       "equipStarted",
       "equipHolster",
       "equipUntil",
@@ -929,7 +919,7 @@ export class Simulation {
       winner: this.winner,
       players: [...this.players.values()].map((p) => {
         const row={inputQueue:this.remoteInputs.get(p.id)?.queue.length||0};
-        for(const key of keys){const value=p[key];row[key]=Array.isArray(value)?value.slice():value;}
+        for(const key of keys){const value=p[key];row[key]=Array.isArray(value)?value.slice():key==='weaponCooldowns'?{...value}:value;}
         return Object.assign(row,{
         shotSpread: p.accuracyState[p.slot]?.spread ?? gun(p).spread * (p.aim ? gun(p).aimSpread : 1),
         recoilPitch:p.recoilPitch||0,recoilYaw:p.recoilYaw||0,firstShot:!!p.accuracyState[p.slot]?.firstShot,shotSerial:p.shotSerial||0,combatState:{...p.accuracyState[p.slot]},
@@ -945,7 +935,7 @@ export class Simulation {
         owner: b.owner,
         vx: b.vx,
         vy: b.vy,
-        vz: b.vz,
+        vz: b.vz,gravity:b.gravity,hitRadius:b.hitRadius,
       })),
       pickups: this.pickups.map((p) => ({ ...p })),
       events: this.events.slice(-60),

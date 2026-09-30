@@ -140,7 +140,7 @@ export function swingPickaxe(sim,p){
  if(!canFight(p))return;
  if(sim.time<(p.nextHarvest||0))return;p.nextHarvest=sim.time+PICKAXE.interval;p.swingAt=sim.time;
  sim.emit('royale-cue',{cue:'pickaxe-swing',player:p.id,x:p.x,y:p.y,z:p.z});
- const hit=aimedObject(sim.map,p,4.5),o={...p,y:p.y+eyeHeight(p)},d=direction(p.yaw,p.pitch);let target=null,range=hit?.distance??4.5;
+ const hit=aimedObject(sim.map,p,PICKAXE.range),o={...p,y:p.y+eyeHeight(p)},d=direction(p.yaw,p.pitch);let target=null,range=hit?.distance??PICKAXE.range;
  for(const other of sim.players.values())if(other!==p&&other.health>0){const t=rayEgg(o,d,other);if(t<range){target=other;range=t;}}
  if(target)sim.damage(target,p,PICKAXE.player,'Pickaxe');else if(hit){const entry=sim.worldDamage[hit.box.objectId],weak=entry?.weakpoint,bonus=weak&&Math.hypot(hit.point.x-weak.x,hit.point.y-weak.y,hit.point.z-weak.z)<.4;damageObject(sim,hit.box,(hit.box.buildId?PICKAXE.structure:PICKAXE.environment)*(bonus?PICKAXE.weakMultiplier:1),p);const object=sim.worldDamage[hit.box.objectId];if(object&&!object.destroyed){const offset=Math.sin(sim.time*7)*.35;object.weakpoint={x:Math.max(hit.box.x-hit.box.w/2+.03,Math.min(hit.box.x+hit.box.w/2-.03,hit.point.x+(Math.abs(d.z)>.7?offset:0))),y:Math.max(hit.box.y+.3,Math.min(hit.box.y+hit.box.h-.2,hit.point.y+.25)),z:Math.max(hit.box.z-hit.box.d/2+.03,Math.min(hit.box.z+hit.box.d/2-.03,hit.point.z+(Math.abs(d.x)>.7?offset:0)))};}sim.emit('royale-cue',{cue:'harvest-hit',player:p.id,x:hit.point.x,y:hit.point.y,z:hit.point.z});}
 }

@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {createServer} from 'vite';
+import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {startRealtimeServer} from '../server/realtime/index.js';
+import {WEAPONS,ROYALE_WEAPONS,weapon} from '../src/data.js';
+const temp=await mkdtemp(tmpdir()+'/ravel-weapon-hud-');process.env.RAVEL_SOCIAL_DATA_PATH=temp+'/social.json';process.env.YOLK_OWNER_DATA_PATH=temp+'/owner.json';
+const origin='http://127.0.0.1:5198',errors=[],results=[];
+const app=await startRealtimeServer({host:'127.0.0.1',port:9002,origins:[origin]}),vite=await createServer({server:{host:'127.0.0.1',port:5198,strictPort:true,watch:null}});await vite.listen();
+const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
+await mkdir('test-results/weapon-balance',{recursive:true});let page;
+try{
+ const context=await browser.newContext({viewport:{width:1280,height:800}});await context.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${app.server.address().port}/game'};`}));
+ page=await context.newPage();page.setDefaultTimeout(45000);page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'BalanceTester'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,fov:85,centerDot:true}));});
+ await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party().ready);
+ if(await page.locator('.welcome-close').isVisible()){await page.locator('.welcome-close').click();if(await page.locator('[data-dismiss="once"]').isVisible())await page.locator('[data-dismiss="once"]').click();}
+ await page.locator('#menu [data-action="play"]').click();await page.locator('[data-experience="solo"]').click();await page.locator('#menu [data-action="play-custom"]').click();
+ for(const [name,value] of [['capacity','4'],['bots','0'],['fill','off'],['visibility','private']])await page.locator(`#setup-${name}`).selectOption(value);
+ await page.locator('[data-action="create-room"]').click();await page.waitForFunction(()=>window.__yolkTest.read().state?.royale?.stage==='spawn-island');
+ const room=[...app.relay.authority.rooms.values()][0],sim=room.sim,p=sim.players.get('host');sim.queueEnds=sim.time+100000;sim.loot=[];sim.chests=[];
+ sim.moveWithCommands=(player,input,dt,commands)=>{player.motionVX=player.motionVZ=0;player.motionFresh=true;player.ack=Math.max(player.ack,...(commands?.steps.map(step=>step.seq)||[input.seq||0]));};
+ if(await page.locator('[data-action="resume"]').isVisible())await page.locator('[data-action="resume"]').click();await page.keyboard.press('Digit1');
+ const read=()=>page.evaluate(()=>{const q=__yolkTest.read(),p=q.state?.players.find(v=>v.id===q.localId);return {gap:parseFloat(document.querySelector('#crosshair').style.getPropertyValue('--crosshair-gap')),ring:parseFloat(document.querySelector('#scope-spread').style.width),ringVisible:!document.querySelector('#scope-spread').hidden,crossVisible:getComputedStyle(document.querySelector('#crosshair')).display!=='none',scopeVisible:getComputedStyle(document.querySelector('#scope')).display!=='none',dotHidden:document.querySelector('#center-dot').hidden,predicted:q.predicted,player:p,scope:q.scope};});
+ async function stance(name){if(name==='crouching'||name==='sliding')await page.keyboard.down('ControlLeft');else await page.keyboard.up('ControlLeft');Object.assign(p,{y:name==='airborne'?8:3.2,grounded:name!=='airborne',crouching:name==='crouching'||name==='sliding',sliding:name==='sliding',slideAge:0,slideVX:name==='sliding'?7.4:0,slideVZ:0,vy:0});app.relay.authority.broadcast(room);await page.waitForTimeout(450);}
+ async function pose(w){await page.mouse.up({button:'left'});await page.mouse.up({button:'right'});Object.assign(p,{x:0,y:3.2,z:0,yaw:0,pitch:0,health:100,shield:100,flight:'ground',slot:1,aim:false,equipUntil:0,nextShot:0,reloadEnd:0,weaponCooldowns:{},shotgunReadyAt:0,pendingFireUntil:0,lastFirePress:0,burstLeft:0,burstWeapon:null,fireLatch:false,use:null,accuracyState:Array.from({length:6},()=>({})),inventory:[{id:'pickaxe',pickaxe:true},{id:w.id,weapon:true,rarity:0,ammo:w.magazine},null,null,null,null],bank:{light:50,medium:50,shells:48,heavy:36,rockets:8}});sim.syncInventory(p);await stance('standing');await page.keyboard.press('Digit1');await page.waitForFunction(id=>__yolkTest.read().state?.players.find(v=>v.id===__yolkTest.read().localId)?.inventory?.[1]?.id===id,w.id);await page.waitForTimeout(600);}
+ for(const w of [...WEAPONS,...ROYALE_WEAPONS]){
+  await pose(w);const idle=await read();assert.ok(idle.crossVisible&&idle.gap>0,w.name+' hip reticle');
+  await stance('crouching');const crouch=await read();assert.ok(crouch.gap<idle.gap,w.name+' crouch accuracy');
+  await stance('sliding');const slide=await read();assert.ok(slide.gap>idle.gap,w.name+' slide accuracy');
+  await stance('airborne');const air=await read();assert.ok(air.gap>idle.gap,w.name+' air accuracy');
+  await stance('standing');await page.mouse.down({button:'right'});await page.waitForFunction(()=>__yolkTest.read().scope?.aimBlend>.995);await page.waitForTimeout(350);const ads=await read();assert.ok(ads.gap<idle.gap&&ads.dotHidden,w.name+' ADS accuracy');
+  if(w.ads){assert.ok(ads.scopeVisible&&ads.scope.fov<55,w.name+' wide zoomed optic');if(w.stableScope)assert.equal(ads.gap,0);await stance('airborne');const scopedAir=await read();assert.ok(scopedAir.ringVisible&&scopedAir.ring>0,w.name+' scope movement ring');await stance('standing');await page.screenshot({path:`test-results/weapon-balance/${w.id}-scope.png`});}
+  const before=p.ammo[1];await page.mouse.down({button:'left'});await page.waitForFunction(()=>{const q=__yolkTest.read(),p=q.predicted||q.state?.players.find(v=>v.id===q.localId);return p?.recoilPitch>0;});await page.mouse.up({button:'left'});await page.mouse.up({button:'right'});assert.ok(p.ammo[1]<before||w.id==='thumper',w.name+' authoritative firing');
+  results.push({weapon:w.name,idle:idle.gap,crouch:crouch.gap,slide:slide.gap,air:air.gap,ads:ads.gap,fov:ads.scope.fov});console.log('PASS HUD',w.name);
+ }
+ await pose(weapon('needle'));await page.mouse.down({button:'right'});await page.waitForFunction(()=>__yolkTest.read().scope?.aimBlend>.995);assert.ok((await read()).scope.fov<30);await page.screenshot({path:'test-results/weapon-balance/desktop-precision-scope.png'});assert.deepEqual(errors,[]);
+ await writeFile('test-results/weapon-balance/browser.json',JSON.stringify({weapons:11,errors,results},null,2));console.log('PASS all 11 crosshairs, crouch/slide/air, ADS, scoped movement rings, preserved wide zoom and immediate recoil');
+}catch(e){if(page){console.log('HUD diagnostic',JSON.stringify(await page.evaluate(()=>window.__yolkTest?.read()).catch(()=>null)));await page.screenshot({path:'test-results/weapon-balance/failure.png'}).catch(()=>{});}throw e;}
+finally{await browser.close();await vite.close();await app.close();await rm(temp,{recursive:true,force:true});}

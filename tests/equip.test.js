@@ -12,7 +12,7 @@ test('every blaster holsters before drawing and settles exactly into its grip',(
   beginEquip(p,10,true);
   assert.equal(equipPose(p,10).visible,false);
   assert.equal(equipPose(p,10.07).visible,false);
-  const mid=equipPose(p,10.14+DRAW_POSES[w.id].duration/2);
+  const mid=equipPose(p,10+p.equipHolster+w.equipTime/2);
   assert.equal(mid.visible,true);assert.equal(mid.active,true);
   assert.ok(mid.position[1]<0);assert.ok(mid.progress>.49&&mid.progress<.51);
   poses.add(JSON.stringify(mid.position));

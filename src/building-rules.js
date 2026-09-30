@@ -1,3 +1,4 @@
+import {UTILITY_WEAPONS} from './weapon-balance.js';
 // Classic Battle Royale reference and original Ravelfront adaptations: docs/BUILDING_REFERENCE.md.
 // Keep balance in this file; geometry and authority never duplicate these numbers.
 export const MATERIALS={
@@ -6,7 +7,7 @@ export const MATERIALS={
  metal:{name:'Metal',health:500,start:110,seconds:25,tick:.5,gain:8,color:0x799ba8,damageColor:0xb4eaff},
 };
 export const GRID=4,COST=10,CAP=999,EDIT_RANGE=8;
-export const PICKAXE={player:20,environment:50,structure:75,weakMultiplier:2,interval:.45};
+export const PICKAXE={...UTILITY_WEAPONS.pickaxe,player:UTILITY_WEAPONS.pickaxe.damage};
 // Original Ravel Coast balancing, NOT claimed to be Fortnite object statistics.
 export const HARVEST_TYPES={
  tree:{material:'wood',health:250,resources:55,volume:3.2},

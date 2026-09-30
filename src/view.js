@@ -711,7 +711,7 @@ export class View {
       if(this.renderScale!==previous)this.resize();
     }
     this.clock += dt;
-    this.recoil = Math.max(0, this.recoil - dt * 7);
+    this.recoil = Math.max(0, this.recoil - dt * (local?gun(local).recoilRecovery:7));
     if(playing)this.loadMap(state?.options.map || "yard");
     if(playing&&state?.royale?.practice)this.prepareBattleMap();
     this.world.visible=playing;
@@ -760,9 +760,9 @@ export class View {
         scoped = w.optic === "scope" || w.optic === "prism";
       const aiming = !!(canFight(local) && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
       if(!Number.isFinite(this.aimBlend))this.aimBlend=0;
-      this.aimBlend += (Number(aiming) - this.aimBlend) * Math.min(1, dt * (w.ads?.transition||14));
+      this.aimBlend += (Number(aiming) - this.aimBlend) * (1-Math.exp(-Math.log(20)*dt/w.adsTime));
       const fov=aiming?adsFov(w,this.settings.fov):this.settings.fov;
-      this.camera.fov+=(fov-this.camera.fov)*Math.min(1,dt*(w.ads?.transition||13));
+      this.camera.fov+=(fov-this.camera.fov)*(1-Math.exp(-Math.log(20)*dt/w.adsTime));
       this.camera.updateProjectionMatrix();
       const bob =
         Math.sin(this.clock * 11) *
@@ -973,7 +973,7 @@ export class View {
         }
         mesh.position.set(
           b.x + b.vx * this.snapshotAge,
-          b.y + b.vy * this.snapshotAge,
+          b.y + b.vy * this.snapshotAge-.5*(b.gravity||0)*this.snapshotAge**2,
           b.z + b.vz * this.snapshotAge,
         );
         if(!b.popper&&b.kind!=='bolt'){
@@ -990,7 +990,7 @@ export class View {
           mesh.position.addScaledVector(offset.delta, blend);
           if (blend === 0) this.shotOffsets.delete(b.id);
         }
-        const velocity = new THREE.Vector3(b.vx, b.vy, b.vz);
+        const velocity = new THREE.Vector3(b.vx,b.vy-(b.gravity||0)*this.snapshotAge,b.vz);
         if (velocity.lengthSq() > 0.01)
           mesh.quaternion.setFromUnitVectors(
             new THREE.Vector3(0, 1, 0),

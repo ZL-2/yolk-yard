@@ -1,10 +1,11 @@
+import {AMMO_RULES,RARITY_SCALE,UTILITY_WEAPONS,ammoTypeFor} from './weapon-balance.js';
 import {weapon,clamp} from './data.js';
 export const RARITIES=[
- {name:'Common',color:'#b8c5cb',mult:1}, {name:'Uncommon',color:'#71d996',mult:1.06},
- {name:'Rare',color:'#60b6ff',mult:1.12},{name:'Epic',color:'#c58bff',mult:1.18},{name:'Legendary',color:'#ffcc67',mult:1.25},
-];
-export const AMMO_CAPS={light:400,medium:360,shells:80,heavy:60,rockets:18};
-export const ammoType=id=>({pip:'light',zipper:'light',scatter:'shells',doubleyolk:'shells',needle:'heavy',peeper:'heavy',thumper:'rockets'}[id]||'medium');
+ {name:'Common',color:'#b8c5cb',}, {name:'Uncommon',color:'#71d996',},
+ {name:'Rare',color:'#60b6ff',},{name:'Epic',color:'#c58bff',},{name:'Legendary',color:'#ffcc67',},
+].map((r,i)=>({...r,mult:RARITY_SCALE[i].damage}));
+export const AMMO_CAPS=Object.fromEntries(Object.entries(AMMO_RULES).map(([id,r])=>[id,r.cap]));
+export const ammoType=ammoTypeFor;
 export const ROYALE_GUN_IDS=['sprinter','scatter','needle','zipper','thumper','anchor','duet','pip','peeper','doubleyolk','comet'];
 export const ITEMS={
  bandage:{name:'Field Dressing',kind:'heal',amount:25,cap:75,duration:2.5,stack:5,color:'#f4f4dd',icon:'✚'},
@@ -12,7 +13,7 @@ export const ITEMS={
  mini:{name:'Mini Shield',kind:'shield',amount:25,cap:50,duration:2,stack:6,color:'#65bdfa',icon:'◈'},
  flask:{name:'Shield Flask',kind:'shield',amount:50,cap:100,duration:4,stack:3,color:'#81a5ff',icon:'◈'},
  splash:{name:'Restoration Capsule',kind:'splash',amount:30,duration:.55,stack:4,color:'#74ebd9',icon:'✦'},
- popper:{name:'Popper',kind:'popper',duration:.35,stack:6,color:'#c091ef',icon:'●'},
+ popper:{name:'Popper',kind:'popper',duration:UTILITY_WEAPONS.popper.useTime,stack:6,color:'#c091ef',icon:'●'},
  impulse:{name:'Impulse Charge',kind:'impulse',duration:.35,stack:3,color:'#ec9fff',icon:'◎'},
  launchpad:{name:'Launch Pad',kind:'launchpad',duration:.6,stack:2,color:'#f9ca65',icon:'↟'},
 };

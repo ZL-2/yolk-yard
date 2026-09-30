@@ -1847,3 +1847,10 @@ body.in-royale .match-center{display:none}
  .royale-map-stats b{font-size:10px;}
  .build-hud{right:128px;}
 }
+
+/* Full firing cone projected through the current camera. */
+.crosshair-arm {transition:transform 80ms linear;}
+.crosshair.pellet-reticle::before {content:"";position:absolute;left:0;top:0;width:calc(2 * var(--crosshair-gap));height:calc(2 * var(--crosshair-gap));transform:translate(-50%,-50%);border:1px solid #fff9;border-radius:50%;transition:width 80ms linear,height 80ms linear;}
+.crosshair[data-category="Rocket launcher"] .crosshair-arm {background:#ffd071;width:3px;height:3px;border-radius:50%;}
+#scope-spread {position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:1px dashed #db7057;border-radius:50%;transition:width 80ms linear,height 80ms linear;}
+#scope-spread[hidden] {display:none;}
