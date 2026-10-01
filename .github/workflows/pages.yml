@@ -29,7 +29,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]')"
       - name: Verify publishing recovery
         if: contains(github.event.head_commit.message, '[deployment-recovery]')
         run: node --test tests/deployment.test.js tests/deployment-ui.test.js tests/updates.test.js
@@ -40,7 +40,7 @@ jobs:
         if: contains(github.event.head_commit.message, '[service-notices]')
         run: node --test tests/service-status.test.js
       - name: Verify Fieldcraft movement, combat, authority, audio and owner access
-        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[capacity-update]') && !contains(github.event.head_commit.message, '[private-social]')
+        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[capacity-update]') && !contains(github.event.head_commit.message, '[private-social]')
         run: |
           npm run test:field
           if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" != "true" ]]; then
@@ -119,17 +119,17 @@ jobs:
           path: test-results/egg-shop
           retention-days: 7
       - run: npm run test:relay
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[operator-audio]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[operator-audio]')"
       - run: npm run test:realtime
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[operator-audio]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[operator-audio]')"
       - name: Verify authoritative countdown, human-only early departure and shared Bus transition
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[operator-audio]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[operator-audio]')"
         run: node scripts/countdown-network-check.mjs
       - name: Verify Royale phases, spectator cutoff, falling loot and host migration
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[operator-audio]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[operator-audio]')"
         run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]')
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]')
         env:
           YOLK_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
         run: node scripts/relay-live-check.mjs
@@ -185,6 +185,18 @@ jobs:
         with:
           name: menu-hub-verification
           path: test-results/menu-hub
+          retention-days: 7
+      - name: Verify hosted Royale, squad bots and private arena loading
+        if: contains(github.event.head_commit.message, '[host-royale]')
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:host-royale
+          node scripts/weapon-balance-network-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[host-royale]')
+        with:
+          name: host-royale-verification
+          path: test-results/host-royale
           retention-days: 7
       - run: npm run build
       - uses: actions/upload-artifact@v4
@@ -382,3 +394,28 @@ jobs:
         with:
           name: menu-hub-live
           path: test-results/menu-hub-live
+
+  verify-host-royale-live:
+    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[host-royale]') }}
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/private-social-live-check.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/host-royale-browser-check.mjs
+        env:
+          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
+          RAVEL_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: host-royale-live
+          path: test-results/host-royale-live
+          retention-days: 7

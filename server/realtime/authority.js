@@ -10,7 +10,7 @@ import {rewardFrame} from '../../src/rewards.js';
 import {visibleMarkers} from '../../src/team-markers.js';
 import {isTeamRoyale} from '../../src/teams.js';
 import {acceptsContestants} from '../../src/royale-phases.js';
-import {MatchCapacity} from './capacity.js';
+import {MatchCapacity,busyMessage} from './capacity.js';
 const address=new RegExp('^yolk-yard-v'+VERSION+'-([A-Z2-9]{8})$');
 // The relay owns simulation and persistent room lifetime. Browsers submit bounded
 // input/interaction intent only; even the room leader cannot submit game state.
@@ -22,10 +22,10 @@ export class MatchAuthority{
  create(peer,m){
   const reject=reason=>this.send(peer,{type:'authority-error',reason});
   const match=address.exec(peer.id);if(!match||this.rooms.has(peer.id))return reject('This match address is unavailable.');
-  if(this.rooms.size>=24)return reject('The game server is at its safe match capacity. Try again shortly.');
   const options={...matchOptions({...m.options,session:'online'}),seed:randomInt(1,2147483647)};
   const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,peer.id):null;
-  if(admission?.hostRun)return reject('Custom matches must run on their player host.');
+  if(options.mode==='royale'||m.visibility==='private'||admission?.hostRun)return reject('Battle Royale and Custom Private Matches run on the player host. Return to Play to open a hosted match.');
+  if(this.rooms.size>=24)return reject(busyMessage);
   if(m.ticket&&!admission||admission&&(admission.teamSize!==options.teamSize||options.mode==='royale'&&admission.partySize>options.teamSize))return reject('Party reservation expired. Return to the lobby and try again.');
   const reserved=admission&&this.capacity.reservations.get(admission.partyId);
   const plan=this.capacity.plan(options,{key:peer.id,humans:admission?.partySize||1,botLimit:reserved?.botLimit});if(!plan.ok)return reject(plan.reason);
@@ -72,6 +72,7 @@ export class MatchAuthority{
   if(!leader)return;
   if(m.type==='start'&&sim.phase!=='playing'){if(peer.authorityConfigRejected){peer.authorityConfigRejected=false;return;}const plan=this.capacity.roundPlan(room);if(!plan.ok){this.send(peer,{type:'authority-notice',event:'match-capacity',data:{message:plan.reason}});return;}this.capacity.rematch(room.key);sim.startRound();this.broadcast(room);}
   if(m.type==='configure'&&sim.phase!=='playing'){
+   if(m.options?.mode==='royale'){peer.authorityConfigRejected=true;this.send(peer,{type:'authority-notice',event:'match-capacity',data:{message:'Battle Royale runs on the player host. Return to Play to open a Royale match.'}});return;}
    const options=matchOptions({...m.options,session:'online',seed:randomInt(1,2147483647)});
    if([...sim.players.values()].filter(p=>!p.bot&&!p.friendSpectator).length>options.capacity)return;
    const plan=this.capacity.roundPlan(room,options);if(!plan.ok){peer.authorityConfigRejected=true;this.send(peer,{type:'authority-notice',event:'match-capacity',data:{message:plan.reason}});this.broadcast(room);return;}peer.authorityConfigRejected=false;

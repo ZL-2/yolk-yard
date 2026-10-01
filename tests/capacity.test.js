@@ -56,49 +56,52 @@ test('whole spectator parties reserve delivery work without replacing bots, and 
  capacity.releaseRoom('a');assert.equal(capacity.reservations.size,0);assert.equal(capacity.used(),before+4);
 });
 test('real public matchmaking trims only new filler bots, preserves seats, and releases cancelled reservations',async()=>{
- const app=await startRealtimeServer({port:0,host:'127.0.0.1'});app.relay.cpuQuota.snapshot=()=>({available:true,quotaCores:.5});
+ const app=await startRealtimeServer({port:0,host:'127.0.0.1'});app.relay.cpuQuota.snapshot=()=>({available:true,quotaCores:.25});
  globalThis.window={YOLK_NETWORK:{relay:`ws://127.0.0.1:${app.server.address().port}/game`}};
  globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
- const host=new Network(),newHost=new Network();let social;
+ const host=new Network(),newHost=new Network();let social;const previousBudget=process.env.RAVEL_CPU_BUDGET_MS;
  const wait=async fn=>{const until=Date.now()+7000;while(!fn()){assert.ok(Date.now()<until,'Matchmaking timeout');await new Promise(r=>setTimeout(r,10));}};
  try{
-  await host.host();await host.createAuthority({mode:'ffa',fill:true,bots:7,capacity:8},safeProfile({name:'Occupied Match'}),'private');
+  await host.host();await host.createAuthority({mode:'ffa',fill:true,bots:7,capacity:8},safeProfile({name:'Occupied Match'}),'public');
   social=new WebSocket(`ws://127.0.0.1:${app.server.address().port}/social`,{origin:'https://zl-2.github.io'});let hello,launch,party,seq=0;const requests=new Map();
   social.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='hello')hello=m;if(m.type==='launch')launch=m.launch;if(m.type==='party')party=m.party;if(m.request){const waiter=requests.get(m.request);requests.delete(m.request);if(m.error)waiter.reject(Error(m.error));else waiter.resolve(m.result);}});
   await new Promise(r=>social.once('open',r));social.send(JSON.stringify({type:'hello',version:VERSION,profile:safeProfile({name:'Public Queue'})}));await wait(()=>hello&&party);
   const ask=(type,data={})=>new Promise((resolve,reject)=>{const request=++seq;requests.set(request,{resolve,reject});social.send(JSON.stringify({type,request,...data}));});
   await ask('queue',{custom:true,options:royale});assert.equal(launch.hostRun,true);assert.equal(launch.visibility,'private');await ask('cancel');launch=null;
   assert.equal(app.relay.authority.capacity.reservations.size,0);
-  await ask('queue',{options:royale});await wait(()=>launch);assert.ok(launch.botLimit<31&&launch.botLimit>=1);assert.equal(launch.options.capacity,32);assert.match(launch.capacityNotice,/Bot fill/);
+  const occupied=app.relay.authority.rooms.get(host.peer.id);for(let i=0;i<7;i++)occupied.sim.addPlayer('occupied-'+i,safeProfile({name:'Occupied '+i}));app.relay.authority.publish(occupied);
+  process.env.RAVEL_CPU_BUDGET_MS='170';
+  await ask('select',{mode:'ffa'});
+  await ask('queue',{options:{mode:'ffa',fill:true,bots:7}});await wait(()=>launch);assert.ok(launch.botLimit<7&&launch.botLimit>=1);assert.equal(launch.options.capacity,8);assert.match(launch.capacityNotice,/Bot fill/);
   const limited=launch.botLimit;await newHost.host(launch.code);await newHost.createAuthority(launch.options,safeProfile({name:'Public Queue'}),'public',launch.ticket);
-  const created=app.relay.authority.rooms.get(newHost.peer.id);assert.equal(created.sim.botLimit,limited);assert.equal([...created.sim.players.values()].filter(p=>p.bot).length,limited);
+  const created=app.relay.authority.rooms.get(newHost.peer.id);assert.equal(created.sim.botLimit,limited);newHost.authorityCommand({type:'start'});await wait(()=>created.sim.phase==='playing');assert.equal([...created.sim.players.values()].filter(p=>p.bot).length,limited);
   await ask('cancel');assert.equal(app.relay.authority.capacity.reservations.size,0);assert.equal(app.relay.authority.rooms.size,1);
- }finally{social?.close();host.destroy();newHost.destroy();await app.close();}
+ }finally{if(previousBudget===undefined)delete process.env.RAVEL_CPU_BUDGET_MS;else process.env.RAVEL_CPU_BUDGET_MS=previousBudget;social?.close();host.destroy();newHost.destroy();await app.close();}
 });
-test('real sockets reject excess custom matches immediately and recover after the occupied room closes',async()=>{
+test('real sockets reject excess public arenas immediately and recover after the occupied room closes',async()=>{
  const app=await startRealtimeServer({port:0,host:'127.0.0.1'}),nodes=[];
- app.relay.cpuQuota.snapshot=()=>({available:true,quotaCores:.5});
+ app.relay.cpuQuota.snapshot=()=>({available:true,quotaCores:.25});
  globalThis.window={YOLK_NETWORK:{relay:`ws://127.0.0.1:${app.server.address().port}/game`}};
  globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
  const make=async name=>{const net=new Network();nodes.push(net);await net.host();return net;};
  try{
-  const a=await make('a');await a.createAuthority(royale,safeProfile({name:'Capacity Alpha'}),'private');
-  const b=await make('b'),started=performance.now();await assert.rejects(b.createAuthority(royale,safeProfile({name:'Capacity Bravo'}),'private'),/safe match capacity/);assert.ok(performance.now()-started<1500);assert.equal(app.relay.authority.rooms.size,1);
+  const a=await make('a');await a.createAuthority({mode:'ffa',fill:true,bots:7},safeProfile({name:'Capacity Alpha'}),'public');
+  const b=await make('b'),started=performance.now();await assert.rejects(b.createAuthority({mode:'ffa',fill:true,bots:7},safeProfile({name:'Capacity Bravo'}),'public'),/safe match capacity/);assert.ok(performance.now()-started<1500);assert.equal(app.relay.authority.rooms.size,1);
   const r=app.relay.authority.rooms.get(a.peer.id);app.relay.remove(r.hostPeer);assert.equal(app.relay.authority.rooms.size,0);
-  await b.createAuthority(royale,safeProfile({name:'Capacity Bravo'}),'private');assert.equal(app.relay.authority.rooms.size,1);
+  await b.createAuthority({mode:'ffa',fill:true,bots:7},safeProfile({name:'Capacity Bravo'}),'public');assert.equal(app.relay.authority.rooms.size,1);
  }finally{for(const n of nodes)n.destroy();await app.close();}
 });
 test('real rematches and mode changes cannot exceed the budget or start a rejected configuration',async()=>{
- const app=await startRealtimeServer({port:0,host:'127.0.0.1'});app.relay.cpuQuota.snapshot=()=>({available:true,quotaCores:.5});
+ const app=await startRealtimeServer({port:0,host:'127.0.0.1'});app.relay.cpuQuota.snapshot=()=>({available:true,quotaCores:.25});
  globalThis.window={YOLK_NETWORK:{relay:`ws://127.0.0.1:${app.server.address().port}/game`}};
  globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
  const notices=[],a=new Network({onStatus:m=>notices.push(m)}),b=new Network({onStatus:m=>notices.push(m)});
  const wait=async fn=>{const until=Date.now()+7000;while(!fn()){assert.ok(Date.now()<until,'Rematch timeout');await new Promise(r=>setTimeout(r,10));}};
  try{
-  await a.host();await a.createAuthority(royale,safeProfile({name:'Rematch Alpha'}),'private');const first=app.relay.authority.rooms.get(a.peer.id);first.sim.phase='results';first.sim.stage='finished';
-  await b.host();await b.createAuthority({mode:'ffa',fill:true,bots:7},safeProfile({name:'Rematch Bravo'}),'private');const second=app.relay.authority.rooms.get(b.peer.id);
+  await a.host();await a.createAuthority({mode:'ffa',fill:true,bots:7},safeProfile({name:'Rematch Alpha'}),'public');const first=app.relay.authority.rooms.get(a.peer.id);first.sim.phase='results';first.sim.stage='finished';
+  await b.host();await b.createAuthority({mode:'ffa',fill:true,bots:7},safeProfile({name:'Rematch Bravo'}),'public');const second=app.relay.authority.rooms.get(b.peer.id);
   a.authorityCommand({type:'start'});await wait(()=>notices.some(n=>/safe match capacity/.test(n)));assert.equal(first.sim.phase,'results');
   const count=notices.length;b.authorityCommand({type:'configure',options:royale});b.authorityCommand({type:'start'});await wait(()=>notices.length>count);await new Promise(r=>setTimeout(r,30));assert.equal(second.sim.options.mode,'ffa');assert.equal(second.sim.phase,'lobby');
-  b.destroy();await wait(()=>!app.relay.authority.rooms.has(second.key));a.authorityCommand({type:'start'});await wait(()=>first.sim.phase==='playing');assert.equal(first.sim.stage,'spawn-island');
+  b.destroy();await wait(()=>!app.relay.authority.rooms.has(second.key));a.authorityCommand({type:'start'});await wait(()=>first.sim.phase==='playing');assert.equal(first.sim.options.mode,'ffa');
  }finally{a.destroy();b.destroy();await app.close();}
 });

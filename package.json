@@ -1,6 +1,6 @@
 {
   "name": "ravelfront",
-  "version": "3.6.1",
+  "version": "3.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,7 +21,8 @@
     "test:weapons": "node --test tests/weapon-balance.test.js tests/weapon-stats.test.js tests/equip.test.js tests/hitbox.test.js tests/arms.test.js tests/weapon-presentation.test.js tests/remote-input.test.js tests/audio.test.js && node --test --test-name-pattern=\"fictional|head is|hitscan|cover|pellets|FSA|lag compensation\" tests/combat-overhaul.test.js && node scripts/weapon-balance-network-check.mjs",
     "test:capacity": "node --test tests/capacity.test.js tests/bot-runtime.test.js tests/bot-movement-speed.test.js tests/rewards-afk.test.js tests/snapshot-codec.test.js tests/authority-performance.test.js tests/server-authority.test.js tests/social-persistence.test.js tests/input-clock.test.js tests/relay-liveness.test.js tests/relay-compact.test.js tests/weapon-balance.test.js tests/remote-input.test.js tests/service-status.test.js && node --test --test-name-pattern=\"fictional|head is|hitscan|cover|pellets|FSA|lag compensation|remote shot|bots respond\" tests/combat-overhaul.test.js && node scripts/social-squads-check.mjs && node scripts/weapon-balance-network-check.mjs",
     "test:capacity-load": "node scripts/capacity-check.mjs",
-    "test:private-social": "node --test tests/private-social.test.js tests/deployment.test.js tests/server-authority.test.js tests/snapshot-codec.test.js tests/social-persistence.test.js tests/input-clock.test.js tests/relay-liveness.test.js && node scripts/social-squads-check.mjs"
+    "test:private-social": "node --test tests/private-social.test.js tests/deployment.test.js tests/server-authority.test.js tests/snapshot-codec.test.js tests/social-persistence.test.js tests/input-clock.test.js tests/relay-liveness.test.js && node scripts/social-squads-check.mjs",
+    "test:host-royale": "node --test tests/royale-teammate-bots.test.js tests/private-social.test.js tests/server-authority.test.js tests/capacity.test.js && node --test --test-name-pattern='Duo knock|revive stops|final active|finishing' tests/field-systems.test.js && node scripts/host-royale-browser-check.mjs"
   },
   "dependencies": {
     "compromise": "14.17.0",

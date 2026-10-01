@@ -573,7 +573,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   const next = preset?.mode ? matchOptions(preset) : getOptions();
   if (!next) return;
   options=matchOptions({...next,session:'online'});autoQueue=automatic;
-  if(launch?.hostRun||!launch){matchEarnings.total=0;matchEarnings.status='Private custom · No Marks';progressMatch='';}
+  if(launch?.hostRun||!launch){matchEarnings.total=0;matchEarnings.status='Player-hosted match · No verified Marks';progressMatch='';}
   const visibility=launch?.hostRun||!launch?'private':visibilityOverride||'public';
   beginSim();
   if(launch?.admission)sim.assignTeam?.(sim.players.get("host"),launch.admission);
@@ -590,7 +590,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     await attempt.host(launch?.code);
     if (attempt !== net) return;
     attempt.setVisibility(visibility);
-    if(attempt.peer?.control&&!launch?.hostRun&&launch){state=await attempt.createAuthority(options,profile,visibility,launch?.ticket);sim=new RemoteSimulation(attempt,()=>state);}
+    if(attempt.peer?.control&&options.mode!=='royale'&&!launch?.hostRun&&launch){state=await attempt.createAuthority(options,profile,visibility,launch?.ticket);sim=new RemoteSimulation(attempt,()=>state);}
     else {if(sim instanceof RoyaleSimulation)sim.startRound();state=sim.snapshot();attempt.broadcast(state);attempt.publishRoom();}
     localId = attempt.id;
     await waitForLoading();
@@ -835,7 +835,7 @@ function resultsMenu() {
 
   modal(
     state.royale ? wonRoyale(state,localId) ? "FRONTIER SECURED!" : "Round complete" : "That’s a wrap.",
-    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${sim || net?.isHost ? '<button class="primary" data-action="rematch">PLAY AGAIN</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">Find public match</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
+    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${sim || net?.isHost ? '<button class="primary" data-action="rematch">PLAY AGAIN</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">Play Royale</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
     "results",
   );
 }
@@ -1097,7 +1097,7 @@ async function launchParty(launch){
  if(net||state)leave(false,false);
  let ok=false;
  try{
-  if(launch.host)ok=await createRoom(launch.options,launch.visibility,true,launch);
+  if(launch.host)ok=await createRoom(launch.options,launch.visibility,!launch.hostRun,launch);
   else {spectateTarget=launch.watchId||null;ok=await joinRoom(launch.code,false,launch.ticket);}
   if(activeLaunch!==launch.id)return;
   if(!ok)throw Error('Your party could not enter that match together.');
@@ -1236,7 +1236,7 @@ const actions = {
   about: () =>
     modal(
       "Welcome to the frontier",
-      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.6.0 · All gameplay code is included in the project.</p>`,
+      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.7.0 · All gameplay code is included in the project.</p>`,
       "about",
     ),
 };

@@ -11,7 +11,7 @@ import {Network} from '../src/network.js';
 import {safeProfile} from '../src/data.js';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms)),rows=[];
 const seconds=Number(process.env.RAVEL_CAPACITY_SECONDS)||8;
-const cases=[['idle',0,0,0],['ffa',2,0,1],['ffa',2,6,1],['teams',2,6,1],['royale',2,30,1],['royale',16,16,1],['royale',2,30,2]].filter(row=>!process.env.RAVEL_CAPACITY_CASE||row.join(':')===process.env.RAVEL_CAPACITY_CASE);
+const cases=[['idle',0,0,0],['ffa',2,0,1],['ffa',2,6,1],['teams',2,6,1],['ffa',8,0,1],['teams',8,0,1],['ffa',2,6,2]].filter(row=>!process.env.RAVEL_CAPACITY_CASE||row.join(':')===process.env.RAVEL_CAPACITY_CASE);
 const roots=[...(process.env.RAVEL_COMPARE_ROOT?[['before',resolve(process.env.RAVEL_COMPARE_ROOT)]]:[]),['after',fileURLToPath(new URL('../',import.meta.url))]];
 globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
 for(const [version,root]of roots)for(const [mode,humans,bots,roomCount]of cases){
@@ -21,7 +21,7 @@ for(const [version,root]of roots)for(const [mode,humans,bots,roomCount]of cases)
  const nodes=[],samples=[];let inputTimer,seq=0;
  const make=()=>{const sample={count:0,last:0,gaps:[],errors:[]};samples.push(sample);const net=new Network({onState:()=>{const now=performance.now();if(sample.last)sample.gaps.push(now-sample.last);sample.last=now;sample.count++;},onError:error=>sample.errors.push(error)});nodes.push(net);return net;};
  try{
-  for(let room=0;room<roomCount;room++){const host=make(),code=await host.host();await host.createAuthority({mode,bots,capacity:mode==='royale'?humans+bots:8,fill:false,difficulty:2,minutes:60,scoreLimit:1000},safeProfile({name:'Host '+room}),'private');for(let i=1;i<humans;i++)await make().join(code,safeProfile({name:'Guest '+room+' '+i}));if(mode!=='royale')host.authorityCommand({type:'start'});}
+  for(let room=0;room<roomCount;room++){const host=make(),code=await host.host();await host.createAuthority({mode,bots,capacity:8,fill:false,difficulty:2,minutes:60,scoreLimit:1000},safeProfile({name:'Host '+room}),'public');for(let i=1;i<humans;i++)await make().join(code,safeProfile({name:'Guest '+room+' '+i}));host.authorityCommand({type:'start'});}
   inputTimer=setInterval(()=>{seq++;for(const net of nodes)net.input({seq,dt:1/60,forward:Math.sin(seq/90)>0?1:-1,strafe:Math.cos(seq/120),yaw:seq/100,pitch:0,fire:seq%3!==0,reload:seq%240===0,slot:mode==='royale'?1:0});},1000/60);
   await sleep(500);if(mode!=='royale')for(const net of nodes)net.send({type:'player-action',action:'respawn'});
   const phased=message('phased');child.send({type:'phase'});await phased;await sleep(1000);

@@ -19,7 +19,7 @@ export function queueMatch(service,u,m){
   const l=other.launch;rooms.push({code:l.code,version:VERSION,mode:l.options.mode,teamSize:l.options.teamSize,capacity:l.options.mode==='royale'?Math.min(16,l.options.capacity):8,contestantCapacity:l.options.capacity,players:0,phase:'lobby',public:true,pendingHost:true});
  }
  if(m.code){room=rooms.find(r=>r.code===m.code&&r.version===VERSION);if(!room)throw Error('That room is unavailable. Check the code with its host.');options=matchOptions({...options,mode:room.mode,teamSize:room.teamSize,capacity:room.contestantCapacity});}
- else if(!m.custom){
+ else if(!m.custom&&options.mode!=='royale'){
   const compatible=rooms.filter(r=>r.public!==false&&!r.hostRun&&r.version===VERSION&&r.mode===options.mode&&(r.teamSize||1)===options.teamSize&&(r.phase==='lobby'||options.mode!=='royale'&&['playing','results'].includes(r.phase))).sort((a,b)=>b.players+pending(b.code)-a.players-pending(a.code));
   room=compatible.find(r=>r.capacity-r.players-pending(r.code)>=p.members.length);
   if(!room&&options.mode!=='royale'&&compatible.some(r=>r.players<r.capacity))throw Error('The public arena is waiting for enough seats for your party. A second arena opens only when the first is full of real players.');
@@ -27,7 +27,7 @@ export function queueMatch(service,u,m){
  if(options.mode==='royale'&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
  if(room)options=matchOptions({...options,mode:room.mode,capacity:room.contestantCapacity||room.capacity,teamSize:room.teamSize});
  if(!room&&options.mode==='royale'&&options.capacity<options.teamSize*2)throw Error('Team Royale needs positions for at least two full teams.');
- const roomCode=room?.code||newCode(),key=address(roomCode),existing=authority?.rooms.get(key),hostRun=room?!!room.hostRun:!!m.custom;
+ const roomCode=room?.code||newCode(),key=address(roomCode),existing=authority?.rooms.get(key),hostRun=room?!!room.hostRun:!!m.custom||options.mode==='royale';
  const spectator=existing?.sim.options.mode==='royale'&&!acceptsContestants(existing.sim.stage);
  if(room&&!spectator&&room.capacity-room.players-pending(roomCode)<p.members.length)throw Error('That match cannot fit your party.');
  const planOptions=existing?.sim.options||options;

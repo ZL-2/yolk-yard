@@ -453,15 +453,17 @@ export class RoyaleSimulation extends Simulation {
   this.emit('finish',{winner:this.winner});this.emit('royale-cue',{cue:'victory'});
  }
  botInput(p){
+  const rescue=rescueBotInput(this,p);if(rescue)return rescue;
   if(p.flight!=='ground')return this.thinkBot(p);
   return scheduledBotInput(this,p,()=>this.thinkBot(p),{combat:.16,roam:.25});
  }
  thinkBot(p){
-  const rescue=rescueBotInput(this,p);if(rescue)return rescue;
   const input={yaw:p.yaw,pitch:0,forward:0,strafe:0,slot:p.slot,swapSlot:-1};
   if(p.flight==='transport'){const mate=isTeamRoyale(this.options)&&[...this.players.values()].find(o=>teammates(this.options,p,o)&&!o.bot&&o.health>0);input.jump=mate?mate.flight!=='transport':this.elapsed>=p.botDrop;if(mate&&mate.flight!=='transport')p.botLand={x:mate.x,y:mate.y,z:mate.z};return input;}
   let goal=p.botLand||{x:0,y:0,z:0};
   if(p.flight!=='ground'){
+   const mate=isTeamRoyale(this.options)&&[...this.players.values()].find(o=>teammates(this.options,p,o)&&!o.bot&&o.connected!==false&&o.health>0&&!o.spectating&&o.flight!=='transport');
+   if(mate)p.botLand=goal={x:mate.x+3,y:mate.y,z:mate.z+3};
    const dx=goal.x-p.x,dz=goal.z-p.z;input.yaw=Math.atan2(-dx,-dz);input.forward=Math.hypot(dx,dz)>4?1:0;
    input.jump=p.flight==='dive'&&p.y<95;return input;
   }

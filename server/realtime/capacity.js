@@ -6,7 +6,7 @@ export function matchWorkload(options,humans=1,botLimit=Infinity){
  const bots=Math.max(0,Math.min(capacity-humans,options.fill?capacity:options.bots||0,botLimit));
  return {humans,bots,cost:options.mode==='royale'?52+humans*9+bots*7:30+humans*8+bots*11};
 }
-const busyMessage='The game server is at its safe match capacity. Join an open match, try fewer bots, or try again shortly.';
+export const busyMessage='The game server is at its safe match capacity. Join an open match, try fewer bots, try again shortly, or play a Custom Private Match — it runs on the player host instead of the game server.';
 export class MatchCapacity {
  constructor(authority){this.authority=authority;this.reservations=new Map();this.sampleAt=performance.now();this.cpuAt=process.cpuUsage();this.pressure=0;this.recovery=0;this.overloaded=false;}
  get budget(){

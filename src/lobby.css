@@ -23,3 +23,6 @@
 body.in-duos .performance-network{top:320px;left:22px}body.in-duos:has(.chat-hud.typing) .performance-network{visibility:hidden}
 @media(max-height:650px) and (min-width:761px){body.in-duos .performance-network{transform:scale(.8);transform-origin:left top}body.in-duos .chat-toggle{left:240px}}
 @media(max-width:760px){body.in-duos .performance-network{top:255px;left:12px;transform:scale(.8);transform-origin:left top}}
+.yard-play-card .yard-find.yard-hosted-match{grid-row:4;margin-top:8px}
+.yard-play-card:has(>.yard-custom) .yard-find.yard-hosted-match{grid-row:5}
+.yard-play-card .yard-find{padding:7px 18px;line-height:1.1;gap:8px}

@@ -7,6 +7,8 @@ import {newBrain,observe,selectThreat,seesPoint} from './bot-perception.js';
 import {selectWeapon,chooseObjective,coverPoint} from './bot-objectives.js';
 import {navigate} from './bot-navigation.js';
 import {ARENA_BOT_COMBAT,smoothArenaCombatMovement} from './bot-movement.js';
+import {squadAnchor,followGoal} from './bot-team.js';
+import {ROYALE_TEAM_BOT as teamPolicy} from './bot-config.js';
 export {BOT_SKILL};
 function combatGoal(sim,p,brain,target,w,skill){
  const d=dist(p,target),desired=(w.engage[0]+w.engage[1])*.5;
@@ -45,8 +47,9 @@ export function botInput(sim,p){
  if(p.use){brain.utility=null;if(visible||now-(brain.attackedAt??-100)<.6)sim.cancelUse?.(p);else return {yaw:p.yaw,pitch:p.pitch,slot:p.use.slot,forward:0,strafe:0,swapSlot:-1};}
  if(now>=brain.decision||!brain.task||brain.weapon!==w.id){
   brain.weapon=w.id;brain.decision=now+Math.max(!p.inventory&&target?ARENA_BOT_COMBAT.decisionMinimum:0,skill.decision*(.85+r()*.3));brain.task=chooseObjective(sim,p,brain,skill,target);brain.objective=brain.task.kind;
-  if(brain.task.kind==='fight'&&target){if(p.inventory||now>=(brain.sideUntil||0)){brain.side=r()<.5?-1:1;brain.sideUntil=now+ARENA_BOT_COMBAT.sideHoldMin+r()*ARENA_BOT_COMBAT.sideHoldExtra;}brain.task.goal=combatGoal(sim,p,brain,target,w,skill);}
+  if(brain.task.kind==='fight'&&target){if(p.inventory||now>=(brain.sideUntil||0)){brain.side=r()<.5?-1:1;brain.sideUntil=now+ARENA_BOT_COMBAT.sideHoldMin+r()*ARENA_BOT_COMBAT.sideHoldExtra;}brain.task.goal=combatGoal(sim,p,brain,target,w,skill);const mate=squadAnchor(sim,p,brain);if(mate&&dist(brain.task.goal,mate)>teamPolicy.combatLeash)brain.task.goal=followGoal(sim,p,mate);}
  }
+ if(brain.task.kind==='follow'){const mate=squadAnchor(sim,p,brain);if(mate)brain.task.goal=followGoal(sim,p,mate);else brain.decision=0;}
  if(visible){if(now-(brain.lastVisibleAt??-100)>skill.perception*2)brain.aimAt=Math.max(brain.aimAt,now+skill.reaction*.6);brain.lastVisibleAt=now;}
  const task=brain.task,goal=task.goal;
  if(task.kind==='rotate'&&p.grounded&&!visible&&dist(p,goal)>45&&now>(brain.mobilityAt||0)){const mobility=p.inventory?.findIndex(i=>i?.id==='impulse'||i?.id==='launchpad');if(mobility>0){brain.mobilityAt=now+8;brain.utility={slot:mobility,yaw:Math.atan2(p.x-goal.x,p.z-goal.z),pitch:0,until:now+1};}}
@@ -65,7 +68,11 @@ export function botInput(sim,p){
   }
  }
  if(task.kind==='chest'&&!visible&&now-(brain.attackedAt??-100)>2){const chest=sim.chests.find(c=>c.id===task.id);if(!chest||chest.opened)brain.decision=0;else if(sim.accessible(p,chest,3.3))interact=true;}
- if(task.kind==='harvest'&&!visible){const d=dist(p,goal);slot=0;yaw=Math.atan2(p.x-goal.x,p.z-goal.z);pitch=0;fire=d<3.3;if(d<3.3){move.mx=move.mz=0;}}
+ if(task.kind==='harvest'&&!visible){
+  const box=sim.map.boxes.find(b=>b.objectId===task.id),enough=p.materials[task.material]>=teamPolicy.materialTarget||Object.values(p.materials).reduce((a,b)=>a+b,0)>=teamPolicy.totalMaterials;
+  if(!box||sim.worldDamage?.[task.id]?.destroyed||enough){brain.decision=0;fire=false;}
+  else{const aim=task.aim,d=Math.hypot(p.x-aim.x,p.z-aim.z);slot=0;yaw=Math.atan2(p.x-aim.x,p.z-aim.z);pitch=Math.atan2(aim.y-p.y-eyeHeight(p),d);fire=d<3.1;if(fire)move.mx=move.mz=0;}
+ }
  if(visible){
   if(now>=brain.nextBurst){
    brain.nextBurst=now+skill.burst+skill.pause+r()*.4;brain.burstUntil=now+skill.burst;
@@ -94,6 +101,6 @@ export function botInput(sim,p){
  if(visible&&Math.abs(wrapAngle(desiredYaw-yaw))>.2)fire=false;
  const movement=smoothArenaCombatMovement(brain,move,yaw,now,arenaCombat);
  const moving=Math.hypot(move.mx,move.mz)>.1;
- return {yaw,pitch,forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room'].includes(task.kind)};
+ return {yaw,pitch,forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
 }
 import {teammates} from './teams.js';

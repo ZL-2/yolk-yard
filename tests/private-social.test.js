@@ -32,13 +32,22 @@ async function fixture(){
   const callbacks={onState:s=>g.state=s,onError:e=>g.errors.push(e),getCheckpoint:()=>g.sim?.checkpoint(),getState:()=>g.sim?.snapshot(),onJoin:(id,p,a)=>!!g.sim?.admitPlayer(id,p,a),onInput:(id,i)=>g.sim?.setInput(id,i,true),onPlayerAction:(id,a)=>g.sim?.playerAction(id,a),onRoster:ids=>g.sim?.setConnectedHumans?.(ids),onLeave:id=>g.sim?.leavePlayer(id),onHost:(checkpoint,departed)=>{g.sim=(checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options)).restore(checkpoint);for(const id of departed)g.sim.leavePlayer(id);startClock();}};
   net=g.net=new Network(callbacks);games.push(g);
   function startClock(){clearInterval(g.clock);g.clock=setInterval(()=>{if(!net.isHost||!g.sim)return;for(let i=0;i<3;i++)g.sim.tick(1/60);g.state=g.sim.snapshot();net.broadcast(g.state);},50);}
-  if(l.host){await net.host(l.code);if(l.hostRun){g.sim=l.options.mode==='royale'?new RoyaleSimulation(l.options):new Simulation(l.options);const h=g.sim.addPlayer('host',u.profile);g.sim.assignTeam?.(h,l.admission);g.sim.startRound();net.setVisibility('private');g.state=g.sim.snapshot();net.broadcast(g.state);startClock();}else await net.createAuthority(l.options,u.profile,l.visibility,l.ticket);await u.ask('host-ready',{id:l.id});}
+  if(l.host){await net.host(l.code);if(l.hostRun){g.sim=l.options.mode==='royale'?new RoyaleSimulation(l.options):new Simulation(l.options);const h=g.sim.addPlayer('host',u.profile);g.sim.assignTeam?.(h,l.admission);if(l.options.mode==='royale')g.sim.startRound();net.setVisibility('private');g.state=g.sim.snapshot();net.broadcast(g.state);startClock();}else await net.createAuthority(l.options,u.profile,l.visibility,l.ticket);await u.ask('host-ready',{id:l.id});}
   else await net.join(l.code,u.profile,l.ticket);
   await u.ask('joined',{id:l.id});await wait(()=>g.state);return g;
  }
  return {app,user,invite,launch,games,users,async close(){for(const g of games){clearInterval(g.clock);g.net.destroy();}for(const u of users)u.ws.close();await app.close();await rm(path,{recursive:true,force:true});}};
 }
 
+test('Royale Play opens a new player-hosted room at every team size and remains code-joinable at server capacity',async()=>{
+ for(const size of [1,2,4]){const f=await fixture();try{
+  const a=await f.user('Royale Captain'),b=await f.user('Code Guest'),c=await f.user('Separate Captain');f.app.relay.authority.capacity.overloaded=true;
+  await a.ask('select',{mode:'royale',teamSize:size});await a.ask('queue',{options:{capacity:8,fill:true,bots:7}});assert.equal(a.launches[0].hostRun,true);assert.equal(a.launches[0].visibility,'private');
+  const host=await f.launch(a);await b.ask('queue',{code:a.launches[0].code});const guest=await f.launch(b);assert.ok(guest.state.royale);assert.notEqual(guest.net.serverAuthority,true);assert.notEqual(host.net.serverAuthority,true);
+  await c.ask('select',{mode:'royale',teamSize:size});await c.ask('queue',{options:{capacity:8,fill:true}});assert.notEqual(c.launches[0].code,a.launches[0].code);
+  assert.equal(f.app.relay.authority.rooms.size,0);assert.equal(f.app.relay.authority.capacity.reservations.size,0);
+ }finally{await f.close();}}
+});
 test('ready parties launch private host customs without server capacity; friends spectate without consuming contestant seats',async()=>{
  const f=await fixture();try{
   const a=await f.user('Custom Leader'),b=await f.user('Custom Mate'),c=await f.user('Watching Friend'),stranger=await f.user('Stranger');
@@ -84,7 +93,7 @@ test('private party arenas run combat on the host and public pending cancellatio
   const a=await f.user('Arena Captain'),b=await f.user('Arena Mate');await f.invite(a,b);await b.ask('ready',{value:true});
   await a.ask('queue',{custom:true,options:{mode,fill:true,bots:6}});const host=await f.launch(a);await wait(()=>b.launches.length);const guest=await f.launch(b);
   assert.equal(f.app.relay.authority.rooms.size,0);assert.equal(f.app.relay.authority.capacity.reservations.size,0);assert.equal(guest.state.visibility,'private');
-  if(mode==='teams')assert.equal(host.sim.players.get('host').team,host.sim.players.get(guest.net.id).team);
+  assert.equal(host.sim.phase,'lobby');assert.equal(guest.state.phase,'lobby');if(mode==='teams')assert.equal(host.sim.players.get('host').team,host.sim.players.get(guest.net.id).team);host.sim.startRound();
   host.sim.playerAction('host','rejoin');guest.net.send({type:'player-action',action:'rejoin'});await wait(()=>host.sim.players.get(guest.net.id)?.health>0);const p=host.sim.players.get(guest.net.id),start={x:p.x,z:p.z};
   for(let i=1;i<=12;i++){guest.net.input({seq:i,forward:1,dt:1/60});await new Promise(r=>setTimeout(r,20));}assert.ok(Math.hypot(p.x-start.x,p.z-start.z)>.1,'host simulates remote movement');
  }finally{await f.close();}}

@@ -2,6 +2,7 @@
 // Movement audio is intentionally silent in the current game. Do not give bots
 // an invisible-footstep sense that human players cannot use.
 export const BOT_WORLD_SENSES=Object.freeze({footsteps:true,chestHumRadius:12});
+export const ROYALE_TEAM_BOT=Object.freeze({followDistance:8,regroupDistance:28,combatLeash:42,lootLeash:24,materialTarget:180,totalMaterials:300,harvestRadius:20,rescueHold:4});
 export const BOT_SKILL=[
  {name:'Casual',reaction:.85,error:.10,hit:.30,lead:.08,cover:.32,grenade:.12,turn:2.5,burst:.26,pause:.85,vision:75,fov:1.15,hearing:65,steps:9,perception:.28,decision:2.4,memory:5,retreat:30,build:.08,stormMargin:18,search:8,teamRange:22},
  {name:'Intermediate',reaction:.52,error:.067,hit:.48,lead:.27,cover:.52,grenade:.3,turn:3.6,burst:.44,pause:.62,vision:100,fov:1.3,hearing:80,steps:11,perception:.22,decision:1.7,memory:8,retreat:38,build:.28,stormMargin:25,search:12,teamRange:28},

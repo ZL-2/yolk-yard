@@ -1,14 +1,24 @@
 # Private customs, friend spectating and coordinated updates
 
-Version 3.5.0 / gameplay protocol 28. Published update numbers are assigned by the release history.
+Version 3.7.0 / gameplay protocol 29. Published update numbers are assigned by the release history.
 
 ## Match ownership
 
-Custom matches are always private. The leader's browser runs simulation, bots and combat; the existing relay transports messages, authenticates party admission and provides invite-code rendezvous. These matches create no server simulation room or workload reservation. Host migration continues between connected contestants. Friend spectators cannot become a host. Host performance and connectivity therefore affect custom matches. Keep the host tab open. Private host results do not award verified Marks or career progression.
+All Royale matches and Custom Private Matches run on the player host and are private. Royale's PLAY button creates a new room for the ready party instead of searching public matches. The leader's browser runs simulation, bots and combat; the existing relay transports messages, authenticates party admission and provides invite-code rendezvous. These matches create no server simulation room or workload reservation. Code joins and host migration continue between connected contestants. Friend spectators cannot become a host. Keep the host tab open. Hosted results retain the existing rule: no verified Marks or career progression from unchecked host-reported outcomes.
 
 Public FFA and Team Scramble fill the existing compatible arena before creating another. Connected real contestant counts come from the authority roster, with unclaimed party tickets reserving seats. Bots and friend spectators do not count toward the eight real seats. Concurrent queues join a pending launch; cancelling its creator cancels the waiting reservations immediately. If a party is larger than the remaining seats, matchmaking explains the wait instead of opening a partly filled second arena. Public arena results restart after ten seconds.
 
-Public Royale retains the existing phase cutoff and server workload gates. In Fill Duos/Squads, human teammates get warmup priority. At departure, existing bots take the missing team positions; additional bots may be created within the contestant and workload limits. No Fill keeps the invited party alone. Teams, slots, drops and revival behavior use the shared team simulation.
+Royale retains the Spawn Island/departure cutoff: code arrivals after departure spectate. In Fill Duos/Squads, human teammates get warmup priority. At departure, bots take missing team positions within the configured contestant limit. No Fill keeps the invited party alone. Server authority rejects Royale and private simulation even through direct room requests, and public arena settings cannot change to Royale. Capacity warnings suggest player-hosted Custom Private Match.
+
+Private FFA and Team Scramble stop in the room lobby after loading. Party readiness acknowledges arrival without automatically starting those rounds. Both host and code guests see the room code; only the host starts the match. Public arenas retain automatic start. Custom Private Match shares the primary button's dimensions and visual styling without overlapping loadout controls on mobile.
+
+## Bot teammates
+
+`ROYALE_TEAM_BOT` in `src/bot-config.js` centralizes squad spacing and material goals. Bots keep a persistent active human teammate as their anchor, follow an approximately eight-unit offset, regroup beyond 28 units, and restrict loot to 24 units and combat destinations to 42 units from the anchor. Immediate danger and storm escape still matter. Human air drops update the bots' landing goal.
+
+Rescue is checked before cached tactical input. Downed humans are selected before downed bots, and combat, reloading and item use stop during rescue. Downed bots crawl toward a teammate until within four units, then remain still; an active reviver also freezes them. The ordinary ten-second, line-of-sight revive applies, with the same damage interruption and 30-health result.
+
+Bots value material pickups until 180 of a type and proactively harvest until 300 total, using reachable nearby props within 20 units. Wood, brick and metal come from actual pickaxe hits and the existing yields. No materials or combat advantages are granted directly.
 
 ## Friends and UI
 
@@ -26,4 +36,4 @@ Future coordinated releases must continue bumping the application version. Cache
 
 ## Verification
 
-`npm run test:private-social` exercises real sockets for private party hosts, friend admission, spectator actions and migration, public arena consolidation, launch cancellation, bot teammate commitment, Social persistence and authoritative gameplay. Capacity and performance checks run separately. `node scripts/private-social-browser-check.mjs` starts its relay, Vite and two browser contexts together and verifies the actual party creation, spectating and update screen flows. CI runs these checks for `[private-social]` releases before publishing Pages.
+`npm run test:host-royale` checks actual follow movement, complete human/bot revives, normal wood/brick/metal harvesting, real party/code sockets under server capacity, public arena authority, and browser flows for Royale PLAY and private arena loading/start screens. The browser checker verifies identical primary buttons at desktop and mobile widths. CI runs this focused suite for `[host-royale]` releases before publishing Pages, then verifies matching live builds, live Royale party hosting and live private arena code/start flows. The broader private-social suite remains available for Social changes.

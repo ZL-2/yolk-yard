@@ -4,6 +4,7 @@ import {eyeHeight} from './stance.js';
 import {navigate} from './bot-navigation.js';
 import {newBrain} from './bot-perception.js';
 import {skillFor} from './bot-config.js';
+import {ROYALE_TEAM_BOT as teamPolicy} from './bot-config.js';
 export const REVIVE_RULES=Object.freeze({seconds:10,range:2.6,health:30,vitality:100,bleed:2,decay:1,damageDelay:.75});
 export const activeMember=p=>!!p&&p.contestant&&p.health>0&&!p.downed&&!p.spectating&&!p.afkRemoved;
 export function mayDown(sim,p,source){return isTeamRoyale(sim.options)&&!p.downed&&!['Left round','Team eliminated','Disconnected'].includes(source)&&[...sim.players.values()].some(o=>teammates(sim.options,p,o)&&activeMember(o));}
@@ -46,10 +47,19 @@ export function resolveDownedTeams(sim){
  for(const p of sim.players.values())if(p.downed&&p.health>0&&!p.spectating&&![...sim.players.values()].some(o=>teammates(sim.options,p,o)&&activeMember(o)))sim.damage(p,null,p.health+1,'Team eliminated');
 }
 export function rescueBotInput(sim,p){
+ if(p.bot&&p.downed&&isTeamRoyale(sim.options)){
+  const mates=[...sim.players.values()].filter(o=>activeMember(o)&&teammates(sim.options,p,o)).sort((a,b)=>Number(a.bot)-Number(b.bot)||dist(p,a)-dist(p,b));
+  const mate=mates.find(o=>o.reviving===p.id||dist(p,o)<=teamPolicy.rescueHold)||mates[0];
+  const still={yaw:p.yaw,pitch:0,forward:0,strafe:0,slot:p.slot,fire:false,interact:false,jump:false,sprint:false,swapSlot:-1};
+  if(!mate||p.reviverId||mate.reviving===p.id||dist(p,mate)<=teamPolicy.rescueHold)return still;
+  const brain=p.brain??=newBrain(sim,p),path=navigate(sim,p,brain,mate,skillFor(sim)),yaw=Math.atan2(p.x-mate.x,p.z-mate.z);
+  return {...still,yaw,forward:-Math.sin(yaw)*path.mx-Math.cos(yaw)*path.mz,strafe:Math.cos(yaw)*path.mx-Math.sin(yaw)*path.mz};
+ }
  if(!activeMember(p)||!isTeamRoyale(sim.options)||p.flight!=='ground')return null;
- const mate=[...sim.players.values()].find(o=>o.downed&&o.health>0&&teammates(sim.options,p,o));if(!mate||dist(p,mate)>40)return null;
+ const mate=[...sim.players.values()].filter(o=>o.downed&&o.health>0&&!o.spectating&&(!o.reviverId||o.reviverId===p.id)&&teammates(sim.options,p,o)).sort((a,b)=>Number(a.bot)-Number(b.bot)||dist(p,a)-dist(p,b))[0];if(!mate)return null;
+ sim.cancelUse?.(p);
  const dx=mate.x-p.x,dz=mate.z-p.z,near=reviveAccessible(sim.map,p,mate);
  const yaw=Math.atan2(-dx,-dz),brain=p.brain??=newBrain(sim,p);
  const path=near?{mx:0,mz:0,jump:false}:navigate(sim,p,brain,mate,skillFor(sim,p));
- return {yaw,pitch:0,forward:-Math.sin(yaw)*path.mx-Math.cos(yaw)*path.mz,strafe:Math.cos(yaw)*path.mx-Math.sin(yaw)*path.mz,jump:path.jump,sprint:!near,interact:near,slot:p.slot};
+ return {yaw,pitch:0,forward:-Math.sin(yaw)*path.mx-Math.cos(yaw)*path.mz,strafe:Math.cos(yaw)*path.mx-Math.sin(yaw)*path.mz,jump:path.jump,sprint:!near,interact:near,slot:p.slot,fire:false,reload:false,aim:false,buildMode:false,swapSlot:-1};
 }
