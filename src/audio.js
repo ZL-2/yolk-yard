@@ -1,6 +1,5 @@
-import {OperatorRadio} from './operator-radio.js';
 import {LobbyMusic} from './lobby-music.js';
-// Original procedural effects, with locally hosted CC0 operator voice samples.
+// Original procedural sound palette. Every sound is generated locally, with no samples/CDN.
 import {FIREARM_SOUNDS,synthesizeShot,reloadSequence} from './firearm-audio.js';
 import {gun} from './data.js';
 import {getMap} from './maps.js';
@@ -8,10 +7,6 @@ import {ITEMS} from './royale-data.js';
 const note=(f,d=.12,v=.12,w='sine',to=0,at=0)=>({f,d,v,w,to,at});
 const noise=(f,d=.15,v=.15,at=0)=>({noise:true,f,d,v,at});
 export const SOUND_CUES={
- 'radio-open':[noise(2100,.065,.045),note(1450,.045,.045,'sine',0,.015)],
- 'radio-close':[note(1120,.035,.035),noise(1800,.05,.035,.025)],
- 'gear-ready':[noise(1100,.14,.06),noise(2800,.035,.045,.11),noise(700,.1,.04,.16)],
- 'operator-ready':[noise(2200,.055,.065,.18),note(290,.035,.035,'triangle',110,.24),noise(950,.06,.055,.29)],
  'world-ping':[note(740,.08,.08),note(1110,.13,.055,'sine',0,.065)],
  'danger-ping':[note(960,.09,.10,'triangle',580),note(960,.12,.075,'triangle',580,.14)],
  'teammate-down':[note(340,.18,.065,'triangle',170),note(250,.23,.06,'triangle',140,.19)],
@@ -86,11 +81,11 @@ for(const [i,id]of Object.keys(ITEMS).entries()){
 }
 export const SHOT_PALETTE={sprinter:[145,1200,.15],scatter:[78,700,.25],needle:[62,2100,.33],zipper:[210,1900,.10],thumper:[52,500,.45],anchor:[100,1100,.19],duet:[185,1800,.14],pip:[240,1800,.12],peeper:[105,2500,.21],doubleyolk:[95,900,.21],comet:[520,2400,.18]};
 export class Sound {
- constructor(){this.radio=new OperatorRadio(this);this.lobbyMusic=new LobbyMusic();this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];}
+ constructor(){this.lobbyMusic=new LobbyMusic();this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];}
  unlock(){
   this.lobbyMusic.unlock();
   if(!this.ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(Audio){this.ctx=new Audio();this.master=this.ctx.createGain();this.compressor=this.ctx.createDynamicsCompressor();this.master.connect(this.compressor).connect(this.ctx.destination);this.master.gain.value=this.volume;const size=this.ctx.sampleRate*2;this.noiseBuffer=this.ctx.createBuffer(1,size,this.ctx.sampleRate);const a=this.noiseBuffer.getChannelData(0);let seed=12345;for(let i=0;i<size;i++){seed=(seed*1664525+1013904223)>>>0;a[i]=seed/2147483648-1;}}}
-  this.ctx?.resume().catch(()=>{});this.radio.preload();
+  this.ctx?.resume().catch(()=>{});
  }
  setVolumes(settings){this.volume=settings.volume??this.volume;this.effectsVolume=settings.effectsVolume??.85;this.ambienceVolume=settings.ambienceVolume??.5;this.musicVolume=settings.musicVolume??.3;this.lobbyMusic.setVolume(this.enabled?this.volume*this.musicVolume:0);if(this.master)this.master.gain.setTargetAtTime(this.enabled?this.volume:0,this.ctx.currentTime,.03);}
  updateLobby(inLobby,dt,hidden=false){this.lobbyMusic.update(inLobby,dt,hidden);}
@@ -147,9 +142,8 @@ export class Sound {
   }
   if(loop){loop.gain.gain.setTargetAtTime(Math.max(0,target)*volume*this.ambienceVolume,this.ctx.currentTime,.3);if(!target){if(!loop.silentAt)loop.silentAt=this.clock;if(this.clock-loop.silentAt>1.5){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();this.loops.delete(id);}}else loop.silentAt=0;}
  }
- stopWorld(){this.radio.reset();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;}
+ stopWorld(){for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;}
  event(e,me,state){
-  this.radio.event(e,me);
   if(e.type==='round')this.cue('round-start');
   if(e.type==='royale-cue'){
    // Personal inventory cues are local, spatial actions are audible to nearby operators.

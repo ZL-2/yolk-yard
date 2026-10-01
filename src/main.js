@@ -1667,7 +1667,6 @@ function loop(now) {
     switchSpectator(1);
   view.spectateTarget = me?.spectating ? spectateTarget : null;
   sound.updateLobby(screen!=='game',dt,document.hidden);
-  sound.radio.update(state,me,screen==='game'&&!paused&&!document.hidden);
   sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!(!net&&paused));
   let renderPlayer = predicted;
   if (sim && !sim.remote && me) {
