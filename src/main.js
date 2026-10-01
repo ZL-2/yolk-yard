@@ -1,3 +1,7 @@
+import {careerMarkup} from './career-ui.js';
+import {recordCareerReceipt} from './career.js';
+import {lobbyNavigation} from './lobby-ui.js';
+import './menu-hub.css';
 import './deployment-ui.css';
 import {DeploymentUI} from './deployment-ui.js';
 import {crosshairRadius} from './combat.js';
@@ -119,6 +123,8 @@ let stats = read("yolk-stats", { matches: 0, kills: 0, wins: 0 }),
   options = matchOptions({map:"yard", mode:"ffa", fill:true});
 const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},stats.eggs||0),matchEarnings={total:0,status:'Match verification pending'};
 let progressMatch='';
+let menuSection=['locker','shop','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
+const menuShopStates={};
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
 let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
 let view,
@@ -177,7 +183,7 @@ const dialog = $("#dialog");
 const ownerConsole=new OwnerConsole({wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 startAnonymousVisits(()=>screen==='game'?(state?.royale?'royale':state?.options?.mode==='teams'?'teams':'ffa'):screen==='lobby'?'lobby':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
-window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(eggWallet.value.balance);if(dialogType==='egg-shop')eggShop?.render();}});
+window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(eggWallet.value.balance);if(eggShop?.root?.isConnected)eggShop.render();if(screen==='menu'&&menuSection==='career')renderMenu(true);}});
 const streakUI=new StreakUI(document.querySelector('#hud'));
 const royaleUI = new RoyaleUI(item=>view.itemPreview(item));
 const buildControls={buildMode:false,buildType:'wall',buildMaterial:'wood',buildRotation:0,editing:false};
@@ -214,10 +220,35 @@ function remember() {
 function titleBar() {
   return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
-function renderMenu() {
-  $("#menu").innerHTML=lobbyMarkup({profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance});
-  view?.setParty(party?.party?.members.filter(m=>m.id!==party.id).map(m=>m.profile)||[]);
+function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance};}
+function renderMenu(force=false) {
+ const root=$('#menu'),model=menuModel();
+ view?.setParty(party?.party?.members.filter(m=>m.id!==party.id).map(m=>m.profile)||[]);
+ if(!force&&menuSection!=='play'&&root.dataset.section===menuSection&&root.querySelector('.hub-page')){
+  const shell=document.createElement('template');shell.innerHTML=lobbyNavigation({...model,section:menuSection});root.querySelector('.yard-nav')?.replaceWith(shell.content.querySelector('.yard-nav'));return;
+ }
+ root.dataset.section=menuSection;
+ if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);return;}
+ root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':'Career'}" tabindex="-1">${menuSection==='career'?careerMarkup({stats,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
+ if(menuSection==='career')$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};
+ else {
+  eggShop??=new EggShop({wallet:eggWallet,view,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
+  eggShop.embedded=true;eggShop.onTab=tab=>selectMenuSection(tab==='locker'?'locker':'shop');eggShop.tab=menuSection==='locker'?'locker':'shop';
+  Object.assign(eggShop,{category:'all',search:'',sort:'featured',page:0},menuShopStates[menuSection]||{});
+  if(menuSection==='locker'&&!eggWallet.value.owned.includes(eggShop.selected))eggShop.selected=eggWallet.value.owned[0]||null;
+  eggShop.open($('#egg-shop'));
+ }
 }
+function selectMenuSection(section,push=true){
+ if(screen!=='menu')return;
+ if(eggShop?.pending){toast('Your purchase is saving. Please wait.');return;}
+ if(['shop','locker'].includes(menuSection)&&eggShop)menuShopStates[menuSection]=Object.fromEntries(['category','search','sort','page','selected'].map(k=>[k,eggShop[k]]));
+ if(dialog.open)closeDialog();menuSection=['play','locker','shop','career'].includes(section)?section:'play';
+ if(push&&location.hash!=='#'+menuSection)history.pushState({menuSection},'',location.pathname+location.search+'#'+menuSection);
+ renderMenu(true);$('#menu .hub-page')?.focus({preventScroll:true});
+}
+window.addEventListener('popstate',()=>{if(screen==='menu')selectMenuSection(location.hash.slice(1)||'play',false);});
+
 function profileMenu(){
   modal('Player details',`<label for="player-name">YOUR NAME</label><input class="field" id="player-name" maxlength="18" value="${esc(profile.name)}" autocomplete="off"><p id="name-safety" role="status"></p><button class="primary" data-action="close">DONE</button>`,'profile');
   $('#player-name').onchange=e=>{const checked=moderateText(e.target.value,{kind:'name'});profile.name=safeName(e.target.value);e.target.value=profile.name;$('#name-safety').textContent=checked.ok?'':'That name was filtered. Choose a friendly nickname.';remember();renderMenu();};
@@ -295,9 +326,10 @@ function loadoutMenu() {
 }
 let customTab = "shell";
 function customizeMenu(tab='shop') {
+  if(screen==='menu'){selectMenuSection(tab==='locker'?'locker':'shop');return;}
   modal('Outfitter','<div id="egg-shop"></div>','egg-shop');
   eggShop??=new EggShop({wallet:eggWallet,view,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
-  eggShop.tab=tab;eggShop.category='all';eggShop.page=0;eggShop.open($('#egg-shop'));
+  eggShop.embedded=false;eggShop.tab=tab;eggShop.category='all';eggShop.page=0;eggShop.open($('#egg-shop'));
 }
 function helpMenu() {
   modal(
@@ -452,8 +484,8 @@ function callbacks() {
         void eggWallet.awardVerified(r).then(({applied})=>{
           if(!applied)return;
           matchEarnings.total=r.amount;matchEarnings.status=r.reason;
-          if(r.eligible){stats.matches++;stats.kills+=r.kills;stats.wins+=Number(r.won);stats.assists=(stats.assists||0)+r.assists;stats.modes??={};const m=stats.modes[r.mode]??={matches:0,wins:0,kills:0,assists:0,placements:[]};m.matches++;m.wins+=Number(r.won);m.kills+=r.kills;m.assists+=r.assists;if(r.mode==='royale')m.placements=[...m.placements,r.place].slice(-100);}
-          stats.eggs=eggWallet.value.earned;save('yolk-stats',stats);if(r.amount)toast('+'+r.amount+' Marks · '+r.label);if(dialogType==='results')resultsMenu();
+          stats=recordCareerReceipt(stats,r);
+          stats.eggs=eggWallet.value.earned;save('yolk-stats',stats);if(r.amount)toast('+'+r.amount+' Marks · '+r.label);if(dialogType==='results')resultsMenu();if(screen==='menu'&&menuSection==='career')renderMenu(true);
         }).catch(e=>toast(e.message));
       }else if(type==='afk'&&event.remaining<=0){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');}
       else if(type==='afk-enforce'&&sim&&!sim.remote){const p=sim.players.get(event.player);if(p){p.afkRemoved=true;p.health=0;p.spectating=true;p.contestant=false;sim.emit('afk-removed',{player:p.id});}}
@@ -1100,7 +1132,7 @@ const actions = {
  'owner-refresh':()=>ownerConsole.refresh(),
  'owner-logout':()=>ownerConsole.logout(),
  'play':()=>playMenu(),
- 'lobby-home':()=>{if(screen==='menu')closeDialog();},
+ 'lobby-home':()=>selectMenuSection('play'),
  'profile':profileMenu,
  'locker':()=>customizeMenu('locker'),
  'item-shop':()=>customizeMenu('shop'),
@@ -1110,7 +1142,7 @@ const actions = {
  'social-retry-identity':()=>{party.retryIdentity();closeDialog();},
  'social-new-identity':()=>modal('Create New Friend Code?',`<p>This creates a separate identity with an empty friend list. It does not restore your old friendships. Your previous browser credential will be kept for recovery.</p><div class="actions"><button class="primary" data-action="social-confirm-new-identity">CREATE NEW CODE</button><button data-action="social">GO BACK</button></div>`,'social-new-identity'),
  'social-confirm-new-identity':()=>{party.newIdentity();closeDialog();},
- 'career':()=>modal('Career',`<div class="account-stats"><span>Matches <b>${stats.matches}</b></span><span>Eliminations <b>${stats.kills}</b></span><span>Wins <b>${stats.wins}</b></span><span>Assists <b>${stats.assists||0}</b></span></div><p>Verified online matches contribute to progression. Spawn Island and practice do not count. Existing career history is preserved.</p><div class="career-modes">${Object.entries(stats.modes||{}).map(([id,m])=>`<p><b>${id==='royale'?'Frontier Royale':id==='teams'?'Team Scramble':'Free for All'}</b> · ${m.matches} matches · ${m.wins} wins · ${m.kills} eliminations${m.placements.length?' · Best placement #'+Math.min(...m.placements.filter(n=>n>0)):''}</p>`).join('')}</div><p>Stats and Marks are saved on this device.</p><button class="primary" data-action="close">DONE</button>`),
+ 'career':()=>selectMenuSection('career'),
  'find-public':()=>queueParty(),
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
  'duo-fill':()=>partyRequest('select',{...party.party.selection,teamFill:true,duoFill:true}),
@@ -1204,7 +1236,7 @@ const actions = {
   about: () =>
     modal(
       "Welcome to the frontier",
-      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.4 · All gameplay code is included in the project.</p>`,
+      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.6.0 · All gameplay code is included in the project.</p>`,
       "about",
     ),
 };
