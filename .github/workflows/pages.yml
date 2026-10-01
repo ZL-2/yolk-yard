@@ -30,6 +30,9 @@ jobs:
       - run: npm ci
       - run: npm test
         if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]')"
+      - name: Verify publishing recovery
+        if: contains(github.event.head_commit.message, '[deployment-recovery]')
+        run: node --test tests/deployment.test.js tests/deployment-ui.test.js tests/updates.test.js
       - name: Verify procedural audio
         if: contains(github.event.head_commit.message, '[operator-audio]')
         run: node --test tests/audio.test.js

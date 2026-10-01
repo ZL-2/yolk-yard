@@ -1,3 +1,4 @@
+import './deployment-ui.css';
 import {DeploymentUI} from './deployment-ui.js';
 import {crosshairRadius} from './combat.js';
 import {showWelcomeBack} from './welcome-back.js';
