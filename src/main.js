@@ -2,8 +2,6 @@ import {careerMarkup} from './career-ui.js';
 import {recordCareerReceipt} from './career.js';
 import {lobbyNavigation} from './lobby-ui.js';
 import './menu-hub.css';
-import './deployment-ui.css';
-import {DeploymentUI} from './deployment-ui.js';
 import {crosshairRadius} from './combat.js';
 import {showWelcomeBack} from './welcome-back.js';
 import {loadingMarkup,showLoading,hideLoading,waitForLoading} from './loading-screen.js';
@@ -548,8 +546,6 @@ function callbacks() {
       connectionReport.performance.update(performance.now()-updateStarted,pendingInputs.length);
     },
     onError: async (message) => {
-      await deployment.check();
-      if(deployment.active){leave(false,false);return;}
       leave(false);
       modal(
         "Connection ended",
@@ -558,7 +554,6 @@ function callbacks() {
       );
     },
     onStatus: (message) => toast(message),
-    onDeployment: status=>deployment.accept(status),
   };
 }
 function beginSim() {
@@ -1090,7 +1085,6 @@ function receiveInvite(invite){
  tray.append(node);while(tray.children.length>3)tray.firstChild.remove();setTimeout(()=>node.remove(),Math.max(0,invite.expires-Date.now()));sound.cue('queue-found');
 }
 async function queueParty(custom=false,code=null){
- if(deployment.active)return;
  if(state){toast('Return to the lobby before finding another match.');return;}
  const selected=custom?getOptions():matchOptions({...party?.party?.selection,fill:true,bots:party?.party?.selection.mode==='royale'?31:7});
  if(!selected)return;
@@ -1098,7 +1092,7 @@ async function queueParty(custom=false,code=null){
  if(await partyRequest('queue',{custom,code,options:selected,visibility:custom?'private':'public'})){dialog.close();dialogType='';renderMenu();}
 }
 async function queuePublicRoyale(spectate=false){
- if(deployment.active||state)return;
+ if(state)return;
  if(await partyRequest('queue',{publicRoyale:true,spectate})){dialog.close();dialogType='';renderMenu();}
 }
 async function launchParty(launch){
@@ -1118,7 +1112,7 @@ function initializeParty(){
  party=new PartyClient(profile,{
   status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'&&screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
-  invite:receiveInvite,launch:launchParty,deployment:status=>deployment.accept(status),
+  invite:receiveInvite,launch:launchParty,
   'public-match':refreshPublicMatch,
   'social-changed':scheduleSocialRefresh,
   'party-notice':m=>toast(m.message),
@@ -1248,7 +1242,7 @@ const actions = {
   about: () =>
     modal(
       "Welcome to the frontier",
-      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.8.1 · All gameplay code is included in the project.</p>`,
+      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.8.2 · All gameplay code is included in the project.</p>`,
       "about",
     ),
 };
@@ -1840,15 +1834,13 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   };
 
 
-const deployment=new DeploymentUI({build:__BUILD_ID__,onStart:()=>{paused=true;keys.clear();queuedActions.clear();input.fire=input.aim=false;},onReady:build=>{
- if(build){const url=new URL(location.href);url.searchParams.set('build',build);url.searchParams.set('refresh',Date.now());location.replace(url.href);}else if(screen==='menu')renderMenu();else if(screen==='game')pauseMenu();
-}});
+// Retire the old blocking update latch, including sessions saved before this fix.
+try{sessionStorage.removeItem('ravelfront-update-pending');}catch{}
 // Each deployment emits its build identifier next to index.html.
 const updates = new UpdateWatcher({
   build: __BUILD_ID__,
   isInMatch: () => screen === "game" || state?.phase === "playing",
   fetchVersion: async () => {
-    if(deployment.active)return null;
     const url = new URL("version.json", location.href);
     url.searchParams.set("t", Date.now());
     const response = await fetch(url, { cache: "no-store" });
