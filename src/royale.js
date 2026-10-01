@@ -1,4 +1,5 @@
 import {COMBAT_LIMITS,UTILITY_WEAPONS} from './weapon-balance.js';
+import {PUBLIC_ROYALE} from './public-royale.js';
 import {rng} from './data.js';
 import {nearbyItems} from './nearby-items.js';
 import {markerAction} from './team-markers.js';
@@ -122,7 +123,7 @@ export class RoyaleSimulation extends Simulation {
   let seated=0;for(const p of humans){const contestant=!p.friendSpectator&&seated++<humanSeats;Object.assign(p,{contestant,lateSpectator:!contestant,spectating:!contestant,team:-1});}
   this.matchTeams={};for(const p of humans)this.assignTeam(p);
   this.startReason=null;this.maxPlayers=this.options.capacity+MAX_SPECTATORS;this.addBots();
-  this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.round++;this.phase='playing';this.stage=RP.ISLAND;this.queueEnds=this.time+(this.options.session==='offline'?OFFLINE_WARMUP_SECONDS:WARMUP_SECONDS);this.startedAt=0;this.elapsed=0;this.winner='';this.winnerId=null;this.winnerTeam=-1;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.chests=[];this.lootId=0;this.lootVersion++;this.pads=[];this.alive=0;this.remaining=0;
+  this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.round++;this.phase='playing';this.stage=RP.ISLAND;this.queueEnds=this.time+(this.options.recurring?PUBLIC_ROYALE.warmupSeconds:this.options.session==='offline'?OFFLINE_WARMUP_SECONDS:WARMUP_SECONDS);this.lastCountdown=null;this.startedAt=0;this.elapsed=0;this.winner='';this.winnerId=null;this.winnerTeam=-1;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.chests=[];this.lootId=0;this.lootVersion++;this.pads=[];this.alive=0;this.remaining=0;
   this.map={...SPAWN_ISLAND,boxes:SPAWN_ISLAND.boxes.map(b=>({...b}))};resetBuilding(this);this.nav=navigation(SPAWN_ISLAND);this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
   for(const p of this.players.values()){if(p.contestant)this.spawnWarmup(p);else Object.assign(p,{health:0,contestant:false,lateSpectator:true,spectating:true,flight:'out'});}
   this.departureMs=null;
@@ -142,11 +143,12 @@ export class RoyaleSimulation extends Simulation {
  }
  beginBattle(reason='manual'){
   if(!isWarmup(this.stage)||this.phase!=='playing')return false;
+  if(this.options.recurring&&!this.humanContestants().length){this.resetPublicWarmup();return false;}
   const departureStarted=performance.now();
   for(const p of [...this.players.values()])if(!p.bot&&p.connected===false)this.removePlayer(p.id);
   // Commit only complete invited groups. An invitation arriving at the cutoff
   // never sends one party member into combat and the other into spectating.
-  for(const p of this.players.values())if(p.contestant&&p.partyId&&p.partySize>1&&[...this.players.values()].filter(o=>!o.bot&&o.connected!==false&&o.partyId===p.partyId).length<p.partySize)Object.assign(p,{contestant:false,spectating:true,lateSpectator:true,health:0,flight:'out'});
+  for(const p of this.players.values())if(!this.options.recurring&&p.contestant&&p.partyId&&p.partySize>1&&[...this.players.values()].filter(o=>!o.bot&&o.connected!==false&&o.partyId===p.partyId).length<p.partySize)Object.assign(p,{contestant:false,spectating:true,lateSpectator:true,health:0,flight:'out'});
   this.addBots();this.fillBotTeammates();
   const seats=[...this.players.values()].filter(p=>p.contestant);
   if(seats.length<2||isTeamRoyale(this.options)&&livingTeams(this.options,seats).size<2){this.queueEnds=this.time+10;this.stage=RP.ISLAND;return false;}
@@ -303,8 +305,9 @@ export class RoyaleSimulation extends Simulation {
  eliminationCredit(victim,attacker){return victim.downed&&this.players.get(victim.knockedBy)||attacker;}
  admitPlayer(id,profile,admission=null){
   if(this.players.has(id))return this.players.get(id);
-  if(admission?.spectator){const p=this.addPlayer(id,profile,false,true);if(p)Object.assign(p,{watchId:admission.watchId,partyId:admission.partyId,memberId:admission.memberId});return p;}
-  if(admission&&(admission.teamSize!==this.options.teamSize||this.options.teamSize<(admission.partySize||1)))return null;
+  this.advanceWarmupClock();
+  if(admission?.spectator){const p=this.addPlayer(id,profile,false,true);if(p)Object.assign(p,{friendSpectator:!admission.publicSpectator,watchId:admission.watchId,partyId:admission.partyId,memberId:admission.memberId,partySize:admission.partySize||1});return p;}
+  if(admission&&(admission.teamSize!==this.options.teamSize||!this.options.recurring&&this.options.teamSize<(admission.partySize||1)))return null;
   if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;
   if(acceptsContestants(this.stage)){
    const humans=[...this.players.values()].filter(p=>!p.bot&&p.contestant),groups=new Map();
@@ -331,6 +334,7 @@ export class RoyaleSimulation extends Simulation {
    for(const b of this.projectiles)if(b.owner===id)b.owner=botId;for(const b of this.builds)if(b.owner===id)b.owner=botId;
    this.players.set(botId,p);this.emit('leave',{name:p.name});
   }else this.removePlayer(id);
+  if(this.options.recurring&&isWarmup(this.stage))this.addBots();
  }
  removePlayer(id){const p=this.players.get(id);if(p&&this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant&&p.health>0){p.connected=false;this.damage(p,null,p.health+p.shield+1,'Disconnected');}super.removePlayer(id);if(this.matchTeams?.[p?.team]){const team=this.matchTeams[p.team];team.members=team.members.filter(member=>member!==id);if(!team.members.length)delete this.matchTeams[p.team];}if(!isWarmup(this.stage))resolveDownedTeams(this);}
  playerAction(id,action){
@@ -353,6 +357,7 @@ export class RoyaleSimulation extends Simulation {
   }
   if(action==='spectate'&&p.health>0){this.damage(p,null,p.health+p.shield+1,'Left round');if(p.flight==='transport'){p.health=0;this.eliminate(p);}}
  }
+ resetPublicWarmup(){this.queueEnds=this.time+PUBLIC_ROYALE.warmupSeconds;this.stage=RP.ISLAND;this.lastCountdown=null;this.startReason=null;}
  advanceWarmupClock(unsteppedSeconds=0){
   if(this.phase!=='playing'||!isWarmup(this.stage))return;
   // The host's physics loop intentionally drops long frame gaps. Translate
@@ -361,7 +366,8 @@ export class RoyaleSimulation extends Simulation {
   if(Number.isFinite(unsteppedSeconds))this.queueEnds-=Math.max(0,unsteppedSeconds);
    const count=Math.ceil(this.queueEnds-this.time);this.stage=count<=5?RP.STARTING:RP.ISLAND;
    if(count>0&&count<=5&&this.lastCountdown!==count){this.lastCountdown=count;this.emit('royale-cue',{cue:'countdown'});}
-   const full=this.options.session!=='offline'&&this.humanContestants().length>=this.options.capacity;
+   if(this.options.recurring&&this.time>=this.queueEnds&&!this.humanContestants().length){this.resetPublicWarmup();return;}
+   const full=!this.options.recurring&&this.options.session!=='offline'&&this.humanContestants().length>=this.options.capacity;
    if(full||this.time>=this.queueEnds)this.beginBattle(full?'human-full':'timer');
  }
  tick(dt){

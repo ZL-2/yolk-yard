@@ -9,6 +9,7 @@ export class PartyClient {
    else if(m.type==='hello'){if(m.identityReset||this.helloToken&&m.token!==this.helloToken){this.blockIdentity('Your saved Friend Code could not be restored. Your browser credential has been kept.');return;}this.id=m.id;this.code=m.code;this.ready=true;try{localStorage.setItem('ravelfront-social-identity',m.token);sessionStorage.removeItem('yolk-party-token');}catch{}this.handlers.status?.('Connected');}
    else if(m.type==='reply'){const pending=this.pending.get(m.request);if(pending){clearTimeout(pending.timer);this.pending.delete(m.request);m.error?pending.reject(Error(m.error)):pending.resolve(m.result);}}
    else if(m.type==='deployment')this.handlers.deployment?.(m.deployment);
+   else if(m.type==='public-match'){this.publicMatch=m.match;this.publicMatchAt=performance.now();this.handlers['public-match']?.(m.match);}
    else if(m.type==='party'){this.party=m.party;this.handlers.change?.(m.party);}
    else this.handlers[m.type]?.(m[m.type]??m);
   };

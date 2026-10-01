@@ -1,5 +1,5 @@
 import {timingPhase,roomTiming,recordTiming,startTiming,finishTiming} from './timing.js';
-import {randomInt} from 'node:crypto';
+import {randomInt,randomUUID} from 'node:crypto';
 import {Simulation} from '../../src/simulation.js';
 import {RoyaleSimulation} from '../../src/royale.js';
 import {VERSION,safeProfile,nameKey} from '../../src/data.js';
@@ -9,7 +9,8 @@ import {ChatRoom} from '../../src/chat.js';
 import {rewardFrame} from '../../src/rewards.js';
 import {visibleMarkers} from '../../src/team-markers.js';
 import {isTeamRoyale} from '../../src/teams.js';
-import {acceptsContestants} from '../../src/royale-phases.js';
+import {acceptsContestants,isWarmup,MAX_HUMANS,MAX_SPECTATORS} from '../../src/royale-phases.js';
+import {PUBLIC_ROYALE,publicRoyaleOptions} from '../../src/public-royale.js';
 import {MatchCapacity,busyMessage} from './capacity.js';
 const address=new RegExp('^yolk-yard-v'+VERSION+'-([A-Z2-9]{8})$');
 // The relay owns simulation and persistent room lifetime. Browsers submit bounded
@@ -18,22 +19,27 @@ export class MatchAuthority{
  constructor(relay){this.relay=relay;this.rooms=new Map();this.capacity=new MatchCapacity(this);this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),1000/60);this.timer.unref?.();}
  roomFor(peer){return this.rooms.get(peer.authorityRoom);}
  connection(peer,connected){const room=this.roomFor(peer),p=room?.sim.players.get(peer.authorityId);if(p){p.connected=connected;if(p.activity)p.activity.last=room.sim.time;}}
- send(peer,message,serialized){if(this.relay.peers.has(peer.id))this.relay.send(peer,message,serialized);}
+ send(peer,message,serialized){if(peer&&this.relay.peers.has(peer.id))this.relay.send(peer,message,serialized);}
+ ensurePublicRoyale(){
+  const key=`yolk-yard-v${VERSION}-${PUBLIC_ROYALE.code}`;
+  if(this.rooms.has(key))return this.rooms.get(key);
+  const sim=new RoyaleSimulation({...publicRoyaleOptions(),seed:randomInt(1,2147483647)});
+  const hostPeer={id:key,token:randomUUID(),virtualRoom:true,ws:null,links:new Map(),pending:[],pendingBytes:0,seq:0,acked:0,clientSeq:0,history:[],historyBytes:0,lastSeen:Date.now(),rewardPublic:true};
+  const room={key,code:PUBLIC_ROYALE.code,owner:'server',hostPeer,sim,recurring:true,visibility:'public',members:new Map(),chat:new ChatRoom(),encoders:new Map(),eventCursors:new Map(),age:0,frameAt:0,progressAt:0,kicked:new Set()};
+  this.relay.peers.set(key,hostPeer);this.rooms.set(key,room);sim.startRound();this.publish(room);return room;
+ }
+ get publicRoom(){return this.rooms.get(`yolk-yard-v${VERSION}-${PUBLIC_ROYALE.code}`);}
+ publicSummary(){
+  const room=this.publicRoom;if(!room)return null;
+  const sim=room.sim,players=[...sim.players.values()],warmup=sim.phase==='playing'&&acceptsContestants(sim.stage),results=sim.phase==='results';
+  const humanPlayers=players.filter(p=>!p.bot&&!p.lateSpectator&&p.connected!==false).length;
+  const spectators=players.filter(p=>!p.bot&&p.lateSpectator&&p.connected!==false).length;
+  const countdownSeconds=warmup?Math.max(0,Math.ceil(sim.queueEnds-sim.time)):0;
+  const estimatedSeconds=results?Math.max(0,Math.ceil((room.restartAt??room.age+PUBLIC_ROYALE.restartSeconds)-room.age)):Math.max(0,Math.ceil((sim.stormSteps.at(-1)?.end||600)+20-(warmup?0:sim.elapsed)))+countdownSeconds;
+  return {code:room.code,version:VERSION,round:sim.round,matchId:sim.matchId,stage:sim.stage,phase:sim.phase,capacity:sim.options.capacity,difficulty:sim.options.difficulty,humanPlayers,spectators,botPlayers:players.filter(p=>p.bot&&p.contestant).length,alive:warmup?sim.options.capacity:sim.alive,joinable:warmup,countdownSeconds,estimatedSeconds,restartSeconds:results?estimatedSeconds:0,availableSeats:Math.max(0,sim.options.capacity-this.capacity.humans(room)-this.capacity.pending(room.key)),availableSpectators:Math.max(0,MAX_SPECTATORS-this.capacity.spectators(room)-this.capacity.pending(room.key,true))};
+ }
  create(peer,m){
-  const reject=reason=>this.send(peer,{type:'authority-error',reason});
-  const match=address.exec(peer.id);if(!match||this.rooms.has(peer.id))return reject('This match address is unavailable.');
-  const options={...matchOptions({...m.options,session:'online'}),seed:randomInt(1,2147483647)};
-  const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,peer.id):null;
-  if(options.mode==='royale'||m.visibility==='private'||admission?.hostRun)return reject('Battle Royale and Custom Private Matches run on the player host. Return to Play to open a hosted match.');
-  if(this.rooms.size>=24)return reject(busyMessage);
-  if(m.ticket&&!admission||admission&&(admission.teamSize!==options.teamSize||options.mode==='royale'&&admission.partySize>options.teamSize))return reject('Party reservation expired. Return to the lobby and try again.');
-  const reserved=admission&&this.capacity.reservations.get(admission.partyId);
-  const plan=this.capacity.plan(options,{key:peer.id,humans:admission?.partySize||1,botLimit:reserved?.botLimit});if(!plan.ok)return reject(plan.reason);
-  const sim=options.mode==='royale'?new RoyaleSimulation(options):new Simulation(options);sim.botLimit=plan.botLimit;
-  const p=sim.addPlayer('host',safeProfile(m.profile));p.loading=true;peer.controlReady=false;sim.assignTeam?.(p,admission);
-  const room={key:peer.id,code:match[1],owner:'host',hostPeer:peer,sim,visibility:m.visibility==='private'?'private':'public',members:new Map([['host',peer]]),chat:new ChatRoom(),encoders:new Map(),eventCursors:new Map(),age:0,frameAt:0,progressAt:0,kicked:new Set()};
-  this.rooms.set(peer.id,room);peer.authorityRoom=peer.id;peer.authorityId='host';
-  if(options.mode==='royale')sim.startRound();this.publish(room);this.send(peer,{type:'authority-ready',id:'host',room:room.key});this.broadcast(room);
+  this.send(peer,{type:'authority-error',reason:'Custom matches run on the player host. The recurring public Royale is the only server-run match; join it from Play.'});
  }
  connect(peer,other,channel){const room=this.rooms.get(other.id);if(!room)return false;this.send(peer,{type:'opened',channel});return true;}
  data(peer,other,entry){
@@ -43,10 +49,13 @@ export class MatchAuthority{
    const reject=reason=>this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason}});
    if(m.version!==VERSION||room.kicked.has(peer.progressId))return reject('Refresh the game or choose another room.'),true;
    const profile=safeProfile(m.profile);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
-   const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission)return reject('Party reservation expired.'),true;
+   const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission||room.recurring&&!admission)return reject('Party reservation expired. Join the public match from Play.'),true;
+   room.sim.advanceWarmupClock?.();
    const reserved=admission&&this.capacity.reservations.has(admission.partyId);
    const spectator=!!admission?.spectator||room.sim.options.mode==='royale'&&!acceptsContestants(room.sim.stage),added=room.sim.players.has(peer.id)?0:1;
-   const plan=this.capacity.plan(room.sim.options,{key:room.key,humans:this.capacity.humans(room)+this.capacity.pending(room.key)+(!spectator&&!reserved?added:0),spectators:this.capacity.spectators(room)+this.capacity.pending(room.key,true)+(spectator&&!reserved?added:0),botLimit:room.sim.botLimit});if(!plan.ok)return reject(plan.reason),true;
+   // Joining this fixed roster replaces a bot; it never allocates another room
+   // or trims the promised 48 contestants through generic workload admission.
+   const plan=room.recurring?{ok:!spectator||this.capacity.spectators(room)<MAX_SPECTATORS,reason:'The public spectator seats are full. Try again shortly.'}:this.capacity.plan(room.sim.options,{key:room.key,humans:this.capacity.humans(room)+this.capacity.pending(room.key)+(!spectator&&!reserved?added:0),spectators:this.capacity.spectators(room)+this.capacity.pending(room.key,true)+(spectator&&!reserved?added:0),botLimit:room.sim.botLimit});if(!plan.ok)return reject(plan.reason),true;
    const p=room.sim.admitPlayer(peer.id,profile,admission);if(!p)return reject('This room is full.'),true;
    peer.authorityRoom=room.key;peer.authorityId=p.id;peer.controlReady=false;p.loading=true;room.members.set(p.id,peer);room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));
    this.send(peer,{type:'data',channel:entry.channel,data:{type:'welcome',id:p.id,hostId:room.owner,members:this.members(room),code:room.code,version:VERSION,serverAuthority:true}});this.broadcast(room);return true;
@@ -69,7 +78,7 @@ export class MatchAuthority{
   if(m.type==='profile'){const ok=sim.setProfile(id,safeProfile(m.profile));this.send(peer,{type:'authority-notice',event:ok===false?'name-required':'name-accepted'});return;}
   if(m.type==='chat-send'){const result=room.chat.submit(id,m,sim.snapshot());if(!result.ok)this.send(peer,{type:'authority-notice',event:'chat-status',data:result});else for(const recipient of result.recipients){const target=room.members.get(recipient);if(target)this.send(target,{type:'authority-notice',event:'chat-message',data:result.message});}return;}
   if(m.type==='chat-report'){const report=room.chat.report(id,m.target,m.reason,sim.snapshot());if(report)this.send(room.members.get(room.owner),{type:'authority-notice',event:'chat-report',data:report});return;}
-  if(!leader)return;
+  if(room.recurring||!leader)return;
   if(m.type==='start'&&sim.phase!=='playing'){if(peer.authorityConfigRejected){peer.authorityConfigRejected=false;return;}const plan=this.capacity.roundPlan(room);if(!plan.ok){this.send(peer,{type:'authority-notice',event:'match-capacity',data:{message:plan.reason}});return;}this.capacity.rematch(room.key);sim.startRound();this.broadcast(room);}
   if(m.type==='configure'&&sim.phase!=='playing'){
    if(m.options?.mode==='royale'){peer.authorityConfigRejected=true;this.send(peer,{type:'authority-notice',event:'match-capacity',data:{message:'Battle Royale runs on the player host. Return to Play to open a Royale match.'}});return;}
@@ -84,9 +93,10 @@ export class MatchAuthority{
   if(m.type==='chat-muted'&&room.members.has(m.id)&&m.id!==id){if(m.muted)room.chat.muted.add(m.id);else room.chat.muted.delete(m.id);}
   if(m.type==='kick'&&m.id!==id){const target=room.members.get(m.id);if(target){room.kicked.add(target.progressId);this.send(target,{type:'authority-notice',event:'kicked'});this.disconnect(target);}}
  }
- publish(room){const s=room.sim,p=room.hostPeer;const humans=[...s.players.values()].filter(p=>!p.bot&&!p.lateSpectator);p.listedAt=Date.now();p.listing={code:room.code,version:VERSION,host:s.players.get(room.owner)?.name||'Operator',map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize,players:humans.length,capacity:Math.min(16,s.options.capacity),contestantCapacity:s.options.capacity,public:room.visibility==='public',phase:s.stage&&['spawn-island','starting','waiting'].includes(s.stage)?'lobby':s.phase};}
+ publish(room){const s=room.sim,p=room.hostPeer;const humans=[...s.players.values()].filter(p=>!p.bot&&!p.lateSpectator&&p.connected!==false);p.listedAt=Date.now();p.listing={code:room.code,version:VERSION,host:room.recurring?'Recurring Frontier Royale':s.players.get(room.owner)?.name||'Operator',map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize,players:humans.length,capacity:Math.min(MAX_HUMANS,s.options.capacity),contestantCapacity:s.options.capacity,public:room.visibility==='public',recurring:!!room.recurring,phase:isWarmup(s.stage)?'lobby':s.phase};}
  broadcast(room){
   const broadcastStarted=startTiming();roomTiming(room);room.timing.cpuQuota=this.relay.cpuQuota?.snapshot();
+  if(!room.members.size){this.publish(room);return;}
   // Avoid cloning sleeping world collections only to discard them below.
   const sim=room.sim,worldKey=sim.options.mode==='royale'?`${sim.matchId}:${sim.map.id}:${sim.round}`:null;
   const lootKey=worldKey?`${worldKey}:${sim.lootVersion}`:null,buildKey=worldKey?`${worldKey}:${sim.buildVersion}`:null;
@@ -119,12 +129,13 @@ export class MatchAuthority{
    const message=encoder.encode({type:'authority-state',state:outgoing},batch);this.send(peer,{type:'authority-frame',frame:message.frame},batch.serialize(message.frame));
   }
   if(!room.publishedAt||room.age-room.publishedAt>=2){this.publish(room);room.publishedAt=room.age;}
-  if(room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,'host',room.sim.inputs.get('host')||{}));}
+  if(room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,room.owner,room.sim.inputs.get(room.owner)||{}));}
   const broadcastCost=finishTiming(broadcastStarted);recordTiming(room,timingPhase(room.sim),'broadcastMaxMs',broadcastCost.wallMs,broadcastCost.cpuMs);
  }
  disconnect(peer){
   const room=this.roomFor(peer),id=peer.authorityId;if(!room||room.members.get(id)!==peer)return false;
   room.sim.leavePlayer(id);room.members.delete(id);room.encoders.delete(id);room.eventCursors.delete(id);delete peer.authorityRoom;delete peer.authorityId;
+  if(room.recurring){room.sim.setConnectedHumans([...room.members].filter(([,p])=>p.ws).map(([id])=>id));this.broadcast(room);return false;}
   if(!room.members.size){this.rooms.delete(room.key);this.capacity.releaseRoom(room.key);room.hostPeer.virtualRoom=false;room.hostPeer.listing=null;if(room.hostPeer!==peer)this.relay.remove(room.hostPeer);return false;}
   if(id===room.owner){room.owner=[...room.members.keys()].find(pid=>!room.sim.players.get(pid)?.friendSpectator);for(const member of room.members.values())this.send(member,{type:'authority-owner',id:room.owner});}
   if(peer===room.hostPeer){peer.virtualRoom=true;peer.detachedAt=0;peer.ws?.close(1000,'Session ended');peer.ws=null;}
@@ -136,15 +147,16 @@ export class MatchAuthority{
   const sliceStarted=performance.now();
   const elapsed=Math.max(0,(now-this.last)/1000);this.last=now;this.accumulator=Math.min(.75,this.accumulator+elapsed);let steps=0;
   for(const room of this.rooms.values()){
-   if(room.visibility==='public'&&room.sim.options.mode!=='royale'&&room.sim.phase==='results'){room.restartAt??=room.age+10;if(room.age>=room.restartAt){room.sim.startRound();delete room.restartAt;}}
+   if(room.recurring&&room.sim.phase==='results'){room.restartAt??=room.age+PUBLIC_ROYALE.restartSeconds;if(room.age>=room.restartAt){this.capacity.rematch(room.key);room.sim.startRound();delete room.restartAt;room.encoders.clear();room.eventCursors.clear();}}
    recordTiming(room,timingPhase(room.sim),'gapMaxMs',elapsed*1000);
   }
-  while(this.accumulator+1e-8>=1/60&&steps++<6){this.accumulator=Math.max(0,this.accumulator-1/60);for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;const phase=timingPhase(room.sim),start=startTiming();room.sim.tick(1/60);const cost=finishTiming(start);recordTiming(room,phase==='spawn'&&timingPhase(room.sim)==='bus'?'departure':phase,'stepMaxMs',cost.wallMs,cost.cpuMs);}
+  while(this.accumulator+1e-8>=1/60&&steps++<6){this.accumulator=Math.max(0,this.accumulator-1/60);for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;const phase=timingPhase(room.sim),start=startTiming();if(room.recurring&&isWarmup(room.sim.stage)&&![...room.members.values()].some(p=>p.ws)){room.sim.time+=1/60;room.sim.advanceWarmupClock();room.sim.prepareBattleWorld();}else room.sim.tick(1/60);const cost=finishTiming(start);recordTiming(room,phase==='spawn'&&timingPhase(room.sim)==='bus'?'departure':phase,'stepMaxMs',cost.wallMs,cost.cpuMs);}
    if(performance.now()-sliceStarted>=4)break;
   }
   // One fresh broadcast after catch-up, never several obsolete broadcasts in a burst.
   // Three 60 Hz steps can sum just below 50 ms; use the same tolerance as catch-up.
   for(const room of this.rooms.values())if(room.age-room.frameAt+1e-8>=.05){room.frameAt=room.age;this.broadcast(room);}
+  if(!this.publicStatusAt||now-this.publicStatusAt>=1000){this.publicStatusAt=now;this.relay.parties.publishPublicMatch(this.publicSummary());}
   // A throttled tick must not be followed by five more ticks before socket IO.
   // Yield between catch-up slices while retaining earned simulation time.
   if(this.accumulator+1e-8>=1/60&&this.rooms.size){this.catchup=setImmediate(()=>{this.catchup=null;this.tick();});this.catchup.unref?.();}

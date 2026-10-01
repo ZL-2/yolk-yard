@@ -1,9 +1,10 @@
 const count=n=>Number.isFinite(Number(n))?Math.max(0,Math.floor(Number(n))):0;
-export const CAREER_MODES={all:'All deployments',royale:'Frontier Royale',ffa:'Free For All',teams:'Team Scramble'};
+export const CAREER_MODES={all:'All deployments',royale:'Frontier Royale',ffa:'Free For All'};
+export const CAREER_MODE_LABELS={...CAREER_MODES,teams:'Team Scramble (retired)'};
 export const CAREER_GRADES=[{name:'Recruit',score:0},{name:'Scout',score:1000},{name:'Operator',score:3500},{name:'Specialist',score:8000},{name:'Vanguard',score:16000},{name:'Commander',score:30000}];
 export function recordCareerReceipt(stats,receipt){
  if(!receipt?.eligible||typeof receipt.id!=='string'||stats.careerReceiptIds?.includes(receipt.id))return stats;
- const mode=Object.hasOwn(CAREER_MODES,receipt.mode)&&receipt.mode!=='all'?receipt.mode:'ffa';
+ const mode=Object.hasOwn(CAREER_MODE_LABELS,receipt.mode)&&receipt.mode!=='all'?receipt.mode:'ffa';
  const next={...stats,matches:count(stats.matches)+1,kills:count(stats.kills)+count(receipt.kills),wins:count(stats.wins)+Number(!!receipt.won),assists:count(stats.assists)+count(receipt.assists),modes:{...stats.modes}};
  const old=next.modes[mode]||{},placements=Array.isArray(old.placements)?old.placements:[];
  next.modes[mode]={...old,matches:count(old.matches)+1,kills:count(old.kills)+count(receipt.kills),wins:count(old.wins)+Number(!!receipt.won),assists:count(old.assists)+count(receipt.assists),placements:mode==='royale'&&count(receipt.place)>0?[...placements,count(receipt.place)].slice(-100):placements};

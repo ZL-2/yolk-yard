@@ -13,7 +13,7 @@ import {RemoteSimulation} from './remote-simulation.js';
 import {canFight} from './stance.js';
 import {StreakUI} from './streak-ui.js';
 import {PartyClient} from './party-client.js';
-import {lobbyMarkup,modeMarkup,socialMarkup,EXPERIENCES} from './lobby-ui.js';
+import {lobbyMarkup,publicRoyaleMarkup,modeMarkup,socialMarkup,EXPERIENCES} from './lobby-ui.js';
 import {teammates,wonRoyale,isTeamRoyale} from './teams.js';
 import {arrangeSettings} from './settings-layout.js';
 import {eggsMarkup,formatEggs} from './currency-ui.js';
@@ -220,7 +220,13 @@ function remember() {
 function titleBar() {
   return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
-function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance};}
+function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity};}
+function refreshPublicMatch(){
+ if(screen!=='menu'||menuSection!=='play')return;
+ const card=$('#menu .public-royale-card');if(!card)return;
+ const focused=card.contains(document.activeElement)?document.activeElement.dataset.action:null;
+ card.innerHTML=publicRoyaleMarkup(menuModel());if(focused)card.querySelector(`[data-action="${focused}"]`)?.focus({preventScroll:true});
+}
 function renderMenu(force=false) {
  const root=$('#menu'),model=menuModel();
  view?.setParty(party?.party?.members.filter(m=>m.id!==party.id).map(m=>m.profile)||[]);
@@ -356,7 +362,7 @@ function setupMenu(editing = false, draft = null) {
   const nextRound = editing && state.phase === "results";
   const select = (id,label,items,value) => `<label>${label}<select class="field" id="setup-${id}">${items.map(([key,text])=>`<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
   modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Custom Private Match",
-    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your rules and invite friends. This private match runs on your computer; keep this tab open."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",net?.serverAuthority?[["public","Public matchmaking"]]:[["private","Private · invite code only"]],net?.serverAuthority?"public":"private")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("teamSize","ROYALE TEAM MODE",[[1,"Solo"],[2,"Duos"],[4,"Squads"]],o.teamSize||1)}${select("teamFill","TEAMMATES",[["on","Fill"],["off","No Fill"]],o.teamFill===false?"off":"on")}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===4?'Last squad standing wins. Eight contestant positions minimum.':o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 32 contestants, including 16 human players. Fill teams get bot teammates in any remaining positions at departure. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
+    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your rules and invite friends. This private match runs on your computer; keep this tab open."}</p><div class="form-grid match-rules">${select("visibility","VISIBILITY",net?.serverAuthority?[["public","Public matchmaking"]]:[["private","Private · invite code only"]],net?.serverAuthority?"public":"private")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("teamSize","ROYALE TEAM MODE",[[1,"Solo"],[2,"Duos"],[4,"Squads"]],o.teamSize||1)}${select("teamFill","TEAMMATES",[["on","Fill"],["off","No Fill"]],o.teamFill===false?"off":"on")}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[2,"2"],[4,"4"],[8,"8"],[12,"12"],[16,"16"],[24,"24"],[32,"32"],[48,"48"]],o.capacity||MAX_CONTESTANTS)}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===4?'Last squad standing wins. Eight contestant positions minimum.':o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Up to 48 contestants, including human players. Fill teams get bot teammates in any remaining positions at departure. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
   $('#setup-visibility').disabled=true;
   const royale=o.mode==='royale';
   if(!editing)$('#setup-mode').disabled=false;
@@ -572,7 +578,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   if (busy) return;
   const next = preset?.mode ? matchOptions(preset) : getOptions();
   if (!next) return;
-  options=matchOptions({...next,session:'online'});autoQueue=automatic;
+  options=matchOptions({...next,session:'online',recurring:false});autoQueue=false;
   if(launch?.hostRun||!launch){matchEarnings.total=0;matchEarnings.status='Player-hosted match · No verified Marks';progressMatch='';}
   const visibility=launch?.hostRun||!launch?'private':visibilityOverride||'public';
   beginSim();
@@ -590,8 +596,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     await attempt.host(launch?.code);
     if (attempt !== net) return;
     attempt.setVisibility(visibility);
-    if(attempt.peer?.control&&options.mode!=='royale'&&!launch?.hostRun&&launch){state=await attempt.createAuthority(options,profile,visibility,launch?.ticket);sim=new RemoteSimulation(attempt,()=>state);}
-    else {if(sim instanceof RoyaleSimulation)sim.startRound();state=sim.snapshot();attempt.broadcast(state);attempt.publishRoom();}
+    state=sim.snapshot();attempt.broadcast(state);attempt.publishRoom();
     localId = attempt.id;
     await waitForLoading();
     if(attempt!==net)return;
@@ -612,7 +617,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     state = null;
     modal(
       "Room could not open",
-      `<div class="error-box">${esc(e.message)}</div>${connectionButton}<button class="primary" data-action="find-public">TRY MATCHMAKING AGAIN</button><button class="plain" data-action="setup" style="margin-top:12px">Try creating a room again</button>`,
+      `<div class="error-box">${esc(e.message)}</div>${connectionButton}<button class="primary" data-action="find-public">CUSTOM PRIVATE MATCH</button><button class="plain" data-action="setup" style="margin-top:12px">Try creating a room again</button>`,
       "error",
     );
   } finally {
@@ -835,7 +840,7 @@ function resultsMenu() {
 
   modal(
     state.royale ? wonRoyale(state,localId) ? "FRONTIER SECURED!" : "Round complete" : "That’s a wrap.",
-    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${sim || net?.isHost ? '<button class="primary" data-action="rematch">PLAY AGAIN</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">Play Royale</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
+    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${state.options.recurring?'<p>Next public round starts automatically in 10 seconds.</p>':sim&&!sim.remote || net?.isHost ? '<button class="primary" data-action="rematch">PLAY AGAIN</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">BACK TO LOBBY</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
     "results",
   );
 }
@@ -1092,6 +1097,10 @@ async function queueParty(custom=false,code=null){
  // The custom launch applies its selection atomically, retaining party readiness.
  if(await partyRequest('queue',{custom,code,options:selected,visibility:custom?'private':'public'})){dialog.close();dialogType='';renderMenu();}
 }
+async function queuePublicRoyale(spectate=false){
+ if(deployment.active||state)return;
+ if(await partyRequest('queue',{publicRoyale:true,spectate})){dialog.close();dialogType='';renderMenu();}
+}
 async function launchParty(launch){
  if(activeLaunch===launch.id)return;activeLaunch=launch.id;
  if(net||state)leave(false,false);
@@ -1110,6 +1119,7 @@ function initializeParty(){
   status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'&&screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,deployment:status=>deployment.accept(status),
+  'public-match':refreshPublicMatch,
   'social-changed':scheduleSocialRefresh,
   'party-notice':m=>toast(m.message),
   'friend-request':m=>{toast(m.name+' sent a friend request. Open Social to accept or decline.');sound.cue('queue-found');scheduleSocialRefresh();},
@@ -1143,7 +1153,9 @@ const actions = {
  'social-new-identity':()=>modal('Create New Friend Code?',`<p>This creates a separate identity with an empty friend list. It does not restore your old friendships. Your previous browser credential will be kept for recovery.</p><div class="actions"><button class="primary" data-action="social-confirm-new-identity">CREATE NEW CODE</button><button data-action="social">GO BACK</button></div>`,'social-new-identity'),
  'social-confirm-new-identity':()=>{party.newIdentity();closeDialog();},
  'career':()=>selectMenuSection('career'),
- 'find-public':()=>queueParty(),
+ 'find-public':()=>setupMenu(),
+ 'public-join':()=>queuePublicRoyale(false),
+ 'public-spectate':()=>queuePublicRoyale(true),
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
  'duo-fill':()=>partyRequest('select',{...party.party.selection,teamFill:true,duoFill:true}),
  'duo-no-fill':()=>partyRequest('select',{...party.party.selection,teamFill:false,duoFill:false}),
@@ -1155,7 +1167,7 @@ const actions = {
   'run-connection-check': runConnectionCheck,
   'copy-connection-report': copyConnectionReport,
  'royale-home':playMenu,
- 'royale-queue':()=>{leave(false);void queueParty();},
+ 'royale-queue':()=>leave(false),
  'royale-map':royaleMap,
  'royale-inventory':royaleInventory,
  'royale-clear-marker':()=>{sendMarker('clear');royaleUI.waypoint=null;},
@@ -1236,7 +1248,7 @@ const actions = {
   about: () =>
     modal(
       "Welcome to the frontier",
-      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.7.0 · All gameplay code is included in the project.</p>`,
+      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, characters, blasters, UI, and sounds were created for this game.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p class="hint">Version 3.8.0 · All gameplay code is included in the project.</p>`,
       "about",
     ),
 };
@@ -1853,6 +1865,7 @@ const updates = new UpdateWatcher({
   },
 });
 setInterval(() => void updates.check(), 20000);
+setInterval(refreshPublicMatch,1000);
 window.addEventListener("focus", () => void updates.check());
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) void updates.check();

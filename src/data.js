@@ -3,7 +3,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Rebuilt arena collision geometry must not mix with older clients.
-export const VERSION = 29;
+export const VERSION = 30;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -145,14 +145,6 @@ export const MODES = [
     description: "Every operator for themselves. First to 20 eliminations.",
     limit: 20,
     teams: false,
-  },
-  {
-    id: "teams",
-    name: "Team scramble",
-    short: "TEAMS",
-    description: "Coral versus blue. First team to 35 eliminations.",
-    limit: 35,
-    teams: true,
   },
 
 ];

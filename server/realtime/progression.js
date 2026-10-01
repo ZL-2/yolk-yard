@@ -3,6 +3,7 @@ import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {dirname} from 'node:path';
 import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from '../../src/activity.js';
 import {calculateReward,participation} from '../../src/rewards.js';
+import {MAX_CONTESTANTS,MAX_SPECTATORS} from '../../src/royale-phases.js';
 const warmup=new Set(['waiting','spawn-island','starting']);
 const bounded=(v,max=1e7)=>Number.isFinite(v)?Math.min(max,Math.max(-max,v)):0;
 export class ProgressionService{
@@ -29,7 +30,7 @@ export class ProgressionService{
   }
  }
  frame(peer,s){
-  if(!peer.listing||!Array.isArray(s?.players)||s.players.length>36||!Number.isInteger(s.round)||!['playing','results'].includes(s.phase))return;
+  if(!peer.listing||!Array.isArray(s?.players)||s.players.length>MAX_CONTESTANTS+MAX_SPECTATORS||!Number.isInteger(s.round)||!['playing','results'].includes(s.phase))return;
   // A room's public/custom provenance is assigned by matchmaking, not the host.
   const room=peer.id,now=this.clock(),key=room+':'+String(s.matchId).slice(0,64)+':'+s.round;
   if(warmup.has(s.stage))return;
@@ -40,7 +41,7 @@ export class ProgressionService{
   if(recovered)for(const p of m.players.values())p.activity.last=now;
   const seen=new Set(),connected=new Map([...this.relay.peers.values()].filter(p=>p.ws).map(p=>[p.id,p]));
   for(const raw of s.players){if(typeof raw.id!=='string'||seen.has(raw.id)||raw.lateSpectator)continue;seen.add(raw.id);
-   const isHost=raw.id===s.hostId,remote=isHost?peer:connected.get(raw.id),bot=raw.bot===true&&/^bot-\d+$/.test(raw.id);
+   const isHost=raw.id===s.hostId,remote=isHost?peer:connected.get(raw.id),bot=raw.bot===true&&/^bot-(?:\d+|fill-\d+x*)$/.test(raw.id);
    if(!bot&&!remote)continue;
    if(!bot&&!isHost&&![...remote.links.values()].some(p=>p.id===room||p.progressId===peer.progressId))continue;
    let p=m.players.get(raw.id);if(!p){if(now-m.started>15)continue;const identity=bot?raw.id:remote.progressId;if(!bot&&[...m.players.values()].some(p=>!p.bot&&p.identity===identity))continue;p={id:raw.id,identity,bot,activity:newActivity(now),joined:now,difficulty:m.difficulty,kills:0,assists:0};m.players.set(p.id,p);}

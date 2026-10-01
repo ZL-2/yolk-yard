@@ -20,6 +20,7 @@ import {
   rng,
 } from "./data.js";
 import { getMap, navigation, surfaceAt } from "./maps.js";
+import {MAX_SPECTATORS} from './royale-phases.js';
 import {
   muzzleOrigin, canStand,
   worldHit,
@@ -74,7 +75,7 @@ export class Simulation {
   }
   addPlayer(id, profile, bot = false, spectator = false) {
     if (this.players.has(id)) return this.players.get(id);
-    if (spectator ? [...this.players.values()].filter(p=>p.lateSpectator).length>=8 : [...this.players.values()].filter(p=>!p.lateSpectator).length >= (this.maxPlayers || 8)) return null;
+    if (spectator ? [...this.players.values()].filter(p=>p.lateSpectator).length>=MAX_SPECTATORS : [...this.players.values()].filter(p=>!p.lateSpectator).length >= (this.maxPlayers || 8)) return null;
     const count = [0, 0];
     for (const p of this.players.values()) if(!p.lateSpectator&&p.team>=0)count[p.team]++;
     const p = {
