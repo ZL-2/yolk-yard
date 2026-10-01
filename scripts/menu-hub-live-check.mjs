@@ -8,7 +8,7 @@ const front='https://zl-2.github.io/yolk-yard',relay='https://yolk-yard-relay.on
 const expected=process.env.GITHUB_SHA||process.env.RAVEL_VERIFY_BUILD;
 const appVersion=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8')).version;
 assert.ok(expected,'Expected published build is required');
-const json=async url=>{const r=await fetch(url+'?verify='+Date.now(),{signal:AbortSignal.timeout(20000),cache:'no-store'});assert.ok(r.ok,url+' '+r.status);return r.json();};
+const json=async url=>{const endpoint=url.startsWith(front)?url+'?verify='+Date.now():url;const r=await fetch(endpoint,{signal:AbortSignal.timeout(20000),cache:'no-store'});assert.ok(r.ok,url+' '+r.status);return r.json();};
 let version,health;const deadline=Date.now()+480000;
 while(true){
  try{[version,health]=await Promise.all([json(front+'/version.json'),json(relay+'/health')]);if(version.build===expected&&version.appVersion===appVersion&&health.build===expected&&health.gameVersion===VERSION&&health.deployment?.updating===false&&health.socialAvailable)break;}catch(e){console.log('Waiting for publishing:',e.message);}
