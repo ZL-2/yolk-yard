@@ -13,6 +13,7 @@ test('update latch survives restart and failed probes; clears only after fronten
   offline=true;await old.check();assert.equal(old.snapshot().updating,true);
   const next=new DeploymentStatus(relay,{build:'new',version:'3.5.1',path,fetcher});await next.ready;assert.equal(next.snapshot().startedAt,start);assert.equal(next.snapshot().updating,true);
   offline=false;await next.check();assert.equal(next.snapshot().updating,true);frontend={build:'new',appVersion:'3.5.1'};await next.check();assert.equal(next.snapshot().updating,false);assert.equal(events.at(-1).deployment.build,'new');
+  latest='3.5.0';await next.set(true);await next.check();assert.equal(next.snapshot().updating,false,'stale older GitHub metadata must not latch a fully published update');
   await next.set(true);relay.parties.store.storage=()=>({available:false});await next.check();assert.equal(next.snapshot().updating,true,'unhealthy social storage cannot reopen the game');
  }finally{await rm(folder,{recursive:true,force:true});}
 });

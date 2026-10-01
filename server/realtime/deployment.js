@@ -21,7 +21,11 @@ export class DeploymentStatus{
   try{
    const get=async url=>{const r=await this.fetcher(url,{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error('Publishing unavailable');return r.json();};
    const latest=await get('https://raw.githubusercontent.com/ZL-2/yolk-yard/main/package.json?t='+Date.now());
-   if(latest.version!==this.version){await this.set(true,latest.version);return;}
+   // GitHub's raw-file cache can briefly return the previous release after
+   // Render and Pages are already live. Older metadata is not a new update.
+   const parts=v=>String(v).split('.').map(Number);
+   const ahead=parts(latest.version).some((n,i,a)=>n>parts(this.version)[i]&&a.slice(0,i).every((x,j)=>x===parts(this.version)[j]));
+   if(ahead){await this.set(true,latest.version);return;}
    const front=await get('https://zl-2.github.io/yolk-yard/version.json?t='+Date.now());
    if(front.build!==this.build||front.appVersion!==this.version){await this.set(true,latest.version);return;}
    if(this.relay.parties.store.storage().available)await this.set(false,this.version);
