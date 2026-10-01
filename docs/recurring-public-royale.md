@@ -1,6 +1,6 @@
 # Quality Update 110 — One Public Frontier
 
-Version 3.8.0 / gameplay protocol 30.
+Version 3.8.1 / gameplay protocol 30. Quality Update 111 completes live hosting verification for this release.
 
 The relay creates exactly one server-owned Solo Royale room at boot. Its 48 contestant seats start as Intermediate bots. Every admitted human replaces one bot, with no additional public-room creation or workload-based bot trimming. The full 45-second Spawn Island window remains open even when every seat is human. The server repeats that window if no connected human contestant is present at departure. A ticket issued before the cutoff cannot admit a late-arriving contestant after departure.
 

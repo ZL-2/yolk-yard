@@ -20,10 +20,10 @@ async function user(name){
 }
 async function launch(u){
  const l=u.launches.at(-1),g={};g.net=new Network({onState:s=>g.state=s,onError:e=>errors.push(e),getCheckpoint:()=>g.sim?.checkpoint(),getState:()=>g.sim?.snapshot(),onJoin:(id,p,a)=>!!g.sim?.admitPlayer(id,p,a),onLeave:id=>g.sim?.leavePlayer(id),onRoster:ids=>g.sim?.setConnectedHumans?.(ids),onPlayerAction:(id,a)=>g.sim?.playerAction(id,a),onInput:(id,i)=>g.sim?.setInput(id,i,true)});games.push(g);
- if(l.host){assert.equal(l.hostRun,true);assert.equal(l.visibility,'private');await g.net.host(l.code);g.sim=l.options.mode==='royale'?new RoyaleSimulation(l.options):new Simulation(l.options);g.sim.addPlayer('host',u.profile);g.net.setVisibility('private');g.state=g.sim.snapshot();g.net.broadcast(g.state);assert.equal(g.sim.phase,'lobby');await u.ask('host-ready',{id:l.id});}
+ if(l.host){assert.equal(l.hostRun,true);assert.equal(l.visibility,'private');await g.net.host(l.code);g.sim=l.options.mode==='royale'?new RoyaleSimulation(l.options):new Simulation(l.options);g.sim.addPlayer('host',u.profile);g.net.setVisibility('private');g.state=g.sim.snapshot();g.net.broadcast(g.state);g.clock=setInterval(()=>{g.state=g.sim.snapshot();g.net.broadcast(g.state);},50);assert.equal(g.sim.phase,'lobby');await u.ask('host-ready',{id:l.id});}
  else await g.net.join(l.code,u.profile,l.ticket);await u.ask('joined',{id:l.id});await wait(()=>g.state,'Live state');return g;
 }
-async function leave(u,g){g.net.destroy();await u.ask('returned');}
+async function leave(u,g){clearInterval(g.clock);g.net.destroy();await u.ask('returned');}
 try{
  let health,published;const end=Date.now()+360000;
  while(true){try{[health,published]=await Promise.all([get(base+'/health'),get(front+'/version.json')]);if(health.build===published.build&&(!expected||health.build===expected)&&health.gameVersion===VERSION&&published.appVersion===version&&health.deployment?.updating===false&&health.socialAvailable)break;}catch{}assert.ok(Date.now()<end,'Game and relay did not finish publishing');await delay(2000);}
@@ -43,4 +43,4 @@ try{
  assert.equal(publicGame.state.players.filter(p=>p.contestant).length,48);publicGame.net.authorityCommand({type:'configure',options:{mode:'ffa',bots:0}});publicGame.net.authorityCommand({type:'visibility',value:'private'});await delay(200);assert.equal(publicGame.state.options.mode,'royale');assert.equal(publicGame.state.visibility,'public');
  await leave(a,publicGame);const after=await get(base+'/health');assert.equal(after.capacity.rooms,1);assert.equal(after.publicMatch.capacity,48);assert.deepEqual(errors,[]);
  console.log(JSON.stringify({result:'PASS',build:health.build,version,qualityUpdate:published.release,protocol:VERSION,serverRooms:1,capacity:48,difficulty:'Intermediate',publicAdmission:join?'Join':'Spectate',lobbySummary:true,manualPrivateModes:['Free For All','Solo','Duos','Squads'],teamScrambleRemoved:true}));
-}finally{for(const g of games)g.net.destroy();for(const u of users){if(u.party&&u.ws.readyState===1)await u.ask('returned').catch(()=>{});u.ws.close();}}
+}finally{for(const g of games){clearInterval(g.clock);g.net.destroy();}for(const u of users){if(u.party&&u.ws.readyState===1)await u.ask('returned').catch(()=>{});u.ws.close();}}
