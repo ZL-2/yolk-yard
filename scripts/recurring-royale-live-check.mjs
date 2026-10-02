@@ -32,8 +32,8 @@ try{
  const tag=Date.now().toString(36).slice(-5),a=await user('QA Host '+tag),b=await user('QA Code '+tag);await wait(()=>a.publicMatch,'Live public match card data');assert.equal(a.publicMatch.capacity,48);assert.equal(a.publicMatch.difficulty,2);assert.equal(a.publicMatch.code,PUBLIC_ROYALE.code);
  for(const [mode,teamSize]of [['ffa',1],['royale',1],['royale',2],['royale',4]]){
   await a.ask('queue',{custom:true,options:{mode,teamSize,capacity:8,bots:3,fill:true}});const host=await launch(a);await b.ask('queue',{code:a.launches.at(-1).code});const guest=await launch(b);
-  assert.equal(guest.state.phase,'lobby');assert.notEqual(host.net.serverAuthority,true);assert.notEqual(guest.net.serverAuthority,true);assert.equal((await get(base+'/health')).capacity.rooms,1);
-  assert.notEqual(host.sim.startRound(),false);host.net.broadcast(host.sim.snapshot());await wait(()=>guest.state.phase==='playing','Live manual start');await leave(b,guest);await leave(a,host);
+  assert.equal(guest.state.phase,'lobby');if(mode==='royale'){assert.equal(host.sim.options.capacity,48);assert.equal(host.sim.options.fill,true);}assert.notEqual(host.net.serverAuthority,true);assert.notEqual(guest.net.serverAuthority,true);assert.equal((await get(base+'/health')).capacity.rooms,1);
+  assert.notEqual(host.sim.startRound(),false);host.net.broadcast(host.sim.snapshot());await wait(()=>guest.state.phase==='playing','Live manual start');if(mode==='royale')assert.equal(guest.state.players.filter(p=>p.contestant).length,48);await leave(b,guest);await leave(a,host);
  }
  await assert.rejects(a.ask('select',{mode:'teams'}),/Choose Free/);
  // Join during warmup when enough time remains to leave before departure.

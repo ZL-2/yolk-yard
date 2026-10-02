@@ -1,3 +1,4 @@
+import {frontierProp} from './world-art.js';
 import * as THREE from 'three';
 import {artKit,buildingStyle} from './royale-art.js';
 import {groundAt,terrainColor} from './terrain.js';
@@ -51,11 +52,13 @@ export function dressIslandBuilding(g,b,raw){
   for(const side of [-1,1])for(let j=0;j<6;j++)box(g,x+side*(w/2+.2),y+h-.5,z-d/2+.5+j*(d-1)/5,.05,.5,.1,s.roof);
   beam(g,[x+w/2+.3,y+.3,z-d/2+.4],[x+w/2+.3,y+h+.8,z-d/2+.4],.12,s.roof);
  }
+ if(b.type==='command'){for(const side of [-1,1]){box(g,x+side*w*.42,y+h/2,z,w*.08,h,d+.4,0x304653);box(g,x+side*7,y+3,z+d/2+.38,2.1,4,.12,0x873f3b);box(g,x+side*7,y+3.8,z+d/2+.46,.2,1.5,.06,0xd8b777);}}
  // Angular relay insignia over each entry, shared across the island's industries.
  box(g,x,y+3.5,z+d/2+.3,.34,.09,.055,0x50c8bd);box(g,x-.12,y+3.6,z+d/2+.3,.09,.28,.055,0xe8ae4c);
 }
 export function islandProp(g,p,raw){
  const k=artKit(raw),{block:box,cylinder,cone,rounded,rock,torus,beam}=k,{x,y,z,w,d,h,kind}=p;
+ if(frontierProp(g,p,k))return true;
  if(kind==='dome'){
   const shell=new THREE.Mesh(new THREE.SphereGeometry(1,20,10,Math.PI*.15,Math.PI*1.55,0,Math.PI/2),raw.mat(0xb4cfca));shell.position.set(x,y,z);shell.scale.set(4.8,4.6,4.8);g.add(shell);
   const rim=torus(g,x,y,z,4.8,.18,0xd8bd80);rim.rotation.x=Math.PI/2;

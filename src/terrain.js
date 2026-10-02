@@ -15,6 +15,7 @@ export function naturalHeight(x,z){
  return Math.max(0,h*smooth((1-edge)/.13));
 }
 export function terrainColor(map,x,z){
+ if(map.id==='hatchery-atoll'){const h=groundAt(map,x,z);return h<.7?0x537e89:h<2?0xb1ac91:Math.abs(x)<80&&Math.abs(z)<80?0x7c8d78:0x657b70;}
  const h=groundAt(map,x,z),edge=(Math.abs(x/254)**4+Math.abs(z/254)**4)**.25;
  if(h<.7)return 0x429aa8;
  if(h<2||edge>.925)return 0xddc88e;

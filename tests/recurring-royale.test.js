@@ -76,7 +76,7 @@ test('private FFA and every Royale team size are host-based; Team Scramble and a
  const f=fixture();try{
   for(const [mode,teamSize]of [['ffa',1],['royale',1],['royale',2],['royale',4]]){
    const {u,messages}=f.user(mode+teamSize);f.relay.parties.command(u,{type:'queue',custom:true,options:{mode,teamSize,recurring:true},visibility:'public'});
-   const l=messages.find(m=>m.type==='launch').launch;assert.equal(l.hostRun,true);assert.equal(l.visibility,'private');assert.equal(l.options.recurring??false,false);assert.notEqual(l.code,PUBLIC_ROYALE.code);
+   const l=messages.find(m=>m.type==='launch').launch;assert.equal(l.hostRun,true);if(l.options.mode==='royale'){assert.equal(l.options.capacity,48);assert.equal(l.options.fill,true);assert.equal(l.options.bots,47);}assert.equal(l.visibility,'private');assert.equal(l.options.recurring??false,false);assert.notEqual(l.code,PUBLIC_ROYALE.code);
    const sim=mode==='royale'?new RoyaleSimulation(l.options):null;if(sim){sim.addPlayer('host',u.profile);assert.equal(sim.phase,'lobby');assert.equal(sim.queueEnds,0);}
   }
   const retired=f.user('Retired');assert.throws(()=>f.relay.parties.command(retired.u,{type:'select',mode:'teams'}),/Choose Free/);assert.throws(()=>f.relay.parties.command(retired.u,{type:'queue',custom:true,options:{mode:'teams'}}),/retired/);

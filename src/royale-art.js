@@ -1,3 +1,4 @@
+import {LOCATION_IDENTITIES} from './world-locations.js';
 import {dressIslandBuilding,islandProp} from './island-art.js';
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -29,7 +30,7 @@ export const DISTRICT_STYLES={
  hatchery:{walls:[0xc6c9ac,0xcdbca1,0x95bfb4],trim:0xf9e9c3,roof:0x699ba0,wood:0x8b9b82},
  factory:{walls:[0x8199a0,0x7d8a98,0xae9e80],trim:0xe9ca72,roof:0x435d70,wood:0x4e6971},
 };
-export function buildingStyle(b){const s=DISTRICT_STYLES[b.kind];return {...s,wall:s.walls[b.index%s.walls.length]};}
+export function buildingStyle(b){const s=LOCATION_IDENTITIES[b.poi]||DISTRICT_STYLES[b.kind]||DISTRICT_STYLES.camp;return {...s,wall:s.walls[b.index%s.walls.length]};}
 export function dressBuilding(g,b,raw){
  if(b.floors)return dressIslandBuilding(g,b,raw);
  const k=artKit(raw),{block:box,cylinder,beam,rock}=k,s=buildingStyle(b),{x,z,w,d,h}=b;
@@ -169,19 +170,20 @@ export function gliderModel(raw,color=0xf4c454){
  for(const x of [-.33,.33])rounded(g,x,1.93,-.06,.11,.075,.14,0x2b4f5a,.035);
  return g;
 }
-export function chestModel(raw,supply=false){
- const {block:box,rounded,cone,cylinder,rock,torus}=artKit(raw),g=new THREE.Group();g.name=supply?'Airfreight supply crate':'Hinged suncrest treasure chest';
- const wood=supply?0x4e9ea8:0xa86b36,trim=supply?0xd6e9d4:0xf3c569;
+export function chestModel(raw,supply=false,epic=false){
+ const {block:box,rounded,cone,cylinder,rock,torus}=artKit(raw),g=new THREE.Group();g.name=supply?'Airfreight supply crate':epic?'Epic armored requisition chest':'Field requisition chest';
+ const wood=supply?0x4e9ea8:epic?0x4e4b86:0x52695a,trim=supply?0xd6e9d4:epic?0xc7a6ff:0xd2b66d;
  rounded(g,0,.49,0,1.76,.96,1.22,wood,.1);
  for(const z of [-.625,.625]){
-  for(let i=0;i<4;i++)box(g,0,.16+i*.2,z,1.55,.035,.025,supply?0x367584:0x784b30);
+  for(let i=0;i<4;i++)box(g,0,.16+i*.2,z,1.55,.035,.025,supply?0x367584:epic?0x262645:0x304737);
   for(const x of [-.72,.72]){box(g,x,.5,z,.19,.96,.08,trim);for(const y of [.16,.8])rock(g,x,y,z+Math.sign(z)*.05,.045,.045,.03,0x916641,1);}
  }
  for(const x of [-.9,.9]){const handle=torus(g,x,.55,0,.16,.035,trim);handle.rotation.y=Math.PI/2;}
+ if(epic){for(const x of [-.42,0,.42])box(g,x,.51,.7,.12,.42,.07,0xcac1ff);}
  const lid=new THREE.Group();lid.position.set(0,.96,-.61);g.add(lid);g.userData.lid=lid;
  rounded(lid,0,.14,.61,1.83,.3,1.28,wood,.11);
  // Curved top with visible plank seams and continuous gold hoops.
- for(let j=0;j<7;j++){const zz=.06+j*.18,yy=.23+Math.sin(j/6*Math.PI)*.24;box(lid,0,yy,zz,1.65,.15,.175,j%2?wood:supply?0x63b5b9:0xc78b45);}
+ for(let j=0;j<7;j++){const zz=.06+j*.18,yy=.23+Math.sin(j/6*Math.PI)*.24;box(lid,0,yy,zz,1.65,.15,.175,j%2?wood:supply?0x63b5b9:epic?0x7674b8:0x6f8669);}
  for(const x of [-.65,.65])for(let j=0;j<7;j++){const zz=.06+j*.18,yy=.31+Math.sin(j/6*Math.PI)*.24;box(lid,x,yy,zz,.15,.065,.19,trim);}
  rounded(g,0,.86,.68,.38,.4,.1,trim,.035);rock(g,0,.89,.75,.11,.15,.055,supply?0x94eef1:0x64cfc3,1);
  for(const x of [-.67,.67])for(const z of [-.43,.43])box(g,x,.035,z,.3,.12,.3,0x536169);
@@ -199,7 +201,8 @@ export function launchpadModel(raw){
 export function lootModel(item,raw,{ground=true}={}){
  const k=artKit(raw),{block:box,rounded,cylinder,cone,torus,rock,beam}=k,g=new THREE.Group();g.name=(item.id||'item')+' collectible';
  const c=Number('0x'+(item.weapon?RARITIES[item.rarity||0].color:ITEMS[item.id]?.color||'#d9b967').slice(1));
- if(item.id==='jumpRig'){rounded(g,0,.35,0,.58,.75,.3,0x283c45,.07);for(const side of [-1,1]){cylinder(g,side*.27,.35,0,.13,.67,0x829491,12);cone(g,side*.27,-.08,0,.13,.19,0xd9ad5b,.7);beam(g,[side*.16,.65,-.16],[side*.16,.03,-.16],.035,0x172d38);}rounded(g,0,.48,.18,.32,.17,.08,0xedc068,.02);}
+ if(item.id==='asterKeycard'){rounded(g,0,.24,0,.64,.43,.055,0x2e5b72,.035);rounded(g,-.13,.25,-.04,.19,.23,.02,0xb9e0de,.01);rounded(g,.13,.28,-.04,.2,.04,.02,0xe7c26d,.005);rounded(g,.13,.19,-.04,.2,.025,.02,0x83bbd0,.005);}
+ else if(item.id==='jumpRig'){rounded(g,0,.35,0,.58,.75,.3,0x283c45,.07);for(const side of [-1,1]){cylinder(g,side*.27,.35,0,.13,.67,0x829491,12);cone(g,side*.27,-.08,0,.13,.19,0xd9ad5b,.7);beam(g,[side*.16,.65,-.16],[side*.16,.03,-.16],.035,0x172d38);}rounded(g,0,.48,.18,.32,.17,.08,0xedc068,.02);}
  else if(item.id==='smoke'){cylinder(g,0,.25,0,.18,.55,0x748980,12);cylinder(g,0,.54,0,.13,.06,0xd9c591,10);rounded(g,.08,.57,0,.09,.14,.07,0x2d454e,.02);box(g,0,.26,.18,.18,.16,.02,0xb9b79b);}
  else if(item.id==='scanner'){rounded(g,0,.18,0,.5,.35,.22,0x2e4e58,.06);rounded(g,0,.2,-.13,.35,.22,.03,0x74decd,.01);beam(g,[.17,.32,0],[.17,.75,0],.016,0xc1d0c2);}
  else if(item.id==='blueprint'){rounded(g,0,.3,0,1.2,.85,.035,0x247bad,.02);for(let i=0;i<7;i++)box(g,-.55+i*.18,.3,.025,.012,.8,.015,0x80d7ed);for(let i=0;i<5;i++)box(g,0,-.05+i*.18,.025,1.1,.012,.015,0x80d7ed);const pencil=cylinder(g,.7,.2,.03,.024,.7,0xf2d261,8);pencil.rotation.z=-.2;}

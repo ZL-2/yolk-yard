@@ -8,7 +8,8 @@ test('native WebSocket replies preserve a connected browser without application 
  const socket=new WebSocket(`ws://127.0.0.1:${app.server.address().port}/game`,{origin:'https://zl-2.github.io'});
  try{
   await new Promise((resolve,reject)=>{socket.once('error',reject);socket.once('open',()=>socket.send(JSON.stringify({type:'register'})));socket.once('message',resolve);});
-  const peer=[...app.relay.peers.values()][0];peer.lastSeen=Date.now()-14000;
+  // The recurring public room is virtual and may precede this real socket.
+  const peer=[...app.relay.peers.values()].find(p=>p.ws);peer.lastSeen=Date.now()-14000;
   const pong=new Promise(resolve=>peer.ws.once('pong',resolve));app.relay.sweep();await pong;
   assert.ok(Date.now()-peer.lastSeen<1000);assert.equal(socket.readyState,WebSocket.OPEN);
   // Truly silent sockets still expire under the existing deadline.

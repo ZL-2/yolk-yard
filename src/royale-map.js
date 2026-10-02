@@ -1,3 +1,4 @@
+import {authorFrontierWorld} from './world-locations.js';
 import {naturalHeight,createTerrain,groundAt,riverX} from './terrain.js';
 // Ravel Coast: a coastal communications frontier fractured by a relay-network collapse.
 // Authoring is deterministic and static. Only match loot is randomized by the host.
@@ -15,15 +16,15 @@ export const DISTRICTS=[
 const boxes=[],chests=[],floorLoot=[],buildings=[],trees=[],props=[],landmarks=[],roads=[],navLinks=[],signs=[];
 const box=(x,z,w,d,h,color='stone',y=0,kind='building',extra={})=>{const b={x,z,w,d,h,color,y,kind,...extra};boxes.push(b);return b;};
 const buildingPlans={
- borough:[[-25,-19,18,18,3,'apartment'],[0,-22,18,16,2,'shop'],[26,-19,18,18,3,'apartment'],[-25,14,18,16,2,'shop'],[2,19,16,18,2,'bakery'],[27,17,18,16,2,'shop'],[-7,43,16,14,1,'garage']],
- farm:[[-22,-19,24,20,2,'barn'],[15,-20,16,16,2,'house'],[-26,20,16,14,1,'stable'],[9,19,22,18,1,'greenhouse'],[35,13,12,14,1,'garage']],
- observatory:[[-20,-14,20,18,2,'lab'],[15,-18,18,18,3,'tower'],[-18,20,22,18,1,'lab'],[14,17,16,18,2,'lab'],[38,10,12,14,1,'garage']],
- docks:[[-23,-22,24,18,2,'warehouse'],[12,-24,18,16,2,'office'],[-26,13,20,18,1,'hangar'],[9,14,18,16,2,'warehouse'],[35,-11,12,14,1,'garage']],
- woods:[[-20,-18,16,16,2,'lodge'],[13,-19,12,14,1,'cabin'],[-27,17,12,14,1,'cabin'],[9,20,14,16,2,'lodge'],[34,10,10,14,1,'shed']],
- works:[[-29,-24,24,18,2,'warehouse'],[14,-25,18,18,3,'office'],[-33,17,16,16,1,'garage'],[6,15,24,18,2,'refinery'],[34,10,12,14,1,'shed']],
- terraces:[[-26,-23,16,18,2,'villa'],[6,-22,18,18,2,'villa'],[33,-19,12,14,1,'garage'],[-22,17,18,16,2,'house'],[12,19,20,18,2,'hotel'],[37,17,12,14,1,'shop']],
- heights:[[-24,-12,18,18,2,'lab'],[9,-16,20,18,3,'hatchery'],[-25,24,18,18,2,'greenhouse'],[12,20,18,16,2,'office']],
- crater:[[-31,-21,16,16,2,'lodge'],[1,-34,16,16,1,'greenhouse'],[-32,15,12,16,1,'cabin'],[9,30,16,16,2,'lodge'],[30,8,12,14,1,'shed']],
+ borough:[[-26,-23,20,16,3,'apartment'],[0,-22,18,16,2,'shop'],[28,-20,16,22,2,'apartment'],[-25,14,18,16,2,'shop'],[2,19,16,18,2,'bakery'],[27,17,18,16,2,'shop'],[-7,43,16,14,1,'garage']],
+ farm:[[-23,-22,28,20,2,'barn'],[15,-20,16,16,2,'house'],[-26,20,16,14,1,'stable'],[10,23,26,16,1,'greenhouse'],[35,13,12,14,1,'garage']],
+ observatory:[[0,-12,28,24,2,'command'],[35,-18,16,16,4,'tower'],[-27,17,18,18,1,'lab'],[10,24,18,14,1,'barracks'],[40,19,12,14,1,'garage']],
+ docks:[[-23,-24,26,20,2,'warehouse'],[16,-26,16,18,3,'office'],[-26,13,20,18,1,'hangar'],[9,14,18,16,2,'warehouse'],[35,-11,12,14,1,'garage']],
+ woods:[[-22,-21,18,18,2,'lodge'],[13,-19,12,14,1,'cabin'],[-27,17,12,14,1,'cabin'],[9,20,14,16,2,'lodge'],[34,10,10,14,1,'shed']],
+ works:[[-29,-24,26,20,3,'warehouse'],[15,-26,18,20,3,'office'],[-33,17,16,16,1,'garage'],[6,15,24,18,2,'refinery'],[34,10,12,14,1,'shed']],
+ terraces:[[-26,-23,16,18,2,'villa'],[6,-22,18,18,2,'villa'],[33,-19,12,14,1,'garage'],[-22,17,18,16,2,'house'],[13,21,24,18,3,'hotel'],[37,17,12,14,1,'shop']],
+ heights:[[-24,-12,18,18,2,'lab'],[10,-18,22,18,3,'hatchery'],[-25,24,18,18,2,'greenhouse'],[12,20,18,16,2,'office']],
+ crater:[[-31,-21,18,18,2,'lab'],[2,-35,22,20,1,'greenhouse'],[-32,15,12,16,1,'cabin'],[9,30,16,16,2,'lodge'],[30,8,12,14,1,'shed']],
 };
 function addBuilding(p,plan,index=0){
  const [dx,dz,w,d,floors,type]=plan,x=p.x+dx,z=p.z+dz;
@@ -86,7 +87,7 @@ for(const [bi,b] of buildings.entries()){
   // Right-hand rooms retain a central 3m passage between their doorways.
   if(w>=16){wall(w*.17,-d*.29,.25,d*.38,3.65,y,'partition');wall(w*.17,d*.29,.25,d*.38,3.65,y,'partition');}
   const px=x+w*.34;
-  if(['lab','hatchery','office','refinery','radio'].includes(b.type)){
+  if(['lab','hatchery','office','refinery','radio','command'].includes(b.type)){
    prop('console',px,z-d*.32,2.4,1.1,1.05,baseY+y,{building:bi});prop('shelf',px,z+d*.3,2.3,.65,2.0,baseY+y,{building:bi});
   }else if(['barn','warehouse','hangar','garage','shed','stable'].includes(b.type)){
    prop('crate',px,z-d*.3,2.0,2,1.5,baseY+y,{building:bi});prop('barrels',px,z+d*.3,1.5,1.5,1.3,baseY+y,{building:bi});
@@ -128,19 +129,6 @@ for(const z of [-102,20,112]){
  landmarks.push({id:'bridge-'+z,name:z<0?'Copper Crossing':z<80?'Span Nine':'Millwater Crossing',x,z,kind:'bridge',risk:'medium'});
  for(const side of [-1,1]){const xx=x+side*18;floorLoot.push({x:xx,z:z+5,y:yAt(xx,z+5),poi:'bridge-'+z,role:'weapon',room:'bridge-bank',source:'ground',chance:.78});chests.push({x:xx,z:z-5,y:yAt(xx,z-5),poi:'bridge-'+z,source:'chest',chance:.65,room:'bridge-bank'});}
 }
-// Major landmarks tell a shared story: freight, food production and the failed relay.
-for(const p of DISTRICTS){
- const y=yAt(p.x,p.z);
- if(p.kind==='farm'){for(const dx of [-7,7])prop('silo',p.x+dx,p.z,4.4,4.4,13,y);}
- else if(p.kind==='factory'){for(const dx of [-6,6])prop('tank',p.x+dx,p.z-4,4.5,4.5,10,y);prop('truck',p.x+21,p.z+36,3,6,2.6);}
- else if(p.kind==='hatchery'){prop(p.id==='observatory'?'radio':'incubator',p.x,p.z,5,5,10,y);}
- else if(p.kind==='dock'){for(let i=0;i<4;i++)prop('container',p.x-16+i*10,p.z+37,7.0,3.4,3);}
- else if(p.kind==='town'){prop('clock',p.x-2,p.z-2,3,3,13,y);}
- else if(p.kind==='camp'){for(let i=0;i<6;i++){const a=i*Math.PI/3;prop('crystal',p.x-7+Math.cos(a)*6,p.z+Math.sin(a)*6,1.5,1.5,2.5,yAt(p.x-7+Math.cos(a)*6,p.z+Math.sin(a)*6));}}
- else if(p.kind==='park')prop('campfire',p.x,p.z,2.4,2.4,.7,y);
- else prop('planter',p.x,p.z,6,4,1.4,y);
- signs.push({x:p.x,z:p.z+4,y:yAt(p.x,p.z+4)+2.5,text:p.name.toUpperCase()});
-}
 // Sheltered coastal docks with real collision and loot.
 for(const x of [127,147,167]){const z=212,y=Math.max(...Array.from({length:13},(_,i)=>yAt(x,z-12+i*2)))+.15;box(x,z,5,24,.3,'crate',y-.3,'bridge',{material:'wood'});for(const dz of [-10,0,10])prop('bollard',x+2,z+dz,.3,.3,1.2,y);floorLoot.push({x,z:z+8,y,poi:'docks',role:'weapon',room:'pier',source:'ground',chance:.85});chests.push({x,z:z-8,y,poi:'docks',source:'high',chance:.6,room:'pier'});}
 const clear=(x,z,r=2)=>!buildings.some(b=>Math.abs(x-b.x)<b.w/2+r+3&&Math.abs(z-b.z)<b.d/2+r+5)&&!boxes.some(b=>Math.abs(x-b.x)<b.w/2+r&&Math.abs(z-b.z)<b.d/2+r)&&!floorLoot.some(p=>Math.hypot(x-p.x,z-p.z)<r+2)&&!chests.some(p=>Math.hypot(x-p.x,z-p.z)<r+2);
@@ -158,6 +146,7 @@ for(const [i,b]of buildings.entries()){
  const x=b.x+b.w/2+3.5,z=b.z+4;
  if(clear(x,z,.5))prop(i%4===0?'car':i%4===1?'bench':i%4===2?'lamp':'crate',x,z,i%4===0?2.1:1.4,i%4===0?4:1, i%4===0?1.5:i%4===2?4.5:1.2);
 }
+const frontier=authorFrontierWorld({districts:DISTRICTS,terrain,buildings,boxes,props,landmarks,roads,signs,chests,floorLoot,navLinks,prop,box});
 // Seeded, spatially varied vegetation; no loot is sprinkled through random forest coordinates.
 for(let i=0;i<3700&&trees.length<640;i++){
  const x=((i*193.371)%480)-240,z=((i*317.719+i*i*.019)%480)-240;
@@ -175,6 +164,6 @@ for(let i=0;i<650;i++){
 // destruction and navigation use the same authored props as the rest of the coast.
 for(const [x,z,kind] of [[116,-173,'crate'],[122,-172,'barrels'],[145,-127,'crate'],[150,-124,'barrels'],[87,-133,'crate'],[86,-129,'barrels']])if(clear(x,z,1.2))prop(kind,x,z,2.1,1.1,1.05);
 // Material assignments and stable IDs are shared by harvesting, destruction and rendering.
-for(const [i,b]of boxes.entries())b.objectId='world-'+i;
+for(const [i,b]of boxes.entries())b.objectId=b.doorId?'world-door-'+b.doorId:'world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
-export const ROYALE_MAP={id:'sunnybreak',revision:4,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Rivers, ridgelines and nine distinct districts.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,material:'brick'};
+export const ROYALE_MAP={id:'sunnybreak',revision:5,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,material:'brick'};

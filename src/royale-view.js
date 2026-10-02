@@ -1,3 +1,5 @@
+import {updateFrontierView} from './frontier-world-view.js';
+import {getMap} from './maps.js';
 import {glidePose} from './glide-pose.js';
 import {lootHeight} from './loot-motion.js';
 import {ROYALE_MAP} from './royale-map.js';
@@ -31,7 +33,7 @@ function roadColor(map,x,z){
  if(map.buildings.some(b=>Math.abs(x-b.x)<b.w/2+.4&&Math.abs(z-b.z)<b.d/2+.4))return null;
  for(const road of map.roads)for(let i=1;i<road.points.length;i++){
   const [ax,az]=road.points[i-1],[bx,bz]=road.points[i],dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));
-  if(Math.hypot(x-ax-t*dx,z-az-t*dz)<=road.width/2)return road.kind==='path'?0xb8aa81:0x7d8987;
+  if(Math.hypot(x-ax-t*dx,z-az-t*dz)<=road.width/2)return road.kind==='runway'?0x34424a:road.kind==='taxiway'?0x56646b:road.kind==='path'?0x9d9275:0x687473;
  }
  return null;
 }
@@ -68,9 +70,9 @@ export function* buildIslandSteps(world,map,kit){
   if(b.building!==undefined)byBuilding[b.building].push(b);
   if(b.tree!==undefined)treeBoxes.set(b.tree,b);
   if(b.prop!==undefined)propBoxes.set(b.prop,b);
-  if(['tree','prop','roof-collider'].includes(b.kind))continue;
+  if(['tree','prop','roof-collider','door','parked-aircraft'].includes(b.kind))continue;
   const s=b.building===undefined?null:buildingStyle(map.buildings[b.building]);
-  const color=s?(b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:b.color==='foundation'?0x8e988a:s.wall):palette[b.color]||0x9cb7aa;
+  const color=s?(b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:b.color==='foundation'?0x8e988a:s.wall):typeof b.color==='number'?b.color:palette[b.color]||0x9cb7aa;
   const m=block(world,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color);m.userData.objectId=b.objectId;yield;
  }
  for(const [i,b] of map.buildings.entries()){
@@ -133,18 +135,18 @@ export class RoyaleView{
   this.ring=new THREE.LineLoop(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(160*3),3)),new THREE.LineBasicMaterial({color:0xc9a5ff}));this.ring.frustumCulled=false;this.ring.userData.ownedMaterial=true;this.root.add(this.ring);
  }
  itemModel(item,ground=true){const g=lootModel(item,this.kit,{ground});bake(g,false,true);return g;}
- chestModel(supply=false){const g=chestModel(this.kit,supply);bake(g.userData.lid,false,true);bake(g,false,true);return g;}
+ chestModel(supply=false,epic=false){const g=chestModel(this.kit,supply,epic);bake(g.userData.lid,false,true);bake(g,false,true);return g;}
  update(state,local,dt,playing){
   this.root.visible=playing&&!!state?.royale;if(!this.root.visible)return;
   const r=state.royale,t=this.view.clock,kit=this.kit;
   this.seasonMeshes??=new Map();const activeSeason=new Set();
   for(const s of [...(r.smokes||[]).map(x=>({...x,kind:'smoke'})),...(r.relays||[]).map(x=>({...x,kind:'relay'}))]){const key=s.kind+s.id;activeSeason.add(key);let mesh=this.seasonMeshes.get(key);if(!mesh){if(s.kind==='smoke'){mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(1,2),new THREE.MeshBasicMaterial({color:0xc1c6bb,transparent:true,opacity:.94,depthWrite:false}));mesh.userData.ownedMaterial=true;mesh.scale.setScalar(s.radius);}else{const g=new THREE.Group(),k=artKit(this.kit);k.rounded(g,0,.6,0,.75,1.2,.6,0x304b54,.06);k.rounded(g,0,1.05,-.32,.5,.3,.06,0x65d6c8,.02);k.beam(g,[0,1.2,0],[0,4,0],.045,0xa7c2bd);k.torus(g,0,3.5,0,.4,.04,0xdfb567);bake(g,false,true);mesh=g;}this.root.add(mesh);this.seasonMeshes.set(key,mesh);}mesh.position.set(s.x,s.y,s.z);if(s.kind==='smoke'){mesh.rotation.y=t*.04;mesh.material.opacity=Math.min(.94,(s.until-state.time)*.8);}}
   for(const [key,m]of this.seasonMeshes)if(!activeSeason.has(key)){m.removeFromParent();this.view.disposeGroup(m);this.seasonMeshes.delete(key);}
-  this.view.lastStateTime=state.time;updateBuildingView(this,state,local);
+  this.view.lastStateTime=state.time;updateBuildingView(this,state,local);updateFrontierView(this,state,local);
   const roundKey=r.matchId+':'+state.round+':'+state.options.map;
   if(this.round!==roundKey){for(const group of [this.chests,this.loot,this.gliders,this.pads]){for(const mesh of group.values()){this.root.remove(mesh);this.view.disposeGroup(mesh);}group.clear();}this.round=roundKey;this.flightPoses.clear();}
-  this.transport.visible=!r.practice&&r.elapsed<=r.route.duration+5;
-  const pos=transportAt(r.route,r.elapsed);this.transport.position.set(pos.x,pos.y+Math.sin(t)*.18,pos.z);this.transport.rotation.y=pos.yaw;this.transport.rotation.z=Math.sin(t*.4)*.015;this.rotors.forEach(m=>m.rotation.y+=dt*18);
+  this.transport.visible=r.practice||r.elapsed<=r.route.duration+5;
+  const pos=r.practice?getMap(state.options.map).parkedTransport:transportAt(r.route,r.elapsed);if(pos){this.transport.position.set(pos.x,pos.y+(r.practice?0:Math.sin(t)*.18),pos.z);this.transport.rotation.y=pos.yaw;this.transport.rotation.z=r.practice?0:Math.sin(t*.4)*.015;}this.rotors.forEach(m=>m.rotation.y+=dt*(r.practice?.15:18));
   this.wall.visible=this.ring.visible=r.storm.active;this.wall.position.set(r.storm.x,110,r.storm.z);this.wall.scale.set(Math.max(.01,r.storm.radius),1,Math.max(.01,r.storm.radius));this.wall.material.uniforms.time.value=t;this.wall.material.uniforms.outside.value=local&&Math.hypot(local.x-r.storm.x,local.z-r.storm.z)>r.storm.radius?1:0;if(r.storm.active&&(!this.nextRingUpdate||t>this.nextRingUpdate)){const a=this.ring.geometry.attributes.position;for(let i=0;i<a.count;i++){const angle=i/a.count*Math.PI*2,x=r.storm.x+Math.cos(angle)*r.storm.radius,z=r.storm.z+Math.sin(angle)*r.storm.radius;a.setXYZ(i,x,groundAt(ROYALE_MAP,x,z)+.14,z);}a.needsUpdate=true;this.nextRingUpdate=t+.15;}
   const observer=local?.spectating?state.players.find(p=>p.id===this.view.spectateTarget)||local:local;
   for(const mesh of this.view.world?.children||[])if(mesh.userData.poiLabel||mesh.userData.detailLabel)mesh.visible=!!observer&&(mesh.userData.poiLabel?observer.flight!=='ground'&&observer.health>0:Math.hypot(mesh.position.x-observer.x,mesh.position.z-observer.z)<35);
@@ -158,7 +160,7 @@ export class RoyaleView{
   for(const [id,m]of this.loot)if(!seen.has(id)){this.root.remove(m);this.view.disposeGroup(m);this.loot.delete(id);}
   for(const chest of r.chests){
    const close=!!observer&&(Math.hypot(chest.x-observer.x,chest.z-observer.z)<(this.view.settings.quality==='low'?70:100)||chest.supply);
-   let mesh=this.chests.get(chest.id);if(!mesh&&!close)continue;if(!mesh){mesh=this.chestModel(chest.supply);this.chests.set(chest.id,mesh);this.root.add(mesh);if(chest.supply){const rig=new THREE.Group(),c=canopy(kit,0x99dad9);c.position.y=1.5;rig.add(c);for(const x of [-.6,.6])for(const z of [-.4,.4])artKit(kit).beam(rig,[x,1.2,z],[Math.sign(x)*.72,3.7,.1],.018,0xf5ead2);bake(rig,false,true);mesh.add(rig);mesh.userData.canopy=rig;}}
+   let mesh=this.chests.get(chest.id);if(!mesh&&!close)continue;if(!mesh){mesh=this.chestModel(chest.supply,chest.epic);this.chests.set(chest.id,mesh);this.root.add(mesh);if(chest.supply){const rig=new THREE.Group(),c=canopy(kit,0x99dad9);c.position.y=1.5;rig.add(c);for(const x of [-.6,.6])for(const z of [-.4,.4])artKit(kit).beam(rig,[x,1.2,z],[Math.sign(x)*.72,3.7,.1],.018,0xf5ead2);bake(rig,false,true);mesh.add(rig);mesh.userData.canopy=rig;}}
    const fall=chest.landAt?Math.max(0,(chest.landAt-state.time)*4):0;mesh.position.set(chest.x,lootHeight(chest,state.time)+fall,chest.z);
    if(mesh.userData.canopy)mesh.userData.canopy.visible=fall>0;
    mesh.userData.lid.rotation.x+=((chest.opened?-1.7:0)-mesh.userData.lid.rotation.x)*Math.min(1,dt*8);
@@ -190,7 +192,7 @@ export class RoyaleView{
  animateActor(model,p,t,dt=1/60){
   this.poseDt=dt;const pose=this.flightPose(p,t,dt);
   const flying=p.flight==='dive'||p.flight==='glide'||p.flight==='launch';
-  if(model.userData.held)model.userData.held.visible=p.health>0&&!p.downed&&!p.reviving&&model.userData.draw?.visible!==false&&!p.building&&!flying&&!!p.inventory?.[p.slot]&&(!!p.inventory[p.slot].weapon||!!p.inventory[p.slot].pickaxe);
+  if(model.userData.held)model.userData.held.visible=p.health>0&&!p.downed&&!p.reviving&&model.userData.draw?.visible!==false&&!p.building&&!p.traversal&&!flying&&!!p.inventory?.[p.slot]&&(!!p.inventory[p.slot].weapon||!!p.inventory[p.slot].pickaxe);
   if(model.userData.blaster)model.userData.blaster.visible=!p.building&&!flying&&!!p.inventory?.[p.slot]?.weapon;
   const item=p.building?{id:'blueprint'}:p.inventory?.[p.slot];
   const itemKey=p.health>0&&!p.downed&&!p.reviving&&!flying&&item&&!item.weapon&&!item.pickaxe?item.id:null;

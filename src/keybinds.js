@@ -17,7 +17,7 @@ export const CONTROLS = [
   ['nextSlot', 'Next item', 'WheelDown', null],
   ['previousSlot', 'Previous item', 'WheelUp', null],
   ['scores', 'Scoreboard', 'Tab', null],
-  ['sprint','Sprint (Royale)','ShiftLeft',null],
+  ['sprint','Tactical sprint','ShiftLeft',null],
   ['interact','Search / pick up / revive (Royale)','KeyF',null],
   ['map','Island map (Royale)','KeyM',null],
   ['inventory','Inventory (Royale)','KeyI',null],

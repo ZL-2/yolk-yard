@@ -812,6 +812,8 @@ export class View {
         this.gunGroup.position.y-=.19*gesture;
         this.gunGroup.rotation.x+=.2*gesture;
       }
+      const sprint=local.sprintBlend||0;this.gunGroup.position.y-=sprint*.28;this.gunGroup.position.x+=sprint*.12;this.gunGroup.rotation.x+=sprint*.55;this.gunGroup.rotation.z+=sprint*.28;
+      if(local.traversal)this.gunGroup.position.y-=.8;
       this.scopeActive = !!aiming && scoped && this.aimBlend > 0.1 && (!local.inventory||!!local.inventory[local.slot]?.weapon);
       if(local.inventory){
         const heldItem=local.building?{id:'blueprint'}:local.inventory[local.slot];
@@ -826,7 +828,7 @@ export class View {
         if(this.heldItem&&heldItem?.pickaxe)animatePickaxe(this.heldItem,this.localArms,local.pickaxe,state.time-(local.swingAt??-100));
         else if(this.heldItem)this.heldItem.rotation.z=local.use?Math.sin(this.clock*8)*.15:0;
         if(this.localArms){this.localArms.rotation.x=local.use ? -.35+Math.sin(this.clock*6)*.06 : 0;}
-        this.gunGroup.rotation.z+=local.sprinting?.35:0;
+
         if(local.use){this.gunGroup.position.y+=.08+Math.sin(this.clock*8)*.015;this.gunGroup.rotation.x=-.3;}
         if(p.flight==='transport'){
           this.camera.position.set(p.x+Math.sin(p.yaw)*Math.cos(p.pitch||0)*24,p.y+8-Math.sin(p.pitch||0)*20,p.z+Math.cos(p.yaw)*Math.cos(p.pitch||0)*24);this.camera.lookAt(p.x,p.y+3,p.z);this.camera.fov=80;this.camera.updateProjectionMatrix();
@@ -911,6 +913,7 @@ export class View {
           model.userData.held.visible=draw.visible&&canFight(p);
           model.userData.held.rotation.set(p.pitch + hands.rotation[0] + recoil * .045 + draw.rotation[0], hands.rotation[1]+draw.rotation[1], hands.rotation[2]+draw.rotation[2]);
           model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
+          const sprint=p.sprintBlend||0;model.userData.held.position.y-=sprint*.3;model.userData.held.position.x+=sprint*.08;model.userData.held.rotation.x+=sprint*.65;model.userData.held.rotation.z+=sprint*.2;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1){
             const gesture=Math.sin(Math.PI*throwT);
             model.userData.held.position.y-=.16*gesture;

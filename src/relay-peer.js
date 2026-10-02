@@ -1,3 +1,4 @@
+import {MAX_HUMANS,MAX_SPECTATORS} from './royale-phases.js';
 import {mergeRelayMessage} from './relay-queue.js';
 import {SnapshotEncoder,SnapshotDecoder} from './snapshot-codec.js';
 import {HostHeartbeat} from './host-heartbeat.js';
@@ -99,7 +100,7 @@ export class RelayPeer extends Events {
    this.emit('error',{type:m.error});return;
   }
   if(m.type==='incoming'){
-   if(this.connections.size>=20)return this.enqueue({type:'close',channel:m.channel});
+   if(this.connections.size>=MAX_HUMANS+MAX_SPECTATORS)return this.enqueue({type:'close',channel:m.channel});
    const conn=new RelayConnection(this,m.peer,m.channel);this.connections.set(m.channel,conn);
    this.emit('connection',conn);
    if(!conn.closed){this.enqueue({type:'accept',channel:m.channel});this.flush();conn.opened();}return;

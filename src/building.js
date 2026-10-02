@@ -1,3 +1,4 @@
+import {worldDoorBox} from './world-rules.js';
 import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates} from './physics.js';
 import {bodyHeight,eyeHeight,canFight} from './stance.js';
 import {groundAt} from './terrain.js';
@@ -105,7 +106,7 @@ export function aimedObject(map,p,range=5){
  return hit?.box?hit:null;
 }
 export function rebuildMap(sim){
- sim.map.boxes=[...sim.worldBoxes.filter(b=>!sim.worldDamage[b.objectId]?.destroyed),...sim.builds.flatMap(pieceBoxes)];invalidateCollision(sim.map);sim.lootSupportDirty=true;sim.navigationRevision=(sim.navigationRevision||0)+1;
+ sim.map.boxes=[...sim.worldBoxes.filter(b=>!sim.worldDamage[b.objectId]?.destroyed).map(b=>worldDoorBox(b,sim.doors)),...sim.builds.flatMap(pieceBoxes)];invalidateCollision(sim.map);sim.lootSupportDirty=true;sim.navigationRevision=(sim.navigationRevision||0)+1;
 }
 export function resetBuilding(sim){
  sim.worldBoxes=authoredBoxes(sim.map);sim.worldDamage={};sim.builds=[];sim.buildId=0;sim.buildVersion=0;rebuildMap(sim);
@@ -116,11 +117,11 @@ export function collapse(sim){
  if(supported.size!==sim.builds.length){sim.builds=sim.builds.filter(b=>supported.has(b.id));sim.buildVersion++;rebuildMap(sim);}
 }
 export function damageObject(sim,box,amount,harvester=null){
- if(!box||!Number.isFinite(amount)||amount<=0)return;
+ if(!box||box.indestructible||!Number.isFinite(amount)||amount<=0)return;
  const built=box.buildId?sim.builds.find(b=>b.id===box.buildId):null;
  if(box.buildId&&!built)return; // Stale references can never become environmental resources.
  if(!built&&!sim.worldBoxes.some(b=>b.objectId===box.objectId))return;
- const definition=harvestDefinition(box,sim.map),material=built?.material||definition.material,max=built?.maxHealth||definition.health;
+ const definition=harvestDefinition(box,sim.map),material=built?.material||definition.material,max=built?.maxHealth||box.health||definition.health;
  const object=built||(sim.worldDamage[box.objectId]??={health:max,maxHealth:max,destroyed:false,resourceBudget:definition.resources,resourcePaid:0});
  if(object.destroyed||object.health<=0)return;
  const before=object.health,taken=Math.min(before,amount);object.health-=taken;object.lastDamage=sim.time;
@@ -227,6 +228,6 @@ export function constructionTick(sim){
 }
 // Remote prediction and rendering use their own map; simulation maps never mutate the authored island.
 export function applyBuildState(map,r){
- const key=r.matchId+':'+r.round+':'+(r.builds||[]).map(b=>[b.id,b.mask,b.path,b.doorOpen,b.rotation,b.material,b.x,b.y,b.z].join(',')).join(';')+':'+Object.keys(r.worldDamage||{}).filter(k=>r.worldDamage[k].destroyed).join(',');if(map.buildKey===key)return;
- map.authored??=authoredBoxes(map);map.boxes=[...map.authored.filter(b=>!r.worldDamage?.[b.objectId]?.destroyed),...(r.builds||[]).flatMap(pieceBoxes)];map.buildKey=key;invalidateCollision(map);
+ const key=r.matchId+':'+r.round+':'+(r.builds||[]).map(b=>[b.id,b.mask,b.path,b.doorOpen,b.rotation,b.material,b.x,b.y,b.z].join(',')).join(';')+':'+Object.keys(r.worldDamage||{}).filter(k=>r.worldDamage[k].destroyed).join(',')+':'+Object.keys(r.doors||{}).filter(k=>r.doors[k].open).join(',');if(map.buildKey===key)return;
+ map.authored??=authoredBoxes(map);map.boxes=[...map.authored.filter(b=>!r.worldDamage?.[b.objectId]?.destroyed).map(b=>worldDoorBox(b,r.doors)),...(r.builds||[]).flatMap(pieceBoxes)];map.buildKey=key;invalidateCollision(map);
 }

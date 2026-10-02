@@ -29,7 +29,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]')"
       - name: Verify lobby character clearance and empty public resets
         if: contains(github.event.head_commit.message, '[lobby-clearance]')
         run: |
@@ -234,6 +234,23 @@ jobs:
         with:
           name: season-one-checks
           path: test-results/season-one
+          retention-days: 7
+      - name: Verify The Fortified Coast gameplay, maps, UI and multiplayer
+        if: contains(github.event.head_commit.message, '[world-overhaul]')
+        run: |
+          node --test tests/world-overhaul.test.js tests/island-overhaul.test.js tests/season-one.test.js tests/royale-teammate-bots.test.js tests/snapshot-codec.test.js tests/weapon-balance.test.js tests/hitbox.test.js tests/recurring-royale.test.js tests/private-transport.test.js tests/relay-compact.test.js tests/relay-liveness.test.js tests/remote-input.test.js
+          node --test --test-name-pattern='every Ravelfront arena|detailed lobby' tests/ravel-arenas.test.js
+          node scripts/weapon-balance-network-check.mjs
+          npx playwright install --with-deps chromium
+          node scripts/world-overhaul-browser-check.mjs
+          node scripts/world-art-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[world-overhaul]')
+        with:
+          name: fortified-coast-checks
+          path: |
+            test-results/world-overhaul
+            test-results/world-art
           retention-days: 7
       - run: npm run build
       - uses: actions/upload-artifact@v4
@@ -545,4 +562,28 @@ jobs:
         with:
           name: season-one-live
           path: test-results/season-one
+          retention-days: 7
+
+  verify-world-overhaul-live:
+    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[world-overhaul]') }}
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/recurring-royale-live-check.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/world-overhaul-browser-check.mjs
+        env:
+          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fortified-coast-live
+          path: test-results/world-overhaul
           retention-days: 7

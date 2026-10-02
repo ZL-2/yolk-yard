@@ -1,19 +1,20 @@
+import {WORLD_RULES} from './world-rules.js';
 import {AMMO_RULES} from './weapon-balance.js';
 import {weapon} from './data.js';
 import {ammoType} from './royale-data.js';
 import {groundAt} from './terrain.js';
 import {canStand,wallDistance,candidates} from './physics.js';
 // One host-only table for authored floor sockets, chests and supply rewards.
-const sources=['ground','chest','high','supply'];
+const sources=['ground','chest','high','supply','epic'];
 export const AMMO_DROPS=AMMO_RULES;
 export const LOOT_TABLE=[
  ...[['sprinter',28,'assault'],['pip',18,'sidearm'],['zipper',23,'smg'],['scatter',20,'shotgun'],['doubleyolk',16,'shotgun'],['duet',13,'assault'],['anchor',8,'marksman'],['peeper',8,'marksman'],['needle',4,'sniper'],['comet',9,'energy'],['thumper',2,'launcher']].map(([id,weight,category])=>({id,weight,category,weapon:true,ammoType:ammoType(id),sources,rarities:id==='thumper'?[0,0,65,30,5]:[53,30,13,3.5,.5]})),
- ...[['bandage',18,0],['medkit',10,1],['mini',30,1],['flask',16,2],['splash',9,2],['popper',8,1],['impulse',6,2],['launchpad',3,3],['smoke',7,1],['scanner',4,2]].map(([id,weight,rarity])=>({id,weight,rarity,category:['bandage','medkit'].includes(id)?'health':['mini','flask','splash'].includes(id)?'shield':'utility',sources:id==='launchpad'?['chest','high','supply']:sources,counts:id==='mini'?[2,3]:id==='bandage'?[2,3]:[1,2]})),
+ ...[['bandage',18,0],['medkit',10,1],['mini',30,1],['flask',16,2],['splash',9,2],['popper',8,1],['impulse',6,2],['launchpad',3,3],['smoke',7,1],['scanner',4,2]].map(([id,weight,rarity])=>({id,weight,rarity,category:['bandage','medkit'].includes(id)?'health':['mini','flask','splash'].includes(id)?'shield':'utility',sources:id==='launchpad'?['chest','high','supply','epic']:sources,counts:id==='mini'?[2,3]:id==='bandage'?[2,3]:[1,2]})),
  ...Object.entries(AMMO_DROPS).map(([id,v])=>({id,...v,category:'ammo',ammoType:id,sources:['ground']})),
 ];
 export function weighted(list,random,weight=o=>o.weight){const total=list.reduce((n,o)=>n+weight(o),0);let r=random()*total;for(const entry of list){r-=weight(entry);if(r<=0)return entry;}return list.at(-1);}
 const quantity=(r,min,max)=>min+Math.floor(r()*(max-min+1));
-function rarity(entry,source,random){const weights=source==='supply'?[0,0,35,50,15]:source==='high'?[5,38,42,13,2]:source==='chest'?[12,48,31,8,1]:entry.rarities;return weighted(weights.map((weight,id)=>({weight:entry.id==='thumper'&&id<2?0:weight,id})),random).id;}
+function rarity(entry,source,random){const weights=source==='epic'?[0,0,0,75,25]:source==='ground'?[58,29,13,0,0]:source==='supply'?[0,0,35,50,15]:source==='high'?[5,38,42,13,2]:source==='chest'?[12,48,31,8,1]:entry.rarities;return weighted(weights.map((weight,id)=>({weight:entry.id==='thumper'&&id<2?0:weight,id})),random).id;}
 export function rollItem(random,source='ground',role='mixed'){
  const category=role==='mixed'?weighted([{id:'weapon',weight:52},{id:'utility',weight:26},{id:'ammo',weight:22}],random).id:role;
  const entries=LOOT_TABLE.filter(e=>e.sources.includes(source)&&(category==='weapon'?e.weapon:category==='ammo'?e.category==='ammo':!e.weapon&&e.category!=='ammo'));
@@ -56,15 +57,17 @@ export function* seedIslandLootSteps(sim){
   const point=choices[Math.floor(sim.random()*choices.length)];if(!point)continue;
   const item=rollItem(sim.random,'ground','weapon');if(sim.dropLoot(point,item))sim.dropLoot(point,matchingAmmo(item,sim.random));
  }
- for(const p of sim.map.chests){yield;if(sim.random()<p.chance&&validLootPoint(sim.map,p,.8))sim.chests.push({id:p.id,x:p.x,y:p.y,z:p.z,poi:p.poi,source:p.source,opened:false,supply:false,contents:rollChest(sim.random,p.source)});}
+ for(const p of sim.map.chests){yield;if(sim.random()<p.chance&&validLootPoint(sim.map,p,.8))sim.chests.push(makeChest(p,sim.random));}
  // A poor random roll must not strip a major landing district of chests.
  for(const district of sim.map.districts){
   yield;
   let count=sim.chests.filter(c=>c.poi===district.id).length;
   for(const point of sim.map.chests.filter(p=>p.poi===district.id&&!sim.chests.some(c=>c.id===p.id))){
    if(count>=3)break;if(!validLootPoint(sim.map,point,.8))continue;
-   sim.chests.push({id:point.id,x:point.x,y:point.y,z:point.z,poi:point.poi,source:point.source,opened:false,supply:false,contents:rollChest(sim.random,point.source)});count++;
+   sim.chests.push(makeChest(point,sim.random));count++;
   }
  }
  sim.lootVersion++;
 }
+
+function makeChest(p,random){const epic=p.source==='epic'||!p.vaultId&&random()<WORLD_RULES.epicChestChance,source=epic?'epic':p.source;return {id:p.id,x:p.x,y:p.y,z:p.z,poi:p.poi,vaultId:p.vaultId,source,epic,opened:false,supply:false,contents:rollChest(random,source)};}

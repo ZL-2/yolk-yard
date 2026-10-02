@@ -1,3 +1,4 @@
+import {redesignArena} from './arena-redesign.js';
 // Shared, deterministic arena geometry: rendering, shots, players and bots use these solids.
 const solid=(x,z,w,d,h,color='concrete',y=0,kind='cover')=>({x,z,w,d,h,color,y,kind});
 const mirrored=(boxes,...items)=>{for(const b of items)boxes.push(b,{...b,x:-b.x,z:-b.z});};
@@ -34,5 +35,5 @@ export function createRavelArenas(){
  for(const sign of [-1,1]){for(const z of [-8,8])foundry.boxes.push(solid(sign*22,z,.7,.7,2.9,'steel',0,'support'));foundry.boxes.push(solid(sign*22,0,6,20,.3,'steel',2.9,'platform'));steps(foundry.boxes,sign*22,-sign*20.5,'z',sign,3.2);for(const z of [-6,5])foundry.boxes.push(solid(sign*24.8,z,.3,4,.8,'steel',3.2,'rail'));house(foundry.boxes,sign*21,sign*27,10,7,3.8,'slate');}
  mirrored(foundry.boxes,solid(-7,-28,7,3.2,1.8,'olive',0,'supply'),solid(-32,17,4,7,2.2,'equipment',0,'generator'),solid(-32,-17,5,3,1.2,'concrete'),solid(-6,15,7,2,1.4,'concrete'));
  foundry.landmarks=[{x:-52,z:-20,type:'chimneys'},{x:52,z:20,type:'chimneys'},{x:0,z:-49,type:'factory',label:'IRONWAKE / WORKS'}];foundry.pickups.push([-22,0,'ammo'],[22,0,'ammo']);
- return [relay,docks,foundry].map(finish);
+ return [relay,docks,foundry].map(redesignArena).map(finish);
 }

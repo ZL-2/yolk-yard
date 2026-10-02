@@ -20,6 +20,7 @@ export function queueMatch(service,u,m){
  if(m.code){room=rooms.find(r=>r.code===m.code&&r.version===VERSION);if(!room)throw Error('That private room is unavailable. Check the code with its host.');options=matchOptions({...options,mode:room.mode,teamSize:room.teamSize,capacity:room.contestantCapacity,recurring:false});}
  if(options.mode==='royale'&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
  if(room)options=matchOptions({...options,mode:room.mode,capacity:room.contestantCapacity||room.capacity,teamSize:room.teamSize});
+ if(!room&&options.mode==='royale')options=matchOptions({...options,capacity:48,bots:47,fill:true});
  if(!room&&options.mode==='royale'&&options.capacity<options.teamSize*2)throw Error('Team Royale needs positions for at least two full teams.');
  let roomCode=room?.code||newCode();while(!room&&(roomCode===PUBLIC_ROYALE.code||service.relay.peers.has(address(roomCode))))roomCode=newCode();
  const hostRun=true,spectator=room?.mode==='royale'&&room.phase!=='lobby';

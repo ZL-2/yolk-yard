@@ -63,5 +63,12 @@ export function buildFrontierArena(world,map){
  for(const p of map.landmarks){if(p.type==='radar')a.radar(p.x,p.z,p.y);if(p.type==='crane')a.crane(p.x,p.z);if(p.type==='chimneys'){for(const dx of [-3,3]){a.cylinder(p.x+dx,9,p.z,1.4,18,'rust');a.cylinder(p.x+dx,15,p.z,1.44,.55,'canvas');}a.building(p.x,p.z,12,13,7,'slate');}if(p.type==='factory')a.building(p.x,p.z,25,8,8,'rust');if(p.type==='ship'){a.box(p.x,-.4,p.z,32,2.2,9,'slate');a.building(p.x+9,p.z,8,7,7,'canvas');a.container(p.x-7,p.z,12,5,3,'rust',.7);}}
  for(let i=0;i<12;i++){const angle=i*Math.PI/6,r=map.size+18,x=Math.sin(angle)*r,z=Math.cos(angle)*r;if(map.district==='uplink compound'){a.rock(x,1,z,5,4,5);a.pine(x+3,z+2,7+i%3);}else if(i%3===0)a.building(x,z,10,9,5+i%3,'slate');}
  for(const x of [-map.size+3,map.size-3])for(const z of [-25,25])a.lamp(x,z);
- a.bake(world);sign(world,0,6,-map.size+.9,'RAVELFRONT / '+map.name.toUpperCase());world.userData.frontierDetails=a.features;
+ for(const p of map.details||[]){
+  if(p.type==='checkpoint'){a.box(p.x,3.6,p.z,5.8,.4,1.2,'slate');for(const side of [-1,1])a.box(p.x+side*2.7,1.8,p.z,.25,3.6,.3,'amber');a.box(p.x,3.3,p.z+.65,2,.25,.04,'light');}
+  if(p.type==='cargo-hook'){a.cylinder(p.x,11,p.z,.06,8,'steel');a.box(p.x,7,p.z,1,.6,1,'dark');for(const side of [-1,1])a.beam([p.x+side*11,15,p.z],[p.x,17,p.z],.14,'steel');}
+  if(p.type==='freight')for(let i=0;i<3;i++)a.box(p.x+(i-1)*.45,1.4,p.z+2.53,.2,.6,.04,'canvas');
+  if(p.type==='pipework')for(const x of [-8,8]){a.cylinder(p.x+x,6.2,p.z,.25,20,'rust',[Math.PI/2,0,0]);for(const z of [-7,0,7])a.box(p.x+x,5.7,p.z+z,.65,.2,.3,'steel');}
+  if(p.type==='furnace'){a.box(p.x,1.15,p.z+1.53,2,.75,.05,'dark');for(let n=-2;n<=2;n++)a.box(p.x+n*.3,1.15,p.z+1.57,.09,.7,.04,'amber');}
+ }
+ a.bake(world);for(const [i,text]of (map.story||[]).entries())sign(world,(i-1)*20,3.1,map.size-1,text.toUpperCase());sign(world,0,6,-map.size+.9,'RAVELFRONT / '+map.name.toUpperCase());world.userData.frontierDetails=a.features;
 }

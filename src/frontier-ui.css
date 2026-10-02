@@ -1,0 +1,44 @@
+/* One readable field palette across legacy dialogs and the new Season 1 UI.
+   Every surface defines both its foreground and background. */
+#dialog,.panel,.dialog-panel,.season-launch {
+ --ink:#edf4f4;--cream:#142b36;--muted:#b8cbd2;--line:#425d6b;--gold:#efbc61;
+ color:#edf4f4!important;background:#102631!important;border-color:#476575!important;
+ color-scheme:dark;scrollbar-color:#7794a3 #172f3a;
+}
+#dialog :is(h1,h2,h3,h4,td,label,legend,strong,b),.panel :is(h1,h2,h3,h4,label,strong,b),.season-launch :is(h2,h3,label){color:#edf4f4}
+#dialog :is(p,.hint,output,.settings-tip,.settings-description p,.settings-footer>span),.panel :is(p,.hint){color:#bdd0d8}
+#dialog :is(button,.field,select,input:not([type=checkbox]):not([type=range])),.panel :is(button,.field,select),.season-launch button {
+ background:#233f4d;color:#f1f6f7;border:1px solid #6d8a98;box-shadow:none;
+}
+#dialog :is(button:hover,button:focus-visible),.panel button:hover{background:#34596a;color:#fff;border-color:#b9d9e4}
+#dialog :is(button.primary,button[aria-selected=true]),.panel button.primary,.season-launch button.primary {
+ background:#efbc61!important;color:#132632!important;border-color:#ffe0a3;box-shadow:none;
+}
+#dialog button:disabled,.panel button:disabled{background:#253944;color:#a4b7c0;opacity:.72}
+#dialog :is(input,select):focus-visible,#dialog button:focus-visible,.panel button:focus-visible{outline:3px solid #86ddeb;outline-offset:2px}
+#dialog kbd,.panel kbd{background:#dce9ed;color:#162d38;border:1px solid #92acb7;box-shadow:none}
+#dialog .controls-table td{color:#edf4f4;border-color:#456372}
+#dialog .controls-table td:first-child{width:38%}
+#dialog .dialog-head,#dialog .settings-tabs,#dialog .settings-footer,#dialog .settings-description{border-color:#476574}
+#dialog .settings-category-heading{background:#254553;color:#dcebf0}
+#dialog[data-kind=settings] .setting-row{background:#1c3744;color:#eef5f7;border-color:#355463}
+#dialog[data-kind=settings] .setting-row:is(.active,:focus-within){background:#2c4c5b;border-color:#8dbfca}
+#dialog[data-kind=settings] .setting-label,#dialog[data-kind=settings] .setting-label span{color:#edf4f4}
+#dialog[data-kind=settings] select{background:#142a35;color:#edf4f4;border-color:#71919f}
+#dialog[data-kind=settings] :is(input[type=range],input[type=checkbox]){accent-color:#72c6d5}
+#dialog[data-kind=settings] .binding-footer{background:#142b36;border-color:#4b6877}
+#dialog .settings-options{scrollbar-color:#819ca9 #142b36}
+.panel.lobby-panel .room-code{background:#173e4c;color:#b3f1ff;border:1px solid #76b6c8;text-shadow:none}
+.panel.lobby-panel .royale-queue{background:#223e4b;color:#f0f5f5;border-color:#527584}
+.panel.lobby-panel .roster-row{color:#edf4f4;border-color:#47616e}
+.panel.lobby-panel .roster-row span{color:#cbdce1}
+#dialog .setting-row small,#dialog .settings-tip,#dialog .settings-description p{color:#c3d5dc}
+#dialog :is(.map-option,.mode-option,.loadout-card,.profile-card,.public-room,.empty-rooms){background:#203c49;color:#eaf3f5;border-color:#547380}
+#dialog .eyebrow,.panel .eyebrow{color:#8ed6de}
+.keycard-guide{position:absolute;top:17%;left:50%;transform:translateX(-50%);max-width:360px;background:#102a39ed;border:1px solid #8ddde8;color:#ecfaff;padding:10px 18px;text-align:center;pointer-events:none;box-shadow:0 5px 20px #0004}
+.keycard-guide b{color:#a6efff;display:block;font-size:14px;letter-spacing:.06em}.keycard-guide small{display:block;color:#d7eaf2;margin-top:4px}.keycard-guide .keycard-arrow{display:inline-block;font-size:26px;margin-right:8px}
+.royale-prompt{background:#132d3aeb;color:#f1f6f8;border-color:#607f90}.royale-prompt kbd{color:#18313e;background:#e3eff2}
+.royale-meter.stamina.exhausted{color:#ffbb8e}.royale-meter.stamina.exhausted i{background:#df8d5a}
+@media(max-width:600px){.keycard-guide{top:19%;max-width:75vw;width:max-content;font-size:12px}.keycard-guide b{font-size:12px}#dialog .controls-table td:first-child{width:45%}}
+
+#arena-stamina{color:#e5f1f5;font-size:10px;margin-bottom:9px}#arena-stamina span{display:block;margin-bottom:4px}#arena-stamina progress{width:100%;height:6px;accent-color:#90d5e1}#arena-stamina.exhausted progress{accent-color:#f1a36c}.crosshair.weapon-lowered{opacity:0}

@@ -1,3 +1,4 @@
+import {updateWorldDamage} from './damage-visuals.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
 import {MATERIALS,pieceBoxes,solvePlacement,aimedObject} from './building.js';
@@ -26,7 +27,7 @@ export function updateBuildingView(rv,state,p){
   if(cached&&cached.key!==key){rv.root.remove(cached.mesh);rv.view.disposeGroup(cached.mesh);rv.buildMeshes.delete(b.id);cached=null;}
   if(!cached){const mesh=buildMesh(b,rv.kit);rv.root.add(mesh);cached={mesh,key};rv.buildMeshes.set(b.id,cached);}
   cached.mesh.visible=(!p||Math.hypot(b.x-p.x,b.z-p.z)<180)&&rv.view.buildControls?.editDraft?.id!==b.id;
-  cached.mesh.traverse(m=>{if(!m.isMesh)return;m.material.emissive?.setHex(state.time-b.lastDamage<.16?MATERIALS[b.material].damageColor:0x000000);if(m.material.emissive)m.material.emissiveIntensity=.28;});
+  cached.mesh.traverse(m=>{if(!m.isMesh)return;if(m.material.color)m.material.color.setHex(MATERIALS[b.material].color).multiplyScalar(1-(b.lastDamage>b.created?Math.max(0,1-b.health/b.maxHealth)*.4:0));m.material.emissive?.setHex(state.time-b.lastDamage<.16?MATERIALS[b.material].damageColor:0x000000);if(m.material.emissive)m.material.emissiveIntensity=.28;});
  }
  for(const [id,c] of rv.buildMeshes)if(!seen.has(id)){rv.root.remove(c.mesh);rv.view.disposeGroup(c.mesh);rv.buildMeshes.delete(id);}
  if(!rv.weakpoint){rv.weakpoint=new THREE.Mesh(new THREE.RingGeometry(.18,.25,32),new THREE.MeshBasicMaterial({color:0x50cfff,depthTest:false,transparent:true,opacity:.95,side:THREE.DoubleSide}));rv.weakpoint.userData.ownedMaterial=true;rv.root.add(rv.weakpoint);}
@@ -51,7 +52,7 @@ export function updateBuildingView(rv,state,p){
    rv.previewBuild.traverse(m=>{if(m.isMesh)m.material.color.setHex(valid?0x61cfff:0xff556d);});controls.reason=reason||(!valid?'Not enough materials':'');
   }
  }
- if(rv.view.world&&rv.worldVersion!==r.matchId+':'+r.round+':'+r.buildVersion){rv.worldVersion=r.matchId+':'+r.round+':'+r.buildVersion;rv.view.world.traverse(m=>{if(!m.userData.objectRanges)return;const attribute=m.geometry.attributes.position;let changed=false;for(const range of m.userData.objectRanges){const destroyed=!!r.worldDamage?.[range.id]?.destroyed;if(!!range.destroyed===destroyed)continue;m.userData.originalPositions??=attribute.array.slice();const start=range.start*3,end=(range.start+range.count)*3;if(destroyed)attribute.array.fill(0,start,end);else attribute.array.set(m.userData.originalPositions.subarray(start,end),start);range.destroyed=destroyed;changed=true;}if(changed)attribute.needsUpdate=true;});}
+ updateWorldDamage(rv.view.world,r.worldDamage,r.matchId+':'+r.round+':'+r.buildVersion);
 }
 function updateEditView(rv,c){
  const edit=c?.editDraft,key=edit?JSON.stringify([edit.id,edit.mask,edit.path,c.editHover,c.editValid]):'';

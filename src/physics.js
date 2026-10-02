@@ -1,3 +1,4 @@
+import {TACTICAL_SPRINT} from './world-rules.js';
 import {SEASON} from './season-one.js';
 import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon, gun } from "./data.js";
@@ -6,7 +7,7 @@ import {STANCE,bodyHeight,eyeHeight,regionPose} from './stance.js';
 export const RADIUS = 0.32,
   HEIGHT = 1.85,
   EYE = 1.70;
-export const ROYALE_MOVEMENT = Object.freeze({walk:5, sprint:7.4});
+export const ROYALE_MOVEMENT = Object.freeze({walk:5, sprint:TACTICAL_SPRINT.speed});
 export const dist = (a, b) =>
   Math.hypot(a.x - b.x, (a.y || 0) - (b.y || 0), a.z - b.z);
 export function direction(yaw, pitch = 0) {
@@ -148,6 +149,16 @@ function movePlayerStep(p, input, map, dt) {
     1.48,
   );
   if (p.flight === 'transport') return;
+  p.traversalLock=Math.max(0,(p.traversalLock||0)-dt);
+  if(p.traversal){
+    const ride=p.traversal,line=map.traversal?.find(l=>l.id===ride.id);
+    if(!line||p.downed||input.jump){p.traversal=null;p.traversalLock=.8;p.vy=input.jump?4:0;p.grounded=false;p.jumpLatch=!!input.jump;return;}
+    const route=ride.route||[ride.from,ride.to],lengths=route.slice(1).map((q,i)=>Math.hypot(q.x-route[i].x,q.y-route[i].y,q.z-route[i].z)),length=lengths.reduce((a,b)=>a+b,0)||1,next=Math.min(1,ride.progress+line.speed*dt/length);let travel=next*length,segment=0;while(segment<lengths.length-1&&travel>lengths[segment])travel-=lengths[segment++];const a=route[segment],b=route[segment+1],t=Math.min(1,travel/(lengths[segment]||1)),point={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t};
+    if(!canStand(map,point)){p.traversal=null;p.vy=0;return;}
+    Object.assign(p,point);ride.progress=next;p.grounded=false;p.vy=0;p.sprinting=p.tacticalSprint=false;p.crouching=p.sliding=false;p.fall={apex:Math.max(p.fall?.apex||p.y,p.y),immune:true,source:'traversal'};
+    if(next>=1){p.traversal=null;p.traversalLock=.8;p.vy=0;p.grounded=false;p.jumpLatch=true;}return;
+  }
+
   if (p.flight === 'dive' || p.flight === 'glide' || p.flight === 'launch') {
     p.crouching=false;p.lowCrouch=false;p.sliding=false;p.crouchLatch=!!input.crouch;
     const toggle=input.jump&&!p.flightLatch;p.flightLatch=!!input.jump;
@@ -166,14 +177,16 @@ function movePlayerStep(p, input, map, dt) {
     }else{if(p.y-floor<=24)p.flight='glide';p.vy=p.flight==='glide'?-SEASON.flight.glideFall:-SEASON.flight.diveFall;}
     p.y+=p.vy*dt;p.grounded=false;
     if(p.y<=floor){p.y=floor;p.vy=0;p.grounded=true;p.flight='ground';p.jumpLatch=!!input.jump;}
-    p.sprinting=false;if(p.inventory){p.sprintRest=(p.sprintRest||0)+dt;if(p.sprintRest>1.3)p.stamina=Math.min(100,(p.stamina??100)+18*dt);if(p.stamina>=20)p.exhausted=false;}return;
+    p.sprinting=p.tacticalSprint=false;p.sprintBlend=0;p.sprintRest=(p.sprintRest||0)+dt;if(p.sprintRest>TACTICAL_SPRINT.delay)p.stamina=Math.min(100,(p.stamina??100)+TACTICAL_SPRINT.recharge*dt);if(p.stamina>=TACTICAL_SPRINT.restart)p.exhausted=false;return;
   }
-  if (p.inventory) {
-    p.stamina ??= 100; p.sprintRest ??= 0;
-    if(p.stamina>=20)p.exhausted=false;
-    p.sprinting=!!input.sprint && !p.downed && !p.reviving && !p.crouching && !p.sliding && !p.exhausted && p.stamina>0 && !input.aim && !input.fire && !p.use && Math.hypot(input.forward||0,input.strafe||0)>.1 && p.grounded;
-    if(p.sprinting){p.stamina=Math.max(0,p.stamina-22*dt);p.sprintRest=0;if(p.stamina===0)p.exhausted=true;}
-    else {p.sprintRest+=dt;if(p.sprintRest>1.3)p.stamina=Math.min(100,p.stamina+18*dt);}
+  {
+    const rule=TACTICAL_SPRINT,was=p.sprinting;p.stamina??=100;p.sprintRest??=0;p.sprintRecovery=Math.max(0,(p.sprintRecovery||0)-dt);
+    if(p.stamina>=rule.restart)p.exhausted=false;
+    p.sprinting=!!input.sprint&&!p.boss&&!p.downed&&!p.reviving&&!p.crouching&&!p.sliding&&!p.exhausted&&p.stamina>0&&!input.aim&&!input.fire&&!p.use&&!input.buildMode&&!input.editing&&!p.reloadEnd&&(input.forward||0)>.2&&p.grounded;
+    p.tacticalSprint=p.sprinting;p.sprintBlend=Math.min(1,Math.max(0,(p.sprintBlend||0)+(p.sprinting?1:-2)*rule.acceleration*dt));
+    if(p.sprinting){p.stamina=Math.max(0,p.stamina-rule.drain*dt);p.sprintRest=0;if(p.stamina===0)p.exhausted=true;}
+    else{p.sprintRest+=dt;if(p.sprintRest>rule.delay)p.stamina=Math.min(100,p.stamina+rule.recharge*dt);}
+    if(was&&!p.sprinting)p.sprintRecovery=rule.raiseTime;
   }
   let f = clamp(input.forward || 0, -1, 1),
     s = clamp(input.strafe || 0, -1, 1),
@@ -203,7 +216,7 @@ function movePlayerStep(p, input, map, dt) {
   if(p.downed){input={...input,jump:false,aim:false};p.crouching=false;p.sliding=false;}
   if(p.reviving){f=0;s=0;}
   const speed =
-    (p.inventory ? ROYALE_MOVEMENT[p.sprinting ? 'sprint' : 'walk'] : weapon(p.weapon).speed) *
+    (p.inventory ? ROYALE_MOVEMENT.walk+(ROYALE_MOVEMENT.sprint-ROYALE_MOVEMENT.walk)*(p.sprinting?p.sprintBlend:0) : weapon(p.weapon).speed*(1+(TACTICAL_SPRINT.arenaMultiplier-1)*(p.sprinting?p.sprintBlend:0))) *
     (input.aim ? gun(p).adsMove : 1) *
     (p.crown != null ? 0.88 : 1)*(p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
   let mx=(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)*speed,mz=(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)*speed;

@@ -1,3 +1,4 @@
+import {initializeFrontier,frontierInteract} from './frontier-world.js';
 import {SEASON,rigCharges} from './season-one.js';
 import {initializeSeason,bossInput,damageBoss,useSeasonItem,seasonInteract,seasonTick} from './season-world.js';
 import {SHOP_SETS} from './shop-catalog.js';
@@ -32,7 +33,7 @@ const battlePreparation=new WeakMap();
 export class RoyaleSimulation extends Simulation {
  constructor(options={}){
   super({...options,mode:'royale'});this.map={...ROYALE_MAP,boxes:(ROYALE_MAP.authored||ROYALE_MAP.boxes).map(b=>({...b}))};resetBuilding(this);this.nav=navigation(ROYALE_MAP);this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.maxPlayers=this.options.capacity;
-  this.loot=[];this.chests=[];this.pads=[];this.lootId=0;this.lootVersion=0;this.startedAt=0;this.elapsed=0;this.alive=0;this.placements=[];this.supplyAt=135;this.queueEnds=0;this.stage=RP.WAITING;this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
+  this.loot=[];this.chests=[];this.pads=[];this.lootId=0;this.lootVersion=0;this.startedAt=0;this.elapsed=0;this.alive=0;this.placements=[];this.supplyAt=135;this.queueEnds=0;this.doors={};this.vault=null;this.stage=RP.WAITING;this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
  }
  addPlayer(id,profile,bot=false,forceSpectator=false){
   if(this.players.has(id))return this.players.get(id);
@@ -121,7 +122,7 @@ export class RoyaleSimulation extends Simulation {
   if(this.phase==='playing')return false;
   for(const p of [...this.players.values()])if(p.bot||p.connected===false)this.players.delete(p.id);
   const humans=[...this.players.values()];
-  this.stage=RP.WAITING;
+  this.doors={};this.vault=null;this.stage=RP.WAITING;
   const humanSeats=Math.min(this.options.capacity,MAX_HUMANS);
   let seated=0;for(const p of humans){const contestant=!p.friendSpectator&&seated++<humanSeats;Object.assign(p,{contestant,lateSpectator:!contestant,spectating:!contestant,team:-1});}
   this.matchTeams={};for(const p of humans)this.assignTeam(p);
@@ -178,7 +179,7 @@ export class RoyaleSimulation extends Simulation {
   if(isTeamRoyale(this.options))for(const p of seats.filter(p=>p.bot)){const mate=seats.find(o=>teammates(this.options,p,o)&&(!o.bot||seats.indexOf(o)<seats.indexOf(p)));if(mate){p.botLand={...mate.botLand,x:mate.botLand.x+3};p.botDrop=mate.botDrop+.25;}}
   this.alive=seats.filter(p=>p.health>0).length;
   this.nav=navigation(ROYALE_MAP);this.loot=prepared.loot;this.chests=prepared.chests;this.lootId=prepared.lootId;this.lootVersion++;
-  initializeSeason(this);this.emit('round',{round:this.round});this.emit('royale-cue',{cue:'transport-horn'});this.departureMs=Math.round(performance.now()-departureStarted);return true;
+  initializeFrontier(this);initializeSeason(this);this.emit('round',{round:this.round});this.emit('royale-cue',{cue:'transport-horn'});this.departureMs=Math.round(performance.now()-departureStarted);return true;
  }
  randomGun(){return rollItem(this.random,'ground','weapon').id;}
  dropLoot(point,item,avoid=[]){
@@ -222,7 +223,7 @@ export class RoyaleSimulation extends Simulation {
   p.use=null;p.reloadEnd=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'pickup-'+(item.rarity||0),item:item.id});return true;
  }
  openChest(p,chest){
-  if(!this.chests.includes(chest)||!canFight(p)||p.flight!=='ground'||chest.opened||!this.accessible(p,chest,3.3))return false;
+  if(!this.chests.includes(chest)||!canFight(p)||p.flight!=='ground'||chest.opened||chest.vaultId&&!this.vault?.open||!this.accessible(p,chest,3.3))return false;
   chest.opened=true;this.lootVersion++;
   const contents=chest.contents||rollChest(this.random,chest.supply?'supply':chest.source||'chest');
   for(const item of contents){const drop=this.dropLoot({...chest,y:chest.y+.7},item,[chest]);if(drop){drop.spawnAt=this.time;drop.spawnFrom={x:chest.x,y:chest.y+.65,z:chest.z};}}
@@ -231,7 +232,7 @@ export class RoyaleSimulation extends Simulation {
  }
  interact(p,input,dt){
   if(!canFight(p))return;
-  if(input.editing)return;if(seasonInteract(this,p,input,dt))return;
+  if(input.editing)return;if(frontierInteract(this,p,input,dt))return;if(seasonInteract(this,p,input,dt))return;
   if(input.interact&&!p.interactLatch&&toggleDoor(this,p)){p.interactLatch=true;return;}
   for(const item of nearbyItems(this,'loot',p,1.6))if((item.ammoType||item.resource)&&this.accessible(p,item,1.6))this.takeLoot(p,item);
   const chest=input.interact?nearbyItems(this,'chests',p,3.3).filter(c=>!c.opened&&this.accessible(p,c,3.3)).sort((a,b)=>dist(p,a)-dist(p,b))[0]:null;
@@ -248,7 +249,7 @@ export class RoyaleSimulation extends Simulation {
  }
  beginUse(p){
   if(!canFight(p)||this.time<(p.equipUntil||0))return;
-  const item=p.inventory[p.slot],def=ITEMS[item?.id];if(!def||p.use||p.flight!=='ground')return;
+  const item=p.inventory[p.slot],def=ITEMS[item?.id];if(!def||def.kind==='keycard'||p.use||p.flight!=='ground'||p.traversal)return;
   if(def.kind==='jumpRig'&&(!rigCharges(item,this.time)||this.time<(item.readyAt||0)))return;
   if(def.kind==='popper'&&this.time<(p.nextPopper||0))return;
   if(def.kind==='heal'&&p.health>=def.cap||def.kind==='shield'&&p.shield>=def.cap)return;
@@ -405,7 +406,7 @@ export class RoyaleSimulation extends Simulation {
    if(!input||!p.bot&&this.time-p.lastInput>.4)input={yaw:p.yaw,pitch:p.pitch,slot:p.slot};
    p.executedShotTime=input.shotTime;if(this.options.training&&!p.bot){p.tutorial??={};if(Math.hypot(input.forward||0,input.strafe||0)>.1)p.tutorial.move=true;if(input.fire)p.tutorial.fire=true;if(p.sliding)p.tutorial.slide=true;if(this.builds.some(b=>b.owner===p.id))p.tutorial.build=true;if(input.editing)p.tutorial.edit=true;if(p.fall?.source==='shockwave')p.tutorial.boost=true;}
    if(p.lifeState==='REVIVED'&&this.time-p.revivedAt>2)p.lifeState='ALIVE';
-   if(p.downed){
+   if(p.downed){p.traversal=null;
     const before={x:p.x,y:p.y,z:p.z};const crawl={...input,fire:false,aim:false,reload:false,interact:false,drop:false,buildMode:false,jump:false,sprint:false,crouch:false};
     this.moveWithCommands(p,crawl,dt,commands?{...commands,steps:commands.steps.map(s=>({...s,fire:false,aim:false,jump:false,sprint:false,crouch:false}))}:null);p.vx=(p.x-before.x)/dt;p.vz=(p.z-before.z)/dt;p.moving=Math.hypot(p.vx,p.vz)>.1;p.aim=false;
     if(this.time-p.downedAt>1){const drain=(REVIVE_RULES.bleed+Math.min(4,p.downCount-1))*dt;if(p.health<=drain)this.damage(p,null,drain,'Bleed out');else p.health-=drain;}
@@ -422,6 +423,7 @@ export class RoyaleSimulation extends Simulation {
     }
     continue;
    }
+   if(p.traversal&&(p.downed||p.spectating))p.traversal=null;
    const wasFlight=p.flight,oldGrounded=p.grounded,previous={x:p.x,y:p.y,z:p.z};
    const reviving=prepareRevive(this,p,input);
    const slot=clamp(Math.floor(input.slot??p.slot),0,5);
@@ -434,7 +436,7 @@ export class RoyaleSimulation extends Simulation {
    if(wasFlight!==p.flight)this.emit('royale-cue',{player:p.id,cue:p.flight==='ground'?'land':p.flight==='dive'?'glider-cut':'glider-deploy',x:p.x,y:p.y,z:p.z});
    else if(!oldGrounded&&p.grounded)this.emit('royale-cue',{player:p.id,cue:'land',x:p.x,y:p.y,z:p.z});
    else if(oldGrounded&&!p.grounded&&p.vy>0)this.emit('royale-cue',{player:p.id,cue:'jump',x:p.x,y:p.y,z:p.z});
-   if(p.flight==='ground'&&!reviving&&!p.downed){
+   if(p.flight==='ground'&&!reviving&&!p.downed&&!p.traversal){
     this.syncInventory(p);this.updateAccuracy(p,previous,dt);
     if(input.drop&&!p.dropLatch)this.dropSlot(p);p.dropLatch=!!input.drop;
     this.interact(p,input,dt);
@@ -508,8 +510,8 @@ export class RoyaleSimulation extends Simulation {
  restore(checkpoint){battlePreparation.delete(this);super.restore(checkpoint);const base=isWarmup(this.stage)?SPAWN_ISLAND:ROYALE_MAP;this.worldBoxes=(base.authored||base.boxes).filter(b=>!b.buildId).map(b=>({...b}));this.map={...base,boxes:[]};rebuildMap(this);this.nav=navigation(base);return this;}
  snapshot({includeLoot=true,includeBuilds=true}={}){
   const state=super.snapshot();state.options={...state.options,map:this.map.id};
-  state.players=state.players.map(p=>{const source=this.players.get(p.id);return Object.assign(p,{tutorial:source.tutorial?{...source.tutorial}:null,training:!!this.options.training,boss:source.boss,maxHealth:source.maxHealth,maxShield:source.maxShield,contestant:source.contestant,lateSpectator:source.lateSpectator,fall:source.fall?{...source.fall}:null,redeploy:source.redeploy,forceGlider:source.forceGlider,launchVelocity:source.launchVelocity?{...source.launchVelocity}:null,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,editing:source.editing,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestProgress:source.chestProgress||0});});
-  state.royale={relays:structuredClone(this.relays||[]),smokes:structuredClone(this.smokes||[]),markers:(this.markers||[]).filter(m=>m.until>this.time).map(m=>({...m})),stage:this.stage,accepting:acceptsContestants(this.stage),practice:isWarmup(this.stage),contestants:[...this.players.values()].filter(p=>p.contestant).length,round:this.round,...(includeBuilds?{builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage)}:{}),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,...(includeLoot?{loot:this.loot.map(i=>({...i})),chests:this.chests.map(({contents,...c})=>({...c}))}:{}),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds,humanContestants:this.humanContestants().length,botContestants:[...this.players.values()].filter(p=>p.bot&&p.contestant).length,humanLimit:Math.min(this.options.capacity,MAX_HUMANS),startReason:this.startReason};
+  state.players=state.players.map(p=>{const source=this.players.get(p.id);return Object.assign(p,{tutorial:source.tutorial?{...source.tutorial}:null,training:!!this.options.training,traversal:source.traversal?structuredClone(source.traversal):null,traversalLock:source.traversalLock,vaultProgress:source.vaultProgress,boss:source.boss,maxHealth:source.maxHealth,maxShield:source.maxShield,contestant:source.contestant,lateSpectator:source.lateSpectator,fall:source.fall?{...source.fall}:null,redeploy:source.redeploy,forceGlider:source.forceGlider,launchVelocity:source.launchVelocity?{...source.launchVelocity}:null,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,editing:source.editing,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestProgress:source.chestProgress||0});});
+  state.royale={doors:structuredClone(this.doors||{}),vault:this.vault?{...this.vault}:null,relays:structuredClone(this.relays||[]),smokes:structuredClone(this.smokes||[]),markers:(this.markers||[]).filter(m=>m.until>this.time).map(m=>({...m})),stage:this.stage,accepting:acceptsContestants(this.stage),practice:isWarmup(this.stage),contestants:[...this.players.values()].filter(p=>p.contestant).length,round:this.round,...(includeBuilds?{builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage)}:{}),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,...(includeLoot?{loot:this.loot.map(i=>({...i})),chests:this.chests.map(({contents,...c})=>({...c}))}:{}),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds,humanContestants:this.humanContestants().length,botContestants:[...this.players.values()].filter(p=>p.bot&&p.contestant).length,humanLimit:Math.min(this.options.capacity,MAX_HUMANS),startReason:this.startReason};
   state.royale.teams=Object.values(this.matchTeams||{}).filter(t=>t.members.length).map(t=>({...t,members:[...t.members]}));state.royale.winnerTeam=this.winnerTeam??-1;state.royale.teamsAlive=livingTeams(this.options,this.players.values()).size;
   return state;
  }

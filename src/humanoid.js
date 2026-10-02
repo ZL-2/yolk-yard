@@ -141,7 +141,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const interval=distance>90?.1:distance>40?.05:0;if(h.clock<h.nextUpdate){h.skipped=(h.skipped||0)+dt;return;}dt=Math.min(.12,dt+(h.skipped||0));h.skipped=0;h.nextUpdate=h.clock+interval;
  const b=h.bones,alpha=1-Math.exp(-dt*12);for(const bone of Object.values(b)){bone.position.copy(bone.userData.rest);bone.quaternion.slerp(identityQuaternion,alpha);}
  const vx=p.vx||0,vz=p.vz||0,speed=Math.min(9,Math.hypot(vx,vz)),grounded=p.grounded!==false;
- h.speed+=(speed-h.speed)*(1-Math.exp(-dt*10));const cycleDistance=p.lobbyPatrol?.cycleDistance|| (p.downed?.85:p.crouching?1.1:p.sprinting?2.0:1.7);h.phase+=speed*dt/cycleDistance*Math.PI*2;
+ h.speed+=(speed-h.speed)*(1-Math.exp(-dt*10));const cycleDistance=p.lobbyPatrol?.cycleDistance|| (p.downed?.85:p.crouching?1.1:p.tacticalSprint?2.45:p.sprinting?2.0:1.7);h.phase+=speed*dt/cycleDistance*Math.PI*2;
  if(grounded&&!h.grounded)h.land=1;h.grounded=grounded;h.land=Math.max(0,h.land-dt*5);
  const airborne=['dive','glide','launch'].includes(p.flight),dead=p.health!==undefined&&p.health<=0;
  h.air+=(Number(airborne)-h.air)*(1-Math.exp(-dt*7));h.death+=(Number(dead)-h.death)*(1-Math.exp(-dt*6));
@@ -153,7 +153,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const blend=1-Math.exp(-dt*14);for(const [key,on]of [['crouch',p.crouching&&!p.sliding],['compact',p.lowCrouch],['slide',p.sliding],['down',p.downed],['revive',p.reviving]])h[key]=(h[key]||0)+(Number(!!on)-(h[key]||0))*blend;
  const lower=Math.max(h.crouch*.53+h.compact*.29,h.slide*.87,h.down*.65,h.revive*.53);
  b.hips.position.y-=lower+(.09+(p.sprinting?.025:0))*moving*(1-Math.max(h.slide,h.down,h.crouch))+h.land*.075+h.death*.58;
- b.hips.rotation.x=-.06*moving-(p.sprinting?.08:0)-h.crouch*.12+h.slide*.27-h.down*1.14-h.revive*.12+h.death*.85;
+ b.hips.rotation.x=-.06*moving-(p.tacticalSprint?.18:p.sprinting?.08:0)-h.crouch*.12+h.slide*.27-h.down*1.14-h.revive*.12+h.death*.85;
  const turn=Math.atan2(Math.sin((p.yaw||0)-h.lastYaw),Math.cos((p.yaw||0)-h.lastYaw))/Math.max(.016,dt);h.lastYaw=p.yaw||0;b.spine.rotation.z=T.MathUtils.clamp(-side*.012-turn*.007,-.09,.09);b.hips.rotation.y=T.MathUtils.clamp(turn*.008,-.07,.07);b.chest.rotation.y=Math.sin(h.phase)*.018*moving;b.chest.rotation.x=Math.sin(time*1.8)*.008+(p.lastDamage&&time-p.lastDamage<.18?-.09:0);
  b.head.rotation.x=(menu?Math.sin(time*.7)*.025:-(p.pitch||0)*.3)+h.down*1.04+h.revive*.14;
  if(menu){b.head.rotation.y=p.scan||0;b.chest.rotation.y+=(p.scan||0)*.3;}
@@ -173,7 +173,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const f=forward/(speed||1),s=side/(speed||1);
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R',phase=h.phase+(sideSign<0?Math.PI:0),cycle=((phase/(2*Math.PI))%1+1)%1;
   // Stance travels backward linearly at ground speed; swing lifts the foot.
-  const stance=cycle<.54,u=stance?cycle/.54:(cycle-.54)/.46,stride=stance?1-u*2:-Math.cos(u*Math.PI),lift=stance?0:Math.sin(u*Math.PI)*.12*moving;
+  const stance=cycle<.54,u=stance?cycle/.54:(cycle-.54)/.46,stride=stance?1-u*2:-Math.cos(u*Math.PI),lift=stance?0:Math.sin(u*Math.PI)*(p.tacticalSprint?.25:.12)*moving;
   let foot=V(sideSign*.12+s*stride*step,.09+lift,-f*stride*step);
   if(patrol){
    // 62% stance: planted boot travels at exactly the scenery's local speed.
@@ -197,7 +197,8 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const held=model.userData.held,arms=model.userData.arms;
  if(held&&arms){held.updateMatrixWorld(true);h.mesh.updateMatrixWorld(true);}
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R';let target;
-  if(airborne)target=p.flight==='glide'?V(sideSign*.33,1.93,-.06):V(sideSign*.61,1.42+Math.sin(time*2.1+sideSign)*.025,-.17);
+  if(p.traversal)target=V(sideSign*.24,1.95,-.08);
+  else if(airborne)target=p.flight==='glide'?V(sideSign*.33,1.93,-.06):V(sideSign*.61,1.42+Math.sin(time*2.1+sideSign)*.025,-.17);
   else if(p.building)target=V(sideSign*.25,1.22-lower+(sideSign>0?Math.sin(time*8)*.035:0),-.38);
   else if(p.use)target=V(sideSign*.22,(sideSign>0?1.53:1.2)-lower,-.3);
   else if(held?.visible&&arms){const limb=arms.userData.limbs.find(l=>l.side===sideSign);target=limb.hand.getWorldPosition(V());target.applyMatrix4(h.mesh.matrixWorld.clone().invert());target.y+=.035;}
@@ -208,7 +209,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   h['handTarget'+S]??=target.clone();h['handTarget'+S].lerp(target,1-Math.exp(-dt*(h.transition<1?16:40)));
   solveChain(h,'arm'+S,'forearm'+S,'hand'+S,h['handTarget'+S],V(sideSign*.65,1.0,.25));
   const hand=b['hand'+S];let handQ=h.mesh.getWorldQuaternion(new T.Quaternion());
-  if(held?.visible&&arms&&!airborne&&!p.use&&!p.building){handQ=arms.userData.limbs.find(l=>l.side===sideSign).hand.getWorldQuaternion(new T.Quaternion());}
+  if(held?.visible&&arms&&!airborne&&!p.traversal&&!p.use&&!p.building){handQ=arms.userData.limbs.find(l=>l.side===sideSign).hand.getWorldQuaternion(new T.Quaternion());}
   hand.quaternion.copy(hand.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(handQ));hand.rotateX(-.12);
 
  }

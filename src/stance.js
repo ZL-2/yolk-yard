@@ -10,7 +10,7 @@ export const stanceOf=p=>p?.downed?'downed':p?.sliding?'sliding':p?.lowCrouch?'c
 export const bodyHeight=p=>STANCE[stanceOf(p)].height;
 export const eyeHeight=p=>STANCE[stanceOf(p)].eye;
 export const canFight=p=>!!p&&p.health>0&&!p.downed&&!p.spectating&&!p.reviving;
-export function resetStance(p){Object.assign(p,{crouching:false,lowCrouch:false,sliding:false,crouchLatch:false,slideVX:0,slideVZ:0,slideAge:0,slideCooldown:0,downed:false,lifeState:'ALIVE',downCount:0,reviving:null,reviverId:null,reviveProgress:0,knockedBy:null,knockSource:null,reviveBlockedUntil:0});}
+export function resetStance(p){Object.assign(p,{stamina:100,sprintRest:0,sprintBlend:0,sprintRecovery:0,tacticalSprint:false,sprinting:false,exhausted:false,traversal:null,traversalLock:0,vaultProgress:0,crouching:false,lowCrouch:false,sliding:false,crouchLatch:false,slideVX:0,slideVZ:0,slideAge:0,slideCooldown:0,downed:false,lifeState:'ALIVE',downCount:0,reviving:null,reviverId:null,reviveProgress:0,knockedBy:null,knockSource:null,reviveBlockedUntil:0});}
 // Standardized anatomical pose. Decorative clothing/hair/backpacks never enter this path.
 export function regionPose(h,p){
  const mode=stanceOf(p),speed=Math.hypot(p.vx||0,p.vz||0);

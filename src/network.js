@@ -1,4 +1,4 @@
-import {isWarmup,MAX_SPECTATORS,MAX_HUMANS,MAX_CONTESTANTS} from './royale-phases.js';
+import {isWarmup,MAX_SPECTATORS,MAX_HUMANS,MAX_SNAPSHOT_ACTORS} from './royale-phases.js';
 import { connectionReport, errorCode, watchConnection } from './connection-report.js';
 import Peer from "peerjs";
 import { RelayPeer, relayURL } from "./relay-peer.js";
@@ -151,7 +151,7 @@ export class Network {
     }
     let accepted = false,
       lastRate = performance.now(),
-      packets = 0;
+      packetCredit = 512;
     const timeout = setTimeout(() => {
       if (!accepted) conn.close();
     }, 8000);
@@ -166,14 +166,16 @@ export class Network {
         return;
       }
       const now = performance.now();
-      if (now - lastRate > 1000) {
-        packets = 0;
-        lastRate = now;
-      }
-      if (++packets > 160) {
+      // A host loading the island receives queued 60 Hz controls in a burst.
+      // Preserve up to eight seconds of delivery without raising the sustained
+      // rate. Simulation still bounds input backlog and grants movement time.
+      packetCredit=Math.min(512,packetCredit+Math.max(0,now-lastRate)*.16);
+      lastRate=now;
+      if (packetCredit < 1) {
         conn.close();
         return;
       }
+      packetCredit--;
       if (msg.type === "hello" && !accepted) {
         if (msg.version !== VERSION || this.connections.size >= this.maxConnections) {
           conn.send({
@@ -311,7 +313,7 @@ export class Network {
             !s ||
             s.version !== VERSION ||
             !Array.isArray(s.players) ||
-            s.players.length > MAX_CONTESTANTS+MAX_SPECTATORS
+            s.players.length > MAX_SNAPSHOT_ACTORS
           )
             return;
           this.lastState = performance.now();
@@ -530,7 +532,7 @@ export class Network {
         this.hostHeartbeat=new HostHeartbeat(this.lastState);
         this.callbacks.onStatus?.('New host connected. Match continues.');
       }else if(msg.type==='state'&&welcomed){
-        const s=msg.state;if(s?.version!==VERSION||!Array.isArray(s.players)||s.players.length>MAX_CONTESTANTS+MAX_SPECTATORS)return;
+        const s=msg.state;if(s?.version!==VERSION||!Array.isArray(s.players)||s.players.length>MAX_SNAPSHOT_ACTORS)return;
         s.players=s.players.map(p=>({...p,...safeProfile(p)}));s.options=matchOptions(s.options);if(s.royale)s.options.map=isWarmup(s.royale.stage)?'hatchery-atoll':'sunnybreak';s.winner=safeSystemText(s.winner,'Round complete');
         s.events=(s.events||[]).slice(-120).map(e=>{const next={...e};for(const key of ['name','targetName'])if(key in next)next[key]=safeName(next[key]);for(const key of ['text','winner','weapon'])if(key in next)next[key]=safeSystemText(next[key]);return next;});
         this.lastState=performance.now();this.snapshot=s;this.members=s.network?.members||this.members;this.hostId=s.network?.hostId||this.hostId;

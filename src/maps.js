@@ -22,8 +22,9 @@ export function navigation(map) {
     origin = -map.size + cell / 2;
   const cells = Array.from({ length: n * n }, () => []),
     nodes = [];
+  const navBoxes=(map.authored||map.boxes).filter(b=>!b.doorId||b.indestructible),navMap=map.doors?.length?{...map,boxes:navBoxes}:map;
   const buckets=new Map(),bucketSize=8;
-  for(const b of (map.authored||map.boxes)){for(let x=Math.floor((b.x-b.w/2-.5)/bucketSize);x<=Math.floor((b.x+b.w/2+.5)/bucketSize);x++)for(let z=Math.floor((b.z-b.d/2-.5)/bucketSize);z<=Math.floor((b.z+b.d/2+.5)/bucketSize);z++){const key=x+','+z;if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(b);}}
+  for(const b of navBoxes){for(let x=Math.floor((b.x-b.w/2-.5)/bucketSize);x<=Math.floor((b.x+b.w/2+.5)/bucketSize);x++)for(let z=Math.floor((b.z-b.d/2-.5)/bucketSize);z<=Math.floor((b.z+b.d/2+.5)/bucketSize);z++){const key=x+','+z;if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(b);}}
   const nearby=(x,z)=>buckets.get(Math.floor(x/bucketSize)+','+Math.floor(z/bucketSize))||[];
   for (let z = 0; z < n; z++)
     for (let x = 0; x < n; x++) {
@@ -89,7 +90,7 @@ export function navigation(map) {
     for(let i=1;i<lane.length;i++){lane[i-1].edges.push(lane[i].id);lane[i].edges.push(lane[i-1].id);}
     for(const end of [lane[0],lane.at(-1)])for(let x=Math.max(0,end.cx-2);x<=Math.min(n-1,end.cx+2);x++)for(let z=Math.max(0,end.cz-2);z<=Math.min(n-1,end.cz+2);z++)for(const node of cells[z*n+x]){
       if(node===end||Math.abs(node.y-end.y)>.08||Math.hypot(node.x-end.x,node.z-end.z)>cell*2.1)continue;
-      let clear=true;for(let j=1;j<=6;j++){const t=j/6;if(!canStand(map,{x:end.x+(node.x-end.x)*t,z:end.z+(node.z-end.z)*t,y:end.y},RADIUS)){clear=false;break;}}
+      let clear=true;for(let j=1;j<=6;j++){const t=j/6;if(!canStand(navMap,{x:end.x+(node.x-end.x)*t,z:end.z+(node.z-end.z)*t,y:end.y},RADIUS)){clear=false;break;}}
       if(clear){end.edges.push(node.id);node.edges.push(end.id);}
     }
   }

@@ -506,7 +506,7 @@ export class Simulation {
   }
   fire(p, burst = false) {
     const w=gun(p);
-    if(!canFight(p)||p.ammo[p.slot]<=0||p.reloadEnd||this.time+1e-9<(p.equipUntil||0))return false;
+    if(!canFight(p)||p.sprinting||p.sprintRecovery>0||p.traversal||p.ammo[p.slot]<=0||p.reloadEnd||this.time+1e-9<(p.equipUntil||0))return false;
     if(burst){if(!w.burst||p.burstWeapon!==w.id||!p.burstLeft||this.time+1e-9<p.burstTime||this.time-(p.lastBurstShotAt??-100)+1e-9<w.burstInterval)return false;}
     else {if(p.burstLeft||this.time+1e-9<Math.max(p.nextShot||0,weaponReadyAt(p,w)))return false;
       p.shotGroup=++this.shotId;rememberShot(p,w,this.time);p.pendingFireUntil=0;
@@ -858,7 +858,7 @@ export class Simulation {
   }
   snapshot() {
     const keys = [
-      'friendSpectator','lateSpectator','watchId',
+      'friendSpectator','lateSpectator','watchId','sprinting','tacticalSprint','sprintBlend','sprintRecovery','stamina','sprintRest','exhausted',
       'crouching','lowCrouch','sliding','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','downed','lifeState','downedAt','revivedAt','downCount','reviving','reviverId','reviveProgress','revives','connected','teamSlot',
       "afkRemaining", "afkRemoved", "lastDamage", "assists", "quickstep", "focus",
       "id", "joinedOrder", "vx", "vz", "place",

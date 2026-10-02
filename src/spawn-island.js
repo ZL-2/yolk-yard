@@ -1,31 +1,37 @@
-// Kestrel departure atoll. Static authored scenery never travels over the network.
-const size=64,cell=2,n=65,heights=new Float32Array(n*n);
-for(let z=0;z<n;z++)for(let x=0;x<n;x++){
- const wx=x*cell-size,wz=z*cell-size,r=Math.hypot(wx/61,wz/57);
- heights[z*n+x]=Math.max(0,Math.min(3.2,(1-r)*12));
-}
-const boxes=[],props=[],trees=[],navLinks=[];
-const box=(x,z,w,d,h,y=3.2,color='stone',kind='building',material='brick')=>{const b={x,z,w,d,h,y,color,kind,material,objectId:'departure-'+boxes.length};boxes.push(b);return b;};
-const prop=(kind,x,z,w=2,d=2,h=1.3,y=3.2)=>{props.push({kind,x,z,w,d,h,y,seed:props.length});box(x,z,w,d,h,y,'crate','prop',kind==='rock'?'brick':['car','lamp','container','generator'].includes(kind)?'metal':'wood').prop=props.length-1;};
-// Open-sided terminal, boarding deck, practice range, cargo court and parkour pier.
-box(0,-18,26,10,.3,3,'foundation');box(0,-21.5,26,.4,4,3.2,'steel');
-for(const x of [-12,12])box(x,-18,.55,8,4,3.2,'steel');
-box(0,-18,27,11,.35,7.2,'gold');box(-8,-17,5,1,1.1,3.2,'crate','furniture','wood');
-box(8,-17,5,1,1.1,3.2,'crate','furniture','wood');
-for(let i=0;i<10;i++)box(18,-19+i*.8,4,.82,.3,3.2+i*.4,'crate','step','wood');
-box(18,-12,4,4,.3,7.2,'floor');navLinks.push({from:{x:18,y:3.2,z:-20},to:{x:18,y:7.5,z:-11}});
-for(let i=0;i<7;i++){box(-29+i*3,19,2.2,3,.35,3.2+i*.36,'crate','step','wood');}
-box(-8,19,6,6,.4,5.36,'crate','bridge','wood');
-for(const x of [24,31,38]){prop('target',x,6,1.2,.5,2.4);prop('crate',x,12,2.2,1.4,1.2);}
-for(const [kind,x,z,w,d,h]of [['container',-28,-12,7,3,2.5],['container',-28,-4,6,3,2.5],['car',-13,-29,2.2,4,1.4],['generator',12,24,2,2,1.6],['bench',-9,7,3,1,1],['bench',-9,11,3,1,1],['lamp',-15,-8,.5,.5,4],['lamp',13,-8,.5,.5,4]])prop(kind,x,z,w,d,h);
-for(let i=0;i<22;i++){const a=i*2.39996,r=37+i%4*2,x=Math.cos(a)*r,z=Math.sin(a)*r;trees.push({x,z,y:3.2,h:7+i%3,kind:i%3?'palm':'oak',seed:i});box(x,z,.7,.7,4,3.2,'crate','tree','wood').tree=trees.length-1;}
-// Eight equal-area sectors and several radii cover the dry, navigable plateau.
-// Keep clear of solid scenery, the movement course and the shoreline slope.
+// Kestrel Forward Airfield. One static mesh/collision authoring for every client.
+const size=96,cell=2,n=97,heights=new Float32Array(n*n);
+for(let z=0;z<n;z++)for(let x=0;x<n;x++){const wx=x*cell-size,wz=z*cell-size,edge=Math.max(Math.abs(wx)/89,Math.abs(wz)/88);heights[z*n+x]=Math.max(0,Math.min(3.2,(1-edge)*24));}
+const boxes=[],props=[],trees=[],navLinks=[],signs=[];
+const box=(x,z,w,d,h,y=3.2,color=0x5b7077,kind='building',material='metal')=>{const b={x,z,w,d,h,y,color,kind,material,objectId:'departure-'+boxes.length};boxes.push(b);return b;};
+const prop=(kind,x,z,w=2,d=2,h=1.3,y=3.2)=>{props.push({kind,x,z,w,d,h,y,seed:props.length});box(x,z,w,d,h,y,0x677b71,'prop',kind==='rock'?'brick':['car','truck','lamp','container','generator'].includes(kind)?'metal':'wood').prop=props.length-1;};
+// Runway 18/36, turning apron, runway edge lights, and a parked R-04.
+const roads=[{kind:'runway',width:20,points:[[25,-72],[25,72]]},{kind:'taxiway',width:12,points:[[-39,-31],[25,-31]]},{kind:'taxiway',width:8,points:[[-47,60],[-47,-54]]},{kind:'path',width:5,points:[[-62,18],[-9,18],[-9,-23]]}];
+for(let z=-64;z<=66;z+=12)box(25,z,.45,5,.025,3.205,0xe6e8d5,'marking');
+for(const side of [-1,1]){box(25+side*9,-1,.22,137,.025,3.205,0xc4c9bb,'marking');for(let z=-68;z<=68;z+=12)box(25+side*12,z,.35,.35,.12,3.2,0x8edbd8,'runway-light');}
+for(const z of [-65,65])for(let x=18;x<=32;x+=2)box(x,z,.8,5,.03,3.205,0xe7e6d2,'marking');
+const parkedTransport={x:25,y:4.68,z:-35,yaw:0};
+box(25,-35,5.8,17,4.6,3.5,0x344d57,'parked-aircraft');box(25,-35.7,16.5,3.6,.5,6.9,0x425c65,'parked-aircraft');
+// Open maintenance hangar, with service bay and staging equipment.
+box(-28,-47,34,27,.25,2.95,0x6a7a79,'foundation');box(-28,-60.5,34,.6,9,3.2,0x647983);
+for(const side of [-1,1]){box(-28+side*17,-47,.6,27,9,3.2,0x526b78);box(-28+side*15,-33.5,4,.5,9,3.2,0x40545e);}
+box(-28,-47,35,28,.4,12.2,0x3e5965);box(-28,-33.5,26,.5,2,10.2,0x526b78);
+for(let i=0;i<4;i++)prop('crate',-40+i*6,-55,2.8,2.3,1.8);prop('wreck',-28,-45,11,5,3);
+// Operations hut and broad observation deck with ordinary walkable stairs.
+box(-58,-17,18,13,.25,2.95,0x697c7b,'foundation');box(-58,-23.5,18,.5,4.5,3.2,0x65766a);
+for(const side of [-1,1])box(-58+side*9,-17,.5,13,4.5,3.2,0x65766a);box(-58,-17,19,14,.3,7.7,0x344f55);
+prop('console',-58,-21,3.6,1.4,1.2);prop('radio',-73,-17,3,3,21);
+for(let i=0;i<12;i++)box(-72,2-i*1.1,3.8,1.12,(i+1)*.4,3.2,0x677e7e,'step');box(-64,-11,19,4,.3,7.7,0x526e79,'floor');navLinks.push({from:{x:-72,y:3.2,z:3},to:{x:-72,y:8,z:-12}});
+// Firing lanes, protective berms, recovery tent, cargo and movement course.
+for(const x of [-66,-58,-50,-42]){prop('target',x,51,1.2,.5,2.3);prop('crate',x,33,2.2,1.2,1.2);box(x,55,7,2,4.5,3.2,0x6b785d,'range-berm','brick');}
+prop('medical-tent',-24,52,9,8,3.8);prop('truck',-18,34,3,6,2.8);prop('generator',-10,-18,2.6,2.4,1.7);
+for(const [x,z]of [[-62,17],[-54,17],[-34,10],[-25,10]])prop('container',x,z,7,3.2,2.8);
+for(let i=0;i<7;i++)box(-6,26+i*4,3.6,2.4,.35,3.2+i*.35,0x6f7d72,'step');
+for(const [x,z]of [[-42,-28],[-13,-28],[-44,22],[-15,22],[-72,33]])prop('lamp',x,z,.35,.35,4.5);
+for(const side of [-1,1])for(let z=-60;z<=64;z+=12)box(side*79,z,.18,9,2.1,3.2,0x546b64,'fence');
+for(let i=0;i<18;i++){const x=-82+(i%3)*3,z=-70+Math.floor(i/3)*28;trees.push({x,z,y:3.2,h:7+i%3,kind:'pine',seed:i});box(x,z,.7,.7,4,3.2,0x75634e,'tree','wood').tree=trees.length-1;}
+signs.push({text:'KESTREL FORWARD AIRFIELD',x:-28,y:10,z:-32.9},{text:'RANGE / LIVE TRAINING',x:-54,y:6,z:54},{text:'36 / HOLD SHORT',x:25,y:4,z:70},{text:'OPERATIONS / R-04',x:-58,y:6.8,z:-10.2},{text:'FIELD MEDICAL',x:-24,y:6.2,z:56},{text:'MOVEMENT / BUILD PRACTICE',x:-5,y:6,z:24});
 export const SPAWN_REGIONS=Array.from({length:8},(_,sector)=>({id:sector,points:[]}));
-for(let z=-36;z<=36;z+=6)for(let x=-36;x<=36;x+=6){
- if(Math.hypot(x/45,z/41)>1||boxes.some(b=>b.y<5.1&&b.y+b.h>3.2&&Math.abs(b.x-x)<b.w/2+1.1&&Math.abs(b.z-z)<b.d/2+1.1))continue;
- const sector=Math.floor(((Math.atan2(z,x)+Math.PI*2)%(Math.PI*2))/(Math.PI/4));SPAWN_REGIONS[sector].points.push([x,z]);
-}
+for(let z=-68;z<=68;z+=6)for(let x=-68;x<=68;x+=6){if(boxes.some(b=>b.y<5.1&&b.y+b.h>3.2&&Math.abs(b.x-x)<b.w/2+1.1&&Math.abs(b.z-z)<b.d/2+1.1))continue;const sector=Math.floor(((Math.atan2(z,x)+Math.PI*2)%(Math.PI*2))/(Math.PI/4));SPAWN_REGIONS[sector].points.push([x,z]);}
 const spawns=SPAWN_REGIONS.flatMap(r=>r.points);
 export function distributedSpawn(players,random=Math.random){
  const occupied=[...players].filter(p=>p.health>0&&Number.isFinite(p.x)),offset=Math.floor(random()*8);
@@ -36,4 +42,4 @@ export function distributedSpawn(players,random=Math.random){
  return {point:spawns.reduce((best,p)=>Math.min(...occupied.map(o=>Math.hypot(o.x-p[0],o.z-p[1])))>Math.min(...occupied.map(o=>Math.hypot(o.x-best[0],o.z-best[1])))?p:best,spawns[0]),region:0};
 }
 
-export const SPAWN_ISLAND={id:'hatchery-atoll',name:'Relay Cay',revision:3,size,navCell:1.5,navMax:20,theme:'royale',sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,boxes,props,trees,navLinks,spawns,pickups:[],floorLoot:[],chests:[],buildings:[],shelters:[],lanes:[],landmarks:[],bases:[[-20,0],[20,0]],zone:[0,0,0],districts:[{name:'Relay Cay',x:0,z:0,color:0xf1cd7a}],roads:[{kind:'path',width:5,points:[[-30,-8],[0,-8],[30,-8]]}],signs:[{text:'KESTREL DEPARTURES',x:0,y:6.1,z:-21},{text:'FIRING RANGE',x:31,y:6,z:5},{text:'MOVEMENT COURSE',x:-24,y:5.7,z:19}],terrain:{size,cell,n,heights,max:3.2}};
+export const SPAWN_ISLAND={id:'hatchery-atoll',name:'Kestrel Forward Airfield',revision:4,size,navCell:1.5,navMax:25,theme:'royale',sky:0xb0c7d1,ground:0x798a70,accent:0xe0b866,boxes,props,trees,navLinks,spawns,pickups:[],floorLoot:[],chests:[],buildings:[],shelters:[],lanes:[],landmarks:[],doors:[],traversal:[],bases:[[-20,0],[20,0]],zone:[0,0,0],districts:[{name:'Kestrel Airfield',x:-25,z:0,color:0xdab975}],roads,signs,parkedTransport,terrain:{size,cell,n,heights,max:3.2}};

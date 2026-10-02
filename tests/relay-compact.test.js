@@ -19,3 +19,5 @@ test('older connections retain full states and input steps are never merged',()=
  for(let seq=1;seq<=3;seq++)peer.enqueue({type:'data',channel:'a',data:{type:'input',input:{seq,fire:seq===2}}});
  peer.flush();assert.equal(frames[0].messages[0].data.type,'state');assert.equal(frames[0].messages.length,4);
 });
+
+test('private hosts admit all 48 contestant seats and spectator transport channels',()=>{const peer=Object.assign(Object.create(RelayPeer.prototype),{connections:new Map(),events:new Map(),enqueue(){},flush(){}});for(let i=0;i<63;i++)peer.message({type:'incoming',channel:'seat-'+i,peer:'player-'+i});assert.equal(peer.connections.size,63);for(const c of peer.connections.values())assert.equal(c.open,true);});
