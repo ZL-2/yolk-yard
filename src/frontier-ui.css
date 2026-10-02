@@ -53,4 +53,4 @@
 #dialog[data-kind=social] button:hover:not(:disabled),#dialog[data-kind=social] button:focus-visible{outline:2px solid #9de6ef;outline-offset:2px}
 #dialog :is(.inventory-ammo,.resource-count){background:#203d4a!important;border-color:#638394!important;color:#edf6f8!important}
 #dialog :is(.inventory-ammo,.resource-count) :is(b,span){color:#edf6f8!important}
-#spectator-status{position:absolute;top:88px;left:20px;max-width:min(420px,80vw);padding:8px 12px;background:#102b3bed;border:1px solid #7db8ca;color:#edf7fa;font-size:12px;border-radius:5px;pointer-events:none}
+#spectator-status{position:absolute;top:184px;left:20px;max-width:min(420px,80vw);padding:8px 12px;background:#102b3bed;border:1px solid #7db8ca;color:#edf7fa;font-size:12px;border-radius:5px;pointer-events:none}
