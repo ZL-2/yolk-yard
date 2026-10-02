@@ -148,11 +148,12 @@ export function buildingTick(sim,p,input){
  if(!canFight(p)){p.building=false;p.editing=false;return false;}
  const wasBuilding=p.building;
  p.buildFacing=snappedFacing(p.yaw,wasBuilding?p.buildFacing:undefined);
- p.editing=!!input.editing;p.building=!!input.buildMode||p.editing;p.buildType=input.buildType||'wall';
+ const enabled=sim.options?.building!==false;
+ p.editing=enabled&&!!input.editing;p.building=enabled&&!!input.buildMode||p.editing;p.buildType=input.buildType||'wall';
  const requested=MATERIALS[input.buildMaterial]?input.buildMaterial:'wood';
  if(requested!==p.buildRequested||!p.buildMaterial){p.buildMaterial=requested;p.buildRequested=requested;}
  p.buildMaterial=selectMaterial(p.materials,p.buildMaterial)||p.buildMaterial;p.buildRotation=Number.isInteger(input.buildRotation)?((input.buildRotation%4)+4)%4:0;
- if(input.editing){p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;return true;}
+ if(p.editing){p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;return true;}
  if(p.building){
   p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;
   if(input.fire&&sim.time>=(p.nextBuild||0)){

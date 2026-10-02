@@ -1664,6 +1664,7 @@ function pumpNetworkInput(now=performance.now()) {
 }
 const performanceHUD=new PerformanceHUD(document.body);
 const lobbyStatus=new LobbyStatus();
+const snapshotTimes=new WeakMap();
 function loop(now) {
   lobbyStatus.update(now,now-lastTime,net,screen);
   performanceHUD.update(now,now-lastTime,net,settings,screen==='game'&&!document.hidden);
@@ -1688,8 +1689,8 @@ function loop(now) {
       }
     }
   }
-  if (sim && !sim.remote && !net?.serverAuthority && (now-(sim.lastPresentationAt||0)>=(net?1000/60:1000/30)||!state)) {
-    sim.lastPresentationAt=now;state = sim.snapshot();handleState();
+  if (sim && !sim.remote && !net?.serverAuthority && (now-(snapshotTimes.get(sim)||0)>=(net?1000/60:1000/30)||!state)) {
+    snapshotTimes.set(sim,now);state = sim.snapshot();handleState();
     if(autoQueue&&screen==='lobby'&&sim.queueEnds&&dialogType!=='setup'){
       const humans=[...sim.players.values()].filter(p=>!p.bot).length;
       if(sim.time>=sim.queueEnds||humans>=sim.options.capacity)launchRound();

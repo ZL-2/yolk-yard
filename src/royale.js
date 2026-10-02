@@ -439,7 +439,7 @@ export class RoyaleSimulation extends Simulation {
     if(input.drop&&!p.dropLatch)this.dropSlot(p);p.dropLatch=!!input.drop;
     this.interact(p,input,dt);
     if(p.reloadEnd&&this.time>=p.reloadEnd){const item=p.inventory[p.slot];if(item?.weapon){const type=ammoType(item.id),add=Math.min(gun(p).magazine-item.ammo,p.bank[type]);item.ammo+=add;p.bank[type]-=add;}p.reloadEnd=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'reload-bolt'});}
-    const buildingAction=this.options.building!==false?buildingTick(this,p,input):false;if(this.options.building===false){p.building=false;p.editing=false;}
+    const buildingAction=buildingTick(this,p,input);
     if(!buildingAction&&p.inventory[p.slot]?.weapon){
      this.combatInput(p,input);
      if(input.fire&&!p.fireLatch&&p.ammo[p.slot]===0&&p.reserve[p.slot]===0)this.emit('royale-cue',{player:p.id,cue:'weapon-empty'});
