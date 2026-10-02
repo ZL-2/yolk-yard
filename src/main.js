@@ -1834,6 +1834,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
         })),
     finish: () => sim?.finish(),
     fixture: (fn) => fn(sim),
+    look: (yaw,pitch) => {input.yaw=yaw;input.pitch=Math.max(-1.48,Math.min(1.48,pitch));},
     pose: (pose) => {
       const p = sim?.players.get(localId);
       if (!p) return;

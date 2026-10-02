@@ -13,7 +13,7 @@ import {eyeHeight} from './stance.js';
 export function selectWeapon(p,target){
  const distance=target?dist(p,target):22;
  const options=p.inventory?p.inventory.map((item,slot)=>({item,slot})).filter(({item})=>item?.weapon&&(item.ammo>0||p.bank[ammoType(item.id)]>0)):[p.weapon,'pip'].map((id,slot)=>({item:{id,ammo:p.ammo[slot],rarity:0},slot})).filter(({slot})=>p.ammo[slot]>0||p.reserve[slot]>0);
- const score=({item,slot})=>{const w=p.inventory?gun({...p,slot}):weapon(item.id),[near,far]=w.engage;
+ const score=({item,slot})=>{const w=p.inventory?gun(p,slot):weapon(item.id),[near,far]=w.engage;
   const accuracy=w.pellets>1?Math.min(1,10/Math.max(1,distance)):w.adsSpread?Math.min(1,.45/(Math.max(1,distance)*w.adsSpread)):1;
   const burst=w.damage*w.pellets*falloffAt(w,distance)*accuracy,pressure=burst*w.roundsPerSecond;
   const rangeCost=distance<near?(near-distance)*.7:distance>far?(distance-far)*.65:0;
@@ -74,7 +74,7 @@ export function chooseObjective(sim,p,brain,skill,target){
   if(!underFire&&weapons.length&&Object.values(p.materials).reduce((a,b)=>a+b,0)<teamPolicy.totalMaterials){
    const resource=[...candidates(sim.map,p,null,0,teamPolicy.harvestRadius)].filter(b=>b.objectId&&!b.buildId&&b.kind!=='boundary'&&nearSquad(b)&&dist(p,b)<teamPolicy.harvestRadius&&!sim.worldDamage?.[b.objectId]?.destroyed&&p.materials[harvestDefinition(b,sim.map).material]<teamPolicy.materialTarget).map(b=>harvestObjective(sim,p,b)).filter(Boolean).sort((a,b)=>dist(p,a.goal)-dist(p,b.goal))[0];if(resource)return resource;
   }
-  if(needs){const anchors=(sim.map.floorLoot||[]).filter(q=>nearSquad(q)&&q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35).sort((a,b)=>dist(p,a)-dist(p,b));if(anchors[0])return {kind:'search-room',goal:anchors[0],id:anchors[0].id};}
+  if(needs){let anchor=null,nearest=Infinity;for(const q of sim.map.floorLoot||[])if(nearSquad(q)&&q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35){const d=dist(p,q);if(d<nearest){nearest=d;anchor=q;}}if(anchor)return {kind:'search-room',goal:anchor,id:anchor.id};}
  }
  if(anchor)return {kind:'follow',goal:followGoal(sim,p,anchor),id:anchor.id};
  if(target)return {kind:'investigate',goal:{x:target.x,y:target.y,z:target.z},id:target.id};

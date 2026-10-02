@@ -3,7 +3,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Rebuilt arena collision geometry must not mix with older clients.
-export const VERSION = 32;
+export const VERSION = 33;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -171,9 +171,9 @@ const cosmeticIndex = (value, options) => Number.isInteger(Number(value)) && Num
 export const TEAM_COLORS = [0x3d8ce8, 0xd94949];
 export const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 export const weapon = (id) => WEAPONS.find((w) => w.id === id) || ROYALE_WEAPONS.find(w => w.id === id) || WEAPONS[0];
-export const gun = (p) => {
- if (!p.inventory) return weapon(p.slot === 1 ? "pip" : p.weapon);
- const item=p.inventory[p.slot], base=weapon(item?.weapon ? item.id : 'pip');
+export const gun = (p, slot=p.slot) => {
+ if (!p.inventory) return weapon(slot === 1 ? "pip" : p.weapon);
+ const item=p.inventory[slot], base=weapon(item?.weapon ? item.id : 'pip');
  const rarity=Math.max(0,Math.min(4,item?.rarity||0)),key=base.id+rarity;
  if(!royaleStats.has(key)) royaleStats.set(key,rarityVariant(base,rarity));
  return royaleStats.get(key);

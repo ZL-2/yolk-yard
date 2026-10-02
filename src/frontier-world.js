@@ -4,12 +4,12 @@ import {rebuildMap} from './building.js';
 import {WORLD_RULES} from './world-rules.js';
 export {WORLD_RULES};
 export function initializeFrontier(sim){sim.doors=Object.fromEntries((sim.map.doors||[]).map(d=>[d.id,{open:false,changedAt:-100}]));sim.vault=sim.map.vault?{id:sim.map.vault.id,open:false,openedAt:0}:null;rebuildMap(sim);}
-export function doorNear(map,p,range=WORLD_RULES.doorRange){const d=direction(p.yaw);return (map.doors||[]).filter(o=>Math.abs(p.y-o.y)<2&&Math.hypot(o.x-p.x,o.z-p.z)<range&&((o.x-p.x)*d.x+(o.z-p.z)*d.z)>-.1).sort((a,b)=>dist(p,a)-dist(p,b))[0];}
+export function doorNear(map,p,range=WORLD_RULES.doorRange){const d=direction(p.yaw);let best,bestDistance=Infinity;for(const o of map.doors||[]){const x=o.x-p.x,z=o.z-p.z,r=x*x+z*z,score=r+(p.y-o.y)**2;if(Math.abs(p.y-o.y)<2&&r<range*range&&score<bestDistance&&x*d.x+z*d.z>-.1){best=o;bestDistance=score;}}return best;}
 export function setDoor(sim,door,open,p=null){
  if(!door||door.vault&&open&&!sim.vault?.open||sim.worldDamage['world-door-'+door.id]?.destroyed)return false;
  const state=sim.doors?.[door.id];if(!state||state.open===open||sim.time-state.changedAt<WORLD_RULES.doorCooldown)return false;
  if(!open&&[...sim.players.values()].some(p=>p.health>0&&p.y<door.y+door.h&&p.y+1.8>door.y&&Math.abs(p.x-door.x)<door.w/2+.4&&Math.abs(p.z-door.z)<.6))return false;
- state.open=open;state.changedAt=sim.time;sim.buildVersion++;rebuildMap(sim);sim.emit('royale-cue',{cue:open?'door-open':'door-close',player:p?.id,x:door.x,y:door.y,z:door.z});return true;
+ state.open=open;state.changedAt=sim.time;sim.buildVersion++;rebuildMap(sim,{navigationChanged:!!door.vault});sim.emit('royale-cue',{cue:open?'door-open':'door-close',player:p?.id,x:door.x,y:door.y,z:door.z});return true;
 }
 export function frontierPrompt(map,state,p){
  if(!canFight(p)||p.flight!=='ground')return null;
@@ -21,6 +21,7 @@ export function frontierPrompt(map,state,p){
 }
 export function frontierInteract(sim,p,input,dt){
  if(!canFight(p)||p.flight!=='ground')return false;
+ if(!input.interact&&!p.sprinting){p.vaultProgress=0;return false;}
  const v=sim.map.vault,nearVault=v&&!sim.vault?.open&&dist(p,v.reader)<3;
  if(nearVault&&input.interact){
   const card=p.inventory.findIndex(i=>i?.id==='asterKeycard');

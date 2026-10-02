@@ -5,7 +5,7 @@ import {RoyaleSimulation} from '../src/royale.js';
 import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
 test('authority delivers 20 snapshots per simulated second without catch-up bursts',t=>{
  t.mock.method(performance,'now',()=>0);
- const authority=new MatchAuthority({});clearInterval(authority.timer);
+ const authority=new MatchAuthority({parties:{publishPublicMatch(){}}});clearInterval(authority.timer);
  const frames=[];let ticks=0;
  const room={age:0,frameAt:0,sim:{tick(){ticks++;}}};
  authority.rooms.set('cadence',room);authority.broadcast=()=>frames.push(ticks);
@@ -43,7 +43,7 @@ test('populated authority broadcasts sleep unchanged world data and respect sock
 
 test('a 600ms scheduling stall is recovered across bounded callbacks',t=>{
  t.mock.method(performance,'now',()=>0);
- const authority=new MatchAuthority({});clearInterval(authority.timer);let ticks=0;
+ const authority=new MatchAuthority({parties:{publishPublicMatch(){}}});clearInterval(authority.timer);let ticks=0;
  authority.broadcast=()=>{};authority.rooms.set('test',{age:0,frameAt:0,sim:{tick(){ticks++;}}});
  const start=authority.last;authority.tick(start+600);assert.equal(ticks,6);
  for(let i=0;i<6;i++){const before=ticks;authority.tick(start+600);assert.ok(ticks-before<=6);}
@@ -151,7 +151,7 @@ test('movement-only snapshots skip world copying without changing full snapshots
 
 test('a costly simulation step yields before replaying the remaining time debt',t=>{
  let clock=0,ticks=0;t.mock.method(performance,'now',()=>clock);
- const authority=new MatchAuthority({});clearInterval(authority.timer);authority.broadcast=()=>{};
+ const authority=new MatchAuthority({parties:{publishPublicMatch(){}}});clearInterval(authority.timer);authority.broadcast=()=>{};
  try{
   authority.rooms.set('slow',{age:0,frameAt:0,sim:{tick(){ticks++;clock+=5;}}});
   authority.tick(100);assert.equal(ticks,1);assert.ok(authority.accumulator>.08);assert.ok(authority.catchup);

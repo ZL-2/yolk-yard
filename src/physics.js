@@ -38,16 +38,21 @@ export function candidates(map,o,d=null,max=0,radius=RADIUS){
  if(map.theme!=='royale')return map.boxes;
  let grid=collisionIndex.get(map);
  if(!grid){grid=new Map();for(const b of map.boxes){for(let x=Math.floor((b.x-b.w/2)/16);x<=Math.floor((b.x+b.w/2)/16);x++)for(let z=Math.floor((b.z-b.d/2)/16);z<=Math.floor((b.z+b.d/2)/16);z++){const k=x+','+z;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(b);}}collisionIndex.set(map,grid);}
- // Reuse point-query buckets while movement stays in the same cells. Geometry
- // invalidation discards this cache together with the spatial index.
- if(!d){
-  const x0=Math.floor((o.x-radius)/16),x1=Math.floor((o.x+radius)/16),z0=Math.floor((o.z-radius)/16),z1=Math.floor((o.z+radius)/16),key=[x0,x1,z0,z1].join(':');
+ // Reuse exact bucket unions for movement and short collision/LOS probes.
+ // Cached arrays are read-only; invalidation discards every geometry reference.
+ const length=d?Math.min(Number.isFinite(max)?max:1600,1600):0;
+ const steps=Math.max(1,Math.ceil(length*Math.hypot(d?.x||0,d?.z||0)/16));
+ if(!d||steps===1){
+  const ex=o.x+(d?.x||0)*length,ez=o.z+(d?.z||0)*length;
+  const x0=Math.floor((Math.min(o.x,ex)-radius)/16),x1=Math.floor((Math.max(o.x,ex)+radius)/16),z0=Math.floor((Math.min(o.z,ez)-radius)/16),z1=Math.floor((Math.max(o.z,ez)+radius)/16),key=x0+':'+x1+':'+z0+':'+z1;
   grid.pointQueries??=new Map();const cached=grid.pointQueries.get(key);if(cached)return cached;
-  const nearby=new Set();for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++)for(const b of grid.get(x+','+z)||[])nearby.add(b);
+  let nearby;
+  if(x0===x1&&z0===z1)nearby=grid.get(x0+','+z0)||[];
+  else{const union=new Set();for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++)for(const b of grid.get(x+','+z)||[])union.add(b);nearby=[...union];}
   if(grid.pointQueries.size>=256)grid.pointQueries.delete(grid.pointQueries.keys().next().value);
   grid.pointQueries.set(key,nearby);return nearby;
  }
- const found=new Set(),visited=new Set(),length=d?Math.min(Number.isFinite(max)?max:1600,1600):0,steps=Math.max(1,Math.ceil(length*Math.hypot(d?.x||0,d?.z||0)/16));
+ const found=new Set(),visited=new Set();
  // Query the swept segment's actual buckets, including the full player/bolt
  // radius. Nine whole neighboring buckets per point used to dominate bot cost.
  for(let i=0;i<steps;i++){
@@ -132,7 +137,7 @@ export function movePlayer(p, input, map, dt) {
   for(let i=0;i<steps;i++){
     const before=beginFallStep(p);movePlayerStep(p,input,map,Math.min(dt,.1)/steps);
     let normalY=1;
-    if(p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.hypot(1,gx,gz);}
+    if(p.fall&&p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.hypot(1,gx,gz);}
     if(p.flight!=='transport')finishFallStep(p,before,normalY);
   }
 }

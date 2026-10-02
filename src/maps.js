@@ -102,23 +102,24 @@ export function navigation(map) {
     }if(best&&distance<(radius*cell)**2)return best;
    }return best||nodes[0];
   };
+  const parent=new Int32Array(nodes.length),cost=new Float32Array(nodes.length),seen=new Uint32Array(nodes.length),closed=new Uint32Array(nodes.length),q=[];let search=0;
   const nav = {
     path(from, to) {
       const start = nearest(from),
         end = nearest(to);
       if (!start || !end) return [];
-      const parent=new Int32Array(nodes.length).fill(-1),cost=new Float32Array(nodes.length).fill(Infinity),closed=new Uint8Array(nodes.length),q=[];
+      if(++search===0xffffffff){seen.fill(0);closed.fill(0);search=1;}q.length=0;
       const heuristic=a=>Math.hypot(a.x-end.x,a.z-end.z)+Math.abs(a.y-end.y)*1.5;
       const push=(id,score)=>{let i=q.length;q.push({id,score});while(i){const p=(i-1)>>1;if(q[p].score<=score)break;[q[p],q[i]]=[q[i],q[p]];i=p;}};
       const pop=()=>{const first=q[0],last=q.pop();if(q.length){q[0]=last;let i=0;while(true){let k=i*2+1;if(k>=q.length)break;if(k+1<q.length&&q[k+1].score<q[k].score)k++;if(q[i].score<=q[k].score)break;[q[i],q[k]]=[q[k],q[i]];i=k;}}return first.id;};
-      parent[start.id]=start.id;cost[start.id]=0;push(start.id,heuristic(start));let best=start.id,bestD=Infinity,visited=0;
+      seen[start.id]=search;parent[start.id]=start.id;cost[start.id]=0;push(start.id,heuristic(start));let best=start.id,bestD=Infinity,visited=0;
       // A partial route is useful immediately and will be extended on the next
       // scheduled search. Unreachable indoor targets cannot stall a host frame.
-      while(q.length&&visited++<4000){const id=pop();if(closed[id])continue;closed[id]=1;const a=nodes[id],d=heuristic(a);if(d<bestD){bestD=d;best=id;}if(id===end.id)break;
-       for(const k of a.edges){const b=nodes[k],next=cost[id]+Math.hypot(b.x-a.x,b.z-a.z)+Math.abs(b.y-a.y)*.8;if(next<cost[k]){cost[k]=next;parent[k]=id;push(k,next+heuristic(b));}}
+      while(q.length&&visited++<4000){const id=pop();if(closed[id]===search)continue;closed[id]=search;const a=nodes[id],d=heuristic(a);if(d<bestD){bestD=d;best=id;}if(id===end.id)break;
+       for(const k of a.edges){const b=nodes[k],next=cost[id]+Math.hypot(b.x-a.x,b.z-a.z)+Math.abs(b.y-a.y)*.8;if(seen[k]!==search||next<cost[k]){seen[k]=search;cost[k]=next;parent[k]=id;push(k,next+heuristic(b));}}
       }
       const path = [];
-      for (let k = best; k !== start.id && parent[k] >= 0; k = parent[k]) {
+      for (let k = best; k !== start.id && seen[k]===search; k = parent[k]) {
         const a = nodes[k];
         path.push({ x: a.x, y: a.y, z: a.z });
       }

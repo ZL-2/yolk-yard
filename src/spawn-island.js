@@ -1,6 +1,6 @@
 // Kestrel Forward Airfield. One static mesh/collision authoring for every client.
-const size=96,cell=2,n=97,heights=new Float32Array(n*n);
-for(let z=0;z<n;z++)for(let x=0;x<n;x++){const wx=x*cell-size,wz=z*cell-size,edge=Math.max(Math.abs(wx)/89,Math.abs(wz)/88);heights[z*n+x]=Math.max(0,Math.min(3.2,(1-edge)*24));}
+const size=68,cell=2,n=69,heights=new Float32Array(n*n);
+for(let z=0;z<n;z++)for(let x=0;x<n;x++){const wx=x*cell-size,wz=z*cell-size,edge=Math.max(Math.abs(wx)/63,Math.abs(wz)/62);heights[z*n+x]=Math.max(0,Math.min(3.2,(1-edge)*24));}
 const boxes=[],props=[],trees=[],navLinks=[],signs=[];
 const box=(x,z,w,d,h,y=3.2,color=0x5b7077,kind='building',material='metal')=>{const b={x,z,w,d,h,y,color,kind,material,objectId:'departure-'+boxes.length};boxes.push(b);return b;};
 const prop=(kind,x,z,w=2,d=2,h=1.3,y=3.2)=>{props.push({kind,x,z,w,d,h,y,seed:props.length});box(x,z,w,d,h,y,0x677b71,'prop',kind==='rock'?'brick':['car','truck','lamp','container','generator'].includes(kind)?'metal':'wood').prop=props.length-1;};
@@ -30,8 +30,16 @@ for(const [x,z]of [[-42,-28],[-13,-28],[-44,22],[-15,22],[-72,33]])prop('lamp',x
 for(const side of [-1,1])for(let z=-60;z<=64;z+=12)box(side*79,z,.18,9,2.1,3.2,0x546b64,'fence');
 for(let i=0;i<18;i++){const x=-82+(i%3)*3,z=-70+Math.floor(i/3)*28;trees.push({x,z,y:3.2,h:7+i%3,kind:'pine',seed:i});box(x,z,.7,.7,4,3.2,0x75634e,'tree','wood').tree=trees.length-1;}
 signs.push({text:'KESTREL FORWARD AIRFIELD',x:-28,y:10,z:-32.9},{text:'RANGE / LIVE TRAINING',x:-54,y:6,z:54},{text:'36 / HOLD SHORT',x:25,y:4,z:70},{text:'OPERATIONS / R-04',x:-58,y:6.8,z:-10.2},{text:'FIELD MEDICAL',x:-24,y:6.2,z:56},{text:'MOVEMENT / BUILD PRACTICE',x:-5,y:6,z:24});
+// Compact the horizontal footprint, retaining full-height cover, safe stairs and
+// the full-size Kestrel. Terrain area is 50% smaller; the runway stays 20m wide.
+const footprint=.7;
+for(const b of boxes){b.x=['marking','runway-light'].includes(b.kind)?25*footprint+(b.x-25):b.x*footprint;b.z*=footprint;if(b.kind!=='parked-aircraft'){b.w*=footprint;b.d*=footprint;}}
+for(const p of props){p.x*=footprint;p.z*=footprint;p.w*=footprint;p.d*=footprint;}
+for(const p of [...trees,...signs,parkedTransport]){p.x*=footprint;p.z*=footprint;}
+for(const road of roads){for(const p of road.points){p[0]*=footprint;p[1]*=footprint;}if(road.kind!=='runway')road.width*=footprint;}
+for(const link of navLinks)for(const p of [link.from,link.to]){p.x*=footprint;p.z*=footprint;}
 export const SPAWN_REGIONS=Array.from({length:8},(_,sector)=>({id:sector,points:[]}));
-for(let z=-68;z<=68;z+=6)for(let x=-68;x<=68;x+=6){if(boxes.some(b=>b.y<5.1&&b.y+b.h>3.2&&Math.abs(b.x-x)<b.w/2+1.1&&Math.abs(b.z-z)<b.d/2+1.1))continue;const sector=Math.floor(((Math.atan2(z,x)+Math.PI*2)%(Math.PI*2))/(Math.PI/4));SPAWN_REGIONS[sector].points.push([x,z]);}
+for(let z=-48;z<=48;z+=4.2)for(let x=-48;x<=48;x+=4.2){if(boxes.some(b=>b.y<5.1&&b.y+b.h>3.2&&Math.abs(b.x-x)<b.w/2+1.1&&Math.abs(b.z-z)<b.d/2+1.1))continue;const sector=Math.floor(((Math.atan2(z,x)+Math.PI*2)%(Math.PI*2))/(Math.PI/4));SPAWN_REGIONS[sector].points.push([x,z]);}
 const spawns=SPAWN_REGIONS.flatMap(r=>r.points);
 export function distributedSpawn(players,random=Math.random){
  const occupied=[...players].filter(p=>p.health>0&&Number.isFinite(p.x)),offset=Math.floor(random()*8);
@@ -42,4 +50,4 @@ export function distributedSpawn(players,random=Math.random){
  return {point:spawns.reduce((best,p)=>Math.min(...occupied.map(o=>Math.hypot(o.x-p[0],o.z-p[1])))>Math.min(...occupied.map(o=>Math.hypot(o.x-best[0],o.z-best[1])))?p:best,spawns[0]),region:0};
 }
 
-export const SPAWN_ISLAND={id:'hatchery-atoll',name:'Kestrel Forward Airfield',revision:4,size,navCell:1.5,navMax:25,theme:'royale',sky:0xb0c7d1,ground:0x798a70,accent:0xe0b866,boxes,props,trees,navLinks,spawns,pickups:[],floorLoot:[],chests:[],buildings:[],shelters:[],lanes:[],landmarks:[],doors:[],traversal:[],bases:[[-20,0],[20,0]],zone:[0,0,0],districts:[{name:'Kestrel Airfield',x:-25,z:0,color:0xdab975}],roads,signs,parkedTransport,terrain:{size,cell,n,heights,max:3.2}};
+export const SPAWN_ISLAND={id:'hatchery-atoll',name:'Kestrel Forward Airfield',revision:5,size,navCell:1.5,navMax:25,theme:'royale',sky:0xb0c7d1,ground:0x798a70,accent:0xe0b866,boxes,props,trees,navLinks,spawns,pickups:[],floorLoot:[],chests:[],buildings:[],shelters:[],lanes:[],landmarks:[],doors:[],traversal:[],bases:[[-20,0],[20,0]],zone:[0,0,0],districts:[{name:'Kestrel Airfield',x:-25,z:0,color:0xdab975}],roads,signs,parkedTransport,terrain:{size,cell,n,heights,max:3.2}};

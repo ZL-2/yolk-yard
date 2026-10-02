@@ -1,0 +1,6 @@
+// Reproducible 150-second simulated public match: one human, 47 bots, boss.
+import {RoyaleSimulation} from '../src/royale.js';
+import {mkdirSync,writeFileSync} from 'node:fs';
+const sim=new RoyaleSimulation({mode:'royale',session:'online',recurring:true,capacity:48,bots:47,fill:true,difficulty:2,seed:821});const p=sim.addPlayer('host',{name:'Profile'});sim.startRound();sim.setConnectedHumans(['host']);const phases={};
+for(let i=0;i<9000;i++){const phase=sim.stage;sim.setInput('host',{seq:i+1,yaw:i*.001,pitch:0,jump:phase==='battle-bus'&&sim.elapsed>8,forward:0,slot:0});p.shieldUntil=Infinity;const t=performance.now();sim.tick(1/60);const ms=performance.now()-t;(phases[phase]??=[]).push(ms);}
+const report=Object.fromEntries(Object.entries(phases).map(([name,a])=>{a.sort((a,b)=>a-b);return[name,{ticks:a.length,totalMs:a.reduce((x,y)=>x+y,0),mean:a.reduce((x,y)=>x+y,0)/a.length,p95:a[Math.floor(a.length*.95)],p99:a[Math.floor(a.length*.99)],max:a.at(-1)}]}));report.actors=sim.players.size;report.alive=sim.alive;report.builds=sim.builds.length;report.events=sim.eventId;mkdirSync('test-results',{recursive:true});writeFileSync(process.env.PROFILE_OUT||'test-results/kestrel-performance.json',JSON.stringify(report,null,2));console.log(report);

@@ -22,7 +22,7 @@ export class GuestPresentation {
   for(const axis of ['x','y','z'])this.offset[axis]*=decay;
   let player=predicted;
   if(player?.health>0){
-   player=state.royale&&player.flight==='transport'?{...player,...transportAt(state.royale.route,elapsed)}:{...player,x:player.x+this.offset.x,y:player.y+this.offset.y,z:player.z+this.offset.z};
+   player=state.royale&&player.flight==='transport'?{...player,...transportAt(state.royale.route,elapsed),yaw:player.yaw,pitch:player.pitch}:{...player,x:player.x+this.offset.x,y:player.y+this.offset.y,z:player.z+this.offset.z};
   }
   visual.players=this.poses.players(state,player,this.time);
   // Projectiles already support bounded extrapolation in View. Keep the packet

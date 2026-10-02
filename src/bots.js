@@ -30,8 +30,9 @@ export function warmupInput(sim,p){
   const home=p.spawnHome||p;const points=sim.map.spawns.filter(([x,z])=>Math.hypot(x-home.x,z-home.z)<15),point=points[Math.floor(sim.random()*points.length)]||[home.x,home.z];brain.goal={x:point[0],y:p.y,z:point[1]};
   brain.jump=sim.random()<.3;brain.jumpAt=sim.time+.5+sim.random()*2;
  }
- const practice=practicing&&p.x>16&&Math.abs(p.z-6)<17&&sim.time%7>1&&sim.time%7<3.2;
- const goal=practice?{x:31,y:4,z:6}:brain.goal,dx=goal.x-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz),yaw=Math.atan2(-dx,-dz);
+ const range=sim.map.props?.filter(p=>p.kind==='target')||[],target=range[index%Math.max(1,range.length)];
+ const practice=practicing&&target&&p.z<target.z-3&&Math.hypot(p.x-target.x,p.z-target.z)<22&&sim.time%7>1&&sim.time%7<3.2;
+ const goal=practice?{x:target.x,y:target.y+1,z:target.z}:brain.goal,dx=goal.x-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz),yaw=Math.atan2(-dx,-dz);
  const move=!practice&&!brain.idle&&d>1.5?navigate(sim,p,brain,goal,skillFor(sim)):{mx:0,mz:0,jump:false};
  const burst=practice&&sim.time%1.1<.32&&d>5&&d<42&&seesPoint(sim,p,{x:goal.x-dx/(d||1)*1.3,y:goal.y,z:goal.z-dz/(d||1)*1.3});
  return {yaw:practice?yaw:Math.hypot(move.mx,move.mz)>.1?Math.atan2(-move.mx,-move.mz):p.yaw,pitch:0,slot:practice?1:0,
@@ -43,7 +44,7 @@ export function botInput(sim,p){
  const skill=skillFor(sim),now=sim.time,r=sim.random,brain=p.brain?.memory?p.brain:(p.brain={...newBrain(sim,p),...p.brain});
  observe(sim,p,brain,skill);const target=selectThreat(sim,p,brain,skill);
  const visible=!!target?.visible&&now-target.seenAt<skill.perception+.08&&seesPoint(sim,p,target);
- let slot=selectWeapon(p,target),w=gun({...p,slot});
+ let slot=selectWeapon(p,target),w=gun(p,slot);
  if(p.use){brain.utility=null;if(visible||now-(brain.attackedAt??-100)<.6)sim.cancelUse?.(p);else return {yaw:p.yaw,pitch:p.pitch,slot:p.use.slot,forward:0,strafe:0,swapSlot:-1};}
  if(now>=brain.decision||!brain.task||brain.weapon!==w.id){
   brain.weapon=w.id;brain.decision=now+Math.max(!p.inventory&&target?ARENA_BOT_COMBAT.decisionMinimum:0,skill.decision*(.85+r()*.3));brain.task=chooseObjective(sim,p,brain,skill,target);brain.objective=brain.task.kind;
