@@ -57,6 +57,21 @@ test('generic Spectate tickets require no friend link, cannot control the public
   assert.equal(f.relay.authority.publicSummary().humanPlayers,0);assert.equal(f.relay.authority.publicSummary().spectators,0);
  }finally{await f.close();}
 });
+test('public active round resets when the final connected viewer leaves, including bus and transport loss',async()=>{
+ const f=fixture();try{
+  const a=f.admit(f.user('Empty Reset Pilot'));const sim=f.room.sim;
+  sim.time=sim.queueEnds;sim.advanceWarmupClock();assert.equal(sim.stage,'battle-bus');
+  const b=f.admit(f.user('Empty Reset Viewer'));assert.equal(sim.players.get(b.p.authorityId).lateSpectator,true);
+  f.relay.authority.disconnect(a.p);assert.equal(sim.stage,'battle-bus','A real spectator still keeps the round running');
+  const old=sim.matchId;f.relay.authority.disconnect(b.p);
+  assert.notEqual(sim.matchId,old);assert.equal(sim.stage,'spawn-island');assert.equal(sim.queueEnds-sim.time,45);assert.equal(bots(sim).length,48);
+  sim.time+=5;f.relay.authority.tick(f.relay.authority.last);assert.equal(sim.queueEnds-sim.time,40,'Empty warmup must not restart every tick');
+  const c=f.admit(f.user('Transport Pilot'));sim.time=sim.queueEnds;sim.advanceWarmupClock();
+  sim.stage='active';sim.builds.push({id:'old-build'});sim.projectiles.push({id:'old-shot'});const active=sim.matchId;c.p.ws=null;
+  f.relay.authority.tick(f.relay.authority.last);assert.notEqual(sim.matchId,active);assert.equal(sim.stage,'spawn-island');assert.equal(sim.queueEnds-sim.time,45);
+  assert.equal(sim.projectiles.length,0);assert.equal(sim.builds.length,0);assert.equal(bots(sim).length,48);assert.equal(f.relay.authority.publicSummary().joinable,true);assert.equal(f.relay.authority.rooms.size,1);
+ }finally{await f.close();}
+});
 test('private FFA and every Royale team size are host-based; Team Scramble and all client-created server rooms are rejected',async()=>{
  const f=fixture();try{
   for(const [mode,teamSize]of [['ffa',1],['royale',1],['royale',2],['royale',4]]){

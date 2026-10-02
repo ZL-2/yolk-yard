@@ -29,7 +29,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
+      - name: Verify lobby character clearance and empty public resets
+        if: contains(github.event.head_commit.message, '[lobby-clearance]')
+        run: |
+          node --test tests/recurring-royale.test.js
+          npx playwright install --with-deps chromium
+          node scripts/lobby-clearance-check.mjs
       - name: Verify nonblocking publishing
         if: contains(github.event.head_commit.message, '[remove-update-screen]')
         run: |
@@ -125,14 +131,14 @@ jobs:
           path: test-results/egg-shop
           retention-days: 7
       - run: npm run test:relay
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
       - run: npm run test:realtime
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
       - name: Verify authoritative countdown, human-only early departure and shared Bus transition
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
         run: node scripts/countdown-network-check.mjs
       - name: Verify Royale phases, spectator cutoff, falling loot and host migration
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
         run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]')
@@ -477,5 +483,23 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: node scripts/no-update-screen-browser-check.mjs
+        env:
+          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
+
+  verify-lobby-clearance-live:
+    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[lobby-clearance]') }}
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/recurring-royale-live-check.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/lobby-clearance-check.mjs
         env:
           RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard

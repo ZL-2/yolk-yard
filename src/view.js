@@ -392,7 +392,15 @@ export class View {
       scan:pose.scan,lobbyPatrol:pose,vx:-Math.sin(model.rotation.y)*pose.speed,vz:-Math.cos(model.rotation.y)*pose.speed},dt,motion.time,{menu:true});
   }
   diagnostics() {
+    let lobbyBounds=null;
+    if(this.menuEgg?.visible){
+      this.menuEgg.updateMatrixWorld(true);this.camera.updateMatrixWorld(true);
+      const box=new THREE.Box3().setFromObject(this.menuEgg),points=[];
+      for(const x of [box.min.x,box.max.x])for(const y of [box.min.y,box.max.y])for(const z of [box.min.z,box.max.z])points.push(new THREE.Vector3(x,y,z).project(this.camera));
+      lobbyBounds={left:Math.min(...points.map(p=>(p.x+1)*innerWidth/2)),right:Math.max(...points.map(p=>(p.x+1)*innerWidth/2)),top:Math.min(...points.map(p=>(1-p.y)*innerHeight/2)),bottom:Math.max(...points.map(p=>(1-p.y)*innerHeight/2))};
+    }
     return {
+      lobbyBounds,
       lobbyMotion: this.lobbyMotion,
       viewmodel:{fov:this.viewmodelCamera.fov,near:this.viewmodelCamera.near,position:this.gunGroup.position.toArray(),scale:this.gunGroup.scale.x},
       humanoid: humanoidDiagnostics(this.menuEgg),
@@ -729,8 +737,9 @@ export class View {
       this.lobbyStage.userData.update?.(dt);
       for(const teammate of this.partyEggs||[])this.animateLobbyCharacter(teammate,teammate.userData.lobbyMotion,dt,.17);
       const partyCount=this.partyEggs?.length||0,partyOffset=partyCount===1?1.4:partyCount===3?1.5:0,narrow=this.camera.aspect<.85;
-      this.camera.position.set(narrow&&partyCount>1?partyOffset:5.8+partyOffset,4.3,narrow?(partyCount===3?34:partyCount>1?29:partyCount?22.5:19):partyCount>1?19:12.5);
-      this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):1.8, 0);
+      const shortLobby=!narrow&&innerHeight<760;
+      this.camera.position.set(narrow&&partyCount>1?partyOffset:5.8+partyOffset,4.3,narrow?(partyCount===3?34:partyCount>1?29:partyCount?22.5:19):partyCount>1?19:shortLobby?15.5:12.5);
+      this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):shortLobby?2.6:1.8, 0);
       this.camera.fov = narrow?47:48;
       this.camera.updateProjectionMatrix();
     } else if (local) {

@@ -32,3 +32,18 @@ body.in-duos .performance-network{top:320px;left:22px}body.in-duos:has(.chat-hud
 @media(max-width:760px){.public-royale-card{top:124px;width:calc(100% - 28px);max-width:440px;padding:12px 14px}.public-royale-title{margin:7px 0}.public-royale-title strong{font-size:20px}.yard-season{top:320px}.yard-party,.yard-party[data-count="3"],.yard-party[data-count="4"]{top:320px}.yard-private-card{display:block}.yard-private-card .yard-find{grid-row:auto;grid-column:auto}.yard-character-label{bottom:210px}.yard-private-card>p{font-size:11px;margin:6px 0 10px}}
 @media(max-height:600px) and (min-width:761px){.public-royale-card{top:84px}.yard-private-card{width:260px}.yard-season{display:none}}
 @media(max-width:760px){.yard-season{max-width:calc(100% - 185px)}.yard-season>.eyebrow{display:block;line-height:1.5}}
+/* Keep the public match above the operator, rather than across their face. */
+@media(min-width:761px){
+ .public-royale-card{top:98px;width:min(640px,calc(100% - 480px));padding:10px 14px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 16px}
+ .public-royale-heading{grid-column:1/-1}
+ .public-royale-title{margin:0;align-self:center}
+ .public-royale-title strong{font-size:19px}
+ .public-royale-title small{font-size:8px}
+ .public-royale-facts{margin:0;flex-wrap:wrap;gap:2px 8px;font-size:9px}
+ .public-royale-action{grid-column:2;grid-row:2/4;flex-direction:column;align-items:stretch;gap:5px}
+ .public-royale-action>span{font-size:9px;text-align:center}
+ .public-royale-action .primary{min-height:34px;padding:7px 14px;font-size:12px}
+ .public-royale-hint{grid-column:1/-1;margin:0;font-size:8px}
+ .yard-party{top:max(17vh,220px)}
+}
+@media(max-height:600px) and (min-width:761px){.public-royale-card{top:98px}.yard-party{top:220px}}
