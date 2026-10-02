@@ -503,3 +503,9 @@ jobs:
       - run: node scripts/lobby-clearance-check.mjs
         env:
           RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lobby-clearance-live
+          path: test-results/lobby-clearance
+          retention-days: 7
