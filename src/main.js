@@ -1,3 +1,4 @@
+import {watchersFor,spectatorMessage} from './spectator-status.js';
 import {recordSeasonEvent,masteryRewards} from './season-progress.js';
 import {careerMarkup} from './career-ui.js';
 import {recordCareerReceipt} from './career.js';
@@ -749,7 +750,17 @@ async function resume(capture = true) {
     }
   }
 }
-let spectateTarget = null;
+let spectateTarget = null,watchSent=null,watchSentAt=0,watcherIds=[],watcherRound=null;
+function updateSpectatorStatus(me,now){
+ const target=me?.spectating?spectateTarget:me?.health<=0?me.killerId:null;
+ if(me&&(target!==watchSent||now-watchSentAt>1500)){const action='watch:'+(target||'');if(sim&&!sim.remote)sim.playerAction(localId,action);else net?.send({type:'player-action',action});watchSent=target;watchSentAt=now;}
+ let node=document.getElementById('spectator-status');if(!node){node=document.createElement('div');node.id='spectator-status';node.setAttribute('role','status');document.getElementById('hud').append(node);}
+ const round=(state?.royale?.matchId||'')+':'+state?.round;if(watcherRound!==round){watcherRound=round;watcherIds=[];}
+ const people=screen==='game'&&me?.health>0&&!me.spectating?watchersFor(state,localId):[];
+ const message=spectatorMessage(watcherIds,people);if(message)notice(message);watcherIds=people.map(p=>p.id);
+ const text=people.length?'◉ '+people.length+' WATCHING · '+people.map(p=>p.name).join(', '):'';if(node.textContent!==text)node.textContent=text;node.hidden=!text;
+}
+
 let spawnIntentUntil = 0;
 function switchSpectator(step) {
   sound.cue('spectator-switch');
@@ -1720,6 +1731,7 @@ function loop(now) {
   if (me?.spectating && !state.players.some(p => p.id === spectateTarget && p.health > 0 && !p.spectating))
     switchSpectator(1);
   view.spectateTarget = me?.spectating ? spectateTarget : null;
+  updateSpectatorStatus(me,now);
   sound.updateLobby(screen!=='game',dt,document.hidden);
   sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!(!net&&paused));
   let renderPlayer = predicted;

@@ -1,3 +1,4 @@
+import {watcherAction} from './spectator-status.js';
 import {initializeFrontier,frontierInteract} from './frontier-world.js';
 import {SEASON,rigCharges} from './season-one.js';
 import {initializeSeason,bossInput,damageBoss,useSeasonItem,seasonInteract,seasonTick} from './season-world.js';
@@ -349,6 +350,7 @@ export class RoyaleSimulation extends Simulation {
  removePlayer(id){const p=this.players.get(id);if(p&&this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant&&p.health>0){p.connected=false;this.damage(p,null,p.health+p.shield+1,'Disconnected');}super.removePlayer(id);if(this.matchTeams?.[p?.team]){const team=this.matchTeams[p.team];team.members=team.members.filter(member=>member!==id);if(!team.members.length)delete this.matchTeams[p.team];}if(!isWarmup(this.stage))resolveDownedTeams(this);}
  playerAction(id,action){
   const p=this.players.get(id);if(!p||this.phase!=='playing')return;
+  if(watcherAction(this,p,action))return;
   if(p.friendSpectator)return;
   if(this.options.training&&action.startsWith('training-weapon-')){const id=action.slice(16);if(['sprinter','scatter','needle','zipper','thumper','anchor','duet','pip','peeper','doubleyolk','comet'].includes(id)){p.inventory[1]={id,weapon:true,count:1,rarity:0,ammo:weapon(id).magazine};p.slot=1;this.syncInventory(p);beginEquip(p,this.time,true);}return;}
   const supply=/^inventory-supply-(wood|brick|metal|light|medium|shells|heavy|rockets)-(half|all)$/.exec(action);

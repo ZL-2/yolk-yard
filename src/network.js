@@ -221,7 +221,7 @@ export class Network {
       }
       if (!accepted) return;
       if (msg.type === "input") this.callbacks.onInput?.(conn.peer, msg.input);
-      else if (msg.type === "player-action" && (["respawn", "spectate", "rejoin", "team-entry-0", "team-entry-1"].includes(msg.action)||/^inventory-(select-[0-5]|drop-[1-5]|drop-one-[1-5]|split-[1-5]|swap-[1-5]-[1-5]|supply-(wood|brick|metal|light|medium|shells|heavy|rockets)-(half|all))$/.test(msg.action)||typeof msg.action==='string'&&msg.action.length<350&&(msg.action==='build-repair'||msg.action.startsWith('build-change:')||msg.action.startsWith('ping-'))))
+      else if (msg.type === "player-action" && (["respawn", "spectate", "rejoin", "team-entry-0", "team-entry-1"].includes(msg.action)||/^inventory-(select-[0-5]|drop-[1-5]|drop-one-[1-5]|split-[1-5]|swap-[1-5]-[1-5]|supply-(wood|brick|metal|light|medium|shells|heavy|rockets)-(half|all))$/.test(msg.action)||typeof msg.action==='string'&&msg.action.length<350&&(msg.action==='build-repair'||msg.action.startsWith('build-change:')||msg.action.startsWith('ping-')||msg.action.startsWith('watch:'))))
         this.callbacks.onPlayerAction?.(conn.peer, msg.action);
       else if (msg.type === "profile") {
         const profile=safeProfile(msg.profile);

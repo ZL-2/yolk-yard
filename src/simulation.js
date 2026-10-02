@@ -1,3 +1,4 @@
+import {watcherAction} from './spectator-status.js';
 import {COMBAT_LIMITS,UTILITY_WEAPONS} from './weapon-balance.js';
 import {arenaSpawnPoints} from './arena-spawns.js';
 import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
@@ -267,6 +268,7 @@ export class Simulation {
   }
   playerAction(id, action) {
     const p = this.players.get(id);
+    if(watcherAction(this,p,action))return;
     if(p?.friendSpectator)return;
     if (!p || p.bot || this.phase !== "playing" ||
         this.time < (p.nextPlayerAction || 0)) return;
@@ -897,7 +899,7 @@ export class Simulation {
       "poppers",
       "shieldUntil",
       "respawnAt",
-      "killerId", "recap", "boss", "maxHealth", "maxShield",
+      "killerId", "watchingId", "recap", "boss", "maxHealth", "maxShield",
       "spectating",
       "awaitingEntry",
       "spawnRequested",

@@ -1,0 +1,2 @@
+// Aggregate only: never expose player identities through a public status endpoint.
+export function releaseActivity(relay){let lobby=0,active=0,unknown=0;for(const u of relay.parties.users.values()){if(!relay.parties.connected(u))continue;if(!u.inMatch){lobby++;continue;}const location=relay.parties.matchLocation(u);if(!location){unknown++;continue;}if(location.listing.phase==='lobby')lobby++;else active++;}return {safe:active===0&&unknown===0,activePlayers:active,lobbyPlayers:lobby,unknownPlayers:unknown,checkedAt:Date.now()};}

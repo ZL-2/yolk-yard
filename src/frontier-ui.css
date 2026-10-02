@@ -42,3 +42,15 @@
 @media(max-width:600px){.keycard-guide{top:19%;max-width:75vw;width:max-content;font-size:12px}.keycard-guide b{font-size:12px}#dialog .controls-table td:first-child{width:45%}}
 
 #arena-stamina{color:#e5f1f5;font-size:10px;margin-bottom:9px}#arena-stamina span{display:block;margin-bottom:4px}#arena-stamina progress{width:100%;height:6px;accent-color:#90d5e1}#arena-stamina.exhausted progress{accent-color:#f1a36c}.crosshair.weapon-lowered{opacity:0}
+
+/* Finish Social's legacy palette, including nested text and disabled actions. */
+#dialog[data-kind=social] :is(button,.friend-code,.social-person,.social-requests,.social-slot){background:#203d4a!important;color:#edf6f8!important;border-color:#638394!important;text-shadow:none}
+#dialog[data-kind=social] :is(button.primary,.social-tabs button[aria-pressed=true]){background:#efbc61!important;color:#132632!important;border-color:#ffe0a3!important}
+#dialog[data-kind=social] button :is(span,strong,b,small){color:inherit!important}
+#dialog[data-kind=social] button:disabled{background:#233744!important;color:#b9cbd3!important;opacity:1}
+#dialog[data-kind=social] :is(.social-party small,.social-person small,.friend-code small,.social-pending){color:#bad1dc!important;opacity:1}
+#dialog[data-kind=social] .presence.active{color:#9bebc6!important}
+#dialog[data-kind=social] button:hover:not(:disabled),#dialog[data-kind=social] button:focus-visible{outline:2px solid #9de6ef;outline-offset:2px}
+#dialog :is(.inventory-ammo,.resource-count){background:#203d4a!important;border-color:#638394!important;color:#edf6f8!important}
+#dialog :is(.inventory-ammo,.resource-count) :is(b,span){color:#edf6f8!important}
+#spectator-status{position:absolute;top:88px;left:20px;max-width:min(420px,80vw);padding:8px 12px;background:#102b3bed;border:1px solid #7db8ca;color:#edf7fa;font-size:12px;border-radius:5px;pointer-events:none}
