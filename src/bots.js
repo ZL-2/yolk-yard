@@ -75,9 +75,9 @@ export function botInput(sim,p){
   else{const aim=task.aim,d=Math.hypot(p.x-aim.x,p.z-aim.z);slot=0;yaw=Math.atan2(p.x-aim.x,p.z-aim.z);pitch=Math.atan2(aim.y-p.y-eyeHeight(p),d);fire=d<3.1;if(fire)move.mx=move.mz=0;}
  }
  if(visible){
-  if(now>=brain.nextBurst){
+  if(!p.inventory&&now>=brain.nextBurst){
    brain.nextBurst=now+skill.burst+skill.pause+r()*.4;brain.burstUntil=now+skill.burst;
-   const accurate=r()<skill.hit;brain.errorX=(r()-.5)*skill.error+(accurate?0:brain.side*(.65+r()*.8)/Math.max(5,distance));brain.errorY=(r()-.5)*skill.error*.65;brain.height=accurate?1.22+(r()-.5)*.24:.55+r()*1.18;
+   if(!p.inventory){const accurate=r()<skill.hit;brain.errorX=(r()-.5)*skill.error+(accurate?0:brain.side*(.65+r()*.8)/Math.max(5,distance));brain.errorY=(r()-.5)*skill.error*.65;brain.height=accurate?1.22+(r()-.5)*.24:.55+r()*1.18;}
   }
   const lead=w.hitscan?0:Math.min(1,distance/w.boltSpeed)*skill.lead,tx=target.x+(target.vx||0)*lead-p.x,tz=target.z+(target.vz||0)*lead-p.z;
   yaw=Math.atan2(-tx,-tz)+(brain.errorX||0)+Math.sin(now*1.7+(p.botSeed||0))*skill.error*.15;
@@ -94,6 +94,7 @@ export function botInput(sim,p){
   }
  }else if(target&&task.kind==='investigate'){yaw=Math.atan2(p.x-target.x,p.z-target.z);if(dist(p,target)<2){delete brain.memory[target.id];brain.decision=0;}}
  if(brain.utility&&brain.utility.until>now&&['popper','impulse','launchpad'].includes(p.inventory?.[brain.utility.slot]?.id)&&!p.use){slot=brain.utility.slot;yaw=brain.utility.yaw;pitch=brain.utility.pitch;fire=!p.useLatch;}
+ const desiredPitch=pitch,rawYaw=yaw;
  const turnDt=clamp(now-brain.turnAt,0,.1);brain.turnAt=now;
  const arenaCombat=!p.inventory&&visible;
  const turn=arenaCombat?Math.min(skill.turn,ARENA_BOT_COMBAT.turnRate):Math.min(skill.turn,2.7);
@@ -102,6 +103,6 @@ export function botInput(sim,p){
  if(visible&&Math.abs(wrapAngle(desiredYaw-yaw))>.2)fire=false;
  const movement=smoothArenaCombatMovement(brain,move,yaw,now,arenaCombat);
  const moving=Math.hypot(move.mx,move.mz)>.1;
- return {yaw,pitch,forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
+ return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,combatAim:visible&&!brain.utility}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
 }
 import {teammates} from './teams.js';

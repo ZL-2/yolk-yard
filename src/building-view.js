@@ -27,7 +27,7 @@ export function updateBuildingView(rv,state,p){
   if(cached&&cached.key!==key){rv.root.remove(cached.mesh);rv.view.disposeGroup(cached.mesh);rv.buildMeshes.delete(b.id);cached=null;}
   if(!cached){const mesh=buildMesh(b,rv.kit);rv.root.add(mesh);cached={mesh,key};rv.buildMeshes.set(b.id,cached);}
   cached.mesh.visible=(!p||Math.hypot(b.x-p.x,b.z-p.z)<180)&&rv.view.buildControls?.editDraft?.id!==b.id;
-  cached.mesh.traverse(m=>{if(!m.isMesh)return;if(m.material.color)m.material.color.setHex(MATERIALS[b.material].color).multiplyScalar(1-(b.lastDamage>b.created?Math.max(0,1-b.health/b.maxHealth)*.4:0));m.material.emissive?.setHex(state.time-b.lastDamage<.16?MATERIALS[b.material].damageColor:0x000000);if(m.material.emissive)m.material.emissiveIntensity=.28;});
+  const visualKey=[b.health,b.maxHealth,b.lastDamage>b.created,state.time-b.lastDamage<.16].join(':');if(cached.visualKey!==visualKey){cached.visualKey=visualKey;cached.mesh.traverse(m=>{if(!m.isMesh)return;if(m.material.color)m.material.color.setHex(MATERIALS[b.material].color).multiplyScalar(1-(b.lastDamage>b.created?Math.max(0,1-b.health/b.maxHealth)*.4:0));m.material.emissive?.setHex(state.time-b.lastDamage<.16?MATERIALS[b.material].damageColor:0x000000);if(m.material.emissive)m.material.emissiveIntensity=.28;});}
  }
  for(const [id,c] of rv.buildMeshes)if(!seen.has(id)){rv.root.remove(c.mesh);rv.view.disposeGroup(c.mesh);rv.buildMeshes.delete(id);}
  if(!rv.weakpoint){rv.weakpoint=new THREE.Mesh(new THREE.RingGeometry(.18,.25,32),new THREE.MeshBasicMaterial({color:0x50cfff,depthTest:false,transparent:true,opacity:.95,side:THREE.DoubleSide}));rv.weakpoint.userData.ownedMaterial=true;rv.root.add(rv.weakpoint);}

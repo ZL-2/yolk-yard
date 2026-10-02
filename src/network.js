@@ -1,4 +1,5 @@
 import {isWarmup,MAX_SPECTATORS,MAX_HUMANS,MAX_SNAPSHOT_ACTORS} from './royale-phases.js';
+import {SnapshotInterest} from './snapshot-interest.js';
 import { connectionReport, errorCode, watchConnection } from './connection-report.js';
 import Peer from "peerjs";
 import { RelayPeer, relayURL } from "./relay-peer.js";
@@ -478,7 +479,8 @@ export class Network {
       const conn=recipients[(i+offset)%recipients.length];
       if (!conn.open || (conn.dataChannel?.bufferedAmount || 0) >= 131072) continue;
       const recipient=state.players.find(p=>p.id===conn.peer),teamGroup=isTeamRoyale(state.options)?recipient?.team:conn.peer;
-      const group=[conn.royaleVersion,conn.buildVersion,conn.lastEventSent,teamGroup].join('|'),cached=broadcasts.get(group);
+      const observer=state.players.find(p=>p.id===(recipient?.watchingId||recipient?.killerId))||recipient;
+      const group=[conn.royaleVersion,conn.buildVersion,conn.lastEventSent,teamGroup,conn.peer,Math.floor((observer?.x||0)/64),Math.floor((observer?.z||0)/64),!!observer?.aim].join('|'),cached=broadcasts.get(group);
       if(cached){Object.assign(conn,cached.cursor);conn.send(cached.message);continue;}
       let outgoing=state;
       if(state.royale){
@@ -494,7 +496,7 @@ export class Network {
       // retransmit the last 60 events in every movement snapshot.
       const events=outgoing.events.filter(e=>(!Number.isFinite(e.id)||e.id>(conn.lastEventSent??-1))&&(e.type!=='duo-marker'||e.player===conn.peer||isTeamRoyale(state.options)&&e.team===recipient?.team));
       for(const event of events)if(Number.isFinite(event.id))conn.lastEventSent=Math.max(conn.lastEventSent??-1,event.id);
-      outgoing={...outgoing,events};
+      this.interest??=new SnapshotInterest();outgoing={...outgoing,events,players:this.interest.players(outgoing,recipient)};
       const message={type:'state',state:outgoing,...(checkpoint?{checkpoint}:{})};
       broadcasts.set(group,{message,cursor:{royaleVersion:conn.royaleVersion,buildVersion:conn.buildVersion,lastEventSent:conn.lastEventSent}});conn.send(message);
     }

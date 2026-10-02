@@ -67,12 +67,12 @@ export function chooseObjective(sim,p,brain,skill,target){
   // Items become known by proximity + LOS. Authored rooms guide searches, not hidden rolls.
   for(const item of nearbyItems(sim,'loot',p,28))if(dist(p,item)<28&&seesPoint(sim,p,item))brain.lootMemory[item.uid]={uid:item.uid,at:sim.time};
   let best=null,bestValue=0;
-  for(const item of sim.loot){const known=brain.lootMemory[item.uid];if(!known||sim.time-known.at>35||!nearSquad(item))continue;const value=usefulLoot(p,item)/(1+dist(p,item)*.055);if(value>bestValue){bestValue=value;best=item;}}
+  for(const item of sim.loot){const known=brain.lootMemory[item.uid];if(!known||sim.time-known.at>35||brain.unreachable?.[item.uid]>sim.time||!nearSquad(item))continue;const value=usefulLoot(p,item)/(1+dist(p,item)*.055);if(value>bestValue){bestValue=value;best=item;}}
   if(best)return {kind:'loot',goal:{x:best.x,y:best.y,z:best.z},uid:best.uid};
   const weapons=p.inventory.filter(i=>i?.weapon),needs=weapons.length<2||!weapons.some(i=>i.ammo+p.bank[ammoType(i.id)]>10)||p.shield<35;
-  if(needs){const chest=nearbyItems(sim,'chests',p,20).filter(c=>nearSquad(c)&&!c.opened&&(!c.landAt||c.landAt<=sim.time)&&dist(p,c)<20&&(dist(p,c)<BOT_WORLD_SENSES.chestHumRadius||seesPoint(sim,p,c))).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(chest)return {kind:'chest',goal:{x:chest.x,y:chest.y,z:chest.z},id:chest.id};}
+  if(needs){const chest=nearbyItems(sim,'chests',p,20).filter(c=>nearSquad(c)&&!(brain.unreachable?.[c.id]>sim.time)&&!c.opened&&(!c.landAt||c.landAt<=sim.time)&&dist(p,c)<20&&(dist(p,c)<BOT_WORLD_SENSES.chestHumRadius||seesPoint(sim,p,c))).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(chest)return {kind:'chest',goal:{x:chest.x,y:chest.y,z:chest.z},id:chest.id};}
   if(!underFire&&weapons.length&&Object.values(p.materials).reduce((a,b)=>a+b,0)<teamPolicy.totalMaterials){
-   const resource=[...candidates(sim.map,p,null,0,teamPolicy.harvestRadius)].filter(b=>b.objectId&&!b.buildId&&b.kind!=='boundary'&&nearSquad(b)&&dist(p,b)<teamPolicy.harvestRadius&&!sim.worldDamage?.[b.objectId]?.destroyed&&p.materials[harvestDefinition(b,sim.map).material]<teamPolicy.materialTarget).map(b=>harvestObjective(sim,p,b)).filter(Boolean).sort((a,b)=>dist(p,a.goal)-dist(p,b.goal))[0];if(resource)return resource;
+   const resource=[...candidates(sim.map,p,null,0,teamPolicy.harvestRadius)].filter(b=>b.objectId&&!(brain.unreachable?.[b.objectId]>sim.time)&&!b.buildId&&b.kind!=='boundary'&&nearSquad(b)&&dist(p,b)<teamPolicy.harvestRadius&&!sim.worldDamage?.[b.objectId]?.destroyed&&p.materials[harvestDefinition(b,sim.map).material]<teamPolicy.materialTarget).map(b=>harvestObjective(sim,p,b)).filter(Boolean).sort((a,b)=>dist(p,a.goal)-dist(p,b.goal))[0];if(resource)return resource;
   }
   if(needs){let anchor=null,nearest=Infinity;for(const q of sim.map.floorLoot||[])if(nearSquad(q)&&q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35){const d=dist(p,q);if(d<nearest){nearest=d;anchor=q;}}if(anchor)return {kind:'search-room',goal:anchor,id:anchor.id};}
  }

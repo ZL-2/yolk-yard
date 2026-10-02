@@ -37,19 +37,19 @@ export function invalidateCollision(map){collisionIndex.delete(map);}
 export function candidates(map,o,d=null,max=0,radius=RADIUS){
  if(map.theme!=='royale')return map.boxes;
  let grid=collisionIndex.get(map);
- if(!grid){grid=new Map();for(const b of map.boxes){for(let x=Math.floor((b.x-b.w/2)/16);x<=Math.floor((b.x+b.w/2)/16);x++)for(let z=Math.floor((b.z-b.d/2)/16);z<=Math.floor((b.z+b.d/2)/16);z++){const k=x+','+z;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(b);}}collisionIndex.set(map,grid);}
+ if(!grid){grid=new Map();for(const b of map.boxes){for(let x=Math.floor((b.x-b.w/2)/8);x<=Math.floor((b.x+b.w/2)/8);x++)for(let z=Math.floor((b.z-b.d/2)/8);z<=Math.floor((b.z+b.d/2)/8);z++){const k=x+','+z;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(b);}}collisionIndex.set(map,grid);}
  // Reuse exact bucket unions for movement and short collision/LOS probes.
  // Cached arrays are read-only; invalidation discards every geometry reference.
  const length=d?Math.min(Number.isFinite(max)?max:1600,1600):0;
- const steps=Math.max(1,Math.ceil(length*Math.hypot(d?.x||0,d?.z||0)/16));
+ const steps=Math.max(1,Math.ceil(length*Math.hypot(d?.x||0,d?.z||0)/8));
  if(!d||steps===1){
   const ex=o.x+(d?.x||0)*length,ez=o.z+(d?.z||0)*length;
-  const x0=Math.floor((Math.min(o.x,ex)-radius)/16),x1=Math.floor((Math.max(o.x,ex)+radius)/16),z0=Math.floor((Math.min(o.z,ez)-radius)/16),z1=Math.floor((Math.max(o.z,ez)+radius)/16),key=x0+':'+x1+':'+z0+':'+z1;
+  const x0=Math.floor((Math.min(o.x,ex)-radius)/8),x1=Math.floor((Math.max(o.x,ex)+radius)/8),z0=Math.floor((Math.min(o.z,ez)-radius)/8),z1=Math.floor((Math.max(o.z,ez)+radius)/8),key=x0+':'+x1+':'+z0+':'+z1;
   grid.pointQueries??=new Map();const cached=grid.pointQueries.get(key);if(cached)return cached;
   let nearby;
   if(x0===x1&&z0===z1)nearby=grid.get(x0+','+z0)||[];
   else{const union=new Set();for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++)for(const b of grid.get(x+','+z)||[])union.add(b);nearby=[...union];}
-  if(grid.pointQueries.size>=256)grid.pointQueries.delete(grid.pointQueries.keys().next().value);
+  if(grid.pointQueries.size>=512)grid.pointQueries.delete(grid.pointQueries.keys().next().value);
   grid.pointQueries.set(key,nearby);return nearby;
  }
  const found=new Set(),visited=new Set();
@@ -57,7 +57,7 @@ export function candidates(map,o,d=null,max=0,radius=RADIUS){
  // radius. Nine whole neighboring buckets per point used to dominate bot cost.
  for(let i=0;i<steps;i++){
   const from=length*i/steps,to=length*(i+1)/steps,ax=o.x+(d?.x||0)*from,az=o.z+(d?.z||0)*from,bx=o.x+(d?.x||0)*to,bz=o.z+(d?.z||0)*to;
-  for(let x=Math.floor((Math.min(ax,bx)-radius)/16);x<=Math.floor((Math.max(ax,bx)+radius)/16);x++)for(let z=Math.floor((Math.min(az,bz)-radius)/16);z<=Math.floor((Math.max(az,bz)+radius)/16);z++){
+  for(let x=Math.floor((Math.min(ax,bx)-radius)/8);x<=Math.floor((Math.max(ax,bx)+radius)/8);x++)for(let z=Math.floor((Math.min(az,bz)-radius)/8);z<=Math.floor((Math.max(az,bz)+radius)/8);z++){
    const key=x+','+z;if(visited.has(key))continue;visited.add(key);for(const b of grid.get(key)||[])found.add(b);
   }
  }

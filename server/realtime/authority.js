@@ -1,4 +1,5 @@
 import {timingPhase,roomTiming,recordTiming,startTiming,finishTiming} from './timing.js';
+import {SnapshotInterest} from '../../src/snapshot-interest.js';
 import {randomInt,randomUUID} from 'node:crypto';
 import {Simulation} from '../../src/simulation.js';
 import {RoyaleSimulation} from '../../src/royale.js';
@@ -129,7 +130,8 @@ export class MatchAuthority{
    }
    encoder.lootKey=lootKey;encoder.buildKey=buildKey;
    room.eventCursors.set(id,state.events.at(-1)?.id||room.eventCursors.get(id)||0);
-   const message=encoder.encode({type:'authority-state',state:outgoing},batch);this.send(peer,{type:'authority-frame',frame:message.frame},batch.serialize(message.frame));
+   room.interest??=new SnapshotInterest();const presentation={...outgoing,players:room.interest.players(outgoing,p)};
+   const message=encoder.encode({type:'authority-state',state:presentation},batch);this.send(peer,{type:'authority-frame',frame:message.frame},batch.serialize(message.frame));
   }
   if(!room.publishedAt||room.age-room.publishedAt>=2){this.publish(room);room.publishedAt=room.age;}
   if(room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,room.owner,room.sim.inputs.get(room.owner)||{}));}

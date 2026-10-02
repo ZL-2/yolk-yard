@@ -1,3 +1,4 @@
+import {nearbyPlayers} from './bot-work.js';
 import {wallDistance,dist,candidates,canStand} from './physics.js';
 import {groundAt} from './terrain.js';
 const clear=(sim,p,q)=>{const dx=q.x-p.x,dz=q.z-p.z,d=Math.hypot(dx,dz)||1;return Math.abs(q.y-p.y)<.45&&wallDistance(sim.map,{x:p.x,y:p.y+.7,z:p.z},{x:dx/d,y:0,z:dz/d},d)>=d-.1;};
@@ -18,7 +19,7 @@ function walkEdge(map,from,x,z){
 }
 export function localRoute(sim,p,goal){
  const queue=[{x:p.x,y:p.y,z:p.z,parent:-1}],seen=new Set(['0,0']),step=1.5;let best=0,bestDistance=dist(p,goal);
- for(let i=0;i<queue.length&&i<160;i++){
+ for(let i=0;i<queue.length&&i<80;i++){
   const at=queue[i];for(const [dx,dz]of [[1,0],[-1,0],[0,1],[0,-1]]){
    const x=at.x+dx*step,z=at.z+dz*step,key=Math.round((x-p.x)/step)+','+Math.round((z-p.z)/step);if(seen.has(key)||Math.hypot(x-p.x,z-p.z)>12)continue;seen.add(key);
    const q=walkEdge(sim.map,at,x,z);if(!q)continue;q.parent=i;queue.push(q);const d=dist(q,goal);if(d<bestDistance){best=queue.length-1;bestDistance=d;}if(d<1.5)break;
@@ -26,19 +27,23 @@ export function localRoute(sim,p,goal){
  }
  const route=[];for(let i=best;i>0;i=queue[i].parent){const{x,y,z}=queue[i];route.push({x,y,z});}return route.reverse();
 }
-function pathBudget(sim){
- if(sim.botPathTick!==sim.time){sim.botPathTick=sim.time;sim.botPathBudget=1;}
- if(sim.botPathBudget<=0)return false;sim.botPathBudget--;return true;
+const requests=new WeakMap();
+function pathBudget(sim,p){
+ if(sim.botPathTick!==sim.time){sim.botPathTick=sim.time;sim.botPathBudget=sim.time>=(sim.botPathNextAt||0)?1:0;}
+ let q=requests.get(sim);if(!q){q=[];requests.set(sim,q);}
+ while(q.length&&(!sim.players.has(q[0].id)||sim.time-q[0].at>.65))q.shift();
+ let entry=q.find(o=>o.id===p.id);if(entry)entry.at=sim.time;else if(sim.botPathGranted!==p.id||sim.botPathTick!==sim.botPathGrantedAt){entry={id:p.id,at:sim.time};q.push(entry);}
+ if(sim.botPathBudget<=0||q[0]?.id!==p.id)return false;q.shift();sim.botPathBudget--;sim.botPathNextAt=sim.time+.04;sim.botPathGranted=p.id;sim.botPathGrantedAt=sim.time;return true;
 }
 export function navigate(sim,p,brain,goal,skill){
  if(!goal)return {mx:0,mz:0,jump:false};
  const now=sim.time,arrived=dist(p,goal)<1.3;
  if(arrived){if(brain.task?.id)brain.visited[brain.task.id]=now;if(p.inventory||brain.task?.kind!=='fight')brain.decision=Math.min(brain.decision,now+.2);}
  // Brake before the exact peek point so smoothed combat movement cannot overshoot and oscillate.
- if(arrived&&!p.inventory&&brain.task?.kind==='fight')return {mx:0,mz:0,jump:false,interact:false};
+ if(arrived)return {mx:0,mz:0,jump:false,interact:false};
  const revision=sim.navigationRevision??sim.buildVersion??0,movedGoal=!brain.pathGoal||dist(goal,brain.pathGoal)>4;
  if((movedGoal||now>(brain.pathAt||0)||revision!==brain.navRevision)&&!arrived){
-  if(pathBudget(sim)){brain.navRevision=revision;brain.pathGoal={...goal};brain.pathAt=now+1.8+sim.random()*.7;p.botPath=directRoute(sim,p,brain,goal)?[]:sim.nav.path(p,goal);}
+  if(pathBudget(sim,p)){brain.navRevision=revision;brain.pathGoal={...goal};brain.pathAt=now+1.8+sim.random()*.7;p.botPath=directRoute(sim,p,brain,goal)?[]:sim.nav.path(p,goal,p.inventory?1200:4000);}
  }
  while(p.botPath?.length&&dist(p,p.botPath[0])<.65)p.botPath.shift();
  const direct=directRoute(sim,p,brain,goal),step=direct?goal:p.botPath?.[0]||goal;
@@ -55,11 +60,11 @@ export function navigate(sim,p,brain,goal,skill){
  }
  if(now>=brain.checkAt){
   const stuck=Math.hypot(p.x-brain.lastX,p.z-brain.lastZ)<.4&&!arrived;
-  if(stuck&&pathBudget(sim)){brain.failures=(brain.failures||0)+1;p.botPath=localRoute(sim,p,goal);brain.pathAt=now+2;brain.side*=-1;if(brain.failures>=3){if(brain.task?.id)brain.visited[brain.task.id]=now;brain.decision=0;brain.task=null;brain.failures=0;}}
+  if(stuck){brain.failures=(brain.failures||0)+1;if(pathBudget(sim,p)){p.botPath=localRoute(sim,p,goal);brain.pathAt=now+2;brain.side*=-1;}if(brain.failures>=2){const id=brain.task?.uid??brain.task?.id;if(id!==undefined){brain.unreachable??={};brain.unreachable[id]=now+12;brain.visited[id]=now;}brain.decision=0;brain.task=null;brain.failures=0;p.botPath=[];}}
   else brain.failures=0;
   brain.lastX=p.x;brain.lastZ=p.z;brain.checkAt=now+Math.max(.7,skill.decision*.6);
  }
- for(const other of sim.players.values())if(other!==p&&other.health>0&&!other.spectating){const d=Math.hypot(p.x-other.x,p.z-other.z);if(d>.01&&d<1.5){mx+=(p.x-other.x)/d*(1.5-d);mz+=(p.z-other.z)/d*(1.5-d);}}
+ for(const other of nearbyPlayers(sim,p,1.5)){const d=Math.hypot(p.x-other.x,p.z-other.z);if(d>.01&&d<1.5){mx+=(p.x-other.x)/d*(1.5-d);mz+=(p.z-other.z)/d*(1.5-d);}}
  if(jump)brain.nextJump=now+1.1;
  const lenMove=Math.max(1,Math.hypot(mx,mz));return {mx:mx/lenMove,mz:mz/lenMove,jump,interact};
 }

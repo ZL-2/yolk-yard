@@ -4,6 +4,7 @@ import {smokeBlocks} from './season-world.js';
 import {wallDistance,dist} from './physics.js';
 import {eyeHeight,bodyHeight} from './stance.js';
 import {wrapAngle,BOT_WORLD_SENSES} from './bot-config.js';
+import {nearbyPlayers} from './bot-work.js';
 export const hostile=(sim,p,t)=>t!==p&&t.health>0&&!t.spectating&&t.flight!=='transport'&&!teammates(sim.options,p,t);
 export function seesPoint(sim,p,t){const o={x:p.x,y:p.y+eyeHeight(p),z:p.z},d={x:t.x-o.x,y:t.y+bodyHeight(t)*.66-o.y,z:t.z-o.z},len=Math.hypot(d.x,d.y,d.z)||1;return !smokeBlocks(sim,o,{x:t.x,y:t.y+1,z:t.z})&&wallDistance(sim.map,o,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.08;}
 export function newBrain(sim,p){return {memory:{},eventId:Math.max(0,sim.eventId-32),perceiveAt:0,decision:0,aimAt:0,nextBurst:0,burstUntil:0,turnAt:sim.time,checkAt:sim.time+1,lastX:p.x,lastZ:p.z,side:sim.random()<.5?-1:1,visited:{},lootMemory:{},objective:'survey',target:null,targetUntil:0};}
@@ -44,7 +45,7 @@ export function observe(sim,p,brain,skill){
  if(sim.time<brain.perceiveAt)return;
  brain.perceiveAt=sim.time+skill.perception+sim.random()*.025;
  for(const m of Object.values(brain.memory))m.visible=false;
- for(const enemy of sim.players.values()){
+ for(const enemy of nearbyPlayers(sim,p,skill.vision)){
   if(!hostile(sim,p,enemy))continue;const d=dist(p,enemy),angle=wrapAngle(Math.atan2(p.x-enemy.x,p.z-enemy.z)-p.yaw);
   if(d<skill.vision&&(Math.abs(angle)<skill.fov||d<20&&sim.time-(brain.memory[enemy.id]?.engagedAt??brain.memory[enemy.id]?.damageAt??-100)<2)&&seesPoint(sim,p,enemy)){
    const previous=brain.memory[enemy.id];brain.memory[enemy.id]={id:enemy.id,x:enemy.x,y:enemy.y,z:enemy.z,vx:enemy.vx||0,vz:enemy.vz||0,vy:enemy.vy||0,bodyScale:enemy.bodyScale||1,visible:true,seenAt:sim.time,updated:sim.time,confidence:1,health:enemy.health,weapon:gun(enemy).id,engagedAt:previous?.engagedAt,damageAt:previous?.damageAt,damage:(previous?.damage||0)*.8,kind:'visual'};

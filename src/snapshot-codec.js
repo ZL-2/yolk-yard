@@ -24,7 +24,7 @@ export class SnapshotBatch {
  }
  players(rows){
   if(!this.values.has(rows))this.values.set(rows,rows.map(row=>{
-   const next={};for(const key of Object.keys(row)){const value=row[key];if(value===undefined||typeof value==='function'||typeof value==='symbol')continue;const cloned=value&&typeof value==='object'?this.clone(value):typeof value==='number'&&!Number.isFinite(value)?null:value;if(key==='__proto__')Object.defineProperty(next,key,{value:cloned,enumerable:true});else next[key]=cloned;}return next;
+   if(this.values.has(row))return this.values.get(row);const next={};for(const key of Object.keys(row)){const value=row[key];if(value===undefined||typeof value==='function'||typeof value==='symbol')continue;const cloned=value&&typeof value==='object'?this.clone(value):typeof value==='number'&&!Number.isFinite(value)?null:value;if(key==='__proto__')Object.defineProperty(next,key,{value:cloned,enumerable:true});else next[key]=cloned;}this.values.set(row,next);return next;
   }));
   return this.index(this.values.get(rows));
  }

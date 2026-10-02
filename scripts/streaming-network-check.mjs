@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {mkdirSync,writeFileSync} from 'node:fs';
+import {RoyaleSimulation} from '../src/royale.js';
+import {SnapshotInterest} from '../src/snapshot-interest.js';
+import {SnapshotBatch,SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
+import {MatchAuthority} from '../server/realtime/authority.js';
+const sim=new RoyaleSimulation({capacity:48,bots:47,fill:true,seed:12});sim.addPlayer('host',{name:'Observer'});sim.startRound();sim.beginBattle();sim.stage='active';
+let n=0;for(const p of sim.players.values()){Object.assign(p,{x:n?400+n*3:0,y:5,z:n?250:0,flight:'ground',yaw:0,pitch:0});n++;}
+const states=[];for(let i=0;i<160;i++){sim.time+=.05;for(const p of sim.players.values())if(p.bot){p.x+=.18;p.yaw+=.012;}const state=sim.snapshot({includeLoot:false,includeBuilds:false});state.events=[];states.push(state);}
+function measure(sampled,recipients){const interest=new SnapshotInterest(),encoders=Array.from({length:recipients},()=>new SnapshotEncoder());let bytes=0;const start=performance.now();for(const state of states){const batch=new SnapshotBatch();for(const encoder of encoders){const players=sampled?interest.players(state,state.players[0]):state.players;const frame=encoder.encode({type:'authority-state',state:{...state,players}},batch);bytes+=batch.serialize(frame.frame).length;}}return {bytes,ms:performance.now()-start};}
+// Warm both code paths before comparing identical snapshots and recipients.
+measure(false,1);measure(true,1);const report={};for(const count of [1,8]){const full=measure(false,count),interest=measure(true,count);assert.ok(interest.bytes<full.bytes*.9,'far pose sampling reduces traffic');report[count]={full,interest};}
+const sent=[],relay={peers:new Map(),send:(p,m)=>sent.push([p.id,m]),progression:{frame(){}}},authority=new MatchAuthority(relay);clearInterval(authority.timer);
+try{const guest=sim.addPlayer('guest',{name:'Guest'});Object.assign(guest,{x:700,y:5,z:250,health:100,flight:'ground'});const members=new Map();for(const id of ['host','guest']){const peer={id,ws:{bufferedAmount:0}};members.set(id,peer);relay.peers.set(id,peer);}const room={sim,members,hostPeer:members.get('host'),owner:'host',code:'ABCDEFGH',visibility:'private',chat:{enabled:true,muted:new Set(),sequence:0},encoders:new Map(),eventCursors:new Map(),age:1,progressAt:1};const decoders=new Map([...members.keys()].map(id=>[id,new SnapshotDecoder()]));authority.broadcast(room);for(const [id,m] of sent)decoders.get(id).decode(m.frame);sent.length=0;sim.time+=.05;guest.health=71;guest.shield=0;guest.inventory[0].ammo=2;authority.broadcast(room);for(const [id,m] of sent){const state=decoders.get(id).decode(m.frame).state,p=state.players.find(p=>p.id==='guest');assert.equal(p.health,71,'both recipients immediately see authoritative damage');assert.equal(p.inventory[0].ammo,2);}
+const host=sim.players.get('host');host.aim=true;sent.length=0;sim.time+=.05;authority.broadcast(room);const state=decoders.get('host').decode(sent.find(([id])=>id==='host')[1].frame).state;const scoped=state.players.find(p=>p.id==='guest');assert.equal(scoped.x,guest.x);assert.equal(scoped.presentationAt,undefined,'scoped target uses current pose');
+}finally{authority.close();}
+mkdirSync('test-results/streaming',{recursive:true});writeFileSync('test-results/streaming/network.json',JSON.stringify(report,null,2));console.log('PASS network: authoritative damage/ammo remain immediate, scope full-rate, reduced far-pose traffic',report);

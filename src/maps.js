@@ -104,7 +104,7 @@ export function navigation(map) {
   };
   const parent=new Int32Array(nodes.length),cost=new Float32Array(nodes.length),seen=new Uint32Array(nodes.length),closed=new Uint32Array(nodes.length),q=[];let search=0;
   const nav = {
-    path(from, to) {
+    path(from, to, limit=4000) {
       const start = nearest(from),
         end = nearest(to);
       if (!start || !end) return [];
@@ -115,7 +115,7 @@ export function navigation(map) {
       seen[start.id]=search;parent[start.id]=start.id;cost[start.id]=0;push(start.id,heuristic(start));let best=start.id,bestD=Infinity,visited=0;
       // A partial route is useful immediately and will be extended on the next
       // scheduled search. Unreachable indoor targets cannot stall a host frame.
-      while(q.length&&visited++<4000){const id=pop();if(closed[id]===search)continue;closed[id]=search;const a=nodes[id],d=heuristic(a);if(d<bestD){bestD=d;best=id;}if(id===end.id)break;
+      while(q.length&&visited++<limit){const id=pop();if(closed[id]===search)continue;closed[id]=search;const a=nodes[id],d=heuristic(a);if(d<bestD){bestD=d;best=id;}if(id===end.id)break;
        for(const k of a.edges){const b=nodes[k],next=cost[id]+Math.hypot(b.x-a.x,b.z-a.z)+Math.abs(b.y-a.y)*.8;if(seen[k]!==search||next<cost[k]){seen[k]=search;cost[k]=next;parent[k]=id;push(k,next+heuristic(b));}}
       }
       const path = [];

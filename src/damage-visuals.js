@@ -3,11 +3,11 @@
 const caches=new WeakMap();
 export function updateWorldDamage(world,damage,key){
  if(!world)return;let cache=caches.get(world);
- if(!cache||cache.children!==world.children.length){cache={children:world.children.length,ranges:new Map(),last:null};world.traverse(m=>{for(const range of m.userData.objectRanges||[]){if(!cache.ranges.has(range.id))cache.ranges.set(range.id,[]);cache.ranges.get(range.id).push({mesh:m,range,stage:0});}});caches.set(world,cache);}
+ if(!cache||cache.children!==world.children.length||cache.revision!==world.userData.geometryRevision){cache={children:world.children.length,revision:world.userData.geometryRevision,ranges:new Map(),last:null};world.traverse(m=>{for(const range of m.userData.objectRanges||[]){if(!cache.ranges.has(range.id))cache.ranges.set(range.id,[]);cache.ranges.get(range.id).push({mesh:m,range,stage:m.userData.damageStages?.[range.id]||0});}});caches.set(world,cache);}
  if(cache.last===key)return;cache.last=key;
  const ids=new Set([...Object.keys(damage||{}),...(cache.damaged||[])]);cache.damaged=new Set(Object.keys(damage||{}));
  for(const id of ids){const data=damage?.[id],stage=data?.destroyed?4:data?Math.min(3,Math.max(1,Math.ceil((1-data.health/data.maxHealth)*3))):0;
-  for(const entry of cache.ranges.get(id)||[]){if(entry.stage===stage)continue;entry.stage=stage;const {mesh,range}=entry,position=mesh.geometry.attributes.position,color=mesh.geometry.attributes.color,start=range.start*3,end=(range.start+range.count)*3;
+  for(const entry of cache.ranges.get(id)||[]){if(entry.stage===stage)continue;entry.stage=stage;const {mesh,range}=entry;mesh.userData.damageStages??={};mesh.userData.damageStages[range.id]=stage;const position=mesh.geometry.attributes.position,color=mesh.geometry.attributes.color,start=range.start*3,end=(range.start+range.count)*3;
    mesh.userData.originalPositions??=position.array.slice();if(color)mesh.userData.originalColors??=color.array.slice();const original=mesh.userData.originalPositions,baseColors=mesh.userData.originalColors;
    position.array.set(original.subarray(start,end),start);
    if(stage===4)position.array.fill(0,start,end);
