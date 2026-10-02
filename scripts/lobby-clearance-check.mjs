@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {createServer} from 'vite';
-import {mkdir} from 'node:fs/promises';
+import {mkdir,readFile} from 'node:fs/promises';
+const expectedVersion=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8')).version;
 const live=process.env.RAVEL_FRONTEND_URL,origin=live||'http://127.0.0.1:5197';
 const vite=live?null:await createServer({server:{host:'127.0.0.1',port:5197,strictPort:true,watch:null}});await vite?.listen();
 const browser=await chromium.launch({executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -21,6 +22,6 @@ try{
   assert.equal(await page.locator('[data-action=public-join],[data-action=public-spectate]').count(),1);assert.match(await page.locator('.public-royale-card').innerText(),/REAL PLAYERS/);
   await page.screenshot({path:`test-results/lobby-clearance/${width}-${height}.png`});
  }
- if(live){const version=await page.evaluate(async()=>fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()));assert.equal(version.appVersion,'3.8.3');assert.equal(version.release,'113');assert.equal(version.build,process.env.GITHUB_SHA);const source=await page.locator('script[type=module][src]').getAttribute('src');const response=await page.request.get(new URL(source,page.url()).href);assert.ok(response.ok());const bundle=await response.text();assert.ok(bundle.includes('shortLobby')||bundle.includes('15.5'),'Short-screen character framing is in the published bundle');}
+ if(live){const version=await page.evaluate(async()=>fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()));assert.equal(version.appVersion,expectedVersion);assert.ok(Number(version.release)>=113);const history=await page.evaluate(async()=>fetch('release-history.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()));assert.equal(history.build,version.build);assert.equal(history.releases[0].number,version.release);assert.equal(version.build,process.env.GITHUB_SHA);const source=await page.locator('script[type=module][src]').getAttribute('src');const response=await page.request.get(new URL(source,page.url()).href);assert.ok(response.ok());const bundle=await response.text();assert.ok(bundle.includes('shortLobby')||bundle.includes('15.5'),'Short-screen character framing is in the published bundle');}
  assert.deepEqual(errors,[]);console.log('PASS '+(live?'live ':'')+'compact public banner clears the lobby operator at desktop and laptop sizes; published version verified.');
 }finally{await browser.close();await vite?.close();}
