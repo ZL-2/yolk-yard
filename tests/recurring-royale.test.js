@@ -9,7 +9,7 @@ import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
 import {rewardFrame} from '../src/rewards.js';
 const bots=sim=>[...sim.players.values()].filter(p=>p.bot&&p.contestant);
 function fixture(){
- const relay=new RealtimeRelay();clearInterval(relay.authority.timer);const room=relay.authority.ensurePublicRoyale();
+ const relay=new RealtimeRelay();relay.authority.now=()=>Date.parse("2026-10-02T16:00:00Z");clearInterval(relay.authority.timer);const room=relay.authority.ensurePublicRoyale();
  function user(id){const messages=[],ws={readyState:1,bufferedAmount:0,send:raw=>messages.push(JSON.parse(raw)),close(){}};const u={id,profile:safeProfile({name:id}),ready:true,sessions:new Map([[ws,{}]]),ws};relay.parties.users.set(id,u);relay.parties.create(u);return {u,messages};}
  function peer(id){const messages=[],p={id,links:new Map([[room.key,room.hostPeer]]),pending:[],pendingBytes:0,history:[],historyBytes:0,seq:0,acked:0,progressId:id};p.ws={readyState:1,bufferedAmount:0,send:raw=>{const m=JSON.parse(raw);messages.push(m);if(m.relaySeq)relay.ack(p,m.relaySeq);},close(){}};relay.peers.set(id,p);return {p,messages};}
  function admit(person){relay.parties.command(person.u,{type:'queue',publicRoyale:true});const ticket=person.u.ticket,{p,messages}=peer('player-'+person.u.id);relay.authority.data(p,room.hostPeer,{channel:'test',data:{type:'hello',version:VERSION,ticket,profile:person.u.profile}});assert.ok(p.authorityRoom,'Public admission succeeds');return {p,messages};}
@@ -97,7 +97,7 @@ test('48 contestants and 16 spectators fit the wire codec and server-verified pu
  const f=fixture();try{
   const a=f.admit(f.user('Rewards'));f.room.sim.time=f.room.sim.queueEnds;f.room.sim.advanceWarmupClock();
   for(let i=0;i<16;i++)assert.ok(f.room.sim.admitPlayer('watch-'+i,safeProfile({name:'Watch '+i}),{spectator:true,publicSpectator:true}));
-  const state=f.room.sim.snapshot(),wire={type:'authority-state',state};assert.equal(state.players.length,64);
+  const state=f.room.sim.snapshot(),wire={type:'authority-state',state};assert.equal(state.players.filter(p=>!p.boss).length,64);assert.equal(state.players.filter(p=>p.boss).length,1);
   assert.deepEqual(new SnapshotDecoder().decode(JSON.parse(JSON.stringify(new SnapshotEncoder().encode(wire).frame))),JSON.parse(JSON.stringify(wire)));
   f.relay.progression.frame(f.room.hostPeer,rewardFrame(state,'server',{}));const at=f.relay.progression.clock();f.relay.progression.clock=()=>at+1;f.relay.progression.frame(f.room.hostPeer,rewardFrame(state,'server',{}));const match=[...f.relay.progression.matches.values()].at(-1);assert.ok(match);assert.equal(match.custom,false);assert.equal(match.players.size,48);assert.equal(match.players.get(a.p.id).identity,a.p.progressId);
   assert.equal([...match.players.values()].filter(p=>!p.bot).length,1);
@@ -109,3 +109,5 @@ test('lobby has only the private button below, a separate public Join/Spectate c
  const bottom=lobby.match(/<section class="yard-play-card[\s\S]*?<\/section>/)[0];assert.equal((bottom.match(/<button/g)||[]).length,1);assert.match(bottom,/CUSTOM PRIVATE MATCH/);assert.doesNotMatch(lobby,/FIND PUBLIC MATCH|Team Scramble/);
  assert.match(publicRoyaleMarkup({...model,publicMatch:{...model.publicMatch,joinable:false,stage:'active'}}),/data-action="public-spectate"/);
 });
+
+test('public admissions and issued tickets close at 7pm while private creation remains available',async()=>{const f=fixture();try{const u=f.user('Closing');f.relay.parties.command(u.u,{type:'queue',publicRoyale:true});const ticket=u.u.ticket;assert.ok(ticket);f.relay.authority.now=()=>Date.parse('2026-10-02T23:00:00Z');assert.equal(f.relay.authority.publicSummary().availability.open,false);const {p,messages}=f.peer('closing-peer');f.relay.authority.data(p,f.room.hostPeer,{channel:'test',data:{type:'hello',version:VERSION,ticket,profile:u.u.profile}});assert.equal(p.authorityRoom,undefined);assert.match(JSON.stringify(messages),/7 AM/);const late=f.user('Closed');assert.throws(()=>f.relay.parties.command(late.u,{type:'queue',publicRoyale:true}),/7 AM/);assert.ok(!late.u.ticket);}finally{await f.close();}});

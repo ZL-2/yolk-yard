@@ -199,8 +199,11 @@ export function launchpadModel(raw){
 export function lootModel(item,raw,{ground=true}={}){
  const k=artKit(raw),{block:box,rounded,cylinder,cone,torus,rock,beam}=k,g=new THREE.Group();g.name=(item.id||'item')+' collectible';
  const c=Number('0x'+(item.weapon?RARITIES[item.rarity||0].color:ITEMS[item.id]?.color||'#d9b967').slice(1));
- if(item.id==='blueprint'){rounded(g,0,.3,0,1.2,.85,.035,0x247bad,.02);for(let i=0;i<7;i++)box(g,-.55+i*.18,.3,.025,.012,.8,.015,0x80d7ed);for(let i=0;i<5;i++)box(g,0,-.05+i*.18,.025,1.1,.012,.015,0x80d7ed);const pencil=cylinder(g,.7,.2,.03,.024,.7,0xf2d261,8);pencil.rotation.z=-.2;}
- else if(item.id==='pickaxe'){cylinder(g,0,0,0,.075,1.65,0x956944,12);for(let i=0;i<8;i++)torus(g,0,-.65+i*.07,0,.081,.018,0x263e57).rotation.x=Math.PI/2;rounded(g,0,.68,0,1.15,.25,.19,0x7cb7cc,.07);const tip=cone(g,.72,.52,0,.13,.55,0xb5e4ec);tip.rotation.z=-1.05;rounded(g,-.63,.68,0,.28,.38,.23,0xd9b365,.03);}
+ if(item.id==='jumpRig'){rounded(g,0,.35,0,.58,.75,.3,0x283c45,.07);for(const side of [-1,1]){cylinder(g,side*.27,.35,0,.13,.67,0x829491,12);cone(g,side*.27,-.08,0,.13,.19,0xd9ad5b,.7);beam(g,[side*.16,.65,-.16],[side*.16,.03,-.16],.035,0x172d38);}rounded(g,0,.48,.18,.32,.17,.08,0xedc068,.02);}
+ else if(item.id==='smoke'){cylinder(g,0,.25,0,.18,.55,0x748980,12);cylinder(g,0,.54,0,.13,.06,0xd9c591,10);rounded(g,.08,.57,0,.09,.14,.07,0x2d454e,.02);box(g,0,.26,.18,.18,.16,.02,0xb9b79b);}
+ else if(item.id==='scanner'){rounded(g,0,.18,0,.5,.35,.22,0x2e4e58,.06);rounded(g,0,.2,-.13,.35,.22,.03,0x74decd,.01);beam(g,[.17,.32,0],[.17,.75,0],.016,0xc1d0c2);}
+ else if(item.id==='blueprint'){rounded(g,0,.3,0,1.2,.85,.035,0x247bad,.02);for(let i=0;i<7;i++)box(g,-.55+i*.18,.3,.025,.012,.8,.015,0x80d7ed);for(let i=0;i<5;i++)box(g,0,-.05+i*.18,.025,1.1,.012,.015,0x80d7ed);const pencil=cylinder(g,.7,.2,.03,.024,.7,0xf2d261,8);pencil.rotation.z=-.2;}
+ else if(item.id==='pickaxe'){cylinder(g,0,0,0,.045,1.35,0x38483f,10);for(let i=0;i<6;i++)torus(g,0,-.5+i*.065,0,.052,.012,0x17272b).rotation.x=Math.PI/2;rounded(g,0,.57,0,.8,.18,.13,0x879391,.025);const tip=cone(g,.45,.47,0,.08,.34,0xb0b9ae);tip.rotation.z=-1.05;rounded(g,-.4,.57,0,.14,.24,.16,0x687574,.025);}
  else if(item.resource){for(let i=0;i<3;i++)rounded(g,(i-1)*.23,.05+i*.08,0,.55,.18,.4,item.resource==='wood'?0xba8852:item.resource==='brick'?0xbc705c:0x799ba8,.03);}
  else if(item.weapon){const blaster=ground?makeGroundBlaster(item.id):makeBlaster(item.id),pose=GROUND_DISPLAY[item.id];blaster.rotation.set(pose.pitch,pose.yaw,0);blaster.scale.setScalar(pose.scale);blaster.position.y=pose.lift;g.add(blaster);g.userData.display=pose;}
  else if(item.ammoType){

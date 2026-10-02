@@ -10,6 +10,7 @@ import {rewardFrame} from '../../src/rewards.js';
 import {visibleMarkers} from '../../src/team-markers.js';
 import {isTeamRoyale} from '../../src/teams.js';
 import {acceptsContestants,isWarmup,MAX_HUMANS,MAX_SPECTATORS} from '../../src/royale-phases.js';
+import {publicWindow} from '../../src/season-one.js';
 import {PUBLIC_ROYALE,publicRoyaleOptions} from '../../src/public-royale.js';
 import {MatchCapacity,busyMessage} from './capacity.js';
 const address=new RegExp('^yolk-yard-v'+VERSION+'-([A-Z2-9]{8})$');
@@ -36,7 +37,8 @@ export class MatchAuthority{
   const spectators=players.filter(p=>!p.bot&&p.lateSpectator&&p.connected!==false).length;
   const countdownSeconds=warmup?Math.max(0,Math.ceil(sim.queueEnds-sim.time)):0;
   const estimatedSeconds=results?Math.max(0,Math.ceil((room.restartAt??room.age+PUBLIC_ROYALE.restartSeconds)-room.age)):Math.max(0,Math.ceil((sim.stormSteps.at(-1)?.end||600)+20-(warmup?0:sim.elapsed)))+countdownSeconds;
-  return {code:room.code,version:VERSION,round:sim.round,matchId:sim.matchId,stage:sim.stage,phase:sim.phase,capacity:sim.options.capacity,difficulty:sim.options.difficulty,humanPlayers,spectators,botPlayers:players.filter(p=>p.bot&&p.contestant).length,alive:warmup?sim.options.capacity:sim.alive,joinable:warmup,countdownSeconds,estimatedSeconds,restartSeconds:results?estimatedSeconds:0,availableSeats:Math.max(0,sim.options.capacity-this.capacity.humans(room)-this.capacity.pending(room.key)),availableSpectators:Math.max(0,MAX_SPECTATORS-this.capacity.spectators(room)-this.capacity.pending(room.key,true))};
+  const availability=publicWindow(this.now?.()??Date.now());
+  return {availability,code:room.code,version:VERSION,round:sim.round,matchId:sim.matchId,stage:sim.stage,phase:sim.phase,capacity:sim.options.capacity,difficulty:sim.options.difficulty,humanPlayers,spectators,botPlayers:players.filter(p=>p.bot&&p.contestant).length,alive:warmup?sim.options.capacity:sim.alive,joinable:availability.open&&warmup,countdownSeconds,estimatedSeconds,restartSeconds:results?estimatedSeconds:0,availableSeats:Math.max(0,sim.options.capacity-this.capacity.humans(room)-this.capacity.pending(room.key)),availableSpectators:Math.max(0,MAX_SPECTATORS-this.capacity.spectators(room)-this.capacity.pending(room.key,true))};
  }
  create(peer,m){
   this.send(peer,{type:'authority-error',reason:'Custom matches run on the player host. The recurring public Royale is the only server-run match; join it from Play.'});
@@ -48,6 +50,7 @@ export class MatchAuthority{
   if(m.type==='hello'){
    const reject=reason=>this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason}});
    if(m.version!==VERSION||room.kicked.has(peer.progressId))return reject('Refresh the game or choose another room.'),true;
+   if(room.recurring&&!publicWindow(this.now?.()??Date.now()).open)return reject('Public Royale opens 7 AM – 7 PM Eastern. Private matches are always available.'),true;
    const profile=safeProfile(m.profile);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
    const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission||room.recurring&&!admission)return reject('Party reservation expired. Join the public match from Play.'),true;
    room.sim.advanceWarmupClock?.();
@@ -159,7 +162,7 @@ export class MatchAuthority{
    if(room.recurring&&room.sim.phase==='results'){room.restartAt??=room.age+PUBLIC_ROYALE.restartSeconds;if(room.age>=room.restartAt)this.restartPublicRoom(room);}
    recordTiming(room,timingPhase(room.sim),'gapMaxMs',elapsed*1000);
   }
-  while(this.accumulator+1e-8>=1/60&&steps++<6){this.accumulator=Math.max(0,this.accumulator-1/60);for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;const phase=timingPhase(room.sim),start=startTiming();if(room.recurring&&isWarmup(room.sim.stage)&&![...room.members.values()].some(p=>p.ws)){room.sim.time+=1/60;room.sim.advanceWarmupClock();room.sim.prepareBattleWorld();}else room.sim.tick(1/60);const cost=finishTiming(start);recordTiming(room,phase==='spawn'&&timingPhase(room.sim)==='bus'?'departure':phase,'stepMaxMs',cost.wallMs,cost.cpuMs);}
+  while(this.accumulator+1e-8>=1/60&&steps++<6){this.accumulator=Math.max(0,this.accumulator-1/60);for(const room of this.rooms.values()){room.age+=1/60;room.sim.recoveringTick=this.accumulator>=1/60;const phase=timingPhase(room.sim),start=startTiming();if(room.recurring&&isWarmup(room.sim.stage)&&![...room.members.values()].some(p=>p.ws)){room.sim.time+=1/60;room.sim.advanceWarmupClock();if(publicWindow(this.now?.()??Date.now()).open)room.sim.prepareBattleWorld();}else room.sim.tick(1/60);const cost=finishTiming(start);recordTiming(room,phase==='spawn'&&timingPhase(room.sim)==='bus'?'departure':phase,'stepMaxMs',cost.wallMs,cost.cpuMs);}
    if(performance.now()-sliceStarted>=4)break;
   }
   // One fresh broadcast after catch-up, never several obsolete broadcasts in a burst.

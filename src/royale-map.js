@@ -171,7 +171,10 @@ for(let i=0;i<650;i++){
  const x=(i*173.43%480)-240,z=(i*271.77%480)-240;if(yAt(x,z)<1.2||roadDistance(x,z)<1.5||!clear(x,z,2.4))continue;
  prop(i%4===0?'bush':'rock',x,z,2+i%3,1.8+i%3, i%4===0?1.2:1.6+i%3*.6,yAt(x,z),{seed:i});
 }
+// Breakwater: Observatory approach cover and distinct supply routes. Geometry,
+// destruction and navigation use the same authored props as the rest of the coast.
+for(const [x,z,kind] of [[116,-173,'crate'],[122,-172,'barrels'],[145,-127,'crate'],[150,-124,'barrels'],[87,-133,'crate'],[86,-129,'barrels']])if(clear(x,z,1.2))prop(kind,x,z,2.1,1.1,1.05);
 // Material assignments and stable IDs are shared by harvesting, destruction and rendering.
 for(const [i,b]of boxes.entries())b.objectId='world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
-export const ROYALE_MAP={id:'sunnybreak',revision:3,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Rivers, ridgelines and nine distinct districts.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,material:'brick'};
+export const ROYALE_MAP={id:'sunnybreak',revision:4,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Rivers, ridgelines and nine distinct districts.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,material:'brick'};

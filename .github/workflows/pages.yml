@@ -29,7 +29,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]')"
       - name: Verify lobby character clearance and empty public resets
         if: contains(github.event.head_commit.message, '[lobby-clearance]')
         run: |
@@ -131,17 +131,17 @@ jobs:
           path: test-results/egg-shop
           retention-days: 7
       - run: npm run test:relay
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]')"
       - run: npm run test:realtime
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]')"
       - name: Verify authoritative countdown, human-only early departure and shared Bus transition
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]')"
         run: node scripts/countdown-network-check.mjs
       - name: Verify Royale phases, spectator cutoff, falling loot and host migration
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]')"
         run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[lobby-clearance]')
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]')
         env:
           YOLK_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
         run: node scripts/relay-live-check.mjs
@@ -221,6 +221,19 @@ jobs:
         with:
           name: recurring-royale-verification
           path: test-results/recurring-royale
+          retention-days: 7
+      - name: Verify Season 1 combat, boss, inventory, schedule, movement and rendering
+        if: contains(github.event.head_commit.message, '[season-one]')
+        run: |
+          node --test tests/season-one.test.js tests/recurring-royale.test.js tests/royale-teammate-bots.test.js tests/bot-movement-speed.test.js tests/snapshot-codec.test.js tests/weapon-balance.test.js tests/hitbox.test.js tests/egg-shop.test.js
+          node scripts/weapon-balance-network-check.mjs
+          npx playwright install --with-deps chromium
+          node scripts/season-one-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[season-one]')
+        with:
+          name: season-one-checks
+          path: test-results/season-one
           retention-days: 7
       - run: npm run build
       - uses: actions/upload-artifact@v4
@@ -508,4 +521,28 @@ jobs:
         with:
           name: lobby-clearance-live
           path: test-results/lobby-clearance
+          retention-days: 7
+
+  verify-season-one-live:
+    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[season-one]') }}
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/recurring-royale-live-check.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/season-one-browser-check.mjs
+        env:
+          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: season-one-live
+          path: test-results/season-one
           retention-days: 7

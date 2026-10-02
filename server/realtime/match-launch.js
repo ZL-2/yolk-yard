@@ -2,6 +2,7 @@ import {randomUUID,randomInt} from 'node:crypto';
 import {VERSION} from '../../src/data.js';
 import {matchOptions} from '../../src/match-options.js';
 import {acceptsContestants,MAX_HUMANS,MAX_SPECTATORS} from '../../src/royale-phases.js';
+import {publicWindow} from '../../src/season-one.js';
 import {PUBLIC_ROYALE} from '../../src/public-royale.js';
 const address=code=>`yolk-yard-v${VERSION}-${code}`;
 const newCode=()=>Array.from({length:8},()=> 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[randomInt(32)]).join('');
@@ -35,6 +36,7 @@ export function queueMatch(service,u,m){
 function queuePublicRoyale(service,u,m){
  const p=service.parties.get(u.party),authority=service.relay.authority,room=authority?.publicRoom;
  if(!room)throw Error('The recurring public match is reconnecting. Try again shortly or create a private match.');
+ if(!publicWindow(authority.now?.()??Date.now()).open)throw Error('Public Royale opens 7 AM – 7 PM Eastern. Create a private match any time.');
  room.sim.advanceWarmupClock();
  const capacity=authority.capacity,spectator=!!m.spectate||!acceptsContestants(room.sim.stage)||room.sim.phase!=='playing';
  const free=spectator?MAX_SPECTATORS-capacity.spectators(room)-capacity.pending(room.key,true):MAX_HUMANS-capacity.humans(room)-capacity.pending(room.key);
@@ -52,6 +54,7 @@ export function spectateFriend(service,u,m){
  const friend=service.users.get(m.id),location=service.matchLocation(friend);
  if(!location||friend.spectateLaunch)throw Error('Your friend is no longer in a match.');
  const room=location.room,capacity=service.relay.authority?.capacity,key=location.key;
+ if(room?.recurring&&!publicWindow(service.relay.authority.now?.()??Date.now()).open)throw Error('Public Royale is closed until 7 AM Eastern.');
  if(room&&capacity){const plan=room.recurring?{ok:capacity.spectators(room)+capacity.pending(key,true)<MAX_SPECTATORS,reason:'The public spectator seats are full. Try again shortly.'}:capacity.plan(room.sim.options,{key,humans:capacity.humans(room)+capacity.pending(key),spectators:capacity.spectators(room)+capacity.pending(key,true)+1,botLimit:room.sim.botLimit});if(!plan.ok)throw Error(plan.reason);}
  const id=randomUUID(),token=randomUUID(),launch={id,code:location.listing.code,host:false,hostRun:!room,spectator:true,watchId:location.watchId,ticket:token};
  const t={token,party:u.party,reservationId:id,member:u.id,friend:m.id,code:launch.code,spectator:true,watchId:launch.watchId,hostRun:!room,teamSize:location.listing.teamSize||1,partySize:1,expires:Date.now()+90000};

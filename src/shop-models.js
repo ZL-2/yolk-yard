@@ -1,57 +1,26 @@
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
 import {shopItem} from './shop-catalog.js';
-function part(group,geometry,color,x=0,y=0,z=0,glow=false){
- const material=new THREE.MeshStandardMaterial({color,metalness:.35,roughness:.38,...(glow?{emissive:color,emissiveIntensity:.3}:{})});
- const mesh=new THREE.Mesh(geometry,material);mesh.userData.ownedMaterial=true;mesh.position.set(x,y,z);group.add(mesh);return mesh;
-}
-const box=(g,c,x,y,z,w,h,d)=>part(g,new THREE.BoxGeometry(w,h,d),c,x,y,z);
-const orb=(g,c,x,y,z,r)=>part(g,new THREE.IcosahedronGeometry(r,1),c,x,y,z);
-const ring=(g,c,x,y,z,r,t=.035)=>part(g,new THREE.TorusGeometry(r,t,8,32),c,x,y,z);
-export function applyWrap(group,id){
- const item=shopItem(id);if(item?.slot!=='wrap')return group;let n=0;
- group.traverse(mesh=>{if(!mesh.isMesh||!mesh.material?.color||mesh.material.transparent||mesh===group.userData.lens)return;
-  const material=mesh.material.clone();material.color.set(n++%3?item.color:item.accent);material.metalness=item.tier==='legendary'?.8:.4;
-  if(item.set==='neon'||item.set==='starbound'){material.emissive?.set(item.accent);material.emissiveIntensity=n%3===0?.25:0;}
-  mesh.material=material;mesh.userData.ownedMaterial=true;
- });return group;
-}
-export function makeShopPickaxe(id){
- const item=shopItem(id),g=new THREE.Group();if(item?.slot!=='pickaxe')return g;
- const c=item.color,a=item.accent,k=item.shape%6;
- part(g,new THREE.CylinderGeometry(.045,.065,1.25,12),c,0,.05,0);for(let j=0;j<5;j++)ring(g,a,0,-.39+j*.065,0,.063,.012).rotation.x=Math.PI/2;
- if(k===0){const crescent=part(g,new THREE.TorusGeometry(.38,.095,8,28,Math.PI*1.45),a,0,.6,0);crescent.rotation.z=-.7;orb(g,c,0,.6,0,.12);}
- if(k===1){box(g,c,0,.65,0,.58,.22,.24);for(let j=-1;j<=1;j++)part(g,new THREE.ConeGeometry(.085,.29,8),a,j*.22,.87,0);orb(g,a,0,.65,-.16,.09);}
- if(k===2){const blade=part(g,new THREE.ConeGeometry(.12,.75,4),a,.18,.8,0);blade.rotation.z=-.8;box(g,c,0,.62,0,.38,.15,.18);}
- if(k===3){const crystal=part(g,new THREE.OctahedronGeometry(.35),a,0,.69,0,true);crystal.scale.set(1.6,.9,.6);box(g,c,0,.7,0,.2,.28,.27);}
- if(k===4){box(g,c,0,.7,0,.64,.24,.28);for(const x of [-.3,.3])box(g,a,x,.7,0,.07,.28,.32);}
- if(k===5){box(g,c,0,.65,0,.8,.22,.2);for(const x of [-.43,.43]){const hook=part(g,new THREE.ConeGeometry(.15,.38,10),a,x,.52,0);hook.rotation.z=Math.sign(x)*2.35;}}
- g.name=item.name;return g;
-}
-export function makeShopBack(id){
- const item=shopItem(id),g=new THREE.Group();if(item?.slot!=='backbling')return g;
- const c=item.color,a=item.accent,k=item.shape%6;
- box(g,c,0,0,0,.46,.58,.22);
- if(k===0){for(const x of [-.25,.25]){part(g,new THREE.CylinderGeometry(.11,.11,.5,12),a,x,0,0);part(g,new THREE.ConeGeometry(.095,.2,12),a,x,-.34,0,true).rotation.z=Math.PI;}orb(g,a,0,.1,.17,.12);}
- if(k===1){const plate=part(g,new THREE.CylinderGeometry(.32,.24,.09,6),a,0,0,.17);plate.rotation.x=Math.PI/2;orb(g,c,0,0,.25,.12);}
- if(k===2){ring(g,a,0,0,.19,.2);orb(g,a,0,0,.21,.14);for(let j=0;j<3;j++)box(g,a,0,-.19+j*.15,.16,.38,.035,.045);}
- if(k===3){for(let j=0;j<5;j++){const crystal=part(g,new THREE.OctahedronGeometry(.18),a,(j-2)*.11,.1+Math.sin(j)*.12,.17,true);crystal.scale.y=1.8;}}
- if(k===4){for(let j=0;j<3;j++){part(g,new THREE.CylinderGeometry(.018,.018,.45,6),a,(j-1)*.14,.4,0);box(g,a,(j-1)*.14,.03,.14,.08,.26,.08);}}
- if(k===5){const shell=part(g,new THREE.SphereGeometry(.3,16,10),a,0,0,.1);shell.scale.set(1,1.1,.5);for(let j=-2;j<=2;j++)box(g,c,j*.09,0,.25,.025,.4,.035);}
- return g;
-}
-export function makeShopGlider(id){
- const item=shopItem(id),g=new THREE.Group();if(item?.slot!=='glider')return g;
- const c=item.color,a=item.accent,k=item.shape%4;
- if(k===0){const sail=part(g,new THREE.ConeGeometry(2.05,.75,12,1,true),c,0,3.2,0);sail.material.side=THREE.DoubleSide;ring(g,a,0,2.84,0,2.05,.045).rotation.x=Math.PI/2;}
- if(k===1){for(const side of [-1,1])for(let j=0;j<4;j++){const wing=box(g,j%2?c:a,side*(.7+j*.4),3-j*.09,.15+j*.12,.75,.13,1.6-j*.22);wing.rotation.z=side*.17;}orb(g,a,0,3,0,.28);}
- if(k===2){const kite=part(g,new THREE.OctahedronGeometry(1.8,0),c,0,3,0);kite.scale.set(1.25,.08,.8);box(g,a,0,3.12,0,3.5,.055,.07);}
- if(k===3){const dome=part(g,new THREE.SphereGeometry(1.9,16,8,0,Math.PI*2,0,Math.PI/2),c,0,2.8,0);dome.scale.y=.4;dome.material.side=THREE.DoubleSide;for(const side of [-1,1])box(g,a,side*1.4,3,.0,.25,.2,2);}
- for(const x of [-1.3,1.3])for(const z of [-.4,.4]){const top=new THREE.Vector3(x,2.8,z),end=new THREE.Vector3(Math.sign(x)*.33,1.93,-.06),delta=top.clone().sub(end),mid=top.clone().add(end).multiplyScalar(.5);const wire=part(g,new THREE.CylinderGeometry(.012,.012,delta.length(),6),a,...mid.toArray());wire.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());}
- for(const x of [-.33,.33])box(g,'#162b36',x,1.93,-.06,.11,.075,.14);
- return g;
-}
-export function makeShopTrail(id){
- const item=shopItem(id),g=new THREE.Group();if(item?.slot!=='trail')return g;
- for(const x of [-.5,.5]){const mesh=part(g,new THREE.ConeGeometry(.11,2.5,8),item.accent,x,1.8,.25,true);mesh.material.transparent=true;mesh.material.opacity=.6;mesh.material.depthWrite=false;}
- return g;
-}
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+function part(g,geometry,color,x=0,y=0,z=0){g.userData.materials??=new Map();let material=g.userData.materials.get(color);if(!material){material=new THREE.MeshStandardMaterial({color,metalness:.22,roughness:.7});g.userData.materials.set(color,material);}const m=new THREE.Mesh(geometry,material);m.userData.ownedMaterial=true;m.position.set(x,y,z);g.add(m);return m;}
+function finish(g){g.updateMatrixWorld(true);const parts=[];for(const m of [...g.children]){if(!m.isMesh)continue;const geo=m.geometry.index?m.geometry.toNonIndexed():m.geometry.clone();geo.applyMatrix4(m.matrix);const color=m.material.color,array=new Float32Array(geo.attributes.position.count*3);for(let n=0;n<array.length;n+=3){array[n]=color.r;array[n+1]=color.g;array[n+2]=color.b;}geo.setAttribute('color',new THREE.BufferAttribute(array,3));parts.push(geo);m.geometry.dispose();g.remove(m);}if(parts.length){const geo=mergeGeometries(parts);parts.forEach(p=>p.dispose());for(const m of g.userData.materials?.values()||[])m.dispose();delete g.userData.materials;const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,metalness:.18,side:THREE.DoubleSide}));m.userData.ownedMaterial=true;g.add(m);}return g;}
+const box=(g,c,x,y,z,w,h,d)=>part(g,new RoundedBoxGeometry(w,h,d,1,Math.min(w,h,d)*.18),c,x,y,z);
+const tube=(g,c,a,b,r=.018)=>{const d=new THREE.Vector3(...b).sub(new THREE.Vector3(...a)),m=part(g,new THREE.CylinderGeometry(r,r,d.length(),6),c,...a.map((v,i)=>(v+b[i])/2));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());return m;};
+export function applyWrap(g,id){const item=shopItem(id);if(item?.slot!=='wrap')return g;let n=0;g.traverse(m=>{if(!m.isMesh||!m.material?.color||m.material.transparent||m===g.userData.lens)return;const material=m.material.clone(),base=new THREE.Color(item.color);material.color.copy(n++%6===0?new THREE.Color(item.accent).lerp(base,.4):base.multiplyScalar(.72+(n%4)*.09));material.metalness=.28;material.roughness=.65;material.emissiveIntensity=0;m.material=material;m.userData.ownedMaterial=true;});return g;}
+export function makeShopPickaxe(id){const i=shopItem(id),g=new THREE.Group();if(i?.slot!=='pickaxe')return g;const k=i.shape%6,c=i.color,a=i.accent,steel='#98a7a8';tube(g,c,[0,-.62,0],[0,.7,0],.047);for(let j=0;j<6;j++)box(g,'#18262c',0,-.4+j*.06,0,.1,.025,.1);box(g,a,0,.47,0,.12,.09,.12);
+ if(k===0||k===4){box(g,steel,.21,.69,0,.5,.25,.075);const edge=box(g,steel,.45,.62,0,.17,.39,.048);edge.rotation.z=-.3;box(g,c,-.12,.7,0,.2,.18,.15);}
+ if(k===1||k===3){box(g,c,0,.73,0,.63,.26,.25);for(const s of [-1,1])box(g,steel,s*.31,.73,0,.065,.3,.29);if(k===3)tube(g,steel,[-.35,.73,0],[-.5,.48,0],.045);}
+ if(k===2){tube(g,steel,[-.37,.58,0],[.4,.76,0],.055);tube(g,steel,[.4,.76,0],[.46,.54,0],.04);}
+ if(k===5){box(g,steel,0,.82,0,.38,.39,.08);box(g,c,0,.69,-.05,.16,.26,.055);}
+ g.name=i.name;return finish(g);}
+export function makeShopBack(id){const i=shopItem(id),g=new THREE.Group();if(i?.slot!=='backbling')return g;const c=i.color,a=i.accent,k=i.shape%6;box(g,c,0,0,0,.4,.55,.2);for(const s of [-1,1]){box(g,'#202e32',s*.17,0,-.13,.06,.57,.06);box(g,c,s*.23,-.12,.01,.13,.25,.18);}for(let j=0;j<4;j++)box(g,'#283a3d',0,-.17+j*.1,.12,.34,.022,.026);box(g,a,0,.21,.115,.16,.05,.04);
+ if(k===0||k===2){tube(g,'#29373b',[.15,.25,0],[.15,.78,0],.014);box(g,'#19282d',-.05,.1,.14,.22,.14,.07);box(g,'#5fb9b0',-.05,.12,.18,.12,.065,.008);for(let j=0;j<3;j++)box(g,a,-.12+j*.07,.04,.18,.025,.022,.009);}
+ if(k===1){box(g,'#cfbaa0',0,-.06,.18,.27,.31,.13);box(g,a,0,-.03,.25,.18,.05,.014);box(g,a,0,-.03,.25,.05,.18,.014);}
+ if(k===3||k===5){for(const s of [-1,1]){part(g,new THREE.CylinderGeometry(.085,.085,.44,10),k===5?'#849598':a,s*.12,.02,.19);box(g,'#25363a',s*.12,.19,.2,.17,.05,.15);}tube(g,'#182b31',[-.12,.27,.18],[.17,.43,0],.022);}
+ if(k===4){box(g,'#25343a',0,0,.18,.31,.22,.09);for(const s of [-1,1]){tube(g,'#3a4e52',[0,.05,.19],[s*.35,.15,.18],.028);box(g,a,s*.34,.15,.18,.24,.028,.12);}}
+ return finish(g);}
+export function makeShopGlider(id){const i=shopItem(id),g=new THREE.Group();if(i?.slot!=='glider')return g;const c=i.color,a=i.accent,k=i.shape%3;
+ if(k!==2){for(let j=0;j<9;j++){const x=(j-4)*.46,curve=3.25-.1*(j-4)**2;const panel=part(g,new THREE.SphereGeometry(1,10,7,0,Math.PI*2,0,Math.PI*.64),j%3===0?a:c,x,curve,0);panel.scale.set(.26,.24,1.15);panel.material.side=THREE.DoubleSide;for(const z of [-.85,.85])tube(g,'#c3d0c3',[x,curve-.12,z],[Math.sign(x)*.33,1.93,-.06],.009);}box(g,'#20343c',0,2.5,0,.5,.18,.8);}
+ else{for(const s of [-1,1]){const wing=box(g,c,s*1.03,2.94,0,2.2,.1,1.6);wing.rotation.z=-s*.09;wing.rotation.y=s*.16;box(g,a,s*1.65,2.9,.35,.42,.08,1.1);tube(g,'#c3d0c3',[s*1.4,2.95,-.4],[s*.33,1.93,-.06],.014);}box(g,'#243b46',0,2.97,0,.48,.3,2.1);}
+ for(const s of [-1,1])box(g,'#182d36',s*.33,1.93,-.06,.12,.08,.15);return finish(g);}
+export function makeShopTrail(id){const i=shopItem(id),g=new THREE.Group();if(i?.slot!=='trail')return g;for(const side of [-1,1])for(let strand=0;strand<2;strand++){const points=Array.from({length:7},(_,j)=>new THREE.Vector3(side*(.45+j*.04)+Math.sin(j*.7+strand)*.05,1.3+j*.52,.25+Math.sin(j*.8)*.09));const m=part(g,new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),12,.022+strand*.014,4,false),strand?i.color:i.accent);m.material=m.material.clone();m.material.transparent=true;m.material.opacity=strand?.19:.44;m.material.depthWrite=false;m.userData.ownedMaterial=true;}return g;}

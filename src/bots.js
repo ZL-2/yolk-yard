@@ -47,7 +47,7 @@ export function botInput(sim,p){
  if(p.use){brain.utility=null;if(visible||now-(brain.attackedAt??-100)<.6)sim.cancelUse?.(p);else return {yaw:p.yaw,pitch:p.pitch,slot:p.use.slot,forward:0,strafe:0,swapSlot:-1};}
  if(now>=brain.decision||!brain.task||brain.weapon!==w.id){
   brain.weapon=w.id;brain.decision=now+Math.max(!p.inventory&&target?ARENA_BOT_COMBAT.decisionMinimum:0,skill.decision*(.85+r()*.3));brain.task=chooseObjective(sim,p,brain,skill,target);brain.objective=brain.task.kind;
-  if(brain.task.kind==='fight'&&target){if(p.inventory||now>=(brain.sideUntil||0)){brain.side=r()<.5?-1:1;brain.sideUntil=now+ARENA_BOT_COMBAT.sideHoldMin+r()*ARENA_BOT_COMBAT.sideHoldExtra;}brain.task.goal=combatGoal(sim,p,brain,target,w,skill);const mate=squadAnchor(sim,p,brain);if(mate&&dist(brain.task.goal,mate)>teamPolicy.combatLeash)brain.task.goal=followGoal(sim,p,mate);}
+  if(brain.task.kind==='fight'&&target){if(now>=(brain.sideUntil||0)){brain.side=r()<.5?-1:1;brain.sideUntil=now+ARENA_BOT_COMBAT.sideHoldMin+r()*ARENA_BOT_COMBAT.sideHoldExtra;}brain.task.goal=combatGoal(sim,p,brain,target,w,skill);const mate=squadAnchor(sim,p,brain);if(mate&&dist(brain.task.goal,mate)>teamPolicy.combatLeash)brain.task.goal=followGoal(sim,p,mate);}
  }
  if(brain.task.kind==='follow'){const mate=squadAnchor(sim,p,brain);if(mate)brain.task.goal=followGoal(sim,p,mate);else brain.decision=0;}
  if(visible){if(now-(brain.lastVisibleAt??-100)>skill.perception*2)brain.aimAt=Math.max(brain.aimAt,now+skill.reaction*.6);brain.lastVisibleAt=now;}
@@ -83,7 +83,7 @@ export function botInput(sim,p){
   pitch=Math.atan2(target.y+(brain.height??1.22)*bodyHeight(target)/1.85-p.y-eyeHeight(p),Math.hypot(tx,tz))+(brain.errorY||0);
   fire=!(p.inventory&&slot===0)&&now>=brain.aimAt&&now<brain.burstUntil&&distance<(w.flightRange??w.range)*.95&&(!w.projectile||distance>7);
   if(task.kind==='rotate'&&task.urgent&&distance>12)fire=false;
-  if(p.inventory&&now-(brain.attackedAt??-100)<1.5&&now>(brain.buildAt||0)&&r()<skill.build*.12){
+  if(sim.options.building!==false&&p.inventory&&now-(brain.attackedAt??-100)<1.5&&now>(brain.buildAt||0)&&r()<skill.build*.12){
    const material=['wood','brick','metal'].find(m=>p.materials[m]>=10);brain.buildAt=now+3+(4-sim.options.difficulty)*1.8;
    if(material&&p.grounded)return {yaw:Math.atan2(p.x-target.x,p.z-target.z),pitch:0,slot,buildMode:true,buildType:p.health<skill.retreat||distance<16?'wall':'stairs',buildMaterial:material,fire:true,forward:0,strafe:0};
   }
@@ -95,7 +95,7 @@ export function botInput(sim,p){
  if(brain.utility&&brain.utility.until>now&&['popper','impulse','launchpad'].includes(p.inventory?.[brain.utility.slot]?.id)&&!p.use){slot=brain.utility.slot;yaw=brain.utility.yaw;pitch=brain.utility.pitch;fire=!p.useLatch;}
  const turnDt=clamp(now-brain.turnAt,0,.1);brain.turnAt=now;
  const arenaCombat=!p.inventory&&visible;
- const turn=arenaCombat?Math.min(skill.turn,ARENA_BOT_COMBAT.turnRate):skill.turn;
+ const turn=arenaCombat?Math.min(skill.turn,ARENA_BOT_COMBAT.turnRate):Math.min(skill.turn,2.7);
  const desiredYaw=yaw;yaw=p.yaw+clamp(wrapAngle(yaw-p.yaw),-turn*turnDt,turn*turnDt);
  if(arenaCombat)pitch=p.pitch+clamp(pitch-p.pitch,-ARENA_BOT_COMBAT.pitchRate*turnDt,ARENA_BOT_COMBAT.pitchRate*turnDt);
  if(visible&&Math.abs(wrapAngle(desiredYaw-yaw))>.2)fire=false;

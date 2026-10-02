@@ -27,6 +27,7 @@ async function leave(u,g){clearInterval(g.clock);g.net.destroy();await u.ask('re
 try{
  let health,published;const end=Date.now()+360000;
  while(true){try{[health,published]=await Promise.all([get(base+'/health'),get(front+'/version.json')]);if(health.build===published.build&&(!expected||health.build===expected)&&health.gameVersion===VERSION&&published.appVersion===version&&health.deployment?.updating===false&&health.socialAvailable)break;}catch{}assert.ok(Date.now()<end,'Game and relay did not finish publishing');await delay(2000);}
+ assert.ok(health.features.includes('season-one-breakwater'));assert.ok(health.features.includes('kestrel-jump-rig'));assert.equal(health.publicMatch.availability.timezone,'America/New_York');const history=await get(front+'/release-history.json?t='+Date.now());assert.equal(history.build,published.build);assert.equal(history.releases[0].number,published.release);const art=await fetch(front+'/season/breakwater.webp');assert.ok(art.ok);assert.ok((await art.arrayBuffer()).byteLength>100000);
  assert.deepEqual(health.serverModes,['royale']);assert.deepEqual(health.privateModes,['ffa','royale']);assert.equal(health.customMatches,'private-host');assert.equal(health.capacity.rooms,1);
  const tag=Date.now().toString(36).slice(-5),a=await user('QA Host '+tag),b=await user('QA Code '+tag);await wait(()=>a.publicMatch,'Live public match card data');assert.equal(a.publicMatch.capacity,48);assert.equal(a.publicMatch.difficulty,2);assert.equal(a.publicMatch.code,PUBLIC_ROYALE.code);
  for(const [mode,teamSize]of [['ffa',1],['royale',1],['royale',2],['royale',4]]){
@@ -37,10 +38,12 @@ try{
  await assert.rejects(a.ask('select',{mode:'teams'}),/Choose Free/);
  // Join during warmup when enough time remains to leave before departure.
  // A running round is observed without changing other players' gameplay.
- const status=(await get(base+'/public-match')).match,join=status.joinable&&status.countdownSeconds>12;
+ const status=(await get(base+'/public-match')).match,closed=status.availability?.open===false,join=status.joinable&&status.countdownSeconds>12;
+ if(closed)await assert.rejects(a.ask('queue',{publicRoyale:true}),/7 AM/);else {
  await a.ask('queue',{publicRoyale:true,spectate:!join});const publicGame=await launch(a);assert.equal(publicGame.net.serverAuthority,true);assert.equal(publicGame.net.isHost,false);assert.equal(publicGame.state.options.recurring,true);assert.equal(publicGame.state.options.difficulty,2);assert.equal(publicGame.state.options.capacity,48);
  const me=publicGame.state.players.find(p=>p.id===publicGame.net.id);assert.ok(me);if(!join)assert.equal(me.spectating,true);
  assert.equal(publicGame.state.players.filter(p=>p.contestant).length,48);publicGame.net.authorityCommand({type:'configure',options:{mode:'ffa',bots:0}});publicGame.net.authorityCommand({type:'visibility',value:'private'});await delay(200);assert.equal(publicGame.state.options.mode,'royale');assert.equal(publicGame.state.visibility,'public');
- await leave(a,publicGame);const after=await get(base+'/health');assert.equal(after.capacity.rooms,1);assert.equal(after.publicMatch.capacity,48);assert.deepEqual(errors,[]);
- console.log(JSON.stringify({result:'PASS',build:health.build,version,qualityUpdate:published.release,protocol:VERSION,serverRooms:1,capacity:48,difficulty:'Intermediate',publicAdmission:join?'Join':'Spectate',lobbySummary:true,manualPrivateModes:['Free For All','Solo','Duos','Squads'],teamScrambleRemoved:true}));
+ await leave(a,publicGame);}
+ const after=await get(base+'/health');assert.equal(after.capacity.rooms,1);assert.equal(after.publicMatch.capacity,48);assert.deepEqual(errors,[]);
+ console.log(JSON.stringify({result:'PASS',build:health.build,version,qualityUpdate:published.release,protocol:VERSION,serverRooms:1,capacity:48,difficulty:'Intermediate',publicAdmission:closed?'Closed by Eastern schedule':join?'Join':'Spectate',lobbySummary:true,manualPrivateModes:['Free For All','Solo','Duos','Squads'],teamScrambleRemoved:true}));
 }finally{for(const g of games){clearInterval(g.clock);g.net.destroy();}for(const u of users){if(u.party&&u.ws.readyState===1)await u.ask('returned').catch(()=>{});u.ws.close();}}

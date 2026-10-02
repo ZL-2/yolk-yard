@@ -4,23 +4,27 @@ export const RARITIES=[
  {name:'Common',color:'#b8c5cb',}, {name:'Uncommon',color:'#71d996',},
  {name:'Rare',color:'#60b6ff',},{name:'Epic',color:'#c58bff',},{name:'Legendary',color:'#ffcc67',},
 ].map((r,i)=>({...r,mult:RARITY_SCALE[i].damage}));
+RARITIES.push({name:'Mythic',color:'#ffd46b',mult:1});
 export const AMMO_CAPS=Object.fromEntries(Object.entries(AMMO_RULES).map(([id,r])=>[id,r.cap]));
 export const ammoType=ammoTypeFor;
 export const ROYALE_GUN_IDS=['sprinter','scatter','needle','zipper','thumper','anchor','duet','pip','peeper','doubleyolk','comet'];
 export const ITEMS={
+ jumpRig:{name:'Kestrel Jump Rig',kind:'jumpRig',duration:.16,stack:1,color:'#ffd46b',icon:'↟'},
+ smoke:{name:'Smoke Canister',kind:'smoke',duration:.4,stack:3,color:'#c5d0cc',icon:'◌'},
+ scanner:{name:'Recon Pulse',kind:'scanner',duration:1.2,stack:2,color:'#5cd9d0',icon:'◎'},
  bandage:{name:'Field Dressing',kind:'heal',amount:25,cap:75,duration:2.5,stack:5,color:'#f4f4dd',icon:'✚'},
  medkit:{name:'Trauma Kit',kind:'heal',amount:100,cap:100,duration:6,stack:2,color:'#8be4b7',icon:'✚'},
  mini:{name:'Mini Shield',kind:'shield',amount:25,cap:50,duration:2,stack:6,color:'#65bdfa',icon:'◈'},
  flask:{name:'Shield Flask',kind:'shield',amount:50,cap:100,duration:4,stack:3,color:'#81a5ff',icon:'◈'},
  splash:{name:'Restoration Capsule',kind:'splash',amount:30,duration:.55,stack:4,color:'#74ebd9',icon:'✦'},
- popper:{name:'Popper',kind:'popper',duration:UTILITY_WEAPONS.popper.useTime,stack:6,color:'#c091ef',icon:'●'},
+ popper:{name:'Frag Grenade',kind:'popper',duration:UTILITY_WEAPONS.popper.useTime,stack:6,color:'#c091ef',icon:'●'},
  impulse:{name:'Impulse Charge',kind:'impulse',duration:.35,stack:3,color:'#ec9fff',icon:'◎'},
  launchpad:{name:'Launch Pad',kind:'launchpad',duration:.6,stack:2,color:'#f9ca65',icon:'↟'},
 };
-export const itemInfo=item=>!item?{name:'Empty slot',color:'#7c8a98',icon:''}:item.pickaxe?{name:'Pickaxe',color:'#7aaddb',icon:''}:item.weapon?{...weapon(item.id),color:RARITIES[item.rarity||0].color,icon:'',name:weapon(item.id).name}:ITEMS[item.id]||{name:item.id,color:'#d6caa5',icon:'▥'};
+export const itemInfo=item=>!item?{name:'Empty slot',color:'#7c8a98',icon:''}:item.pickaxe?{name:'Pickaxe',color:'#7aaddb',icon:''}:item.weapon?{...weapon(item.id),color:(RARITIES[item.rarity||0]||{color:'#ffd46b'}).color,icon:'',name:weapon(item.id).name}:ITEMS[item.id]||{name:item.id,color:'#d6caa5',icon:'▥'};
 // 32 contestants / 512 m island. Opening loot time grows; later stages tighten.
 export const STORM_STEPS=[
- {radius:225,wait:105,close:65,dps:1},{radius:160,wait:35,close:50,dps:2},
+ {radius:225,wait:115,close:65,dps:1},{radius:160,wait:35,close:50,dps:2},
  {radius:108,wait:25,close:40,dps:3},{radius:68,wait:20,close:30,dps:5},
  {radius:40,wait:15,close:25,dps:7},{radius:20,wait:12,close:20,dps:9},
  {radius:7,wait:8,close:18,dps:12},{radius:0,wait:5,close:18,dps:20},

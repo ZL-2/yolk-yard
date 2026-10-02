@@ -712,7 +712,7 @@ export class View {
     // Reduce GPU work when rendering itself delays input and socket processing.
     this.frameAverage=(this.frameAverage||1/60)*.9+dt*.1;
     this.budgetClock=(this.budgetClock||0)+dt;
-    if(this.budgetClock>.75){
+    if(this.budgetClock>1.5){
       this.budgetClock=0;const previous=this.renderScale||1;
       if(this.frameAverage>1/32){this.renderScale=Math.max(.5,previous-.15);this.renderer.shadowMap.enabled=false;}
       else if(this.frameAverage<1/55)this.renderScale=Math.min(1,previous+.05);
@@ -721,7 +721,7 @@ export class View {
     this.clock += dt;
     this.recoil = Math.max(0, this.recoil - dt * (local?gun(local).recoilRecovery:7));
     if(playing)this.loadMap(state?.options.map || "yard");
-    if(playing&&state?.royale?.practice)this.prepareBattleMap();
+    if(playing&&state?.royale?.practice&&!state.options.training)this.prepareBattleMap();
     this.world.visible=playing;
     if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x6f9295;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(sky,playing?(map.theme==='royale'?330:72):35,playing?(map.theme==='royale'?1000:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
@@ -829,7 +829,7 @@ export class View {
         this.gunGroup.rotation.z+=local.sprinting?.35:0;
         if(local.use){this.gunGroup.position.y+=.08+Math.sin(this.clock*8)*.015;this.gunGroup.rotation.x=-.3;}
         if(p.flight==='transport'){
-          this.camera.position.set(p.x+Math.sin(p.yaw)*24,p.y+16,p.z+Math.cos(p.yaw)*24);this.camera.lookAt(p.x,p.y+3,p.z);this.camera.fov=80;this.camera.updateProjectionMatrix();
+          this.camera.position.set(p.x+Math.sin(p.yaw)*Math.cos(p.pitch||0)*24,p.y+8-Math.sin(p.pitch||0)*20,p.z+Math.cos(p.yaw)*Math.cos(p.pitch||0)*24);this.camera.lookAt(p.x,p.y+3,p.z);this.camera.fov=80;this.camera.updateProjectionMatrix();
         }else if(p.health>0&&p.flight!=='ground'){
           this.camera.position.set(p.x+Math.sin(p.yaw)*6,p.y+3.5,p.z+Math.cos(p.yaw)*6);this.camera.rotation.set(Math.min(p.pitch,-.18),p.yaw,0,'YXZ');
         }

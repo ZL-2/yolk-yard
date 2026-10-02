@@ -1,3 +1,4 @@
+import {SEASON} from './season-one.js';
 import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon, gun } from "./data.js";
 import {groundAt,terrainHit} from './terrain.js';
@@ -151,7 +152,7 @@ function movePlayerStep(p, input, map, dt) {
     p.crouching=false;p.lowCrouch=false;p.sliding=false;p.crouchLatch=!!input.crouch;
     const toggle=input.jump&&!p.flightLatch;p.flightLatch=!!input.jump;
     const f=clamp(input.forward || 0,-1,1),s=clamp(input.strafe || 0,-1,1),length=Math.max(1,Math.hypot(f,s));
-    const speed=p.flight==='glide'?24:p.flight==='launch'?26:17;
+    const speed=SEASON.flight[p.flight];
     pushAxis(p,map,'x',(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)/length*speed*dt);
     pushAxis(p,map,'z',(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)/length*speed*dt);
     p.x=clamp(p.x,-map.size+.5,map.size-.5);p.z=clamp(p.z,-map.size+.5,map.size-.5);
@@ -162,7 +163,7 @@ function movePlayerStep(p, input, map, dt) {
       p.vy-=20*dt;
       const ceiling=worldHit(map,{x:p.x,y:p.y+HEIGHT,z:p.z},{x:0,y:1,z:0},Math.max(0,p.vy*dt));
       if(ceiling||p.vy<=0){p.flight=p.forceGlider?'glide':'ground';p.vy=Math.min(0,p.vy);}
-    }else{if(p.y-floor<=24)p.flight='glide';p.vy=p.flight==='glide'?-6:-25;}
+    }else{if(p.y-floor<=24)p.flight='glide';p.vy=p.flight==='glide'?-SEASON.flight.glideFall:-SEASON.flight.diveFall;}
     p.y+=p.vy*dt;p.grounded=false;
     if(p.y<=floor){p.y=floor;p.vy=0;p.grounded=true;p.flight='ground';p.jumpLatch=!!input.jump;}
     p.sprinting=false;if(p.inventory){p.sprintRest=(p.sprintRest||0)+dt;if(p.sprintRest>1.3)p.stamina=Math.min(100,(p.stamina??100)+18*dt);if(p.stamina>=20)p.exhausted=false;}return;
@@ -186,13 +187,15 @@ function movePlayerStep(p, input, map, dt) {
   // bounded by server freshness, so crouch edges can initiate slides under jitter.
   const momentumX=p.motionFresh?p.motionVX:p.vx,momentumZ=p.motionFresh?p.motionVZ:p.vz;
   const speedBefore=Math.hypot(momentumX||0,momentumZ||0),crouchEdge=!!input.crouch&&!p.crouchLatch;
+  const gx=p.grounded&&input.crouch?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=p.grounded&&input.crouch?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0,slope=Math.hypot(gx,gz);
+  if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&slope>=SEASON.slide.slope&&p.slideCooldown===0){p.sliding=true;p.slideAge=0;p.slideVX=-gx/slope*3;p.slideVZ=-gz/slope*3;}
   if(!p.downed&&!p.reviving&&crouchEdge&&p.grounded&&speedBefore>=5.5&&p.slideCooldown===0){
     p.sliding=true;p.slideAge=0;const boost=Math.min(9,speedBefore+.35)/Math.max(.01,speedBefore);p.slideVX=momentumX*boost;p.slideVZ=momentumZ*boost;
   }
   p.crouchLatch=!!input.crouch;
   if(p.sliding){
     p.slideAge=(p.slideAge||0)+dt;
-    if(!input.crouch||input.jump||p.downed||p.reviving||p.slideAge>=3.4||Math.hypot(p.slideVX,p.slideVZ)<2.6){p.sliding=false;p.slideCooldown=.65;}
+    if(!input.crouch||input.jump||p.downed||p.reviving||slope<SEASON.slide.slope&&(p.slideAge>=3.4||Math.hypot(p.slideVX,p.slideVZ)<2.6)){p.sliding=false;p.slideCooldown=.65;}
   }
   p.crouching=!p.downed&&(p.sliding||!!p.reviving||!!input.crouch||!canStand(map,p));
   p.lowCrouch=!!p.crouching&&!p.sliding&&!canOccupy(map,p,STANCE.crouching.height);
@@ -208,12 +211,12 @@ function movePlayerStep(p, input, map, dt) {
     let vx=p.slideVX||0,vz=p.slideVZ||0,v=Math.hypot(vx,vz);
     if(p.grounded){
       const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;
-      vx-=gx*8*dt;vz-=gz*8*dt;
-      const loss=Math.max(0,1-3.8*dt/Math.max(v,.01));vx*=loss;vz*=loss;
+      vx-=gx*SEASON.slide.gravity*dt;vz-=gz*SEASON.slide.gravity*dt;
+      const loss=Math.max(0,1-(slope>=SEASON.slide.slope?2.4:3.8)*dt/Math.max(v,.01));vx*=loss;vz*=loss;
     }
     v=Math.hypot(vx,vz);const wanted=Math.hypot(mx,mz);
     if(wanted>.1){const blend=Math.min(.055,dt*.85);vx=vx*(1-blend)+mx/wanted*v*blend;vz=vz*(1-blend)+mz/wanted*v*blend;const n=Math.hypot(vx,vz)||1;vx*=v/n;vz*=v/n;}
-    const cap=Math.min(1,10.5/(Math.hypot(vx,vz)||1));p.slideVX=mx=vx*cap;p.slideVZ=mz=vz*cap;
+    const cap=Math.min(1,SEASON.slide.cap/(Math.hypot(vx,vz)||1));p.slideVX=mx=vx*cap;p.slideVZ=mz=vz*cap;
   }else if(!p.grounded&&p.slideAge>0&&!p.downed){mx=mx*.2+(p.slideVX||0)*.8;mz=mz*.2+(p.slideVZ||0)*.8;}
   else if(p.grounded&&!p.sliding)p.slideAge=0;
   const dx=mx*dt,dz=mz*dt;

@@ -136,7 +136,7 @@ export class Simulation {
   setProfile(id, profile) {
     const p = this.players.get(id);
     if (!p) return;
-    const safe = safeProfile(profile);
+    const safe = safeProfile(profile);if(this.options.weaponPool==='precision'&&!['anchor','peeper','needle'].includes(safe.weapon))safe.weapon='anchor';if(this.options.weaponPool==='close'&&!['scatter','doubleyolk','zipper','pip'].includes(safe.weapon))safe.weapon='zipper';
     if([...this.players.values()].some(other=>other.id!==id&&!other.bot&&nameKey(other.name)===nameKey(safe.name)))return false;
     for(const other of this.players.values())if(other.id!==id&&other.bot&&nameKey(other.name)===nameKey(safe.name))other.name=this.uniqueBotName(other.name+' Bot');
     p.nextProfile = safe;
@@ -300,6 +300,7 @@ export class Simulation {
     this.emit("player-action", {player: id, action});
   }
   spawn(p) {
+    if(this.options.weaponPool==='precision'&&!['anchor','peeper','needle'].includes((p.nextProfile||p).weapon)){p.weapon='anchor';if(p.nextProfile)p.nextProfile.weapon='anchor';}if(this.options.weaponPool==='close'&&!['scatter','doubleyolk','zipper','pip'].includes((p.nextProfile||p).weapon)){p.weapon='zipper';if(p.nextProfile)p.nextProfile.weapon='zipper';}
     resetStance(p);
     resetBonuses(p);
     if (p.spectating) { p.health = 0; return; }
@@ -730,7 +731,7 @@ export class Simulation {
     this.emit("hit", {
       player: attacker?.id,
       target: victim.id,
-      amount: applied, shotId,
+      amount: applied, shotId, weapon:source,
       sourceX:attacker?.x, sourceY:attacker?.y, sourceZ:attacker?.z,
       x: victim.x, y: victim.y + 1.28, z: victim.z,
       precision,
@@ -738,6 +739,7 @@ export class Simulation {
     }
     if (victim.health > 0) return;
     attacker=this.eliminationCredit?.(victim,attacker)||attacker;
+    victim.recap={weapon:source,damage:Math.round(applied),distance:attacker?Math.round(dist(victim,attacker)):0,critical:!!precision,name:attacker?.name||source};
     victim.killerId = attacker && attacker !== victim ? attacker.id : null;
     for(const [id,time] of Object.entries(victim.damageLedger||{})){const helper=this.players.get(id);if(helper&&id!==victim.killerId&&this.time-time<12)helper.assists=(helper.assists||0)+1;}victim.damageLedger={};
     victim.deaths++;
@@ -895,7 +897,7 @@ export class Simulation {
       "poppers",
       "shieldUntil",
       "respawnAt",
-      "killerId",
+      "killerId", "recap", "boss", "maxHealth", "maxShield",
       "spectating",
       "awaitingEntry",
       "spawnRequested",

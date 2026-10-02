@@ -91,6 +91,10 @@ export class RoyaleView{
   const {block,ball,cylinder,rounded,beam}=artKit(this.kit),g=this.transport=new THREE.Group();g.name='Kestrel tiltrotor';this.root.add(g);
   // An original cargo tiltrotor: low graphite fuselage, swept wings and four
   // independent rotor nacelles. No balloon or borrowed Battle Bus silhouette.
+  rounded(g,0,.1,-8.05,4.5,1.4,3.2,0x213946,.4);
+  const windscreen=rounded(g,0,2.9,-8.03,4.1,1.2,2.1,0x244b58,.2);windscreen.rotation.x=-.32;
+  for(const side of [-1,1]){beam(g,[side*1.7,1.6,-8.8],[side*1.2,3.4,-7.8],.1,0x172a35);rounded(g,side*2.8,.3,4.4,.2,1.9,2.2,0x4d686c,.06);block(g,side*2.92,.5,4.4,.04,.18,1.7,0xc4a66a);rounded(g,side*6.5,2.45,-3.6,1.8,1.4,2.65,0x25424d,.3);rounded(g,side*7.6,2.7,-1.2,.25,.16,.4,side<0?0xeb6558:0x69cfa8,.04);}
+  rounded(g,0,-.6,7.05,4.2,.3,2.5,0x243b43,.12);for(let j=0;j<6;j++)block(g,0,-.42,6.1+j*.27,3.7,.04,.045,0x7c9190);
   rounded(g,0,1,0,5.8,3.8,13.6,0x334d58,.7);rounded(g,0,-.7,.4,4.7,.65,11.8,0x182d38,.22);
   rounded(g,0,1.3,-6.9,4.5,3.1,3.5,0x3c606b,.7);rounded(g,0,2,-8.5,3.7,1.4,.18,0x79b8c4,.18);
   block(g,0,2,-8.62,.12,1.4,.06,0x142e38);
@@ -133,6 +137,9 @@ export class RoyaleView{
  update(state,local,dt,playing){
   this.root.visible=playing&&!!state?.royale;if(!this.root.visible)return;
   const r=state.royale,t=this.view.clock,kit=this.kit;
+  this.seasonMeshes??=new Map();const activeSeason=new Set();
+  for(const s of [...(r.smokes||[]).map(x=>({...x,kind:'smoke'})),...(r.relays||[]).map(x=>({...x,kind:'relay'}))]){const key=s.kind+s.id;activeSeason.add(key);let mesh=this.seasonMeshes.get(key);if(!mesh){if(s.kind==='smoke'){mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(1,2),new THREE.MeshBasicMaterial({color:0xc1c6bb,transparent:true,opacity:.94,depthWrite:false}));mesh.userData.ownedMaterial=true;mesh.scale.setScalar(s.radius);}else{const g=new THREE.Group(),k=artKit(this.kit);k.rounded(g,0,.6,0,.75,1.2,.6,0x304b54,.06);k.rounded(g,0,1.05,-.32,.5,.3,.06,0x65d6c8,.02);k.beam(g,[0,1.2,0],[0,4,0],.045,0xa7c2bd);k.torus(g,0,3.5,0,.4,.04,0xdfb567);bake(g,false,true);mesh=g;}this.root.add(mesh);this.seasonMeshes.set(key,mesh);}mesh.position.set(s.x,s.y,s.z);if(s.kind==='smoke'){mesh.rotation.y=t*.04;mesh.material.opacity=Math.min(.94,(s.until-state.time)*.8);}}
+  for(const [key,m]of this.seasonMeshes)if(!activeSeason.has(key)){m.removeFromParent();this.view.disposeGroup(m);this.seasonMeshes.delete(key);}
   this.view.lastStateTime=state.time;updateBuildingView(this,state,local);
   const roundKey=r.matchId+':'+state.round+':'+state.options.map;
   if(this.round!==roundKey){for(const group of [this.chests,this.loot,this.gliders,this.pads]){for(const mesh of group.values()){this.root.remove(mesh);this.view.disposeGroup(mesh);}group.clear();}this.round=roundKey;this.flightPoses.clear();}

@@ -13,12 +13,12 @@ globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const wait=async(fn,label,ms=10000)=>{const end=Date.now()+ms;while(!fn()){assert.ok(Date.now()<end,label);await pause(15);}};
 let sim,clock;
-function client(name){const c={state:null,errors:[],seq:0,profile:safeProfile({name})};c.net=new Network({onState:s=>c.state=s,onError:e=>c.errors.push(e),getState:()=>sim?.snapshot(),getCheckpoint:()=>sim?.checkpoint(),onJoin:(id,p,a)=>!!sim?.admitPlayer(id,p,a),onInput:(id,i)=>sim?.setInput(id,i,true),onLeave:id=>sim?.leavePlayer(id)});c.input=i=>c.net.isHost?sim.setInput(c.net.id,i,true):c.net.input(i);c.inputBatch=list=>c.net.isHost?list.forEach(i=>sim.setInput(c.net.id,i,true)):c.net.inputBatch(list);nets.push(c.net);return c;}
+function client(name){const c={state:null,errors:[],seq:0,profile:safeProfile({name})};c.net=new Network({onState:s=>c.state=s,onError:e=>c.errors.push(e),getState:()=>sim?.snapshot(),getCheckpoint:()=>sim?.checkpoint(),onJoin:(id,p,a)=>!!sim?.admitPlayer(id,p,a),onInput:(id,i)=>sim?.setInput(id,i,true),onPlayerAction:(id,a)=>sim?.playerAction(id,a),onLeave:id=>sim?.leavePlayer(id)});c.input=i=>c.net.isHost?sim.setInput(c.net.id,i,true):c.net.input(i);c.inputBatch=list=>c.net.isHost?list.forEach(i=>sim.setInput(c.net.id,i,true)):c.net.inputBatch(list);nets.push(c.net);return c;}
 try{
  const host=client('Balance Host'),guest=client('Balance Guest'),observer=client('Balance Observer');
  const code=await host.net.host();sim=new RoyaleSimulation({capacity:4,bots:0,fill:false,teamSize:1,seed:9});sim.addPlayer('host',host.profile);sim.startRound();host.net.setVisibility('private');host.state=sim.snapshot();host.net.broadcast(host.state);clock=setInterval(()=>{sim.tick(1/60);host.state=sim.snapshot();host.net.broadcast(host.state);},1000/60);
  await guest.net.join(code,guest.profile);await observer.net.join(code,observer.profile);
- assert.equal(app.relay.authority.rooms.size,0);await wait(()=>sim.players.size===3,'Three independent players');sim.beginBattle();
+ assert.equal([...app.relay.authority.rooms.values()].filter(r=>!r.recurring).length,0);await wait(()=>sim.players.size===3,'Three independent players');sim.beginBattle();for(const [id,p]of sim.players)if(p.boss)sim.players.delete(id);
  sim.map={...sim.map,boxes:[],terrain:null,size:1200};sim.worldBoxes=[];sim.loot=[];sim.chests=[];sim.stormSteps=sim.stormSteps.map(v=>({...v,start:1e9,closeAt:1e9,end:2e9}));sim.route.duration=1e9;
  sim.moveWithCommands=(p,input,dt,commands)=>{p.yaw=input.yaw??p.yaw;p.pitch=input.pitch??p.pitch;p.motionFresh=true;p.motionVX=p.motionVZ=0;p.ack=Math.max(p.ack,...(commands?.steps.map(v=>v.seq)||[input.seq||0]));};
  const report=[];
@@ -44,7 +44,14 @@ try{
  for(let n=0;n<36;n++)c.net.inputBatch([{seq:++c.seq,fire:true,slot:1,yaw:1,pitch:0,dt:1/60}]);await pause(400);c.net.input({seq:++c.seq,fire:false,slot:1,yaw:1,pitch:0,dt:1/60});await pause(120);
  const shots=sim.events.filter(e=>e.type==='shot'&&e.player===p.id);assert.ok(shots.length>0&&shots.length<=8);for(let n=1;n<shots.length;n++)assert.ok(shots[n].time-shots[n-1].time>=5/60-1e-8);
  const health=p.health,shield=p.shield;c.net.send({type:'damage',damage:999999,target:p.id});c.net.send({type:'state',players:[]});await pause(100);assert.equal(p.health,health);assert.equal(p.shield,shield);
+ // Season 1: the same guest action travels through the actual host command filter.
+ sim.inputs.clear();sim.remoteInputs.clear();p.bank.medium=101;p.supplyDropAt=0;p.flight='ground';p.useLatch=false;p.use=null;p.equipUntil=0;p.reloadEnd=0;p.lastInput=sim.time;
+ c.net.send({type:'player-action',action:'inventory-supply-medium-half'});c.net.send({type:'player-action',action:'inventory-supply-medium-half'});
+ await wait(()=>p.bank.medium===50,'Guest supplies dropped once by host');assert.equal(sim.loot.filter(i=>i.droppedBy===p.id&&i.ammoType==='medium').reduce((n,i)=>n+i.count,0),51);
+ p.inventory[1]={id:'jumpRig',count:1,rarity:5,charges:3,rechargeAt:0};p.slot=1;p.useLatch=false;p.equipUntil=0;sim.syncInventory(p);
+ c.input({seq:++c.seq,slot:1,fire:true,yaw:0,pitch:0,dt:1/60});await wait(()=>p.inventory[1].charges===2,'Guest mythic activation accepted');c.input({seq:++c.seq,slot:1,fire:false,yaw:0,pitch:0,dt:1/60});
+ await wait(()=>[host,guest,observer].every(n=>n.state?.players.find(v=>v.id===p.id)?.inventory[1]?.charges===2),'All peers receive identical mythic charge state');assert.equal(p.fall.immune,true);
  const checkpoint=sim.checkpoint();assert.deepEqual(checkpoint.players.find(v=>v.id===p.id).weaponCooldowns,p.weaponCooldowns);
  await mkdir('test-results/weapon-balance',{recursive:true});await writeFile('test-results/weapon-balance/network.json',JSON.stringify({sockets:3,weapons:11,comparisons:report,cadenceShots:shots.length,duplicatesRejected:true,forgedDamageRejected:true},null,2));
- console.log('PASS all 11 firearms: host/guest body/head rules, three independent sockets, accepted ammo, physical trajectories, duplicate sequences, cadence and forged-damage rejection');
+ console.log('PASS all 11 firearms: host/guest body/head rules, three independent sockets, accepted ammo, physical trajectories, duplicate sequences, cadence forged-damage rejection, guest supply drops and mythic charge synchronization');
 }finally{clearInterval(clock);for(const net of nets)net.destroy();await app.close();await rm(temp,{recursive:true,force:true});}

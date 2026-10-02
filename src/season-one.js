@@ -1,0 +1,6 @@
+// Season rules shared by host, dedicated authority, prediction and presentation.
+export const SEASON=Object.freeze({number:1,name:'Operation Breakwater',boss:{id:'warden-aster',name:'Commandant Voss',health:600,shield:400,weapon:'sprinter',rarity:4,leash:70,notice:48,reaction:.8},rig:{charges:3,recharge:12,cooldown:1.2,vertical:19,horizontal:18},flight:{glide:16,dive:13,launch:20,glideFall:4.8,diveFall:20},slide:{slope:.2,gravity:18,cap:10.5}});
+const eastern=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',hourCycle:'h23'});
+let windowMinute=-Infinity,windowValue;
+export function publicWindow(now=Date.now()){const minute=Math.floor(now/60000);if(minute!==windowMinute){windowMinute=minute;const hour=Number(eastern.format(new Date(now)));windowValue=Object.freeze({open:hour>=7&&hour<19,label:'7 AM – 7 PM Eastern',timezone:'America/New_York'});}return windowValue;}
+export function rigCharges(item,time){if(!item||item.id!=='jumpRig')return 0;item.charges??=SEASON.rig.charges;item.rechargeAt??=0;if(item.charges<SEASON.rig.charges&&time>=item.rechargeAt){const added=1+Math.floor((time-item.rechargeAt)/SEASON.rig.recharge);item.charges=Math.min(SEASON.rig.charges,item.charges+added);item.rechargeAt=item.charges===SEASON.rig.charges?0:item.rechargeAt+added*SEASON.rig.recharge;}return item.charges;}
