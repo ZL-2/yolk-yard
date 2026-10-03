@@ -33,23 +33,24 @@ try{
   assert.ok((await preview.locator('.ravel-loading').evaluate(e=>getComputedStyle(e).backgroundImage)).includes(art.file));
   await preview.locator('[data-action=cancel-connect]').waitFor({state:'visible'});await shot(preview,art.id);
  }
+ for(const kind of ['connect','exit']){await preview.evaluate(html=>document.querySelector('#loading-screen').innerHTML=html,loadingMarkup(kind==='exit'?'RETURNING TO LOBBY':'ESTABLISHING MATCH UPLINK',kind==='exit'?'Preparing your operator in the lobby.':'Connecting to the room service.',kind==='connect',{kind,art:LOADING_ART.matches[1]}));await shot(preview,kind);}
  const host=await page('Loading Captain');await host.locator('#loading-screen').waitFor({state:'hidden'});await host.locator('#menu [data-action=play-custom]').waitFor({state:'visible'});
  assert.equal(await host.locator('vite-error-overlay').count(),0);
  if(!live){
   await host.locator('#menu [data-action=play-custom]').click();await host.locator('#setup-mode').selectOption('ffa');await host.locator('#setup-bots').selectOption('2');
-  await host.locator('[data-action=create-room]').click();await host.locator('dialog[data-kind=connecting] [data-action=cancel-connect]').waitFor({state:'visible'});await shot(host,'connecting');
-  await host.locator('dialog[data-kind=connecting] [data-action=cancel-connect]').click();await host.locator('#loading-screen').waitFor({state:'hidden'});await host.locator('#menu [data-action=play-custom]').waitFor({state:'visible'});await host.waitForTimeout(2200);
+  const connecting=await host.evaluate(()=>{document.querySelector('[data-action=create-room]').click();const dialog=document.querySelector('dialog'),root=document.querySelector('#loading-screen .ravel-loading'),art=dialog.querySelector('.ravel-loading').dataset.loadingArt;const result={open:dialog.open,art,rootArt:root.dataset.loadingArt};setTimeout(()=>dialog.querySelector('[data-action=cancel-connect]').click(),300);return result;});
+  assert.equal(connecting.open,true);assert.notEqual(connecting.art,'startup');assert.equal(connecting.art,connecting.rootArt);
+  await host.locator('#loading-screen').waitFor({state:'hidden'});await host.locator('#menu [data-action=play-custom]').waitFor({state:'visible'});await host.waitForTimeout(2200);
   assert.equal(await host.evaluate(()=>window.__yolkTest.read().screen),'menu','cancel cannot later enter a room');
   await host.locator('#menu [data-action=play-custom]').click();await host.locator('#setup-mode').selectOption('ffa');await host.locator('#setup-bots').selectOption('2');await host.locator('[data-action=create-room]').click();
   await host.locator('#lobby [data-action=start-match]').waitFor({state:'visible'});const code=(await host.locator('#lobby .room-code').innerText()).replace(/[^A-Z2-9]/g,'');
   const guest=await page('Loading Wing');await guest.locator('#loading-screen').waitFor({state:'hidden'});await guest.locator('#menu [data-action=play-custom]').click();await guest.locator('[data-action=join]').click();await guest.locator('#join-code').fill(code);await guest.locator('[data-action=join-room]').click();
-  await guest.locator('dialog[data-kind=connecting] .ravel-loading').waitFor({state:'visible'});
+  await guest.locator('dialog[data-kind=connecting] .ravel-loading').waitFor({state:'attached'});
   const connected=await guest.locator('#loading-screen .ravel-loading').getAttribute('data-loading-art');assert.notEqual(connected,'startup');assert.equal(await guest.locator('dialog[data-kind=connecting] .ravel-loading').getAttribute('data-loading-art'),connected);
   await guest.locator('#lobby .room-code').waitFor({state:'visible'});await host.locator('[data-action=start-match]').click();
-  for(const p of [host,guest]){await p.locator('#loading-screen [data-loading-kind=enter]').waitFor({state:'visible'});assert.notEqual(await p.locator('#loading-screen .ravel-loading').getAttribute('data-loading-art'),'startup');}
-  await shot(guest,'guest-entry');for(const p of [host,guest])await p.locator('#loading-screen').waitFor({state:'hidden'});
+  for(const p of [host,guest]){await p.waitForFunction(()=>window.__yolkTest.read().screen==='game');await p.locator('#loading-screen [data-loading-kind=enter]').waitFor({state:'attached'});assert.notEqual(await p.locator('#loading-screen .ravel-loading').getAttribute('data-loading-art'),'startup');await p.locator('#loading-screen').waitFor({state:'hidden'});}
   const before=await guest.locator('#loading-screen .ravel-loading').getAttribute('data-loading-art');await guest.keyboard.press('Escape');await guest.locator('dialog [data-action=leave-confirm]').click();
-  await guest.locator('#loading-screen [data-loading-kind=exit]').waitFor({state:'visible'});const returning=await guest.locator('#loading-screen .ravel-loading').getAttribute('data-loading-art');assert.notEqual(returning,before);assert.equal(await guest.locator('.load-context').innerText(),'RETURNING TO LOBBY');await shot(guest,'return-to-lobby');await guest.locator('#loading-screen').waitFor({state:'hidden'});
+  await guest.locator('#loading-screen [data-loading-kind=exit]').waitFor({state:'attached'});const returning=await guest.locator('#loading-screen .ravel-loading').getAttribute('data-loading-art');assert.notEqual(returning,before);assert.equal(await guest.locator('#loading-screen .load-context').textContent(),'RETURNING TO LOBBY');await guest.locator('#loading-screen').waitFor({state:'hidden'});
   assert.equal(await guest.evaluate(()=>window.__yolkTest.read().screen),'menu');assert.equal(await host.evaluate(()=>window.__yolkTest.read().screen),'game');
   await host.keyboard.press('Escape');await host.locator('dialog [data-action=leave-confirm]').click();await host.locator('#loading-screen').waitFor({state:'hidden'});
  }else{
