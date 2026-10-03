@@ -273,8 +273,8 @@ function modal(title, body, type = "generic") {
   paused = true;
   if (document.pointerLockElement) document.exitPointerLock();
   if(type==='error')hideLoading(true);
-  if(type==='connecting')showLoading('ESTABLISHING MATCH UPLINK','Connecting to the room service.');
-  dialog.innerHTML = type==='connecting'?loadingMarkup('ESTABLISHING MATCH UPLINK','Connecting to the room service. You can cancel at any time.',true):`<div class="dialog-head"><h2>${title}</h2><button class="close-btn" data-action="close" aria-label="Close dialog">×</button></div><div class="dialog-body">${body}</div>`;
+  const connectingArt=type==='connecting'?showLoading('ESTABLISHING MATCH UPLINK','Connecting to the room service.',{kind:'connect'}):null;
+  dialog.innerHTML = type==='connecting'?loadingMarkup('ESTABLISHING MATCH UPLINK','Connecting to the room service. You can cancel at any time.',true,{kind:'connect',art:connectingArt}):`<div class="dialog-head"><h2>${title}</h2><button class="close-btn" data-action="close" aria-label="Close dialog">×</button></div><div class="dialog-body">${body}</div>`;
   if (!dialog.open) dialog.showModal();
 }
 function closeDialog() {
@@ -700,7 +700,8 @@ function launchRound(){
   state=sim.snapshot();net?.broadcast(state);enterGame(true);return true;
 }
 function enterGame(capture = false) {
-  showLoading('DEPLOYING TO THE FRONT','Preparing the battlefield and your operator.');
+  const entering=state.players.find(p=>p.id===localId),watching=!!(entering?.friendSpectator||entering?.lateSpectator);
+  showLoading(watching?'PREPARING SPECTATOR VIEW':'DEPLOYING TO THE FRONT',watching?'Connecting to the action. Spectators cannot affect the match.':'Preparing the battlefield and your operator.',{kind:watching?'spectate':'enter'});
   guestFire.reset();
   connectionReport.network.reset();
   resultAt=0;$("#round-banner").hidden=true;
@@ -800,7 +801,8 @@ function pauseMenu() {
   );
 }
 function leave(confirm = false,notifyParty=true) {
-  hideLoading(true);
+  const returningFromMatch=screen==='game';
+  if(returningFromMatch)showLoading('RETURNING TO LOBBY','Closing the match connection and preparing your operator in the lobby.',{kind:'exit'});else hideLoading(true);
   if(notifyParty){activeLaunch=null;void partyRequest("returned");}
   earnMatch++;
   buildControls.buildMode=false;buildUI.cancel();
