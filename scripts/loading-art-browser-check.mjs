@@ -21,7 +21,7 @@ try{
  if(!live){temp=await mkdtemp('/tmp/ravel-loading-');process.env.RAVEL_SOCIAL_DATA_PATH=temp+'/social.json';process.env.RAVEL_REWARD_DATA_PATH=temp+'/progress.json';app=await startRealtimeServer({host:'127.0.0.1',port:9002,origins:[origin]});vite=await createServer({server:{host:'127.0.0.1',port:5198,strictPort:true,watch:null}});await vite.listen();}
  browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
  const preview=await page('Loading Artwork',true);
- await preview.locator('#loading-screen [data-loading-art=startup]').waitFor({state:'visible'});
+ await preview.locator('#loading-screen[data-loading-art=startup]').waitFor({state:'visible'});
  metrics.assets.push(await decoded(preview,LOADING_ART.startup));
  assert.ok(await preview.locator('.load-status').innerText());await shot(preview,'startup');
  const bootImages=await preview.evaluate(()=>performance.getEntriesByType('resource').map(r=>r.name).filter(n=>/\/loading\/.*\.webp/.test(n)));
