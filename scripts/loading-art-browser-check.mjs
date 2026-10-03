@@ -28,7 +28,7 @@ try{
  assert.ok(bootImages.every(n=>n.includes('kestrel-airstrip.webp')),'boot does not preload all match illustrations');
  for(const art of LOADING_ART.matches){
   const html=loadingMarkup('DEPLOYING TO MATCH','Preparing terrain, operators and equipment.',true,{kind:'enter',art});
-  await preview.evaluate(html=>document.querySelector('#loading-screen').innerHTML=html,html);
+  await preview.evaluate(html=>{const root=document.querySelector('#loading-screen');root.className='';root.removeAttribute('data-loading-art');root.removeAttribute('data-loading-kind');root.innerHTML=html;},html);
   const image=await decoded(preview,art);metrics.assets.push(image);assert.ok(image.width>=1500&&image.height>=800);
   assert.ok((await preview.locator('.ravel-loading').evaluate(e=>getComputedStyle(e).backgroundImage)).includes(art.file));
   await preview.locator('[data-action=cancel-connect]').waitFor({state:'visible'});await shot(preview,art.id);
