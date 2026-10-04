@@ -25,7 +25,7 @@ export function audibleVisualEvent(e){
  return null;
 }
 export class SoundVisuals{
- constructor(root){this.node=document.createElement('div');this.node.id='visual-sounds';this.node.setAttribute('aria-label','Directional sound indicators');this.node.hidden=true;root.append(this.node);this.signals=new Map();this.lastEvent=0;this.nextAt=0;this.icons=[];}
+ constructor(root){this.node=document.createElement('div');this.node.id='visual-sounds';this.node.className='visual-sounds';this.node.setAttribute('aria-label','Directional sound indicators');this.node.hidden=true;root.append(this.node);this.signals=new Map();this.lastEvent=0;this.nextAt=0;this.icons=[];}
  update(state,listener,{enabled=true,playing=true}={},now=performance.now()){
   this.node.hidden=!enabled||!playing||!listener||listener.health<=0||!visualSoundsAllowed(state,listener);
   if(this.node.hidden){this.signals.clear();this.lastEvent=state?.events?.at(-1)?.id||0;return;}

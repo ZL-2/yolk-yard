@@ -1,4 +1,4 @@
-#visual-sounds{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:7}
+#visual-sounds,.visual-sounds{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:7}
 .sound-direction{position:absolute;inset:0;width:0;height:0;transform:rotate(var(--bearing));color:#f4f7fa;filter:drop-shadow(0 2px 3px #031523)}
 .sound-direction.gunfire,.sound-direction.explosion{color:#ffc16f}.sound-direction.chest{color:#ffe272}.sound-direction.glider{color:#e6f5ff}.sound-direction.activity{color:#acdedb}
 .sound-direction svg{position:absolute;width:23px;height:23px;left:-11.5px;top:-126px;transform:rotate(calc(-1 * var(--bearing)));fill:currentColor;stroke:currentColor;stroke-width:.6}

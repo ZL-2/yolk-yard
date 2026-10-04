@@ -1794,7 +1794,9 @@ function loop(now) {
   document.body.classList.toggle('is-emoting',screen==='game'&&!!me?.emote);
   emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game'&&(!me||me.spectating||me.health<=0||me.flight==='transport'||me.downed);
   const emoteButtonText=(screen==='menu'?!!view.lobbyEmote:!!me?.emote)?'STOP EMOTE':'EMOTES · '+bindingLabel(settings.keybinds.emotes[0]||'KeyO');if(emoteButton.textContent!==emoteButtonText)emoteButton.textContent=emoteButtonText;
-  view.emoteLook={yaw:input.yaw,pitch:input.pitch};
+  const emoteCameraKey=me?.emote?me.id+':'+me.emote.id+':'+me.emote.start:null;
+  if(emoteCameraKey&&view.emoteCameraKey!==emoteCameraKey){input.yaw=me.emote.yaw;input.pitch=0;}
+  view.emoteCameraKey=emoteCameraKey;view.emoteLook={yaw:input.yaw,pitch:input.pitch};
   if(me&&state?.options.recurring){const record={season:1,wins:me.crownWins||0,unlocked:!!me.crownEmoteUnlocked,owned:!!me.crown};const key=JSON.stringify(record);if(key!==crownStatusKey){crownStatusKey=key;crownStatus=record;save('ravelfront-crown-status',record);}}
   const currentProgress=(state?.royale?.matchId||net?.code||'local')+':'+state?.round;
   if(currentProgress!==progressMatch){progressMatch=currentProgress;matchEarnings.total=0;matchEarnings.status=me?.friendSpectator?'Spectating · No Marks':net?.serverAuthority?'Match verification pending':net?'Private custom · No Marks':'Practice · No currency rewards';}
