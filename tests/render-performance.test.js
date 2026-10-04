@@ -36,12 +36,14 @@ test('warmup construction preserves the full island and departure adopts prepare
   const {applyBuildState}=await import('../src/building.js'),{getMap}=await import('../src/maps.js');
   applyBuildState(getMap('sunnybreak'),{matchId:'transition-test',round:1,builds:[],worldDamage:{}});
   direct.loadMap('sunnybreak');prepared.loadMap('sunnybreak');
-  assert.ok(meshes.some(mesh=>mesh.userData.objectRanges?.some(range=>range.id)),'prepared scenery has destruction IDs');
+  let identified=0;prepared.world.traverse(mesh=>{if(mesh.userData.objectRanges?.some(range=>range.id))identified++;});assert.ok(identified>0,'prepared streamed scenery has destruction IDs');
   assert.equal(prepared.preparedBattle,null);assert.equal(prepared.world.children.length,direct.world.children.length);
   meshes.forEach(mesh=>assert.equal(mesh.parent,prepared.world));
-  for(let i=0;i<direct.world.children.length;i++){
-   const a=direct.world.children[i],b=prepared.world.children[i];assert.deepEqual(a.position.toArray(),b.position.toArray());assert.deepEqual(a.userData,b.userData);
-   for(const key of ['position','color'])assert.deepEqual(a.geometry?.attributes[key]?.array,b.geometry?.attributes[key]?.array);
+  const collect=world=>{const result=[];world.traverse(mesh=>{if(mesh.isMesh)result.push(mesh);});return result;},a=collect(direct.world),b=collect(prepared.world);assert.equal(a.length,b.length);
+  for(let i=0;i<a.length;i++){
+   assert.deepEqual(a[i].position.toArray(),b[i].position.toArray());assert.deepEqual(a[i].userData.objectRanges,b[i].userData.objectRanges);
+   for(const key of ['position','color'])assert.deepEqual(a[i].geometry?.attributes[key]?.array,b[i].geometry?.attributes[key]?.array);
   }
+
  }finally{globalThis.document=previous;}
 });

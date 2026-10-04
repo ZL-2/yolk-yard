@@ -1,3 +1,5 @@
+import {bossDefeatMessage} from './bosses.js';
+import {showFrontMessage,updateFrontMessage} from './front-message.js';
 import {emoteWheel} from './emote-ui.js';
 import {EMOTES} from './emotes.js';
 import {CROWN_ICON} from './crowns.js';
@@ -312,12 +314,12 @@ function closeDialog() {
   }
 }
 function toast(text) {
-  $("#toast").textContent = text;
+  showFrontMessage($("#toast"),text);
   toastUntil = performance.now() + 4500;
 }
-function notice(text) {
-  $("#notice").textContent = text;
-  noticeUntil = performance.now() + 2600;
+function notice(text,duration=2600) {
+  showFrontMessage($("#notice"),text);
+  noticeUntil = performance.now() + duration;
 }
 function settingsMenu() {
   modal(
@@ -924,7 +926,7 @@ function processEvents() {
     if(e.type==='crown-victory'&&e.player===localId)notice(e.crowned?'CROWNED VICTORY · '+e.wins+' this season':'VICTORY CROWN EARNED');
     if(e.type==='boss-cache-open')notice(e.name.toUpperCase()+' UNLOCKED');
     if(e.type==='boss-interrupted'&&e.player===localId)notice('ROOK’S WINCH INTERRUPTED');
-    if(e.type==='vault-open')notice('VOSS VAULT UNLOCKED · Epic requisitions secured',3500);if(e.type==='boss-defeated')notice('VOSS DEFEATED · Keycard, legendary rifle & mythic Jump Rig dropped',4500);if(e.type==='relay-captured'&&e.player===localId)notice('SIGNAL LIVE · Contacts revealed. Your location is exposed.',3500);
+    if(e.type==='vault-open')notice('VOSS VAULT UNLOCKED · Epic requisitions secured',3500);if(e.type==='boss-defeated')notice(bossDefeatMessage(e),4500);if(e.type==='relay-captured'&&e.player===localId)notice('SIGNAL LIVE · Contacts revealed. Your location is exposed.',3500);
     const me = state.players.find((p) => p.id === localId);
     sound.event(e,me,state);
     if(e.type==='duo-marker')sound.cue(e.kind==='danger'?'danger-ping':'world-ping',null,.75);
@@ -1844,8 +1846,8 @@ function loop(now) {
   $('#hud').classList.toggle('low-health',!!current&&current.health>0&&current.health<25);
   damageFlash = Math.max(0, damageFlash - dt * 1.5);
   $("#damage").style.opacity = damageFlash;
-  $("#notice").style.opacity = now < noticeUntil ? 1 : 0;
-  $("#toast").style.opacity = now < toastUntil ? 1 : 0;
+  updateFrontMessage($("#notice"),now < noticeUntil);
+  updateFrontMessage($("#toast"),now < toastUntil);
   for (const row of $("#feed").children)
     if (Number(row.dataset.expire) < now) row.remove();
   requestAnimationFrame(loop);
@@ -1870,6 +1872,8 @@ try {
 if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
     editor:()=>mapEditor,
+    notify:text=>toast(text),
+    scenery:()=>({labels:(()=>{let n=0;view.world.traverse(m=>{if(m.isSprite)n++;});return n;})(),loot:view.royaleView.loot.size,chests:view.royaleView.chests.size}),
     party:()=>({id:party?.id,party:party?.party,ready:party?.ready}),
     partyMembers:()=>view?.partyEggs?.length||0,
     chatRead: () => ({rows:chat.inbox.rows,open:chat.opened,muted:[...chat.inbox.muted],chatEnabled:net?.chatEnabled}),
@@ -1899,7 +1903,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
       triangles: view?.renderer.info.render.triangles,
       presentation: view?.diagnostics(),
     }),
-    celebrations:()=>({localVisible:!!view.models.get(localId)?.visible,localPose:view.models.get(localId)?.userData.human?.pose,crownProp:!!view.models.get(localId)?.userData.crownRecord?.visible,cameraPosition:view.camera.position.toArray(),bossNames:[...view.models].filter(([id])=>state?.players.find(p=>p.id===id)?.boss).map(([id,m])=>({id,visible:m.userData.nameplate?.visible}))}),
+    celebrations:()=>({lobbyYaw:view.menuEgg.rotation.y,lobbyPosition:view.menuEgg.position.toArray(),localVisible:!!view.models.get(localId)?.visible,localPose:view.models.get(localId)?.userData.human?.pose,crownProp:!!view.models.get(localId)?.userData.crownRecord?.visible,cameraPosition:view.camera.position.toArray(),bossNames:[...view.models].filter(([id])=>state?.players.find(p=>p.id===id)?.boss).map(([id,m])=>({id,visible:m.userData.nameplate?.visible}))}),
     network: () =>
       Object.values(net?.peer?.connections || {})
         .flat()

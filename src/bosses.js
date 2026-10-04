@@ -10,3 +10,16 @@ export const MYTHIC_WEAPONS=Object.freeze({
  'marshal-rook':{id:'doubleyolk',name:"Marshal Rook’s Mythic Breacher Shotgun",damage:1.12,reload:.80,spread:.84,interval:1.12},
  'lieutenant-nyx':{id:'anchor',name:"Lieutenant Nyx’s Mythic DMR",damage:1.12,reload:.90,magazine:6,firstShot:.18},
 });
+const BOSS_REWARDS={rig:'Mythic Service Rifle, Jump Rig & Voss keycard',winch:'Mythic Breacher Shotgun, Anchor Winch & Rook keycard',veil:'Mythic DMR, Veil Projector & Nyx keycard'};
+export function bossDefeatMessage(event){
+ const def=BOSSES.find(b=>b.id===(event.bossId||event.target)||b.name===event.name);
+ return def?`${def.name.toUpperCase()} DEFEATED · ${BOSS_REWARDS[def.ability]} dropped`:`${event.name||'Boss'} defeated`;
+}
+export function bossMapMarkers(map,players,caches=[]){
+ return BOSSES.flatMap(def=>{
+  const boss=players.find(p=>p.boss&&(p.bossId||p.id)===def.id),site=map.bossSites?.find(s=>s.bossId===def.id),poi=map.districts?.find(p=>p.id===def.poi),cache=caches.find(c=>c.bossId===def.id);
+  const point=site||poi;if(!point)return [];
+  const alive=!!boss&&boss.health>0,label=def.name.split(' ').at(-1).toUpperCase()+(alive?' · BOSS':def.ability==='rig'?' · VAULT':cache?.opened?' · CLEARED':' · CACHE');
+  return [{id:def.id,x:point.x,z:point.z,alive,label,color:def.accent}];
+ });
+}

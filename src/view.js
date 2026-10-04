@@ -748,7 +748,7 @@ export class View {
       this.clearOutgoing(this);
       this.preview(profile);
       if(this.lobbyEmote?.until&&this.clock>=this.lobbyEmote.until)this.lobbyEmote=null;
-      if(this.lobbyEmote){this.menuEgg.rotation.y=.2;if(this.menuEgg.userData.held)this.menuEgg.userData.held.visible=false;const p={health:100,grounded:true,emote:this.lobbyEmote,crownWins:this.lobbyCrownWins||0};animateHumanoid(this.menuEgg,p,dt,this.clock,{menu:true});updateCelebration(this.menuEgg,p,this.clock,g=>this.disposeGroup(g));}
+      if(this.lobbyEmote){this.menuEgg.rotation.y=Math.atan2(this.menuEgg.position.x-this.camera.position.x,this.menuEgg.position.z-this.camera.position.z);if(this.menuEgg.userData.held)this.menuEgg.userData.held.visible=false;const p={health:100,grounded:true,emote:this.lobbyEmote,crownWins:this.lobbyCrownWins||0};animateHumanoid(this.menuEgg,p,dt,this.clock,{menu:true});updateCelebration(this.menuEgg,p,this.clock,g=>this.disposeGroup(g));}
       else {this.animateLobbyCharacter(this.menuEgg,this.lobbyMotion,dt);updateCelebration(this.menuEgg,{health:100},this.clock,g=>this.disposeGroup(g));}
       this.lobbyStage.userData.update?.(dt);
       for(const teammate of this.partyEggs||[])this.animateLobbyCharacter(teammate,teammate.userData.lobbyMotion,dt,.17);
@@ -770,7 +770,7 @@ export class View {
       );
       this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
       if (killer || local.downed || local.emote) {
-        const cameraYaw=local.emote?(this.emoteLook?.yaw??p.yaw)+Math.PI:p.yaw;
+        const cameraYaw=local.emote?(this.emoteLook?.yaw??p.yaw):p.yaw;
         const back = new THREE.Vector3(Math.sin(cameraYaw), local.emote?.2:.35, Math.cos(cameraYaw)).normalize();
         const origin = {x:p.x, y:p.y+(p.downed?.8:1.6), z:p.z};
         const distance = Math.max(0.1, wallDistance(getMap(state.options.map), origin, back, local.emote?4.2:3.5)-0.2);

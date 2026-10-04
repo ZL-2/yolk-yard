@@ -2,6 +2,7 @@ import {ROYALE_BOT_RANGE} from './field-refinement.js';
 import {gun,clamp} from './data.js';
 import {skillFor,wrapAngle} from './bot-config.js';
 import {eyeHeight,bodyHeight} from './stance.js';
+export function royaleAimError(skill,distance){return skill.error*(.22+.7*clamp(distance/60,0,1));}
 // Cheap execution every physics tick, expensive sensing/objectives stay scheduled.
 // Uses observed positions only. Never snap to hidden/live enemy positions.
 export function executeRoyaleIntent(sim,p,input){
@@ -10,15 +11,18 @@ export function executeRoyaleIntent(sim,p,input){
  const skill=skillFor(sim),target=brain.memory?.[brain.target],w=gun(p,input.slot??p.slot);
  let yaw=input.desiredYaw??input.yaw,pitch=input.desiredPitch??input.pitch,fire=input.fire;
  if(input.combatAim&&sim.players.get(brain.target)?.health>0&&target?.visible&&now-target.seenAt<.65){
+  const distance=Math.hypot(target.x-p.x,target.z-p.z);
+  if(brain.executionWeapon!==w.id){brain.executionWeapon=w.id;brain.aimAt=Math.max(brain.aimAt||0,now+Math.max(.65,skill.reaction));brain.burstUntil=0;brain.nextBurst=brain.aimAt;brain.errorAt=0;}
   if(now>=(brain.errorAt||0)){
    // Gradual correlated error instead of a whole burst being perfect or a miss.
-   brain.errorAt=now+.22+(1-skill.hit)*.12;brain.biasX=(sim.random()+sim.random()-1)*skill.error*.42;brain.biasY=(sim.random()+sim.random()-1)*skill.error*.25;
+   const error=royaleAimError(skill,distance);brain.errorAt=now+.24+(1-skill.hit)*.16;brain.biasX=(sim.random()+sim.random()-1)*error;brain.biasY=(sim.random()+sim.random()-1)*error*.7;
+   if(brain.aimErrorX===undefined){brain.aimErrorX=brain.biasX;brain.aimErrorY=brain.biasY;}
   }
   const blend=1-Math.exp(-dt*5);brain.aimErrorX=(brain.aimErrorX||0)+((brain.biasX||0)-(brain.aimErrorX||0))*blend;brain.aimErrorY=(brain.aimErrorY||0)+((brain.biasY||0)-(brain.aimErrorY||0))*blend;
-  const distance=Math.hypot(target.x-p.x,target.z-p.z),age=Math.min(.22,Math.max(0,now-target.seenAt)),lead=(w.hitscan?0:Math.min(.45,distance/w.boltSpeed)*skill.lead)+age;
+  const age=Math.min(.22,Math.max(0,now-target.seenAt)),lead=(w.hitscan?0:Math.min(.45,distance/w.boltSpeed)*skill.lead)+age;
   const dx=target.x+(target.vx||0)*lead-p.x,dz=target.z+(target.vz||0)*lead-p.z;
   yaw=Math.atan2(-dx,-dz)+brain.aimErrorX;pitch=Math.atan2(target.y+bodyHeight(target)*.63-p.y-eyeHeight(p),Math.hypot(dx,dz))+brain.aimErrorY;
-  if(now>=brain.nextBurst){brain.burstUntil=now+(.34+skill.burst*.65);brain.nextBurst=brain.burstUntil+.14+skill.pause*.22+sim.random()*.08;}
+  if(now>=brain.nextBurst){brain.burstUntil=now+.18+skill.burst*.4;brain.nextBurst=brain.burstUntil+.55+skill.pause*.7+sim.random()*.35;}
   fire=now>=brain.aimAt&&now<brain.burstUntil&&distance<Math.min(ROYALE_BOT_RANGE.engage,(w.flightRange??w.range)*.95)&&(!w.projectile||distance>7)&&input.slot>0;
   if(brain.task?.urgent&&distance>12)fire=false;
  }else if(input.combatAim)fire=false;

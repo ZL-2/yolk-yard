@@ -5,6 +5,7 @@ import {updateFrontierView} from './frontier-world-view.js';
 import {getMap} from './maps.js';
 import {glidePose} from './glide-pose.js';
 import {lootHeight} from './loot-motion.js';
+import {nearbyItems,itemById} from './nearby-items.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {groundAt,terrainColor} from './terrain.js';
 import {updateBuildingView} from './building-view.js';
@@ -16,6 +17,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {transportAt} from './royale-data.js';
 import {artKit,buildingStyle,dressBuilding,treeModel,propModel,gliderModel,chestModel,lootModel,launchpadModel} from './royale-art.js';
 const bakedMaterial=new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true});
+const lootTemplates=new Map();
 const propTemplates=new Map(),repeatProps=new Set(['counter','sofa','bed','shelf','crate','barrels','console','bollard','crop','solar','fence','car','bench','lamp','bush']);
 function repeatedProp(group,p,kit){
  if(!repeatProps.has(p.kind)){propModel(group,p,kit);return;}
@@ -94,9 +96,7 @@ export function* buildIslandSteps(world,map,kit){
  for(const [i,t]of map.trees.entries()){if(t.editorHidden)continue;const start=world.children.length;treeModel(world,t,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=treeBoxes.get(i)?.objectId;yield;}
  for(const [i,p]of map.props.entries()){if(p.editorHidden)continue;const start=world.children.length;propModel(world,p,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=propBoxes.get(i)?.objectId;yield;}
  yield* bakeSteps(world,true);buildMapObjects(world,map,kit);
- // World names are separate from the small diegetic signs and only visible during the drop.
- for(const p of map.districts){const label=islandLabel(p.name);label.position.set(p.x,groundAt(map,p.x,p.z)+19,p.z);label.userData.poiLabel=true;world.add(label);}
- for(const sign of map.signs){const label=islandLabel(sign.text,.16);label.position.set(sign.x,sign.y,sign.z);label.userData.detailLabel=true;label.visible=false;world.add(label);}
+ // Landmark names remain on the map; the world has no floating signs.
 }
 function* streamedIslandSteps(world,map,kit){
  const ocean=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800),new THREE.MeshLambertMaterial({color:0x4195ad}));ocean.rotation.x=-Math.PI/2;ocean.position.y=.5;ocean.userData.ownedMaterial=true;world.add(ocean);
@@ -125,8 +125,6 @@ function* streamedIslandSteps(world,map,kit){
  for(const cell of cells.values()){yield* draw(cell,cell.coarse,false);world.add(cell.coarse);yield;}
  const dispose=group=>{group.traverse(m=>{if(m.geometry&&!m.geometry.userData.shared)m.geometry.dispose();if(m.userData.ownedMaterial)m.material?.dispose();});group.clear();};
  const details=new WorldDetails(world,[...cells.values()],cell=>{const group=new THREE.Group();return {group,steps:draw(cell,group,true)};},dispose);world.userData.details=details;
- for(const p of map.districts){const label=islandLabel(p.name);label.position.set(p.x,groundAt(map,p.x,p.z)+19,p.z);label.userData.poiLabel=true;world.add(label);}
- for(const s of map.signs){const label=islandLabel(s.text,.16);label.position.set(s.x,s.y,s.z);label.userData.detailLabel=true;label.visible=false;world.add(label);}
 }
 function canopy(kit,color=0xffcf64){const g=gliderModel(kit,color);bake(g,false,true);return g;}
 export class RoyaleView{
@@ -153,7 +151,6 @@ export class RoyaleView{
   }
   block(g,0,2.5,6.3,7,.24,3.5,0x37545f);
   for(const x of [-1.7,1.7])ball(g,x,.4,-8.52,.24,.15,.1,0xf5e4bd);
-  const title=islandLabel('KESTREL / R-04',.33);title.position.set(0,4.2,0);g.add(title);
   this.rotors=[];for(const x of [-6.5,6.5])for(const z of [-3.5,3.5]){
    rounded(g,x,2.55,z,1.6,1.25,2.2,0x1c3543,.25);cylinder(g,x,3.35,z,.28,.55,0xc69448,12);
    const rotor=new THREE.Group();rotor.position.set(x,3.7,z);
@@ -176,7 +173,39 @@ export class RoyaleView{
   this.wall=new THREE.Mesh(new THREE.CylinderGeometry(1,1,240,256,1,true),material);this.wall.position.y=90;this.wall.userData.ownedMaterial=true;this.root.add(this.wall);
   this.ring=new THREE.LineLoop(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(160*3),3)),new THREE.LineBasicMaterial({color:0xc9a5ff}));this.ring.frustumCulled=false;this.ring.userData.ownedMaterial=true;this.root.add(this.ring);
  }
- itemModel(item,ground=true){const g=lootModel(item,this.kit,{ground});bake(g,false,true);return g;}
+ itemModel(item,ground=true){
+  const key=[item.id,item.rarity||0,item.weapon||false,item.resource||'',item.ammoType||'',ground].join(':');let template=lootTemplates.get(key);
+  if(!template){const g=lootModel(item,this.kit,{ground});bake(g,false,true);if(lootTemplates.size>=192)return g;g.traverse(m=>{if(m.geometry)m.geometry.userData.shared=true;});lootTemplates.set(key,g);template=g;}
+  const g=template.clone(true);g.traverse(m=>{m.userData.ownedMaterial=false;});return g;
+ }
+ updateCollectibles(r,observer,dt,t,time){
+  const low=this.view.settings.quality==='low',lootRadius=low?45:70,chestRadius=low?70:100;
+  if(!observer)return;
+  if(!this.itemQuery||t>=this.itemQuery.at||this.itemQuery.version!==r.lootVersion||Math.hypot(observer.x-this.itemQuery.x,observer.z-this.itemQuery.z)>3||this.itemQuery.low!==low){
+   const nearest=(a,b)=>(a.x-observer.x)**2+(a.z-observer.z)**2-(b.x-observer.x)**2-(b.z-observer.z)**2;
+   this.itemQuery={at:t+.1,version:r.lootVersion,x:observer.x,z:observer.z,low,loot:nearbyItems(r,'loot',observer,lootRadius).sort(nearest).map(i=>i.uid),chests:[...new Set([...nearbyItems(r,'chests',observer,chestRadius).sort(nearest).map(c=>c.id),...r.chests.filter(c=>c.supply).map(c=>c.id)])]};
+  }
+  // Close objects arrive first, with bounded geometry work each frame.
+  let created=0;const deadline=performance.now()+3;
+  for(const id of this.itemQuery.loot){if(this.loot.has(id))continue;const item=itemById(r,'loot',id);if(!item)continue;if(created>=3||performance.now()>deadline)break;const mesh=this.itemModel(item);this.loot.set(id,mesh);this.root.add(mesh);created++;}
+  for(const [id,mesh]of this.loot){
+   const item=itemById(r,'loot',id),distance=item?Math.hypot(item.x-observer.x,item.z-observer.z):Infinity;
+   if(distance>150){mesh.removeFromParent();this.view.disposeGroup(mesh);this.loot.delete(id);continue;}
+   mesh.visible=distance<lootRadius;if(!mesh.visible)continue;
+   mesh.position.set(item.x,lootHeight(item,time)+.24+Math.sin(t*1.65+item.uid)*.055,item.z);mesh.rotation.y=Math.sin(t*.55+item.uid)*.16;
+   if(!item.motion&&item.spawnFrom&&time-item.spawnAt<.6){const age=Math.max(0,(time-item.spawnAt)/.6),ease=1-(1-age)**3;mesh.position.x=THREE.MathUtils.lerp(item.spawnFrom.x,item.x,ease);mesh.position.z=THREE.MathUtils.lerp(item.spawnFrom.z,item.z,ease);mesh.position.y=THREE.MathUtils.lerp(item.spawnFrom.y,item.y+.24,ease)+Math.sin(age*Math.PI)*.6;}
+  }
+  for(const id of this.itemQuery.chests){if(this.chests.has(id))continue;const chest=itemById(r,'chests',id);if(!chest)continue;if(created>=3||performance.now()>deadline)break;const mesh=this.chestModel(chest.supply,chest.epic);this.chests.set(id,mesh);this.root.add(mesh);created++;
+   if(chest.supply){const rig=new THREE.Group(),c=canopy(this.kit,0x99dad9);c.position.y=1.5;rig.add(c);for(const x of [-.6,.6])for(const z of [-.4,.4])artKit(this.kit).beam(rig,[x,1.2,z],[Math.sign(x)*.72,3.7,.1],.018,0xf5ead2);bake(rig,false,true);mesh.add(rig);mesh.userData.canopy=rig;}
+  }
+  for(const [id,mesh]of this.chests){
+   const chest=itemById(r,'chests',id),distance=chest?Math.hypot(chest.x-observer.x,chest.z-observer.z):Infinity;
+   if(!chest||!chest.supply&&distance>180){mesh.removeFromParent();this.view.disposeGroup(mesh);this.chests.delete(id);continue;}
+   mesh.visible=distance<chestRadius||!!chest.supply;if(!mesh.visible)continue;
+   const fall=chest.landAt?Math.max(0,(chest.landAt-time)*4):0;mesh.position.set(chest.x,lootHeight(chest,time)+fall,chest.z);if(mesh.userData.canopy)mesh.userData.canopy.visible=fall>0;
+   mesh.userData.lid.rotation.x+=((chest.opened?-1.7:0)-mesh.userData.lid.rotation.x)*Math.min(1,dt*8);
+  }
+ }
  chestModel(supply=false,epic=false){const g=chestModel(this.kit,supply,epic);bake(g.userData.lid,false,true);bake(g,false,true);return g;}
  update(state,local,dt,playing){
   this.root.visible=playing&&!!state?.royale;if(!this.root.visible)return;
@@ -185,33 +214,16 @@ export class RoyaleView{
   for(const s of [...state.players.filter(p=>p.bossWindup).map(p=>({id:p.id,x:p.x,y:p.y+.06,z:p.z,kind:'telegraph'})),...state.players.filter(p=>p.bossVeil).map(p=>({id:p.id,x:p.x,y:p.y+1.55,z:p.z,goal:p.bossVeil.goal,kind:'laser'})),...(r.smokes||[]).map(x=>({...x,kind:'smoke'})),...(r.relays||[]).map(x=>({...x,kind:'relay'}))]){const key=s.kind+s.id;activeSeason.add(key);let mesh=this.seasonMeshes.get(key);if(!mesh){if(s.kind==='laser'){mesh=new THREE.Group();const line=new THREE.Line(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3)),new THREE.LineBasicMaterial({color:0xff554c,transparent:true,opacity:.9}));line.frustumCulled=false;line.userData.ownedMaterial=true;const marker=new THREE.Mesh(new THREE.RingGeometry(.18,.3,16),new THREE.MeshBasicMaterial({color:0xff554c,side:THREE.DoubleSide}));marker.rotation.x=-Math.PI/2;marker.userData.ownedMaterial=true;mesh.add(line,marker);}else if(s.kind==='telegraph'){mesh=new THREE.Mesh(new THREE.RingGeometry(1.1,1.35,24),new THREE.MeshBasicMaterial({color:0xffc563,transparent:true,opacity:.8,side:THREE.DoubleSide}));mesh.rotation.x=-Math.PI/2;}else if(s.kind==='smoke'){mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(1,2),new THREE.MeshBasicMaterial({color:0xc1c6bb,transparent:true,opacity:.94,depthWrite:false}));mesh.userData.ownedMaterial=true;mesh.scale.setScalar(s.radius);}else{const g=new THREE.Group(),k=artKit(this.kit);k.rounded(g,0,.6,0,.75,1.2,.6,0x304b54,.06);k.rounded(g,0,1.05,-.32,.5,.3,.06,0x65d6c8,.02);k.beam(g,[0,1.2,0],[0,4,0],.045,0xa7c2bd);k.torus(g,0,3.5,0,.4,.04,0xdfb567);bake(g,false,true);mesh=g;}this.root.add(mesh);this.seasonMeshes.set(key,mesh);}mesh.position.set(s.x,s.y,s.z);if(s.kind==='laser'){const a=mesh.children[0].geometry.attributes.position;a.setXYZ(0,0,0,0);a.setXYZ(1,s.goal.x-s.x,s.goal.y+.08-s.y,s.goal.z-s.z);a.needsUpdate=true;mesh.children[1].position.set(s.goal.x-s.x,s.goal.y+.08-s.y,s.goal.z-s.z);}if(s.kind==='smoke'){mesh.rotation.y=t*.04;mesh.material.opacity=Math.min(.94,(s.until-state.time)*.8);}}
   for(const [key,m]of this.seasonMeshes)if(!activeSeason.has(key)){m.removeFromParent();this.view.disposeGroup(m);this.seasonMeshes.delete(key);}
   this.cacheMeshes??=new Map();
-  for(const cache of r.bossCaches||[]){let mesh=this.cacheMeshes.get(cache.id);if(!mesh){mesh=this.chestModel(false,true);const name=islandLabel(cache.name,.12);name.position.y=1.5;mesh.add(name);this.root.add(mesh);this.cacheMeshes.set(cache.id,mesh);}mesh.position.set(cache.x,cache.y,cache.z);mesh.visible=!cache.opened;}
+  for(const cache of r.bossCaches||[]){let mesh=this.cacheMeshes.get(cache.id);if(!mesh){mesh=this.chestModel(false,true);this.root.add(mesh);this.cacheMeshes.set(cache.id,mesh);}mesh.position.set(cache.x,cache.y,cache.z);mesh.visible=!cache.opened;}
   this.view.lastStateTime=state.time;updateBuildingView(this,state,local);updateFrontierView(this,state,local);
   const roundKey=r.matchId+':'+state.round+':'+state.options.map;
-  if(this.round!==roundKey){for(const group of [this.chests,this.loot,this.gliders,this.pads]){for(const mesh of group.values()){this.root.remove(mesh);this.view.disposeGroup(mesh);}group.clear();}this.round=roundKey;this.flightPoses.clear();for(const mesh of this.cacheMeshes.values()){mesh.removeFromParent();this.view.disposeGroup(mesh);}this.cacheMeshes.clear();}
+  if(this.round!==roundKey){for(const group of [this.chests,this.loot,this.gliders,this.pads]){for(const mesh of group.values()){this.root.remove(mesh);this.view.disposeGroup(mesh);}group.clear();}this.round=roundKey;this.itemQuery=null;this.flightPoses.clear();for(const mesh of this.cacheMeshes.values()){mesh.removeFromParent();this.view.disposeGroup(mesh);}this.cacheMeshes.clear();}
   this.transport.visible=r.practice||r.elapsed<=r.route.duration+5;
   const pos=r.practice?getMap(state.options.map).parkedTransport:transportAt(r.route,r.elapsed);if(pos){this.transport.position.set(pos.x,pos.y+(r.practice?0:Math.sin(t)*.18),pos.z);this.transport.rotation.y=pos.yaw;this.transport.rotation.z=r.practice?0:Math.sin(t*.4)*.015;}this.rotors.forEach(m=>m.rotation.y+=dt*(r.practice?.15:18));
   this.wall.visible=this.ring.visible=r.storm.active;this.wall.position.set(r.storm.x,110,r.storm.z);this.wall.scale.set(Math.max(.01,r.storm.radius),1,Math.max(.01,r.storm.radius));this.wall.material.uniforms.time.value=t;this.wall.material.uniforms.outside.value=local&&Math.hypot(local.x-r.storm.x,local.z-r.storm.z)>r.storm.radius?1:0;if(r.storm.active&&(!this.nextRingUpdate||t>this.nextRingUpdate)){const a=this.ring.geometry.attributes.position;for(let i=0;i<a.count;i++){const angle=i/a.count*Math.PI*2,x=r.storm.x+Math.cos(angle)*r.storm.radius,z=r.storm.z+Math.sin(angle)*r.storm.radius;a.setXYZ(i,x,groundAt(ROYALE_MAP,x,z)+.14,z);}a.needsUpdate=true;this.nextRingUpdate=t+.15;}
   const observer=local?.spectating?state.players.find(p=>p.id===this.view.spectateTarget)||local:local;
   const revision=this.view.world.userData.geometryRevision;this.view.world.userData.details?.update(observer,{quality:this.view.settings.quality,scoped:!!observer?.aim&&this.view.scopeActive,time:t});if(revision!==this.view.world.userData.geometryRevision)updateWorldDamage(this.view.world,r.worldDamage,r.matchId+':'+state.round+':'+r.buildVersion);
-  for(const mesh of this.view.world?.children||[])if(mesh.userData.poiLabel||mesh.userData.detailLabel)mesh.visible=!!observer&&(mesh.userData.poiLabel?observer.flight!=='ground'&&observer.health>0:Math.hypot(mesh.position.x-observer.x,mesh.position.z-observer.z)<35);
-  const seen=new Set();
-  for(const item of r.loot){
-   seen.add(item.uid);let mesh=this.loot.get(item.uid);if(mesh&&observer&&Math.hypot(item.x-observer.x,item.z-observer.z)>150){mesh.removeFromParent();this.view.disposeGroup(mesh);this.loot.delete(item.uid);mesh=null;}
-   const close=observer&&Math.hypot(item.x-observer.x,item.z-observer.z)<(this.view.settings.quality==='low'?45:70);
-   if(!mesh&&close){mesh=this.itemModel(item);this.loot.set(item.uid,mesh);this.root.add(mesh);}
-   if(mesh){mesh.visible=!!close;mesh.position.set(item.x,lootHeight(item,state.time)+.24+Math.sin(t*1.65+item.uid)*.055,item.z);mesh.rotation.y=Math.sin(t*.55+item.uid)*.16;if(!item.motion&&item.spawnFrom&&state.time-item.spawnAt<.6){const age=Math.max(0,(state.time-item.spawnAt)/.6),ease=1-(1-age)**3;mesh.position.x=THREE.MathUtils.lerp(item.spawnFrom.x,item.x,ease);mesh.position.z=THREE.MathUtils.lerp(item.spawnFrom.z,item.z,ease);mesh.position.y=THREE.MathUtils.lerp(item.spawnFrom.y,item.y+.24,ease)+Math.sin(age*Math.PI)*.6;}}
-  }
-  for(const [id,m]of this.loot)if(!seen.has(id)){this.root.remove(m);this.view.disposeGroup(m);this.loot.delete(id);}
-  for(const chest of r.chests){
-   const close=!!observer&&(Math.hypot(chest.x-observer.x,chest.z-observer.z)<(this.view.settings.quality==='low'?70:100)||chest.supply);
-   let mesh=this.chests.get(chest.id);if(mesh&&!chest.supply&&observer&&Math.hypot(chest.x-observer.x,chest.z-observer.z)>180){mesh.removeFromParent();this.view.disposeGroup(mesh);this.chests.delete(chest.id);mesh=null;}if(!mesh&&!close)continue;if(!mesh){mesh=this.chestModel(chest.supply,chest.epic);this.chests.set(chest.id,mesh);this.root.add(mesh);if(chest.supply){const rig=new THREE.Group(),c=canopy(kit,0x99dad9);c.position.y=1.5;rig.add(c);for(const x of [-.6,.6])for(const z of [-.4,.4])artKit(kit).beam(rig,[x,1.2,z],[Math.sign(x)*.72,3.7,.1],.018,0xf5ead2);bake(rig,false,true);mesh.add(rig);mesh.userData.canopy=rig;}}
-   const fall=chest.landAt?Math.max(0,(chest.landAt-state.time)*4):0;mesh.position.set(chest.x,lootHeight(chest,state.time)+fall,chest.z);
-   if(mesh.userData.canopy)mesh.userData.canopy.visible=fall>0;
-   mesh.userData.lid.rotation.x+=((chest.opened?-1.7:0)-mesh.userData.lid.rotation.x)*Math.min(1,dt*8);
-
-   mesh.visible=close;
-  }
+  this.updateCollectibles(r,observer,dt,t,state.time);
   for(const p of state.players){
    let mesh=this.gliders.get(p.id);const style=(p.glider||'')+':'+(p.trail||'');
    if(mesh&&mesh.userData.style!==style){this.root.remove(mesh);this.view.disposeGroup(mesh);this.gliders.delete(p.id);mesh=null;}

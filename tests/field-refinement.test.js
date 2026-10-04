@@ -6,7 +6,7 @@ import {canStand,movePlayer,wallDistance} from '../src/physics.js';
 import {inventory,damageObject} from '../src/building.js';
 import {rollChest,rollItem} from '../src/royale-loot.js';
 import {rng,weapon,WEAPONS,ROYALE_WEAPONS} from '../src/data.js';
-import {clearOfRelays,gateBuildFire,SWAP_HOLD_SECONDS,ROYALE_BOT_RANGE} from '../src/field-refinement.js';
+import {clearOfRelays,gateBuildFire,ROYALE_BOT_RANGE} from '../src/field-refinement.js';
 import {skillFor,BOT_SKILL} from '../src/bot-config.js';
 import {stormPriority,chooseObjective} from '../src/bot-objectives.js';
 import {spectatorTargets,watchersFor,watcherAction} from '../src/spectator-status.js';
@@ -52,12 +52,11 @@ test('empty public warmup stays unstarted; first human gets 45s, joins inherit i
  const copy=new RoyaleSimulation().restore(s.checkpoint());assert.equal(copy.queueEnds,s.queueEnds);
  const html=publicRoyaleMarkup({publicMatch:{joinable:true,countdownStarted:false,countdownSeconds:0,availability:{open:true},availableSeats:48,phase:'playing',humanPlayers:0},online:true});assert.match(html,/data-action="public-join"/);assert.match(html,/45s ON FIRST JOIN/);
 });
-test('tap cannot replace a full inventory; held pickup swaps only once and interrupted holds reset',()=>{
+test('tap swaps a full inventory immediately and a held key swaps only once',()=>{
  const{s,p}=flat();for(let i=1;i<=5;i++)p.inventory[i]={id:'sprinter',weapon:true,count:1,rarity:0,ammo:30};s.syncInventory(p);const item=s.dropWeapon({x:1,y:0,z:0},'needle',2);
- s.interact(p,{interact:true},1/60);assert.equal(p.inventory[1].id,'sprinter');s.interact(p,{},1/60);assert.equal(p.swapProgress,0);
- for(let n=0;n<Math.ceil(SWAP_HOLD_SECONDS*60)+1;n++){s.time+=1/60;s.interact(p,{interact:true},1/60);}
- assert.equal(p.inventory[1].id,'needle');assert.ok(!s.loot.includes(item));assert.equal(s.loot.filter(l=>l.weapon).length,1);assert.equal(p.inventory[0].id,'pickaxe');
- for(let n=0;n<150;n++){s.time+=1/60;s.interact(p,{interact:true},1/60);}assert.equal(p.inventory[1].id,'needle');
+ s.interact(p,{interact:true},1/60);assert.equal(p.inventory[1].id,'needle');assert.ok(!s.loot.includes(item));assert.equal(p.swapProgress,0);assert.equal(p.inventory[0].id,'pickaxe');
+ for(let n=0;n<150;n++){s.time+=1/60;s.interact(p,{interact:true},1/60);}assert.equal(p.inventory[1].id,'needle');assert.equal(s.loot.filter(l=>l.weapon).length,1);
+ s.interact(p,{},1/60);s.interact(p,{interact:true},1/60);assert.equal(p.inventory[1].id,'sprinter','release permits the next intentional swap');
 });
 test('building click cannot fire a gun after switching until release, including semi-auto buffered presses',()=>{
  const{s,p}=flat();p.inventory[1]={id:'pip',weapon:true,count:1,rarity:1,ammo:14};s.syncInventory(p);

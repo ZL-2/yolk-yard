@@ -1,6 +1,8 @@
+import {bossMapMarkers} from './bosses.js';
+import {nearbyItems} from './nearby-items.js';
 import {CROWN_ICON} from './crowns.js';
 import {bossCachePrompt} from './season-world.js';
-import {pickupNeedsSwap,SWAP_HOLD_SECONDS} from './field-refinement.js';
+import {pickupNeedsSwap} from './field-refinement.js';
 const setText=(node,value)=>{if(node&&node.textContent!==String(value))node.textContent=value;};
 import {rigRechargeState} from './season-one.js';
 import {frontierPrompt,keycardRoute} from './frontier-world.js';
@@ -14,6 +16,7 @@ import {buildIcon} from './building-ui.js';
 import {gun} from './data.js';
 import {ITEMS,RARITIES,itemInfo,transportAt,ammoType} from './royale-data.js';
 import {ROYALE_MAP} from './royale-map.js';
+import {lootHeight} from './loot-motion.js';
 import {wallDistance,dist} from './physics.js';
 import {groundAt,terrainColor} from './terrain.js';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -64,7 +67,7 @@ export class RoyaleUI{
  }
  drawMap(canvas,state,p,full=false){
   if(!canvas||!state.royale)return;
-  const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height,map=getMap(state.options.map),size=map.size*2,s=w/size,r=state.royale,key=map.id+':'+w;
+  const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height,map=getMap(state.options.map),size=map.size*2,s=w/size,r=state.royale,key=map.id+':'+(map.revision||0)+':'+w;
   const point=(x,z)=>[(x+map.size)*s,(z+map.size)*s];
   c.clearRect(0,0,w,h);
   this.mapBackgrounds??=new Map();
@@ -85,7 +88,8 @@ export class RoyaleUI{
   if(full){for(const landmark of map.landmarks){const [x,z]=point(landmark.x,landmark.z);c.strokeStyle='#fff2b7';c.lineWidth=1.5;c.strokeRect(x-3,z-3,6,6);c.font='600 9px system-ui';c.textAlign='center';c.fillStyle='#ffefc2';c.fillText(landmark.name,x,z+12);}
    c.font='800 13px system-ui';c.textAlign='center';c.strokeStyle='#23453b';c.lineWidth=3;c.fillStyle='#fff9e5';for(const poi of map.districts){const [x,z]=point(poi.x,poi.z);c.strokeText(poi.name.toUpperCase(),x,z-35*s);c.fillText(poi.name.toUpperCase(),x,z-35*s);}}
   for(const station of r.relays||[]){const [x,z]=point(station.x,station.z);c.fillStyle='#69e9cd';c.fillRect(x-3,z-3,6,6);if(full){c.font='bold 10px system-ui';c.fillText('RELAY',x,z+15);}}
-  const boss=state.players.find(o=>o.boss&&o.health>0),command=map.districts?.find(p=>p.id==='observatory');if(command&&!r.practice){const[x,z]=point(command.x,command.z);c.save();c.beginPath();c.arc(x,z,(full?29:13),0,Math.PI*2);c.fillStyle='#b3443338';c.fill();c.strokeStyle='#ffd18a';c.lineWidth=full?3:2;c.stroke();c.fillStyle='#ffdda1';c.font='bold '+(full?24:18)+'px system-ui';c.textAlign='center';c.strokeStyle='#132f40';c.lineWidth=3;c.strokeText(boss?'★':'◇',x,z+6);c.fillText(boss?'★':'◇',x,z+6);if(full){c.font='bold 11px system-ui';c.fillText(boss?'VOSS · BOSS + VAULT':'VOSS VAULT',x,z+43);}c.restore();}
+  if(!r.practice)for(const marker of bossMapMarkers(map,state.players,r.bossCaches)){const[x,z]=point(marker.x,marker.z);c.save();c.beginPath();c.arc(x,z,full?22:10,0,Math.PI*2);c.fillStyle='#b3443338';c.fill();c.strokeStyle=marker.color;c.lineWidth=full?3:2;c.stroke();c.fillStyle=marker.color;c.font='bold '+(full?22:15)+'px system-ui';c.textAlign='center';c.strokeStyle='#132f40';c.lineWidth=3;c.strokeText(marker.alive?'★':'◇',x,z+5);c.fillText(marker.alive?'★':'◇',x,z+5);if(full){c.font='bold 10px system-ui';c.fillText(marker.label,x,z+35);}c.restore();}
+
   const guidance=keycardRoute(map,r,p);if(guidance){const v=map.vault,[x,z]=point(v.entrance.x,v.entrance.z);c.save();c.strokeStyle='#9ceaff';c.lineWidth=2;c.setLineDash([4,3]);c.beginPath();c.moveTo(...point(p.x,p.z));c.lineTo(x,z);c.stroke();c.setLineDash([]);c.strokeRect(x-5,z-5,10,10);c.restore();}
   for(const chest of r.chests||[])if(chest.supply&&!chest.opened){const [x,z]=point(chest.x,chest.z);c.fillStyle='#ffd377';c.beginPath();c.moveTo(x,z-5);c.lineTo(x+5,z);c.lineTo(x,z+5);c.lineTo(x-5,z);c.closePath();c.fill();}
   for(const marker of visibleMarkers(state,p)){const [x,z]=point(marker.x,marker.z);const owner=state.players.find(o=>o.id===marker.player),style=owner?teamStyle(state.players,owner):{slot:1,color:'#7dddf4'};c.fillStyle=marker.kind==='danger'?'#ff795f':style.color;c.strokeStyle='#102e36';c.lineWidth=2;c.beginPath();c.moveTo(x,z-7);c.lineTo(x+6,z);c.lineTo(x,z+7);c.lineTo(x-6,z);c.closePath();c.fill();c.stroke();c.fillStyle='#102e36';c.font='bold 10px system-ui';c.textAlign='center';c.fillText(marker.kind==='danger'?'!':String(style.slot),x,z+3);}
@@ -138,11 +142,11 @@ export class RoyaleUI{
   const rescue=local.reviving?state.players.find(o=>o.id===local.reviving):local.downed&&local.reviverId?local:null;
   if(rescue){$('royale-use').hidden=false;setText($('royale-use-label'),`${local.downed?'Being revived':'Reviving '+rescue.name} · ${Math.max(0,REVIVE_RULES.seconds-rescue.reviveProgress).toFixed(1)}s`);$('royale-use-fill').style.width=(rescue.reviveProgress/REVIVE_RULES.seconds*100)+'%';}
   let prompt='';if(canFight(local)&&local.flight==='ground'&&!paused){
-   const accessible=item=>{if(dist(local,item)>3.2||item.landAt>state.time)return false;const from={x:local.x,y:local.y+.9,z:local.z},dx=item.x-from.x,dy=item.y+.6-from.y,dz=item.z-from.z,len=Math.hypot(dx,dy,dz)||1;return wallDistance(getMap(state.options.map),from,{x:dx/len,y:dy/len,z:dz/len},len)>=len-.15;};
-   const chest=r.chests.find(c=>!c.opened&&accessible(c));const item=r.loot.filter(i=>accessible(i)).sort((a,b)=>dist(local,a)-dist(local,b))[0];
+   const accessible=source=>{const item=source.motion?{...source,y:lootHeight(source,state.time)}:source;if(dist(local,item)>3.2||item.landAt>state.time)return false;const from={x:local.x,y:local.y+.9,z:local.z},dx=item.x-from.x,dy=item.y+.6-from.y,dz=item.z-from.z,len=Math.hypot(dx,dy,dz)||1;return wallDistance(getMap(state.options.map),from,{x:dx/len,y:dy/len,z:dz/len},len)>=len-.15;};
+   const chest=nearbyItems(r,'chests',local,3.3).find(c=>!c.opened&&accessible(c));const item=nearbyItems(r,'loot',local,3.2).filter(i=>!(i.droppedBy===local.id&&i.pickupAfter>state.time)&&accessible(i)).sort((a,b)=>dist(local,a)-dist(local,b))[0];
    if(item?.ammoType)prompt=`${escape(item.count)} ${escape(item.ammoType.toUpperCase())} AMMO<small>Automatic pickup</small>`;
    else if(chest)prompt=`<kbd>${escape(label('interact'))}</kbd> HOLD TO SEARCH ${chest.supply?'SUPPLY DROP':chest.epic?'EPIC CHEST':'CHEST'}`;
-   else if(item){const info=itemInfo(item),swap=pickupNeedsSwap(local,item),rarity=RARITIES[item.rarity??ITEMS[item.id]?.rarity??0];prompt=`<kbd>${escape(label('interact'))}</kbd> ${escape(info.name)} <span style="color:${info.color}">${item.weapon||['jumpRig','anchorWinch','veilProjector','victoryCrown'].includes(item.id)?rarity.name:'×'+item.count}</span><small>${swap?'HOLD TO SWAP · '+Math.min(100,Math.round((local.swapUid===item.uid?local.swapProgress||0:0)/SWAP_HOLD_SECONDS*100))+'%':'Pick up'}</small>`;}
+   else if(item){const info=itemInfo(item),swap=pickupNeedsSwap(local,item),rarity=RARITIES[item.rarity??ITEMS[item.id]?.rarity??0];prompt=`<kbd>${escape(label('interact'))}</kbd> ${escape(info.name)} <span style="color:${info.color}">${item.weapon||['jumpRig','anchorWinch','veilProjector','victoryCrown'].includes(item.id)?rarity.name:'×'+item.count}</span><small>${swap?'Press to swap selected slot':'Pick up'}</small>`;}
   }
   const relay=r.relays?.find(o=>dist(local,o)<3);if(relay&&!paused)prompt=`<kbd>${escape(label('interact'))}</kbd> ${relay.cooldown>state.time?'RELAY RECHARGING · '+Math.ceil(relay.cooldown-state.time)+'s':'HOLD 3s TO SCAN · '+Math.round(relay.progress/3*100)+'%'}<small>Reveals nearby activity AND your location for 12 seconds</small>`;
   const field=!paused&&frontierPrompt(getMap(state.options.map),r,local);const cache=!paused&&bossCachePrompt(r.bossCaches,local);if(cache)prompt=`<kbd>${escape(label('interact'))}</kbd> ${escape(cache.text)}${cache.progress?'<small>'+Math.round(cache.progress/1.5*100)+'% AUTHENTICATING</small>':''}`;

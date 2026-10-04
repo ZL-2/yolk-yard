@@ -1,4 +1,7 @@
 import {BOSSES} from './bosses.js';
+import {nearbyItems} from './nearby-items.js';
+const bossIds=new Set(BOSSES.map(b=>b.id));
+export const BOSS_SOUND_ICON='./art/boss-sound.png';
 // Presentation consumes existing replicated sounds/movement; no new network scans.
 export const SOUND_RANGES=Object.freeze({footsteps:26,glider:24,chest:12,gunfire:125,explosion:190,activity:20});
 const paths={
@@ -22,7 +25,7 @@ export function audibleVisualEvent(e){
  return null;
 }
 export class SoundVisuals{
- constructor(root){this.node=document.createElement('div');this.node.id='visual-sounds';this.node.setAttribute('aria-label','Directional sound indicators');this.node.hidden=true;root.append(this.node);this.signals=new Map();this.lastEvent=0;this.nextAt=0;}
+ constructor(root){this.node=document.createElement('div');this.node.id='visual-sounds';this.node.setAttribute('aria-label','Directional sound indicators');this.node.hidden=true;root.append(this.node);this.signals=new Map();this.lastEvent=0;this.nextAt=0;this.icons=[];}
  update(state,listener,{enabled=true,playing=true}={},now=performance.now()){
   this.node.hidden=!enabled||!playing||!listener||listener.health<=0||!visualSoundsAllowed(state,listener);
   if(this.node.hidden){this.signals.clear();this.lastEvent=state?.events?.at(-1)?.id||0;return;}
@@ -35,12 +38,12 @@ export class SoundVisuals{
    if(distance>=range)return;
    this.signals.set(key,{kind,point:{x:point.x,y:point.y,z:point.z},until:now+ttl*1000,strength:Math.max(.3,1-distance/range)});
   };
-  for(const e of state.events||[])if(e.id>this.lastEvent){this.lastEvent=e.id;if(state.time-e.time>1.3||e.player===listener.id)continue;const cue=audibleVisualEvent(e);if(cue){const kind=BOSSES.some(b=>b.id===e.player)?'boss':cue.kind;add(kind+':'+(e.player||e.id),kind,cue.point,cue.range,cue.ttl);}}
+  for(const e of state.events||[])if(e.id>this.lastEvent){this.lastEvent=e.id;if(state.time-e.time>1.3||e.player===listener.id)continue;const cue=audibleVisualEvent(e);if(cue){const kind=bossIds.has(e.player)?'boss':cue.kind;add(kind+':'+(e.player||e.id),kind,cue.point,cue.range,cue.ttl);}}
   for(const p of state.players||[]){if(p.id===listener.id||p.health<=0||p.spectating)continue;
    if(p.flight==='glide')add('glider:'+p.id,'glider',p,24,.22);
    else if((p.flight==='ground'||!state.royale)&&p.grounded!==false&&p.moving&&!p.crouching&&!p.sliding&&!p.downed&&Math.hypot(p.vx||0,p.vz||0)>.8)add('footsteps:'+p.id,p.boss?'boss':'footsteps',p,p.sprinting?26:20,.28);
   }
-  for(const c of state.royale?.chests||[])if(!c.opened&&!(c.landAt>state.time))add('chest:'+c.id,'chest',c,12,.25);
+  if(state.royale)for(const c of nearbyItems(state.royale,'chests',listener,12))if(!c.opened&&!(c.landAt>state.time))add('chest:'+c.id,'chest',c,12,.25);
   for(const [id,c]of this.signals)if(c.until<=now)this.signals.delete(id);
   // At most eight sectors/icons during the active match.
   const sectors=new Map();for(const c of this.signals.values()){
@@ -48,6 +51,11 @@ export class SoundVisuals{
    if(!old||c.strength>old.strength)sectors.set(key,{...c,angle});
   }
   const cues=[...sectors.values()].sort((a,b)=>b.strength-a.strength).slice(0,8);
-  this.node.innerHTML=cues.map(c=>`<span class="sound-direction ${c.kind}" style="--bearing:${c.angle}rad;opacity:${c.strength}" aria-label="${c.kind}"><i class="sound-arc"></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[c.kind]}"/></svg></span>`).join('');
+  for(let i=0;i<Math.max(cues.length,this.icons.length);i++){
+   const c=cues[i];let node=this.icons[i];if(!node&&c){node=document.createElement('span');node.innerHTML=`<i class="sound-arc"></i><svg viewBox="0 0 24 24" aria-hidden="true"><path/></svg><img src="${BOSS_SOUND_ICON}" alt="" decoding="async"/>`;this.node.append(node);this.icons.push(node);}
+   if(!node)continue;node.hidden=!c;if(!c)continue;
+   if(node.dataset.kind!==c.kind){node.dataset.kind=c.kind;node.className='sound-direction '+c.kind;node.setAttribute('aria-label',c.kind);node.querySelector('img').hidden=c.kind!=='boss';node.querySelector('svg').hidden=c.kind==='boss';node.querySelector('path').setAttribute('d',paths[c.kind]);}
+   node.style.setProperty('--bearing',c.angle+'rad');node.style.opacity=c.strength;
+  }
  }
 }

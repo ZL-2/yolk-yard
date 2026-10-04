@@ -1,4 +1,5 @@
-import {nearbyItems} from './nearby-items.js';
+import {nearbyItems,itemById} from './nearby-items.js';
+import {ROYALE_BOT_RANGE} from './field-refinement.js';
 import {gun,weapon,mode} from './data.js';
 import {falloffAt,rarityVariant} from './combat.js';
 import {ITEMS,ammoType,AMMO_CAPS} from './royale-data.js';
@@ -48,14 +49,41 @@ export function stormPriority(sim,p,skill){
  const x=s.nextX+Math.cos(angle)*r,z=s.nextZ+Math.sin(angle)*r;
  return {kind:'rotate',urgent:outside||s.closing&&travel+8>=s.seconds,goal:{x,z,y:groundAt(sim.map,x,z)},travel};
 }
+function lootObjective(sim,p,brain,nearSquad,unarmed=false){
+ for(const item of nearbyItems(sim,'loot',p,unarmed?40:28)){
+  if(unarmed&&!item.weapon||!nearSquad(item)||brain.unreachable?.[item.uid]>sim.time||usefulLoot(p,item)<=0)continue;
+  const known=brain.lootMemory[item.uid];if(known&&sim.time-known.at<.75||seesPoint(sim,p,item))brain.lootMemory[item.uid]={uid:item.uid,at:sim.time};
+ }
+ let best=null,bestValue=0;
+ for(const [uid,known]of Object.entries(brain.lootMemory)){
+  const item=itemById(sim,'loot',known.uid);if(!item||sim.time-known.at>35){delete brain.lootMemory[uid];continue;}
+  if(unarmed&&!item.weapon||brain.unreachable?.[item.uid]>sim.time||!nearSquad(item))continue;
+  const value=usefulLoot(p,item)/(1+dist(p,item)*.055);if(value>bestValue){bestValue=value;best=item;}
+ }
+ return best?{kind:'loot',goal:{x:best.x,y:best.y,z:best.z},uid:best.uid}:null;
+}
+function chestObjective(sim,p,brain,nearSquad,radius=20){
+ let best=null,nearest=Infinity;
+ for(const c of nearbyItems(sim,'chests',p,radius)){
+  const d=dist(p,c);if(d>=nearest||!nearSquad(c)||brain.unreachable?.[c.id]>sim.time||c.opened||c.landAt>sim.time||d>radius)continue;
+  if(d<BOT_WORLD_SENSES.chestHumRadius||seesPoint(sim,p,c)){best=c;nearest=d;}
+ }
+ return best?{kind:'chest',goal:{x:best.x,y:best.y,z:best.z},id:best.id}:null;
+}
 export function chooseObjective(sim,p,brain,skill,target){
  const royale=!!p.inventory&&!isWarmup(sim.stage),storm=royale?stormPriority(sim,p,skill):null;
  const anchor=royale?squadAnchor(sim,p,brain):null,nearSquad=q=>!anchor||dist(q,anchor)<=teamPolicy.lootLeash;
- const underFire=sim.time-(brain.attackedAt??-100)<2.5,threat=!!target&&(target.visible||underFire);
+ const underFire=sim.time-(brain.attackedAt??-100)<2.5,threat=!!target&&(target.visible||underFire)&&(!royale||dist(p,target)<=ROYALE_BOT_RANGE.engage);
+ const unarmed=royale&&!p.inventory.some(i=>i?.weapon&&(i.ammo>0||p.bank[ammoType(i.id)]>0));
  if(storm?.urgent)return storm;
+ // A landed bot needs a gun before taking fights or following a distant squad.
+ // Visibility of an opponent must never block a reachable first gun pickup.
+ if(unarmed){const first=lootObjective(sim,p,brain,()=>true,true)||chestObjective(sim,p,brain,()=>true,32);if(first)return first;
+  let best=null,nearest=Infinity;for(const q of sim.map.floorLoot||[])if(q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35){const d=dist(p,q);if(d<nearest){nearest=d;best=q;}}
+  if(best)return {kind:'search-room',goal:best,id:best.id};
+ }
  if(anchor&&dist(p,anchor)>teamPolicy.regroupDistance&&(!underFire||!target||dist(p,target)>10))return {kind:'follow',goal:followGoal(sim,p,anchor),id:anchor.id};
  if(threat){
-  const unarmed=!!p.inventory&&!p.inventory.some(i=>i?.weapon&&(i.ammo>0||p.bank[ammoType(i.id)]>0));
   if(unarmed){const cover=coverPoint(sim,p,target);if(cover)return {kind:'cover',goal:cover};const dx=p.x-target.x,dz=p.z-target.z,len=Math.hypot(dx,dz)||1;return {kind:'retreat',goal:{x:p.x+dx/len*8,y:p.y,z:p.z+dz/len*8}};}
   const low=p.health<skill.retreat||p.reloadEnd>sim.time||p.ammo[p.slot]===0;
   if(low||underFire&&sim.random()<skill.cover){const cover=coverPoint(sim,p,target);if(cover)return {kind:'cover',goal:cover,enemy:target};}
@@ -68,12 +96,9 @@ export function chooseObjective(sim,p,brain,skill,target){
   const heal=p.inventory.findIndex(i=>i&&((ITEMS[i.id]?.kind==='heal'&&p.health<80)||(ITEMS[i.id]?.kind==='shield'&&p.shield<Math.min(100,ITEMS[i.id].cap||100))||(i.id==='splash'&&(p.health<85||p.shield<70))));
   if(heal>=1&&!underFire){if(target){const cover=coverPoint(sim,p,target);if(cover&&dist(p,cover)>1)return {kind:'cover',goal:cover};}return {kind:'heal',goal:{x:p.x,y:p.y,z:p.z},slot:heal};}
   // Items become known by proximity + LOS. Authored rooms guide searches, not hidden rolls.
-  for(const item of nearbyItems(sim,'loot',p,28))if(dist(p,item)<28&&seesPoint(sim,p,item))brain.lootMemory[item.uid]={uid:item.uid,at:sim.time};
-  let best=null,bestValue=0;
-  for(const item of sim.loot){const known=brain.lootMemory[item.uid];if(!known||sim.time-known.at>35||brain.unreachable?.[item.uid]>sim.time||!nearSquad(item))continue;const value=usefulLoot(p,item)/(1+dist(p,item)*.055);if(value>bestValue){bestValue=value;best=item;}}
-  if(best)return {kind:'loot',goal:{x:best.x,y:best.y,z:best.z},uid:best.uid};
+  const loot=lootObjective(sim,p,brain,nearSquad);if(loot)return loot;
   const weapons=p.inventory.filter(i=>i?.weapon),needs=weapons.length<2||!weapons.some(i=>i.ammo+p.bank[ammoType(i.id)]>10)||p.shield<35;
-  if(needs){const chest=nearbyItems(sim,'chests',p,20).filter(c=>nearSquad(c)&&!(brain.unreachable?.[c.id]>sim.time)&&!c.opened&&(!c.landAt||c.landAt<=sim.time)&&dist(p,c)<20&&(dist(p,c)<BOT_WORLD_SENSES.chestHumRadius||seesPoint(sim,p,c))).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(chest)return {kind:'chest',goal:{x:chest.x,y:chest.y,z:chest.z},id:chest.id};}
+  if(needs){const chest=chestObjective(sim,p,brain,nearSquad);if(chest)return chest;}
   if(!underFire&&weapons.length&&Object.values(p.materials).reduce((a,b)=>a+b,0)<teamPolicy.totalMaterials){
    const resource=[...candidates(sim.map,p,null,0,teamPolicy.harvestRadius)].filter(b=>b.objectId&&!(brain.unreachable?.[b.objectId]>sim.time)&&!b.buildId&&b.kind!=='boundary'&&nearSquad(b)&&dist(p,b)<teamPolicy.harvestRadius&&!sim.worldDamage?.[b.objectId]?.destroyed&&p.materials[harvestDefinition(b,sim.map).material]<teamPolicy.materialTarget).map(b=>harvestObjective(sim,p,b)).filter(Boolean).sort((a,b)=>dist(p,a.goal)-dist(p,b.goal))[0];if(resource)return resource;
   }

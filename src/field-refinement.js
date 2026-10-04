@@ -1,6 +1,6 @@
 // Shared host rules for authored recovery supplies and deliberate pickups.
 export const SHIELD_BARREL=Object.freeze({restore:10,radius:3.6,health:150});
-export const SWAP_HOLD_SECONDS=.45;
+export const SWAP_HOLD_SECONDS=0; // Compatibility for older checkpoints; swaps are immediate.
 export const RELAY_LOOT_CLEARANCE=3.4;
 export const ROYALE_BOT_RANGE=Object.freeze({vision:70,engage:62});
 import {ITEMS} from './royale-data.js';

@@ -1,4 +1,5 @@
 import {isWarmup} from './royale-phases.js';
+import {itemById} from './nearby-items.js';
 import {gun,weapon,mode,clamp} from './data.js';
 import {dist} from './physics.js';
 import {eyeHeight,bodyHeight} from './stance.js';
@@ -45,7 +46,8 @@ export function botInput(sim,p){
  observe(sim,p,brain,skill);const target=selectThreat(sim,p,brain,skill);
  const evacuation=p.inventory?stormPriority(sim,p,skill):null;
  if(evacuation?.urgent){brain.decision=0;brain.utility=null;sim.cancelUse?.(p);}
- const visible=!!target?.visible&&now-target.seenAt<skill.perception+.08&&seesPoint(sim,p,target);
+ const visible=!!target?.visible&&now-target.seenAt<skill.perception+.08;
+ const unarmed=!!p.inventory&&!p.inventory.some(i=>i?.weapon&&(i.ammo>0||p.bank[ammoType(i.id)]>0));
  let slot=selectWeapon(p,target),w=gun(p,slot);
  if(p.use){brain.utility=null;if(visible||now-(brain.attackedAt??-100)<.6)sim.cancelUse?.(p);else return {yaw:p.yaw,pitch:p.pitch,slot:p.use.slot,forward:0,strafe:0,swapSlot:-1};}
  if(now>=brain.decision||!brain.task||brain.weapon!==w.id){
@@ -67,14 +69,14 @@ export function botInput(sim,p){
  const move=navigate(sim,p,brain,goal,skill),distance=target?dist(p,target):Infinity;
  let yaw=Math.atan2(-move.mx,-move.mz),pitch=0,fire=false,popper=false,interact=move.interact&&!p.interactLatch;
  if(!move.mx&&!move.mz)yaw=p.yaw+(target?0:Math.sin(now*.35+(p.botSeed||0))*.03);
- if(task.kind==='loot'&&!visible&&now-(brain.attackedAt??-100)>2){
-  const item=sim.loot.find(i=>i.uid===task.uid);
+ if(task.kind==='loot'&&(unarmed||!visible&&now-(brain.attackedAt??-100)>2)){
+  const item=itemById(sim,'loot',task.uid);
   if(!item)brain.decision=0;else if(sim.accessible(p,item)){
    if(item.weapon&&p.inventory.every(Boolean)){const similar=p.inventory.findIndex(i=>i?.weapon&&weapon(i.id).role===weapon(item.id).role);if(similar>0)slot=similar;}
    interact=!p.interactLatch;
   }
  }
- if(task.kind==='chest'&&!visible&&now-(brain.attackedAt??-100)>2){const chest=sim.chests.find(c=>c.id===task.id);if(!chest||chest.opened)brain.decision=0;else if(sim.accessible(p,chest,3.3))interact=true;}
+ if(task.kind==='chest'&&(unarmed&&distance>8||!visible&&now-(brain.attackedAt??-100)>2)){const chest=itemById(sim,'chests',task.id);if(!chest||chest.opened)brain.decision=0;else if(sim.accessible(p,chest,3.3))interact=true;}
  if(task.kind==='harvest'&&!visible){
   const box=sim.map.boxes.find(b=>b.objectId===task.id),enough=p.materials[task.material]>=teamPolicy.materialTarget||Object.values(p.materials).reduce((a,b)=>a+b,0)>=teamPolicy.totalMaterials;
   if(!box||sim.worldDamage?.[task.id]?.destroyed||enough){brain.decision=0;fire=false;}
@@ -112,3 +114,4 @@ export function botInput(sim,p){
  return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,combatAim:visible&&!brain.utility}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
 }
 import {teammates} from './teams.js';
+import {ammoType} from './royale-data.js';

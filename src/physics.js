@@ -34,38 +34,62 @@ export function rayBox(o, d, b, max = Infinity) {
 // Spatial buckets keep large-island collision proportional to nearby cover.
 const collisionIndex = new WeakMap();
 export function invalidateCollision(map){collisionIndex.delete(map);}
+function collisionGrid(map){
+ let grid=collisionIndex.get(map);
+ if(grid&&grid.boxes===map.boxes&&grid.count===map.boxes.length)return grid;
+ let minX=Infinity,minZ=Infinity,maxX=-Infinity,maxZ=-Infinity;
+ for(const b of map.boxes){minX=Math.min(minX,Math.floor((b.x-b.w/2)/8));maxX=Math.max(maxX,Math.floor((b.x+b.w/2)/8));minZ=Math.min(minZ,Math.floor((b.z-b.d/2)/8));maxZ=Math.max(maxZ,Math.floor((b.z+b.d/2)/8));}
+ if(!map.boxes.length)minX=minZ=maxX=maxZ=0;
+ const width=maxX-minX+1,height=maxZ-minZ+1,buckets=new Array(width*height);
+ for(let id=0;id<map.boxes.length;id++){const b=map.boxes[id];for(let x=Math.floor((b.x-b.w/2)/8);x<=Math.floor((b.x+b.w/2)/8);x++)for(let z=Math.floor((b.z-b.d/2)/8);z<=Math.floor((b.z+b.d/2)/8);z++){const key=(x-minX)*height+z-minZ;const bucket=buckets[key]??={ids:[],boxes:[]};bucket.ids.push(id);bucket.boxes.push(b);}}
+ grid={boxes:map.boxes,count:map.boxes.length,minX,minZ,maxX,maxZ,height,buckets,stamp:0,seen:new Uint32Array(map.boxes.length),queries:new Map()};collisionIndex.set(map,grid);return grid;
+}
+function queryStamp(grid){if(++grid.stamp===0xffffffff){grid.seen.fill(0);grid.stamp=1;}return grid.stamp;}
+const EMPTY_BOXES=Object.freeze([]);
 export function candidates(map,o,d=null,max=0,radius=RADIUS){
  if(map.theme!=='royale')return map.boxes;
- let grid=collisionIndex.get(map);
- if(!grid){grid=new Map();for(const b of map.boxes){for(let x=Math.floor((b.x-b.w/2)/8);x<=Math.floor((b.x+b.w/2)/8);x++)for(let z=Math.floor((b.z-b.d/2)/8);z<=Math.floor((b.z+b.d/2)/8);z++){const k=x+','+z;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(b);}}collisionIndex.set(map,grid);}
+ const grid=collisionGrid(map);
  // Reuse exact bucket unions for movement and short collision/LOS probes.
  // Cached arrays are read-only; invalidation discards every geometry reference.
  const length=d?Math.min(Number.isFinite(max)?max:1600,1600):0;
  const steps=Math.max(1,Math.ceil(length*Math.hypot(d?.x||0,d?.z||0)/8));
  if(!d||steps===1){
   const ex=o.x+(d?.x||0)*length,ez=o.z+(d?.z||0)*length;
-  const x0=Math.floor((Math.min(o.x,ex)-radius)/8),x1=Math.floor((Math.max(o.x,ex)+radius)/8),z0=Math.floor((Math.min(o.z,ez)-radius)/8),z1=Math.floor((Math.max(o.z,ez)+radius)/8),key=x0+':'+x1+':'+z0+':'+z1;
-  grid.pointQueries??=new Map();const cached=grid.pointQueries.get(key);if(cached)return cached;
+  const x0=Math.max(grid.minX,Math.floor((Math.min(o.x,ex)-radius)/8)),x1=Math.min(grid.maxX,Math.floor((Math.max(o.x,ex)+radius)/8)),z0=Math.max(grid.minZ,Math.floor((Math.min(o.z,ez)-radius)/8)),z1=Math.min(grid.maxZ,Math.floor((Math.max(o.z,ez)+radius)/8));
+  if(x0>x1||z0>z1)return EMPTY_BOXES;
+  const first=(x0-grid.minX)*grid.height+z0-grid.minZ,last=(x1-grid.minX)*grid.height+z1-grid.minZ;
+  if(first===last)return grid.buckets[first]?.boxes||EMPTY_BOXES;
+  const key=first*grid.buckets.length+last,cached=grid.queries.get(key);if(cached)return cached;
   let nearby;
-  if(x0===x1&&z0===z1)nearby=grid.get(x0+','+z0)||[];
-  else{const union=new Set();for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++)for(const b of grid.get(x+','+z)||[])union.add(b);nearby=[...union];}
-  if(grid.pointQueries.size>=512)grid.pointQueries.delete(grid.pointQueries.keys().next().value);
-  grid.pointQueries.set(key,nearby);return nearby;
+  const stamp=queryStamp(grid);nearby=[];for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++){const bucket=grid.buckets[(x-grid.minX)*grid.height+z-grid.minZ];if(bucket)for(const id of bucket.ids)if(grid.seen[id]!==stamp){grid.seen[id]=stamp;nearby.push(grid.boxes[id]);}}
+  if(grid.queries.size>=512)grid.queries.delete(grid.queries.keys().next().value);
+  grid.queries.set(key,nearby);return nearby;
  }
- const found=new Set(),visited=new Set();
+ const found=[],stamp=queryStamp(grid);
  // Query the swept segment's actual buckets, including the full player/bolt
  // radius. Nine whole neighboring buckets per point used to dominate bot cost.
  for(let i=0;i<steps;i++){
   const from=length*i/steps,to=length*(i+1)/steps,ax=o.x+(d?.x||0)*from,az=o.z+(d?.z||0)*from,bx=o.x+(d?.x||0)*to,bz=o.z+(d?.z||0)*to;
   for(let x=Math.floor((Math.min(ax,bx)-radius)/8);x<=Math.floor((Math.max(ax,bx)+radius)/8);x++)for(let z=Math.floor((Math.min(az,bz)-radius)/8);z<=Math.floor((Math.max(az,bz)+radius)/8);z++){
-   const key=x+','+z;if(visited.has(key))continue;visited.add(key);for(const b of grid.get(key)||[])found.add(b);
+   if(x<grid.minX||x>grid.maxX||z<grid.minZ||z>grid.maxZ)continue;const bucket=grid.buckets[(x-grid.minX)*grid.height+z-grid.minZ];if(bucket)for(const id of bucket.ids)if(grid.seen[id]!==stamp){grid.seen[id]=stamp;found.push(grid.boxes[id]);}
   }
  }
  return found;
 }
 export function wallDistance(map, o, d, max = 200) {
   let t = max;
-  for (const b of candidates(map,o,d,max)) t = Math.min(t, rayBox(o, d, b, t));
+  if(map.theme!=='royale'){for(const b of map.boxes)t=Math.min(t,rayBox(o,d,b,t));}
+  else{
+   // Visit ray buckets in order and stop at the nearest hit. No candidate Set,
+   // strings or result array is allocated for the many bot sight-line probes.
+   const grid=collisionGrid(map),stamp=queryStamp(grid),length=Math.min(Number.isFinite(max)?max:1600,1600),steps=Math.max(1,Math.ceil(length*Math.hypot(d.x,d.z)/8));
+   for(let i=0;i<steps&&length*i/steps<=t;i++){
+    const from=length*i/steps,to=Math.min(t,length*(i+1)/steps),ax=o.x+d.x*from,az=o.z+d.z*from,bx=o.x+d.x*to,bz=o.z+d.z*to;
+    for(let x=Math.max(grid.minX,Math.floor(Math.min(ax,bx)/8));x<=Math.min(grid.maxX,Math.floor(Math.max(ax,bx)/8));x++)for(let z=Math.max(grid.minZ,Math.floor(Math.min(az,bz)/8));z<=Math.min(grid.maxZ,Math.floor(Math.max(az,bz)/8));z++){
+     const bucket=grid.buckets[(x-grid.minX)*grid.height+z-grid.minZ];if(bucket)for(const id of bucket.ids)if(grid.seen[id]!==stamp){grid.seen[id]=stamp;t=Math.min(t,rayBox(o,d,grid.boxes[id],t));}
+    }
+   }
+  }
   const ground=terrainHit(map,o,d,t);if(ground)t=Math.min(t,ground.distance);
   return t;
 }

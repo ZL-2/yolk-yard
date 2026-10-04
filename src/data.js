@@ -3,8 +3,8 @@ import { safeName } from './moderation.js';
 import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
-// Rebuilt arena collision geometry must not mix with older clients.
-export const VERSION = 38;
+// Immediate pickups and revised Royale combat require matching clients.
+export const VERSION = 39;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -171,10 +171,12 @@ export const NO_EYEWEAR = 6;
 const cosmeticIndex = (value, options) => Number.isInteger(Number(value)) && Number(value) >= 0 && Number(value) < options.length ? Number(value) : 0;
 export const TEAM_COLORS = [0x3d8ce8, 0xd94949];
 export const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-export const weapon = (id) => WEAPONS.find((w) => w.id === id) || ROYALE_WEAPONS.find(w => w.id === id) || WEAPONS[0];
+const weaponIndex=new Map([...ROYALE_WEAPONS,...WEAPONS].map(w=>[w.id,w])),itemStats=new WeakMap();
+export const weapon = (id) => weaponIndex.get(id)||WEAPONS[0];
 export const gun = (p, slot=p.slot) => {
  if (!p.inventory) return weapon(slot === 1 ? "pip" : p.weapon);
- const item=p.inventory[slot], base=weapon(item?.weapon ? item.id : 'pip');
+ const item=p.inventory[slot],cached=item&&itemStats.get(item);if(cached&&cached.id===item.id&&cached.rarity===item.rarity&&cached.bossId===item.bossId&&cached.weapon===item.weapon)return cached.stats;
+ const base=weapon(item?.weapon ? item.id : 'pip');
  const mythic=item?.rarity===5?MYTHIC_WEAPONS[item.bossId]:null;
  const rarity=Math.max(0,Math.min(5,item?.rarity||0)),key=base.id+rarity+':'+(mythic?item.bossId:'');
  if(!royaleStats.has(key)){
@@ -182,7 +184,7 @@ export const gun = (p, slot=p.slot) => {
   if(mythic&&mythic.id===base.id)Object.assign(v,{name:mythic.name,rarity:5,damage:base.damage*mythic.damage,reload:base.reload*mythic.reload,reloadEmpty:base.reloadEmpty*mythic.reload,spread:base.spread*(mythic.spread||1),adsSpread:base.adsSpread*(mythic.spread||1),interval:base.interval*(mythic.interval||1),magazine:mythic.magazine||base.magazine,firstShot:mythic.firstShot??base.firstShot});
   royaleStats.set(key,v);
  }
- return royaleStats.get(key);
+ const stats=royaleStats.get(key);if(item)itemStats.set(item,{id:item.id,rarity:item.rarity,bossId:item.bossId,weapon:item.weapon,stats});return stats;
 };
 export const mode = (id) => MODES.find((m) => m.id === id) || MODES.find(m => m.id === "ffa");
 export const cleanName = safeName;

@@ -1,4 +1,5 @@
 import {relayURL} from './relay-peer.js';
+import {prepareFrontMessage,updateFrontMessage} from './front-message.js';
 export function elapsedClock(start,now=Date.now()){
  const total=Math.max(0,Math.floor((now-start)/1000));return [Math.floor(total/3600),Math.floor(total/60)%60,total%60].map(n=>String(n).padStart(2,'0')).join(':');
 }
@@ -9,7 +10,7 @@ export class LobbyStatus{
   // Retire the old per-browser incident timer. Shared incidents come only from the server.
   try{storage?.removeItem('ravelfront-local-incident');}catch{}
   this.root=document.createElement('aside');this.root.className='lobby-service-status';this.root.hidden=true;this.root.setAttribute('role','status');this.root.innerHTML='<strong>WIDESPREAD PERFORMANCE NOTICE</strong><p class="service-issue"></p><p class="service-work">We’re working to restore smooth gameplay.</p><div class="service-elapsed">ONGOING FOR <time>00:00:00</time></div>';
-  document.body.append(this.root);this.pollTimer=setInterval(()=>void this.poll(),5000);this.pollTimer.unref?.();void this.poll();
+  prepareFrontMessage(this.root);this.pollTimer=setInterval(()=>void this.poll(),5000);this.pollTimer.unref?.();void this.poll();
  }
  async poll(){
   if(!this.url||this.polling||document.hidden)return;this.polling=true;
@@ -35,9 +36,10 @@ export class LobbyStatus{
    }
   }
   const clock=this.monotonic();
-  if(!this.notice||this.syncedAt===null||clock-this.syncedAt>45000){this.root.hidden=true;return;}
+  if(!this.notice||this.syncedAt===null||clock-this.syncedAt>45000){this.root.hidden=true;updateFrontMessage(this.root,false);return;}
   this.root.querySelector('.service-issue').textContent=this.notice.message;
   this.root.querySelector('time').textContent=elapsedClock(this.notice.startedAt,this.serverAtSync+clock-this.syncedAt);
+  updateFrontMessage(this.root,!this.root.hidden);
  }
  close(){clearInterval(this.pollTimer);this.root.remove();}
 }

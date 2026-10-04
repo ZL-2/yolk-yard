@@ -921,7 +921,9 @@ body.in-game #hud {
   pointer-events: none;
 }
 .notice {
-  position: absolute;
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
   left: 50%;
   top: 25%;
   transform: translateX(-50%);
@@ -1013,7 +1015,7 @@ body.in-game #hud {
   margin-bottom: 15px;
 }
 .toast {
-  position: absolute;
+  position: fixed;
   bottom: 100px;
   left: 50%;
   transform: translateX(-50%);
@@ -1026,8 +1028,13 @@ body.in-game #hud {
   opacity: 0;
   transition: opacity 0.15s;
   font-size: 0.9rem;
-  z-index: 20;
+  z-index: 2147483647;
+  pointer-events: none;
 }
+.notice[popover],.toast[popover]{margin:0;border:0;right:auto;inset-inline-start:50%;width:max-content;color:#fff}
+.notice[popover]{bottom:auto;top:25%}
+.toast[popover]{top:auto;bottom:100px}
+.notice::backdrop,.toast::backdrop{background:transparent;pointer-events:none}
 .mobile-controls {
   display: none;
   pointer-events: none;
