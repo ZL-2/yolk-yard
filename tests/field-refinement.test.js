@@ -34,7 +34,8 @@ test('shield barrels restore nearby operators once, cap shields, exclude distant
  const {s,p}=battle(),barrel=s.worldBoxes.find(b=>b.harvestType==='shieldBarrel');
  Object.assign(p,{x:barrel.x+1.1,y:barrel.y,z:barrel.z,flight:'ground',health:100,shield:95});
  const far=s.addPlayer('watch',{name:'Watch'},false,true);Object.assign(far,{x:barrel.x+20,y:barrel.y,z:barrel.z,health:100,shield:0,spectating:false,flight:'ground'});
- damageObject(s,barrel,10000,p);assert.equal(p.shield,100);assert.equal(far.shield,0);p.shield=0;damageObject(s,barrel,10000,p);assert.equal(p.shield,0);
+ const downed=s.addPlayer('downed',{name:'Downed'},false,true);Object.assign(downed,{x:barrel.x+1.4,y:barrel.y,z:barrel.z,health:40,shield:0,spectating:false,flight:'ground',downed:true});
+ damageObject(s,barrel,10000,p);assert.equal(p.shield,100);assert.equal(far.shield,0);assert.equal(downed.shield,0);assert.equal(downed.health,40);p.shield=0;damageObject(s,barrel,10000,p);assert.equal(p.shield,0);
  const restored=new RoyaleSimulation().restore(s.checkpoint());assert.equal(restored.worldDamage[barrel.objectId].destroyed,true);assert.ok(!restored.map.boxes.some(b=>b.objectId===barrel.objectId));
 });
 test('raised front access clears the stairwell and reaches Voss door on actual collision',()=>{
