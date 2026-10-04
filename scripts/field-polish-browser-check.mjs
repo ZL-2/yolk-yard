@@ -18,7 +18,7 @@ try{
  for(const id of ['salute','shuffle','cheer']){
   await page.evaluate(()=>document.querySelector('#emote-button').click());await page.locator('[data-emote='+id+']').evaluate(b=>b.click());await page.waitForFunction(()=>document.body.classList.contains('is-emoting'));await page.waitForTimeout(300);
   if(!live){const data=await page.evaluate(()=>{const d=window.__yolkTest.read(),c=window.__yolkTest.celebrations(),p=d.state.players.find(p=>p.id===d.localId);return {camera:c.cameraPosition,player:{x:p.x,z:p.z,yaw:p.emote.yaw},visible:c.localVisible};}),dx=data.camera[0]-data.player.x,dz=data.camera[2]-data.player.z;metrics[id]=data;const rear=(dx*Math.sin(data.player.yaw)+dz*Math.cos(data.player.yaw))/Math.hypot(dx,dz);assert.ok(rear>.95,'camera starts behind emote: '+JSON.stringify(data));assert.equal(data.visible,true);}
-  await page.screenshot({path:out+'/behind-'+id+'.png'});await page.keyboard.press('KeyW');await page.waitForFunction(()=>!document.body.classList.contains('is-emoting'));
+  await page.screenshot({path:out+'/behind-'+id+'.png'});await page.keyboard.down('KeyW');try{await page.waitForFunction(()=>!document.body.classList.contains('is-emoting'));}finally{await page.keyboard.up('KeyW');}
  }
  if(!live){
   await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.options.training=false;s.beginBattle();}));await page.waitForTimeout(2500);assert.equal(await page.evaluate(()=>window.__yolkTest.scenery().labels),0,'no landmark/building text sprites');
