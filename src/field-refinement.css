@@ -46,7 +46,7 @@
 #dialog[data-kind="royale-inventory"] .item-art{height:52px}
 #dialog[data-kind="royale-inventory"] #inventory-selected-name{font-size:12px;margin:7px 0}
 #dialog[data-kind="royale-inventory"] .inventory-actions{flex:none;display:flex;gap:6px;margin:0;padding:9px 0 0;flex-wrap:nowrap}
-#dialog[data-kind="royale-inventory"] .inventory-actions button{padding:7px 5px;font-size:11px;min-width:0;flex:1;color:#17303a;background:#dce8e2;border-color:#83a0a2}
+#dialog[data-kind="royale-inventory"] .inventory-actions button{padding:7px 5px;font-size:11px;min-width:0;flex:1;color:#17303a!important;background:#dce8e2!important;border-color:#83a0a2!important}
 @media(max-height:650px){
  #dialog[data-kind="royale-inventory"]{padding:10px 14px}
  #dialog[data-kind="royale-inventory"] .dialog-head{margin-bottom:8px;padding-bottom:5px}
