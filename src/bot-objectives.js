@@ -39,11 +39,14 @@ export function coverPoint(sim,p,enemy){
 }
 export function stormPriority(sim,p,skill){
  const s=sim.storm;if(!s?.active||isWarmup(sim.stage))return null;
- const outside=Math.hypot(p.x-s.x,p.z-s.z)>s.radius,travel=Math.max(0,Math.hypot(p.x-s.nextX,p.z-s.nextZ)-s.nextRadius*.78)/5;
+ const outside=Math.hypot(p.x-s.x,p.z-s.z)>s.radius,distance=Math.hypot(p.x-s.nextX,p.z-s.nextZ),safeRadius=Math.max(0,s.nextRadius-12);
+ if(!outside&&distance<=safeRadius)return null;
+ // Route/obstruction allowance: straight-line distance underestimates time to safety.
+ const travel=Math.max(0,distance-safeRadius)/5*1.5;
  if(!outside&&travel+skill.stormMargin<s.seconds)return null;
- const angle=Math.atan2(p.z-s.nextZ,p.x-s.nextX),r=Math.max(0,s.nextRadius*.55);
+ const angle=Math.atan2(p.z-s.nextZ,p.x-s.nextX),r=safeRadius;
  const x=s.nextX+Math.cos(angle)*r,z=s.nextZ+Math.sin(angle)*r;
- return {kind:'rotate',urgent:outside,goal:{x,z,y:groundAt(sim.map,x,z)},travel};
+ return {kind:'rotate',urgent:outside||s.closing&&travel+8>=s.seconds,goal:{x,z,y:groundAt(sim.map,x,z)},travel};
 }
 export function chooseObjective(sim,p,brain,skill,target){
  const royale=!!p.inventory&&!isWarmup(sim.stage),storm=royale?stormPriority(sim,p,skill):null;

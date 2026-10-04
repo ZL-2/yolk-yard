@@ -1,12 +1,13 @@
 const categories=[
  ['video','▣','Video',['quality','fov','showFps']],
- ['audio','♫','Audio',['volume','effectsVolume','ambienceVolume','musicVolume']],
+ ['audio','♫','Audio',['volume','effectsVolume','ambienceVolume','musicVolume','visualSoundEffects']],
  ['mouse','↗','Mouse',['sensitivity','scopeSensitivity','invert']],
  ['hud','⊕','HUD',['centerDot','hitMarkers','netDebugStats','connectionWarnings']],
  ['gameplay','⚙','Gameplay',['confirmEditOnRelease','chatMode']],
  ['bindings','⌨','Keybinds',[]]
 ];
 const descriptions={
+ visualSoundEffects:'Show directional footsteps, gunfire, explosives, gliders and nearby chest sounds around the crosshair. Quiet crouching is excluded. Saved on this browser.',
  showFps:'Show your measured frames per second during gameplay.',
  netDebugStats:'Show ping, incoming and outgoing traffic, message rates and a latency graph. Packet loss is unavailable in this browser transport.',
  connectionWarnings:'Show a yellow connection arrow when updates are delayed and a red X when the connection is interrupted or severely delayed.',

@@ -1,3 +1,4 @@
+import {clearOfRelays} from './field-refinement.js';
 import {WORLD_RULES} from './world-rules.js';
 import {AMMO_RULES} from './weapon-balance.js';
 import {weapon} from './data.js';
@@ -9,12 +10,12 @@ const sources=['ground','chest','high','supply','epic'];
 export const AMMO_DROPS=AMMO_RULES;
 export const LOOT_TABLE=[
  ...[['sprinter',28,'assault'],['pip',18,'sidearm'],['zipper',23,'smg'],['scatter',20,'shotgun'],['doubleyolk',16,'shotgun'],['duet',13,'assault'],['anchor',8,'marksman'],['peeper',8,'marksman'],['needle',4,'sniper'],['comet',9,'energy'],['thumper',2,'launcher']].map(([id,weight,category])=>({id,weight,category,weapon:true,ammoType:ammoType(id),sources,rarities:id==='thumper'?[0,0,65,30,5]:[53,30,13,3.5,.5]})),
- ...[['bandage',18,0],['medkit',10,1],['mini',30,1],['flask',16,2],['splash',9,2],['popper',8,1],['impulse',6,2],['launchpad',3,3],['smoke',7,1],['scanner',4,2]].map(([id,weight,rarity])=>({id,weight,rarity,category:['bandage','medkit'].includes(id)?'health':['mini','flask','splash'].includes(id)?'shield':'utility',sources:id==='launchpad'?['chest','high','supply','epic']:sources,counts:id==='mini'?[2,3]:id==='bandage'?[2,3]:[1,2]})),
+ ...[['bandage',18,0],['medkit',10,1],['mini',30,1],['flask',16,2],['splash',9,2],['popper',8,1],['impulse',6,2],['launchpad',3,3],['smoke',7,1],['scanner',4,2]].map(([id,weight,rarity])=>({id,weight,rarity,category:['bandage','medkit'].includes(id)?'health':['mini','flask','splash'].includes(id)?'shield':'utility',sources:id==='launchpad'?['chest','high','supply','epic']:sources,counts:id==='mini'?[3,3]:id==='flask'?[1,1]:id==='bandage'?[2,3]:[1,2]})),
  ...Object.entries(AMMO_DROPS).map(([id,v])=>({id,...v,category:'ammo',ammoType:id,sources:['ground']})),
 ];
 export function weighted(list,random,weight=o=>o.weight){const total=list.reduce((n,o)=>n+weight(o),0);let r=random()*total;for(const entry of list){r-=weight(entry);if(r<=0)return entry;}return list.at(-1);}
 const quantity=(r,min,max)=>min+Math.floor(r()*(max-min+1));
-function rarity(entry,source,random){const weights=source==='epic'?[0,0,0,75,25]:source==='ground'?[58,29,13,0,0]:source==='supply'?[0,0,35,50,15]:source==='high'?[5,38,42,13,2]:source==='chest'?[12,48,31,8,1]:entry.rarities;return weighted(weights.map((weight,id)=>({weight:entry.id==='thumper'&&id<2?0:weight,id})),random).id;}
+function rarity(entry,source,random){const weights=source==='epic'?[0,0,0,75,25]:source==='ground'?[58,29,13,0,0]:source==='supply'?[0,0,35,50,15]:source==='high'?[0,43,42,13,2]:source==='chest'?[0,60,31,8,1]:entry.rarities;return weighted(weights.map((weight,id)=>({weight:entry.id==='thumper'&&id<2?0:weight,id})),random).id;}
 export function rollItem(random,source='ground',role='mixed'){
  const category=role==='mixed'?weighted([{id:'weapon',weight:52},{id:'utility',weight:26},{id:'ammo',weight:22}],random).id:role;
  const entries=LOOT_TABLE.filter(e=>e.sources.includes(source)&&(category==='weapon'?e.weapon:category==='ammo'?e.category==='ammo':!e.weapon&&e.category!=='ammo'));
@@ -24,16 +25,19 @@ export function rollItem(random,source='ground',role='mixed'){
  return {id:e.id,count:quantity(random,...e.counts),rarity:e.rarity};
 }
 export function matchingAmmo(item,random){const type=ammoType(item.id),a=AMMO_DROPS[type];return {id:type,ammoType:type,count:quantity(random,a.min,a.max),rarity:0};}
-export function rollChest(random,source='chest'){const gun=rollItem(random,source,'weapon'),utility=rollItem(random,source,'utility');return [gun,matchingAmmo(gun,random),utility,...(!['bandage','medkit','mini','flask','splash'].includes(utility.id)?[{id:'mini',count:2,rarity:1}]:[])];}
+export function rollChest(random,source='chest'){
+ const gun=rollItem(random,source,'weapon'),utility=rollItem(random,source,'utility'),material=['wood','brick','metal'][Math.min(2,Math.floor(random()*3))];
+ return [gun,matchingAmmo(gun,random),utility,...(!['bandage','medkit','mini','flask','splash'].includes(utility.id)?[{id:'mini',count:3,rarity:1}]:[]),{id:material,resource:material,count:30,rarity:0}];
+}
 // Highest support *below this floor*, never the highest rooftop at X/Z.
 export function supportBelow(map,x,z,y){let floor=groundAt(map,x,z);for(const b of candidates(map,{x,y,z},null,0,0))if(b.y+b.h<=y+.24&&Math.abs(x-b.x)<b.w/2&&Math.abs(z-b.z)<b.d/2)floor=Math.max(floor,b.y+b.h);return floor;}
 export function validLootPoint(map,p,margin=.7){return p.y>=groundAt(map,p.x,p.z)-.06&&Math.abs(supportBelow(map,p.x,p.z,p.y)-p.y)<.26&&canStand(map,p,margin);}
-export function placeLoot(map,point,existing=[]){
+export function placeLoot(map,point,existing=[],relays=map.relays||[]){
  const base={x:point.x,y:Number.isFinite(point.y)?point.y:groundAt(map,point.x,point.z),z:point.z};let best=null,bestScore=-Infinity;
  for(let i=0;i<64;i++){
   const a=i*2.399963,r=i===0?0:.65+Math.sqrt(i)*.42,x=base.x+Math.cos(a)*r,z=base.z+Math.sin(a)*r;
   const y=supportBelow(map,x,z,base.y+.02),candidate={x,y,z};
-  if(Math.abs(y-base.y)>1.0||!validLootPoint(map,candidate))continue;
+  if(Math.abs(y-base.y)>1.0||!validLootPoint(map,candidate)||!clearOfRelays(candidate,relays))continue;
   const dx=x-base.x,dy=y-base.y,dz=z-base.z,len=Math.hypot(dx,dy,dz);
   if(len>0&&wallDistance(map,{...base,y:base.y+.62},{x:dx/len,y:dy/len,z:dz/len},len)<len-.1)continue;
   let separation=2;for(const item of existing)if(Math.abs(item.y-y)<1.2)separation=Math.min(separation,Math.hypot(item.x-x,item.z-z));
@@ -47,7 +51,7 @@ export function* seedIslandLootSteps(sim){
  for(const point of sim.map.floorLoot){
   yield;
   if(sim.random()>point.chance||!validLootPoint(sim.map,point))continue;
-  const item=rollItem(sim.random,'ground',point.role),drop=sim.dropLoot(point,item);
+  const item=point.ammoType?{id:point.ammoType,ammoType:point.ammoType,count:AMMO_DROPS[point.ammoType].min,rarity:0}:rollItem(sim.random,'ground',point.role),drop=sim.dropLoot(point,item);
   if(drop?.weapon){if(point.floor===0)armed.add(point.building);sim.dropLoot(point,matchingAmmo(item,sim.random));}
  }
  // Each structure has a usable early-game weapon, with variable sockets and contents.

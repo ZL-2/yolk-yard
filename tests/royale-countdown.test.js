@@ -17,7 +17,7 @@ test('one online human with bots gets thirty seconds, and midway joins inherit t
 });
 for(const capacity of [2,8,12,16])test(`custom ${capacity} starts only when every seat contains a connected human`,()=>{
  const s=make({capacity});for(let i=1;i<capacity-1;i++)s.admitPlayer('p'+i,{name:'Player '+i});assert.notEqual(s.stage,'battle-bus');assert.ok(s.queueEnds-s.time>20);
- s.admitPlayer('last',{name:'Last'});assert.equal(s.stage,'battle-bus');assert.equal(s.startReason,'human-full');assert.equal(s.alive,capacity);assert.equal([...s.players.values()].filter(p=>p.bot).length,0);assert.equal(rounds(s),1);
+ s.admitPlayer('last',{name:'Last'});assert.equal(s.stage,'battle-bus');assert.equal(s.startReason,'human-full');assert.equal(s.alive,capacity);assert.equal([...s.players.values()].filter(p=>p.bot&&p.contestant).length,0);assert.equal(rounds(s),1);
  const late=s.admitPlayer('watch',{name:'Watch'});assert.equal(late.spectating,true);assert.equal(late.contestant,false);s.leavePlayer('last');s.advanceWarmupClock(80);assert.equal(s.stage,'battle-bus');assert.equal(rounds(s),1);
 });
 test('32 contestant capacity is preserved; sixteen humans plus bots is not full of humans',()=>{

@@ -1,3 +1,4 @@
+import {SHIELD_BARREL} from './field-refinement.js';
 import {worldDoorBox} from './world-rules.js';
 import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates} from './physics.js';
 import {bodyHeight,eyeHeight,canFight} from './stance.js';
@@ -134,7 +135,16 @@ export function damageObject(sim,box,amount,harvester=null){
   harvester.materials[material]=(harvester.materials[material]||0)+earned;
   if(earned){harvester.lastHarvest={material,amount:earned,time:sim.time};sim.emit('harvest',{player:harvester.id,material,amount:earned,x:box.x,y:box.y+1,z:box.z});}
  }
- if(object.health<=0){object.destroyed=true;if(built)sim.builds=sim.builds.filter(b=>b!==built);sim.emit('royale-fx',{kind:'break',x:box.x,y:box.y,z:box.z});rebuildMap(sim);collapse(sim);}
+ if(object.health<=0){object.destroyed=true;if(built)sim.builds=sim.builds.filter(b=>b!==built);sim.emit('royale-fx',{kind:'break',x:box.x,y:box.y,z:box.z});rebuildMap(sim);collapse(sim);
+  if(!built&&box.harvestType==='shieldBarrel'){
+   for(const p of sim.players.values())if(canFight(p)&&p.flight==='ground'&&Math.hypot(p.x-box.x,p.y-box.y,p.z-box.z)<=SHIELD_BARREL.radius){
+    const from={x:box.x,y:box.y+.7,z:box.z},dx=p.x-from.x,dy=p.y+.9-from.y,dz=p.z-from.z,len=Math.hypot(dx,dy,dz)||1;
+    if(wallDistance(sim.map,from,{x:dx/len,y:dy/len,z:dz/len},len)<len-.1)continue;
+    const health=Math.min(SHIELD_BARREL.restore,100-p.health);p.health+=health;p.shield=Math.min(100,p.shield+SHIELD_BARREL.restore-health);
+   }
+   sim.emit('royale-fx',{kind:'splash',x:box.x,y:box.y,z:box.z});sim.emit('royale-cue',{cue:'barrel-break',x:box.x,y:box.y,z:box.z});
+  }
+ }
  sim.buildVersion++;
 }
 export function swingPickaxe(sim,p){

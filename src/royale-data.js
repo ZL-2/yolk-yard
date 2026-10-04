@@ -10,7 +10,7 @@ export const ammoType=ammoTypeFor;
 export const ROYALE_GUN_IDS=['sprinter','scatter','needle','zipper','thumper','anchor','duet','pip','peeper','doubleyolk','comet'];
 export const ITEMS={
  asterKeycard:{name:'Voss Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#80d9ed',icon:'▣'},
- jumpRig:{name:'Kestrel Jump Rig',kind:'jumpRig',duration:.16,stack:1,color:'#ffd46b',icon:'↟'},
+ jumpRig:{name:'Kestrel Jump Rig',rarity:5,kind:'jumpRig',duration:.16,stack:1,color:'#ffd46b',icon:'↟'},
  smoke:{name:'Smoke Canister',kind:'smoke',duration:.4,stack:3,color:'#c5d0cc',icon:'◌'},
  scanner:{name:'Recon Pulse',kind:'scanner',duration:1.2,stack:2,color:'#5cd9d0',icon:'◎'},
  bandage:{name:'Field Dressing',kind:'heal',amount:25,cap:75,duration:2.5,stack:5,color:'#f4f4dd',icon:'✚'},

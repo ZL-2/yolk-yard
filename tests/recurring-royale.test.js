@@ -15,11 +15,11 @@ function fixture(){
  function admit(person){relay.parties.command(person.u,{type:'queue',publicRoyale:true});const ticket=person.u.ticket,{p,messages}=peer('player-'+person.u.id);relay.authority.data(p,room.hostPeer,{channel:'test',data:{type:'hello',version:VERSION,ticket,profile:person.u.profile}});assert.ok(p.authorityRoom,'Public admission succeeds');return {p,messages};}
  return {relay,room,user,peer,admit,async close(){relay.close();await relay.parties.store.flush();}};
 }
-test('server owns exactly one 48-seat Intermediate Solo match and resets every empty 45-second window',async()=>{
+test('server owns exactly one 48-seat Intermediate Solo match and waits for its first human',async()=>{
  const f=fixture();try{const {sim}=f.room;
   assert.equal(f.relay.authority.ensurePublicRoyale(),f.room);assert.equal(f.relay.authority.rooms.size,1);
   assert.equal(sim.options.difficulty,2);assert.equal(sim.options.teamSize,1);assert.equal(bots(sim).length,48);
-  for(let n=0;n<3;n++){assert.equal(sim.queueEnds-sim.time,45);sim.time=sim.queueEnds;sim.advanceWarmupClock();assert.equal(sim.stage,'spawn-island');assert.equal(sim.queueEnds-sim.time,45);}
+  for(let n=0;n<3;n++){assert.equal(sim.queueEnds,0);sim.time+=50;sim.advanceWarmupClock();assert.equal(sim.stage,'spawn-island');assert.equal(sim.queueEnds,0);assert.equal(f.relay.authority.publicSummary().countdownStarted,false);}
   assert.equal(f.relay.authority.publicSummary().humanPlayers,0);assert.equal(f.room.owner,'server');
  }finally{await f.close();}
 });
@@ -64,11 +64,11 @@ test('public active round resets when the final connected viewer leaves, includi
   const b=f.admit(f.user('Empty Reset Viewer'));assert.equal(sim.players.get(b.p.authorityId).lateSpectator,true);
   f.relay.authority.disconnect(a.p);assert.equal(sim.stage,'battle-bus','A real spectator still keeps the round running');
   const old=sim.matchId;f.relay.authority.disconnect(b.p);
-  assert.notEqual(sim.matchId,old);assert.equal(sim.stage,'spawn-island');assert.equal(sim.queueEnds-sim.time,45);assert.equal(bots(sim).length,48);
-  sim.time+=5;f.relay.authority.tick(f.relay.authority.last);assert.equal(sim.queueEnds-sim.time,40,'Empty warmup must not restart every tick');
+  assert.notEqual(sim.matchId,old);assert.equal(sim.stage,'spawn-island');assert.equal(sim.queueEnds,0);assert.equal(bots(sim).length,48);
+  sim.time+=5;f.relay.authority.tick(f.relay.authority.last);assert.equal(sim.queueEnds,0,'Empty warmup must stay unstarted');
   const c=f.admit(f.user('Transport Pilot'));sim.time=sim.queueEnds;sim.advanceWarmupClock();
   sim.stage='active';sim.builds.push({id:'old-build'});sim.projectiles.push({id:'old-shot'});const active=sim.matchId;c.p.ws=null;
-  f.relay.authority.tick(f.relay.authority.last);assert.notEqual(sim.matchId,active);assert.equal(sim.stage,'spawn-island');assert.equal(sim.queueEnds-sim.time,45);
+  f.relay.authority.tick(f.relay.authority.last);assert.notEqual(sim.matchId,active);assert.equal(sim.stage,'spawn-island');assert.equal(sim.queueEnds,0);
   assert.equal(sim.projectiles.length,0);assert.equal(sim.builds.length,0);assert.equal(bots(sim).length,48);assert.equal(f.relay.authority.publicSummary().joinable,true);assert.equal(f.relay.authority.rooms.size,1);
  }finally{await f.close();}
 });

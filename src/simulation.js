@@ -712,7 +712,7 @@ export class Simulation {
         p,
         attacker,
         (b.damage??config.damage)*Math.max(0,1-distance/(radius*config.splashFalloff))*(p===attacker?config.selfDamage:1),
-        b.popper ? "Popper" : "Thumper", false, b.shotId,
+        b.popper ? "Frag Grenade" : weapon(b.weapon||"thumper").name, false, b.shotId,
       );
     }
   }

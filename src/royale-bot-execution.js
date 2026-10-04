@@ -1,3 +1,4 @@
+import {ROYALE_BOT_RANGE} from './field-refinement.js';
 import {gun,clamp} from './data.js';
 import {skillFor,wrapAngle} from './bot-config.js';
 import {eyeHeight,bodyHeight} from './stance.js';
@@ -18,7 +19,7 @@ export function executeRoyaleIntent(sim,p,input){
   const dx=target.x+(target.vx||0)*lead-p.x,dz=target.z+(target.vz||0)*lead-p.z;
   yaw=Math.atan2(-dx,-dz)+brain.aimErrorX;pitch=Math.atan2(target.y+bodyHeight(target)*.63-p.y-eyeHeight(p),Math.hypot(dx,dz))+brain.aimErrorY;
   if(now>=brain.nextBurst){brain.burstUntil=now+(.34+skill.burst*.65);brain.nextBurst=brain.burstUntil+.14+skill.pause*.22+sim.random()*.08;}
-  fire=now>=brain.aimAt&&now<brain.burstUntil&&distance<(w.flightRange??w.range)*.95&&(!w.projectile||distance>7)&&input.slot>0;
+  fire=now>=brain.aimAt&&now<brain.burstUntil&&distance<Math.min(ROYALE_BOT_RANGE.engage,(w.flightRange??w.range)*.95)&&(!w.projectile||distance>7)&&input.slot>0;
   if(brain.task?.urgent&&distance>12)fire=false;
  }else if(input.combatAim)fire=false;
  const desired=yaw,desiredP=pitch;yaw=p.yaw+clamp(wrapAngle(yaw-p.yaw),-skill.turn*dt,skill.turn*dt);pitch=p.pitch+clamp(pitch-p.pitch,-1.9*dt,1.9*dt);

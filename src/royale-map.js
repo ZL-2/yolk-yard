@@ -44,9 +44,9 @@ for(const [name,x,z,type,kind,floors] of landmarkPlan){const p={id:'landmark-'+l
 const terrain=createTerrain(buildings,DISTRICTS),surface={terrain};
 const yAt=(x,z)=>groundAt(surface,x,z);
 function prop(kind,x,z,w=2,d=1.5,h=1.4,y=yAt(x,z),extra={}){
- const material=['truck','car','tank','container','lamp','barrels','console','generator','pump','radio','silo','crane','telescope','dome','beacon','drill','solar'].includes(kind)?'metal':['rock','planter'].includes(kind)?'brick':'wood';
+ const material=['truck','car','tank','container','lamp','barrels','shield-barrel','console','generator','pump','radio','silo','crane','telescope','dome','beacon','drill','solar'].includes(kind)?'metal':['rock','planter'].includes(kind)?'brick':'wood';
  const p={kind,x,z,w,d,h,y,material,...extra};props.push(p);
- if(!extra.decorative)box(x,z,w,d,h,material==='metal'?'steel':material==='wood'?'crate':'stone',y,'prop',{material,prop:props.length-1,buildBlocking:!['bush','lamp','bench','fence','bollard','crop','campfire'].includes(kind)});
+ if(!extra.decorative)box(x,z,w,d,h,material==='metal'?'steel':material==='wood'?'crate':'stone',y,'prop',{material,...(kind==='shield-barrel'?{health:150,harvestType:'shieldBarrel'}:{}),prop:props.length-1,buildBlocking:!['bush','lamp','bench','fence','bollard','crop','campfire'].includes(kind)});
  return p;
 }
 function anchor(b,x,z,level,role='mixed',room='room',chest=false){
@@ -166,4 +166,4 @@ for(const [x,z,kind] of [[116,-173,'crate'],[122,-172,'barrels'],[145,-127,'crat
 // Material assignments and stable IDs are shared by harvesting, destruction and rendering.
 for(const [i,b]of boxes.entries())b.objectId=b.doorId?'world-door-'+b.doorId:'world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
-export const ROYALE_MAP={id:'sunnybreak',revision:5,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,material:'brick'};
+export const ROYALE_MAP={id:'sunnybreak',revision:6,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,material:'brick'};

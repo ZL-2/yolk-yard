@@ -15,8 +15,8 @@ export class ChatPanel {
     this.toggle.setAttribute('aria-label','Open chat'); this.toggle.setAttribute('aria-controls','chat-hud');
     this.peek=el('div',undefined,'chat-peek'); this.peek.hidden=true;
     this.panel=el('dialog'); this.panel.id='chat-panel'; this.panel.setAttribute('aria-labelledby','chat-title');
-    this.panel.innerHTML=`<header class="chat-head"><div><span class="chat-eyebrow">THE YARD • LIVE</span><h2 id="chat-title">Player controls</h2></div><button type="button" class="chat-close" aria-label="Close chat">×</button></header>
-      <div class="chat-toolbar"><label>Channel<select id="chat-channel" aria-label="Chat channel"><option value="room">Room</option><option value="team">Team</option></select></label><span class="chat-shield">◈ Filter always on</span></div>
+    this.panel.innerHTML=`<header class="chat-head"><div><span class="chat-eyebrow">RAVELFRONT • LIVE</span><h2 id="chat-title">Player controls</h2></div><button type="button" class="chat-close" aria-label="Close chat">×</button></header>
+      <div class="chat-toolbar"><label>Channel<select id="chat-channel" aria-label="Chat channel"><option value="room">Room</option><option value="team">Team</option></select></label><button class="chat-hud-close" type="button" aria-label="Close chat">×</button><span class="chat-shield">◈ Filter always on</span></div>
       <p class="chat-audience" id="chat-audience"></p>
       <div class="chat-log" role="log" aria-live="polite" aria-relevant="additions" aria-label="Chat messages" tabindex="0"></div>
       <p class="chat-status" role="status"></p>
@@ -38,7 +38,9 @@ export class ChatPanel {
     this.panel.addEventListener('keydown',e=>e.stopPropagation());
     this.hud.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.isComposing)e.preventDefault();if(e.key==='Escape'){e.preventDefault();this.close();}e.stopPropagation();});
     this.input.oninput=()=>{this.hud.querySelector('#chat-count').textContent=`${this.input.value.length}/${CHAT_LIMIT}`;};
-    this.channel.onchange=()=>this.update();
+    this.channel.onchange=()=>{this.updateAudience();};
+    this.hud.querySelector('.chat-hud-close').onclick=()=>this.close();
+    this.hud.addEventListener('pointerdown',e=>e.stopPropagation());
     this.preference.onchange=()=>{
       this.callbacks.setPreference(this.preference.value); this.inbox.rows=[]; this.peek.replaceChildren();this.peek.hidden=true;
       this.renderLog();this.update();
@@ -113,10 +115,10 @@ export class ChatPanel {
     const me=ctx.state?.players.find(p=>p.id===ctx.localId);
     const spectator=me?.spectating&&ctx.state?.phase==='playing';
     const teams=(ctx.state?.options.mode==='teams'||ctx.state?.options.mode==='royale'&&[2,4].includes(ctx.state.options.teamSize))&&!me?.spectating;
-    this.channel.options[1].hidden=!teams;this.channel.options[1].disabled=!teams;
-    if(!teams)this.channel.value='room';
-    this.channel.options[0].textContent=spectator?'Spectators':'Room';
-    this.hud.querySelector('#chat-audience').textContent=spectator?'Only spectators can see your messages.':this.channel.value==='team'?'Only your teammates can see these messages.':'Everyone in this room can see these messages.';
+    // Changing native select options during each HUD refresh reopens its popup.
+    const channelKey=teams+':'+spectator;
+    if(channelKey!==this.channelKey){this.channelKey=channelKey;this.channel.options[1].hidden=!teams;this.channel.options[1].disabled=!teams;if(!teams)this.channel.value='room';this.channel.options[0].textContent=spectator?'Spectators':'Room';}
+    this.spectatorChannel=spectator;this.updateAudience();
     this.preference.value=ctx.preference;
     const disabled=ctx.preference==='off'||ctx.enabled===false||ctx.roomMuted?.includes(ctx.localId);
     this.input.disabled=disabled||ctx.preference==='quick';this.hud.querySelector('.chat-send').disabled=this.input.disabled;
@@ -129,6 +131,7 @@ export class ChatPanel {
     const key=JSON.stringify([ctx.state?.players.map(p=>[p.id,p.name,p.bot]),[...this.inbox.muted],ctx.roomMuted,ctx.enabled,ctx.host]);
     if(key!==this.lastRoster){this.lastRoster=key;this.renderPlayers(ctx);}
   }
+  updateAudience(){const text=this.spectatorChannel?'Only spectators can see your messages.':this.channel.value==='team'?'Only your teammates can see these messages.':'Everyone in this room can see these messages.';const node=this.hud.querySelector('#chat-audience');if(node.textContent!==text)node.textContent=text;}
   renderPlayers(ctx) {
     const list=this.panel.querySelector('.chat-players');list.replaceChildren();
     for(const p of ctx.state?.players||[]) {

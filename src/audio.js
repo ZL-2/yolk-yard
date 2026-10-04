@@ -66,6 +66,7 @@ export const SOUND_CUES={
  'storm-tick':[noise(400,.12,.035),note(110,.1,.035,'sine',80)],
  elimination:[note(740,.15,.08),note(1108,.25,.07,'triangle',0,.11)],
  'operator-down':[noise(250,.22,.08),noise(700,.12,.035,.08)],
+ 'barrel-break':[noise(300,.35,.12),note(620,.18,.08,'sine',250)],
  'step-soil':[noise(380,.085,.042),noise(1900,.055,.015)],
  'step-wood':[noise(650,.07,.042),note(130,.04,.018,'triangle',85)],
  'step-metal':[noise(1350,.065,.035),note(530,.04,.015,'sine',270)],
@@ -117,7 +118,7 @@ export class Sound {
   const category=id==='victory'||id==='defeat'?'music':id.startsWith('ambient')?'ambience':'effects';
   const key=id+(position?Math.round(position.x/5)+':'+Math.round(position.z/5):'');
   if((this.cooldowns.get(key)||0)>this.clock)return;this.cooldowns.set(key,this.clock+.05);
-  const radius=id.includes('chest')?16:id.includes('impact')||id.includes('hit')||id==='ricochet'?30:id==='supply-land'?110:id==='ambient-bell'?95:id.includes('glider')?24:id==='land'||id==='jump'?20:45;
+  const radius=id.startsWith('step-')?26:id.includes('chest')?16:id.includes('impact')||id.includes('hit')||id==='ricochet'?30:id==='supply-land'?110:id==='ambient-bell'?95:id.includes('glider')?24:id==='land'||id==='jump'?20:45;
   preset.forEach(p=>this.layer(p,position?{...position,radius}:null,category,scale));
  }
  tone(freq,duration=.09,type='sine',volume=.15,end=0){this.layer(note(freq,duration,volume,type,end));}
@@ -168,7 +169,7 @@ export class Sound {
   const royale=state.royale,ground=me.flight==='ground'||!royale;
   this.stepClocks??=new Map();
   const map=getMap(state.options?.map);
-  for(const p of state.players||[]){if(p.health<=0||p.sliding||p.downed||!p.grounded||p.flight&&p.flight!=='ground'||Math.hypot(p.x-me.x,p.z-me.z)>18)continue;
+  for(const p of state.players||[]){if(p.health<=0||p.sliding||p.downed||!p.grounded||p.flight&&p.flight!=='ground'||Math.hypot(p.x-me.x,p.z-me.z)>(p.crouching?8:p.sprinting?26:20))continue;
    const speed=Math.hypot(p.vx||0,p.vz||0),previous=this.stepClocks.get(p.id)||0,next=previous+speed*dt/(p.sprinting?1:.85);this.stepClocks.set(p.id,next);
    if(Math.floor(next)>Math.floor(previous)&&speed>.8){const support=map?.boxes?.find(b=>Math.abs(b.y+b.h-p.y)<.08&&Math.abs(b.x-p.x)<b.w/2&&Math.abs(b.z-p.z)<b.d/2),surface=support?(['wood','metal'].includes(support.material)?support.material:'stone'):'soil';this.cue('step-'+surface,p,(p.id===me.id?.75:.6)*(p.crouching?.45:1));}
   }

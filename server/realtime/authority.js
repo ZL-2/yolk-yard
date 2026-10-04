@@ -20,7 +20,7 @@ const address=new RegExp('^yolk-yard-v'+VERSION+'-([A-Z2-9]{8})$');
 export class MatchAuthority{
  constructor(relay){this.relay=relay;this.rooms=new Map();this.capacity=new MatchCapacity(this);this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),1000/60);this.timer.unref?.();}
  roomFor(peer){return this.rooms.get(peer.authorityRoom);}
- connection(peer,connected){const room=this.roomFor(peer),p=room?.sim.players.get(peer.authorityId);if(p){p.connected=connected;if(p.activity)p.activity.last=room.sim.time;}}
+ connection(peer,connected){const room=this.roomFor(peer),p=room?.sim.players.get(peer.authorityId);if(p){p.connected=connected;if(p.activity)p.activity.last=room.sim.time;room.sim.advanceWarmupClock();}}
  send(peer,message,serialized){if(peer&&this.relay.peers.has(peer.id))this.relay.send(peer,message,serialized);}
  ensurePublicRoyale(){
   const key=`yolk-yard-v${VERSION}-${PUBLIC_ROYALE.code}`;
@@ -36,10 +36,10 @@ export class MatchAuthority{
   const sim=room.sim,players=[...sim.players.values()],warmup=sim.phase==='playing'&&acceptsContestants(sim.stage),results=sim.phase==='results';
   const humanPlayers=players.filter(p=>!p.bot&&!p.lateSpectator&&p.connected!==false).length;
   const spectators=players.filter(p=>!p.bot&&p.lateSpectator&&p.connected!==false).length;
-  const countdownSeconds=warmup?Math.max(0,Math.ceil(sim.queueEnds-sim.time)):0;
+  const countdownSeconds=warmup&&sim.queueEnds>0?Math.max(0,Math.ceil(sim.queueEnds-sim.time)):0;
   const estimatedSeconds=results?Math.max(0,Math.ceil((room.restartAt??room.age+PUBLIC_ROYALE.restartSeconds)-room.age)):Math.max(0,Math.ceil((sim.stormSteps.at(-1)?.end||600)+20-(warmup?0:sim.elapsed)))+countdownSeconds;
   const availability=publicWindow(this.now?.()??Date.now());
-  return {availability,code:room.code,version:VERSION,round:sim.round,matchId:sim.matchId,stage:sim.stage,phase:sim.phase,capacity:sim.options.capacity,difficulty:sim.options.difficulty,humanPlayers,spectators,botPlayers:players.filter(p=>p.bot&&p.contestant).length,alive:warmup?sim.options.capacity:sim.alive,joinable:availability.open&&warmup,countdownSeconds,estimatedSeconds,restartSeconds:results?estimatedSeconds:0,availableSeats:Math.max(0,sim.options.capacity-this.capacity.humans(room)-this.capacity.pending(room.key)),availableSpectators:Math.max(0,MAX_SPECTATORS-this.capacity.spectators(room)-this.capacity.pending(room.key,true))};
+  return {availability,code:room.code,version:VERSION,round:sim.round,matchId:sim.matchId,stage:sim.stage,phase:sim.phase,capacity:sim.options.capacity,difficulty:sim.options.difficulty,humanPlayers,spectators,botPlayers:players.filter(p=>p.bot&&p.contestant).length,alive:warmup?sim.options.capacity:sim.alive,joinable:availability.open&&warmup,countdownStarted:!!(warmup&&sim.queueEnds),countdownSeconds,estimatedSeconds,restartSeconds:results?estimatedSeconds:0,availableSeats:Math.max(0,sim.options.capacity-this.capacity.humans(room)-this.capacity.pending(room.key)),availableSpectators:Math.max(0,MAX_SPECTATORS-this.capacity.spectators(room)-this.capacity.pending(room.key,true))};
  }
  create(peer,m){
   this.send(peer,{type:'authority-error',reason:'Custom matches run on the player host. The recurring public Royale is the only server-run match; join it from Play.'});

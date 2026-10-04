@@ -4,7 +4,7 @@ import {dist} from './physics.js';
 import {eyeHeight,bodyHeight} from './stance.js';
 import {BOT_SKILL,skillFor,wrapAngle} from './bot-config.js';
 import {newBrain,observe,selectThreat,seesPoint} from './bot-perception.js';
-import {selectWeapon,chooseObjective,coverPoint} from './bot-objectives.js';
+import {selectWeapon,chooseObjective,stormPriority,coverPoint} from './bot-objectives.js';
 import {navigate} from './bot-navigation.js';
 import {ARENA_BOT_COMBAT,smoothArenaCombatMovement} from './bot-movement.js';
 import {squadAnchor,followGoal} from './bot-team.js';
@@ -17,7 +17,7 @@ function combatGoal(sim,p,brain,target,w,skill){
  if(d>desired*1.45)return {x:target.x+dx/l*desired*.85,y:target.y,z:target.z+dz/l*desired*.85};
  if(d<desired*.6)return {x:p.x+dx/l*5,y:p.y,z:p.z+dz/l*5};
  // Commit to an angle, then stop/peek, rather than perpetually orbiting.
- const shift=sim.random()<.32?0:2+sim.random()*3;
+ const shift=p.inventory?2.2+sim.random()*2.2:sim.random()<.32?0:2+sim.random()*3;
  return {x:p.x-dz/l*brain.side*shift,y:p.y,z:p.z+dx/l*brain.side*shift};
 }
 // Atoll behavior has its own schedule and never enters match combat objectives.
@@ -43,6 +43,8 @@ export function botInput(sim,p){
  if(isWarmup(sim.stage))return warmupInput(sim,p);
  const skill=skillFor(sim),now=sim.time,r=sim.random,brain=p.brain?.memory?p.brain:(p.brain={...newBrain(sim,p),...p.brain});
  observe(sim,p,brain,skill);const target=selectThreat(sim,p,brain,skill);
+ const evacuation=p.inventory?stormPriority(sim,p,skill):null;
+ if(evacuation?.urgent){brain.decision=0;brain.utility=null;sim.cancelUse?.(p);}
  const visible=!!target?.visible&&now-target.seenAt<skill.perception+.08&&seesPoint(sim,p,target);
  let slot=selectWeapon(p,target),w=gun(p,slot);
  if(p.use){brain.utility=null;if(visible||now-(brain.attackedAt??-100)<.6)sim.cancelUse?.(p);else return {yaw:p.yaw,pitch:p.pitch,slot:p.use.slot,forward:0,strafe:0,swapSlot:-1};}
@@ -52,6 +54,10 @@ export function botInput(sim,p){
  }
  if(brain.task.kind==='follow'){const mate=squadAnchor(sim,p,brain);if(mate)brain.task.goal=followGoal(sim,p,mate);else brain.decision=0;}
  if(visible){if(now-(brain.lastVisibleAt??-100)>skill.perception*2)brain.aimAt=Math.max(brain.aimAt,now+skill.reaction*.6);brain.lastVisibleAt=now;}
+ if(p.inventory&&brain.task?.kind==='fight'&&target&&(now>=(brain.combatMoveAt||0)||dist(p,brain.task.goal)<1.5)){
+  brain.combatMoveAt=now+.85;brain.task.goal=combatGoal(sim,p,brain,target,w,skill);
+  const mate=squadAnchor(sim,p,brain);if(mate&&dist(brain.task.goal,mate)>teamPolicy.combatLeash)brain.task.goal=followGoal(sim,p,mate);
+ }
  const task=brain.task,goal=task.goal;
  if(task.kind==='rotate'&&p.grounded&&!visible&&dist(p,goal)>45&&now>(brain.mobilityAt||0)){const mobility=p.inventory?.findIndex(i=>i?.id==='impulse'||i?.id==='launchpad');if(mobility>0){brain.mobilityAt=now+8;brain.utility={slot:mobility,yaw:Math.atan2(p.x-goal.x,p.z-goal.z),pitch:0,until:now+1};}}
  if(task.kind==='heal'){
@@ -103,6 +109,6 @@ export function botInput(sim,p){
  if(visible&&Math.abs(wrapAngle(desiredYaw-yaw))>.2)fire=false;
  const movement=smoothArenaCombatMovement(brain,move,yaw,now,arenaCombat);
  const moving=Math.hypot(move.mx,move.mz)>.1;
- return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,combatAim:visible&&!brain.utility}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&!visible&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
+ return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,combatAim:visible&&!brain.utility}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
 }
 import {teammates} from './teams.js';

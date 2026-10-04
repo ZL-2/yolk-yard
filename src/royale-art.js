@@ -138,6 +138,10 @@ export function propModel(g,p,raw){
   for(let i=0;i<3;i++)box(g,x,y+.65,z-.2+i*.2,2.6,.12,.16,0xaf875c);
   for(let i=0;i<2;i++)box(g,x,y+.92+i*.24,z-.32,2.6,.15,.1,0xaf875c);
   for(const dx of [-.95,.95]){box(g,x+dx,y+.33,z,.12,.65,.6,0x41616a);box(g,x+dx,y+.8,z-.32,.1,.8,.1,0x41616a);}
+ }else if(kind==='shield-barrel'){
+  cylinder(g,x,y+.62,z,.42,1.24,0x23495d,12);
+  for(const yy of [.12,.42,.94,1.16]){const r=torus(g,x,y+yy,z,.43,.035,0x79eadb);r.rotation.x=Math.PI/2;}
+  box(g,x,y+.68,z-.423,.37,.4,.025,0x73e8d4);box(g,x,y+.68,z-.45,.25,.085,.025,0xe7fff9);box(g,x,y+.68,z-.45,.085,.25,.025,0xe7fff9);
  }else if(kind==='barrels'){
   for(const dx of [-.4,.4]){cylinder(g,x+dx,y+.6,z,.35,1.2,0xc19762,10);for(const yy of [.2,1]){const r=torus(g,x+dx,y+yy,z,.36,.035,0x556873);r.rotation.x=Math.PI/2;}}
  }else if(kind==='planter'){

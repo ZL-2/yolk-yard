@@ -1,4 +1,7 @@
-import {watchersFor,spectatorMessage} from './spectator-status.js';
+import {SoundVisuals} from './sound-visuals.js';
+import {inventoryDropTarget} from './inventory-drag.js';
+import {gateBuildFire} from './field-refinement.js';
+import {watchersFor,spectatorMessage,spectatorTargets} from './spectator-status.js';
 import {recordSeasonEvent,masteryRewards} from './season-progress.js';
 import {careerMarkup} from './career-ui.js';
 import {recordCareerReceipt} from './career.js';
@@ -48,6 +51,7 @@ import {EggWallet,ownedLoadout} from './egg-wallet.js';
 import {KeybindEditor} from "./keybind-editor.js";
 import './field-update.css';
 import './frontier-ui.css';
+import './field-refinement.css';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
 import { CONTROLS, normalizeBindings, bindingDown, bindingLabel, wheelIntent } from "./keybinds.js";
 import { RELEASES, RELEASE } from "./releases.js";
@@ -104,6 +108,7 @@ const settings = {
   ...PERFORMANCE_DEFAULTS,
   quality: "high",
   invert: false,
+  visualSoundEffects: true,
   centerDot: true,
   hitMarkers: true,
   chatMode: "all",
@@ -309,7 +314,7 @@ function settingsMenu() {
       )
       .join(
         "",
-      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
+      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["visualSoundEffects", "Visualize Sound Effects"], ["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
     "settings",
   );
   bindingEditor=new KeybindEditor(dialog.querySelector(".keybind-list"),settings.keybinds,bindings=>{settings.keybinds=bindings;keys.clear();queuedActions.clear();input.fire=input.aim=false;save("yolk-settings",settings);});
@@ -318,7 +323,7 @@ function settingsMenu() {
 function loadoutMenu() {
   modal(
     "Choose your weapon",
-    `<p>${screen === "game" ? "Your selection takes effect on your next respawn." : "Every primary includes a Pip sidearm and two frag grenades."}</p><div class="selection-grid">${WEAPONS.filter(
+    `<p>${screen === "game" ? "Your selection takes effect on your next respawn." : "Every primary includes a P-9 Sidearm and two frag grenades."}</p><div class="selection-grid">${WEAPONS.filter(
       (w) => !w.secondary,
     )
       .map(
@@ -760,13 +765,13 @@ function updateSpectatorStatus(me,now){
  const people=screen==='game'&&me?.health>0&&!me.spectating?watchersFor(state,localId):[];
  const message=spectatorMessage(watcherIds,people);if(message)notice(message);watcherIds=people.map(p=>p.id);
  const text=people.length?'◉ '+people.length+' WATCHING · '+people.map(p=>p.name).join(', '):'';if(node.textContent!==text)node.textContent=text;node.hidden=!text;
+ const eye=document.getElementById('royale-watch-count');if(eye){eye.textContent=String(people.length);eye.parentElement.hidden=!people.length;eye.parentElement.setAttribute('aria-label',people.length+' spectators watching you');}
 }
 
 let spawnIntentUntil = 0;
 function switchSpectator(step) {
   sound.cue('spectator-switch');
-  const me=state?.players.find(p=>p.id===localId),mates=state?.players.filter(p=>teammates(state.options,me,p)&&p.health>0&&!p.spectating)||[];
-  const players = mates.length?mates:state?.players.filter(p => p.id !== localId && !p.spectating && p.health > 0) || [];
+  const players=spectatorTargets(state,localId);
   const index = players.findIndex(p => p.id === spectateTarget);
   spectateTarget = players.length ? players[(index + step + players.length) % players.length].id : null;
 }
@@ -1532,14 +1537,16 @@ document.addEventListener('click',e=>{
 let touchDrag=null;
 dialog.addEventListener('change',e=>{if(e.target.matches('[data-training-weapon]')&&sim?.options.training)sim.playerAction(localId,'training-weapon-'+e.target.value);});
 dialog.addEventListener('click',e=>{const drop=e.target.closest('[data-supply-drop]');if(drop){const action='inventory-supply-'+drop.dataset.supplyDrop;if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});}});
-dialog.addEventListener('dragstart',e=>{const slot=e.target.closest('[data-royale-slot]');if(!slot)return;royaleUI.dragging=true;e.dataTransfer.setData('text/plain',slot.dataset.royaleSlot);e.dataTransfer.effectAllowed='move';slot.classList.add('dragging');});
-dialog.addEventListener('dragover',e=>{if(e.target.closest('[data-royale-slot],[data-inventory-drop],.inventory-ammo-section')){e.preventDefault();e.dataTransfer.dropEffect='move';}});
-dialog.addEventListener('drop',e=>{const slot=e.target.closest('[data-royale-slot]');if(e.target.closest('[data-inventory-drop],.inventory-ammo-section')){e.preventDefault();const from=Number(e.dataTransfer.getData('text/plain'));if(royaleUI.dragging&&from>=1&&from<6)inventoryAction('drop',from);royaleUI.dragging=false;return;}if(!slot)return;e.preventDefault();const from=Number(e.dataTransfer.getData('text/plain')),to=Number(slot.dataset.royaleSlot);royaleUI.dragging=false;if(Number.isInteger(from)&&from>=1&&from<6&&from!==to)inventoryAction('swap',to,from);});
-dialog.addEventListener('dragend',()=>{royaleUI.dragging=false;royaleUI.inventoryKey='';royaleUI.updateInventory(state?.players.find(p=>p.id===localId));});
-dialog.addEventListener('pointerdown',e=>{const slot=e.target.closest('[data-royale-slot]');if(slot&&e.pointerType==='touch')touchDrag={from:Number(slot.dataset.royaleSlot),x:e.clientX,y:e.clientY};});
+let inventoryDragSlot=null;
+const applyInventoryDrag=(x,y)=>{const target=inventoryDropTarget(dialog,x,y),from=inventoryDragSlot;if(!Number.isInteger(from)||from<1||from>5)return;if(target?.kind==='drop')inventoryAction('drop',from);else if(target?.kind==='swap'&&target.slot>0&&target.slot!==from)inventoryAction('swap',target.slot,from);};
+dialog.addEventListener('dragstart',e=>{const slot=e.target.closest('[data-royale-slot]');if(!slot||Number(slot.dataset.royaleSlot)===0)return;inventoryDragSlot=Number(slot.dataset.royaleSlot);royaleUI.dragging=true;e.dataTransfer.setData('text/plain',String(inventoryDragSlot));e.dataTransfer.effectAllowed='move';slot.classList.add('dragging');});
+document.addEventListener('dragover',e=>{if(royaleUI.dragging&&dialogType==='royale-inventory'&&inventoryDropTarget(dialog,e.clientX,e.clientY)){e.preventDefault();e.dataTransfer.dropEffect='move';}});
+document.addEventListener('drop',e=>{if(!royaleUI.dragging||dialogType!=='royale-inventory')return;e.preventDefault();applyInventoryDrag(e.clientX,e.clientY);royaleUI.dragging=false;inventoryDragSlot=null;});
+dialog.addEventListener('dragend',()=>{royaleUI.dragging=false;inventoryDragSlot=null;royaleUI.inventoryKey='';royaleUI.updateInventory(state?.players.find(p=>p.id===localId));});
+dialog.addEventListener('pointerdown',e=>{const slot=e.target.closest('[data-royale-slot]');if(slot&&Number(slot.dataset.royaleSlot)>0&&e.pointerType==='touch'){touchDrag={from:Number(slot.dataset.royaleSlot),x:e.clientX,y:e.clientY};inventoryDragSlot=touchDrag.from;slot.setPointerCapture(e.pointerId);}});
 dialog.addEventListener('pointermove',e=>{if(touchDrag&&Math.hypot(e.clientX-touchDrag.x,e.clientY-touchDrag.y)>8){royaleUI.dragging=true;e.preventDefault();}},{passive:false});
-dialog.addEventListener('pointerup',e=>{if(!touchDrag)return;const slot=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-royale-slot]'),from=touchDrag.from;touchDrag=null;const dragged=royaleUI.dragging;royaleUI.dragging=false;if(dragged&&document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-inventory-drop],.inventory-ammo-section'))inventoryAction('drop',from);else if(dragged&&slot&&Number(slot.dataset.royaleSlot)!==from)inventoryAction('swap',Number(slot.dataset.royaleSlot),from);});
-dialog.addEventListener('pointercancel',()=>{if(touchDrag){touchDrag=null;royaleUI.dragging=false;}});
+dialog.addEventListener('pointerup',e=>{if(!touchDrag)return;const dragged=royaleUI.dragging;touchDrag=null;if(dragged)applyInventoryDrag(e.clientX,e.clientY);royaleUI.dragging=false;inventoryDragSlot=null;royaleUI.inventoryKey='';});
+dialog.addEventListener('pointercancel',()=>{touchDrag=null;royaleUI.dragging=false;inventoryDragSlot=null;});
 dialog.addEventListener('keydown',e=>{if(dialogType!=='royale-inventory')return;const slot=e.target.closest('[data-royale-slot]');if(slot&&e.altKey&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const from=Number(slot.dataset.royaleSlot),to=1+((from-1+(e.key==='ArrowRight'?1:4))%5);inventoryAction('swap',to,from);dialog.querySelector(`[data-royale-slot="${to}"]`)?.focus();}});
 document.addEventListener('wheel',e=>{if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
 document.addEventListener("contextmenu", (e) => {
@@ -1647,7 +1654,7 @@ function frameInput() {
   swapSlot=-1;
   queuedActions.clear();
   if(active&&(nextInput.forward||nextInput.strafe||nextInput.jump||nextInput.fire||nextInput.interact))lastEarnAction=performance.now();
-  return nextInput;
+  return state?.royale?gateBuildFire(triggerGuard,nextInput):nextInput;
 }
 let lastTime = performance.now(),
   accumulator = 0,
@@ -1679,6 +1686,8 @@ function pumpNetworkInput(now=performance.now()) {
   }
   net.inputBatch(commands);
 }
+const soundVisuals=new SoundVisuals(document.getElementById('hud'));
+const triggerGuard={};
 const performanceHUD=new PerformanceHUD(document.body);
 const lobbyStatus=new LobbyStatus();
 const snapshotTimes=new WeakMap();
@@ -1734,6 +1743,7 @@ function loop(now) {
     switchSpectator(1);
   view.spectateTarget = me?.spectating ? spectateTarget : null;
   updateSpectatorStatus(me,now);
+  soundVisuals.update(state,me?.spectating?state?.players.find(p=>p.id===spectateTarget):me,{enabled:settings.visualSoundEffects,playing:screen==='game'&&!paused&&!document.hidden},now);
   sound.updateLobby(screen!=='game',dt,document.hidden);
   sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!(!net&&paused));
   let renderPlayer = predicted;

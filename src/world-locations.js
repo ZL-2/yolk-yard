@@ -78,6 +78,13 @@ export function authorFrontierWorld(c){
  const gate=door(vx,vy,vz+8.8,4,3.4,{vault:true,material:'metal'});
  put(vx,vy,vz+29,4.8,house.baseY-vy,3.1,0x788b8b,{indestructible:true,kind:'step'});
  for(let i=0;i<18;i++){const z=vz+27.6-i*1.03,top=house.baseY-i/3;put(vx,vy,z,4.8,top-vy,1.05,0x788b8b,{indestructible:true,kind:'step'});}
+ // Raised bridge and side approach preserve the front-door route above the stairwell.
+ const front=house.z+house.d/2;
+ put(vx,house.baseY-.22,front+2,14,.22,4.6,0x72858a,{indestructible:true,kind:'floor',frontAccess:true});
+ put(vx+4.5,house.baseY-.22,vz+22,2.6,.22,16,0x72858a,{indestructible:true,kind:'floor',frontAccess:true});
+ put(vx+6,house.baseY,vz+23,.15,1,12,0xb4c2be,{indestructible:true});
+ sign('COMMAND ENTRANCE →',vx+4.5,house.baseY+1.8,vz+27);
+ navLinks.push({from:{x:vx+4.5,y:house.baseY,z:vz+29},to:{x:vx,y:house.baseY,z:front+1}});
  navLinks.push({from:{...reader},to:{...entrance}});
  for(const [i,[dx,dz,source]]of [[-6,-4,'epic'],[6,-4,'epic'],[-6,4,'chest'],[6,4,'chest']].entries())chests.push({id:'vault-chest-'+i,x:vx+dx,y:vy,z:vz+dz,poi:'observatory',source,chance:1,vaultId:'aster-vault',room:'vault'});
  for(const side of [-1,1])prop('vault-rack',vx+side*9.2,vz,1.6,12,3.6,vy,{decorative:true});
@@ -100,5 +107,23 @@ export function authorFrontierWorld(c){
   put(a.x+a.w/2,top-.27,z,4,.25,3.4,0x697f85,{indestructible:true});
   traversal.push({id:'asc-'+poi,type:'ascender',label:poi==='observatory'?'COMMAND ROOF ACCESS':poi==='works'?'HEADFRAME LIFT':'DOCK SERVICE LIFT',from:{x:x+3.2,y:yAt(x+3.2,z+.55),z:z+.55},to:{x:x+1,y:top,z:z+.55},via:[{x:x+3.2,y:top+.1,z:z+.55}],speed:6.5});
  }
- return {doors,traversal,vault,bossHouse:buildings.indexOf(house)};
+ // Five ammunition reserves supplement the four locked vault chests.
+ for(const [i,type]of ['light','medium','shells','heavy','rockets'].entries())floorLoot.push({x:vx-4+i*2,y:vy,z:vz,poi:'observatory',role:'ammo',ammoType:type,chance:1,vaultId:vault.id});
+ const shieldBarrels=[];
+ const barrel=(x,y,z,location)=>{prop('shield-barrel',x,z,.85,.85,1.25,y,{material:'metal',location});shieldBarrels.push({x,y,z,location});};
+ for(const dx of [-2,2])barrel(vx+dx,vy,vz-6,'Voss strategic reserve');
+ // Select one supply room each at the docks and quarry, plus the woodland clinic.
+ for(const [id,label]of [['docks','Dock supply room'],['works','Quarry repair room']]){
+  const b=buildings.find(b=>b.poi===id&&['warehouse','factory','refinery'].includes(b.type))||buildings.find(b=>b.poi===id);
+  const x=b.x-b.w/2+2,z=b.z+b.d*.28;
+  for(const dx of [0,1.2])if(!boxes.some(o=>o.y<b.baseY+1.5&&o.y+o.h>b.baseY+.1&&Math.abs(o.x-(x+dx))<o.w/2+.5&&Math.abs(o.z-z)<o.d/2+.5))barrel(x+dx,b.baseY,z,label);
+ }
+  for(const dx of [0,1.2]){const x=-73+dx,z=207;if(!boxes.some(o=>Math.abs(o.x-x)<o.w/2+.5&&Math.abs(o.z-z)<o.d/2+.5&&o.y+o.h>yAt(x,z)+.1))barrel(x,yAt(x,z),z,'Sable field clinic');}
+ // Relays are authored ahead of loot seeding. Their access zone stays empty.
+ const relays=[];
+ for(const id of ['borough','observatory','works']){
+  const socket=floorLoot.find(l=>l.poi===id&&!l.roof&&l.floor===0&&!chests.some(ch=>Math.hypot(ch.x-l.x,ch.z-l.z)<4&&Math.abs(ch.y-l.y)<2));
+  if(socket)relays.push({id,name:LOCATION_IDENTITIES[id].title,x:socket.x,y:socket.y,z:socket.z});
+ }
+ return {doors,traversal,vault,relays,shieldBarrels,bossHouse:buildings.indexOf(house)};
 }

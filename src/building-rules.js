@@ -18,6 +18,7 @@ export const HARVEST_TYPES={
  planter:{material:'brick',health:300,resources:30,volume:11},
  stoneWall:{material:'brick',health:500,resources:42,volume:30},
  lamp:{material:'metal',health:300,resources:14,volume:.55},
+ shieldBarrel:{material:'metal',health:150,resources:6,volume:.9},
  barrels:{material:'metal',health:400,resources:22,volume:3},
  car:{material:'metal',health:700,resources:55,volume:16},
  metalWall:{material:'metal',health:650,resources:32,volume:30},

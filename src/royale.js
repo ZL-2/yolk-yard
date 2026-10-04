@@ -1,3 +1,4 @@
+import {clearOfRelays,pickupNeedsSwap,SWAP_HOLD_SECONDS,gateBuildFire} from './field-refinement.js';
 import {watcherAction} from './spectator-status.js';
 import {initializeFrontier,frontierInteract} from './frontier-world.js';
 import {SEASON,rigCharges} from './season-one.js';
@@ -77,7 +78,7 @@ export class RoyaleSimulation extends Simulation {
  spawnWarmup(p){
   resetStance(p);
   const {point,region}=distributedSpawn([...this.players.values()].filter(o=>o!==p),this.random);p.activity=newActivity(this.time);p.afkRemoved=false;p.spawnRegion=region;p.spawnHome={x:point[0],z:point[1]};p.warmupBrain=null;
-  Object.assign(p,{x:point[0],z:point[1],y:groundAt(SPAWN_ISLAND,...point),vy:0,grounded:true,flight:'ground',health:100,shield:0,stamina:100,slot:0,spectating:false,contestant:true,lateSpectator:false,awaitingEntry:false,kills:0,points:0,streak:0,materials:{wood:500,brick:500,metal:500},inventory:inventory(),use:null,brain:null});
+  Object.assign(p,{x:point[0],z:point[1],y:groundAt(SPAWN_ISLAND,...point),vy:0,grounded:true,flight:'ground',health:100,shield:0,stamina:100,slot:0,spectating:false,contestant:true,lateSpectator:false,awaitingEntry:false,kills:0,points:0,streak:0,materials:{wood:500,brick:500,metal:500},inventory:inventory(),use:null,swapUid:null,swapProgress:0,swapDoneHeld:false,buildFireHeld:false,awaitFireRelease:false,brain:null});
   p.inventory[1]={id:'sprinter',weapon:true,count:1,rarity:0,ammo:weapon('sprinter').magazine};
   p.inventory[2]={id:'scatter',weapon:true,count:1,rarity:0,ammo:weapon('scatter').magazine};
   p.bank={light:0,medium:180,shells:40,heavy:0,rockets:0};resetAirborne(p);this.syncInventory(p);
@@ -128,7 +129,7 @@ export class RoyaleSimulation extends Simulation {
   let seated=0;for(const p of humans){const contestant=!p.friendSpectator&&seated++<humanSeats;Object.assign(p,{contestant,lateSpectator:!contestant,spectating:!contestant,team:-1});}
   this.matchTeams={};for(const p of humans)this.assignTeam(p);
   this.startReason=null;this.maxPlayers=this.options.capacity+MAX_SPECTATORS;this.addBots();
-  this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.round++;this.phase='playing';this.stage=RP.ISLAND;this.queueEnds=this.time+(this.options.recurring?PUBLIC_ROYALE.warmupSeconds:this.options.session==='offline'?OFFLINE_WARMUP_SECONDS:WARMUP_SECONDS);this.lastCountdown=null;this.startedAt=0;this.elapsed=0;this.winner='';this.winnerId=null;this.winnerTeam=-1;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.chests=[];this.lootId=0;this.lootVersion++;this.pads=[];this.alive=0;this.remaining=0;
+  this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.round++;this.phase='playing';this.stage=RP.ISLAND;this.queueEnds=this.time+(this.options.recurring?(this.humanContestants().length?PUBLIC_ROYALE.warmupSeconds:-this.time):this.options.session==='offline'?OFFLINE_WARMUP_SECONDS:WARMUP_SECONDS);this.lastCountdown=null;this.startedAt=0;this.elapsed=0;this.winner='';this.winnerId=null;this.winnerTeam=-1;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.chests=[];this.lootId=0;this.lootVersion++;this.pads=[];this.alive=0;this.remaining=0;
   this.map={...SPAWN_ISLAND,boxes:SPAWN_ISLAND.boxes.map(b=>({...b}))};resetBuilding(this);this.nav=navigation(SPAWN_ISLAND);this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
   for(const p of this.players.values()){if(p.contestant)this.spawnWarmup(p);else Object.assign(p,{health:0,contestant:false,lateSpectator:true,spectating:true,flight:'out'});}
   this.departureMs=null;
@@ -172,7 +173,7 @@ export class RoyaleSimulation extends Simulation {
   for(const [index,p] of seats.entries()){
    resetStance(p);
    const contestant=p.contestant;
-   Object.assign(p,{health:contestant?COMBAT_LIMITS.royaleHealth:0,shield:0,stamina:100,sprintRest:0,exhausted:false,sprinting:false,flight:contestant?'transport':'out',flightLatch:false,grounded:false,eliminated:!contestant,spectating:!contestant,awaitingEntry:false,spawnRequested:false,place:0,eliminatedAt:null,kills:0,deaths:0,points:0,streak:0,slot:0,materials:{wood:0,brick:0,metal:0},building:false,editing:false,swingAt:-100,nextBuild:0,nextHarvest:0,poppers:0,reloadEnd:0,burstLeft:0,nextShot:0,weaponCooldowns:{},shotgunReadyAt:0,pendingFireUntil:0,lastFirePress:0,burstWeapon:null,fireLatch:false,shieldUntil:0,lastDamage:-100,respawnAt:0,killerId:null,crown:null,inventory:inventory(),ammo:Array(6).fill(0),reserve:Array(6).fill(0),accuracyState:Array.from({length:6},()=>({})),bank:{light:0,medium:0,shells:0,heavy:0,rockets:0},use:null,chestId:null,chestProgress:0,interactLatch:false,dropLatch:false,useLatch:false,botThink:0,botPath:[],botIntent:null,botIntentAt:0,brain:null,warmupBrain:null,botDrop:4+this.random()*27,botLand:(()=>{const group=landingOrder[(index+landingOffset)%landingOrder.length],choices=landingSpots[groups.indexOf(group)];return choices[index%choices.length]||this.map.floorLoot[0];})()});
+   Object.assign(p,{health:contestant?COMBAT_LIMITS.royaleHealth:0,shield:0,stamina:100,sprintRest:0,exhausted:false,sprinting:false,flight:contestant?'transport':'out',flightLatch:false,grounded:false,eliminated:!contestant,spectating:!contestant,awaitingEntry:false,spawnRequested:false,place:0,eliminatedAt:null,kills:0,deaths:0,points:0,streak:0,slot:0,materials:{wood:0,brick:0,metal:0},building:false,editing:false,swingAt:-100,nextBuild:0,nextHarvest:0,poppers:0,reloadEnd:0,burstLeft:0,nextShot:0,weaponCooldowns:{},shotgunReadyAt:0,pendingFireUntil:0,lastFirePress:0,burstWeapon:null,fireLatch:false,shieldUntil:0,lastDamage:-100,respawnAt:0,killerId:null,crown:null,inventory:inventory(),ammo:Array(6).fill(0),reserve:Array(6).fill(0),accuracyState:Array.from({length:6},()=>({})),bank:{light:0,medium:0,shells:0,heavy:0,rockets:0},use:null,swapUid:null,swapProgress:0,swapDoneHeld:false,buildFireHeld:false,awaitFireRelease:false,chestId:null,chestProgress:0,interactLatch:false,dropLatch:false,useLatch:false,botThink:0,botPath:[],botIntent:null,botIntentAt:0,brain:null,warmupBrain:null,botDrop:4+this.random()*27,botLand:(()=>{const group=landingOrder[(index+landingOffset)%landingOrder.length],choices=landingSpots[groups.indexOf(group)];return choices[index%choices.length]||this.map.floorLoot[0];})()});
    const routeDx=this.route.toX-this.route.fromX,routeDz=this.route.toZ-this.route.fromZ;
    p.botDrop=clamp(((p.botLand.x-this.route.fromX)*routeDx+(p.botLand.z-this.route.fromZ)*routeDz)/(routeDx*routeDx+routeDz*routeDz)*this.route.duration+this.random()*1.4-.7,3.2,32);
    p.activity=newActivity(this.time);p.afkRemoved=false;resetAirborne(p);Object.assign(p,{damageUntil:0,eggsUntil:0,miniUntil:0,streakArmor:0,restockUntil:0,bodyScale:1,nextLaunch:0,swapLatch:false,jumpLatch:false,botStuck:null});p.contestant=contestant;p.lateSpectator=false;Object.assign(p,transportAt(this.route,0));p.pitch=0;p.vy=0;
@@ -186,7 +187,7 @@ export class RoyaleSimulation extends Simulation {
  dropLoot(point,item,avoid=[]){
   if(this.loot.length>=2400)return null;
   const supported={...point,y:supportBelow(this.map,point.x,point.z,point.y??groundAt(this.map,point.x,point.z))};
-  const spot=placeLoot(this.map,supported,avoid.length?[...this.loot,...avoid]:this.loot);if(!spot)return null;
+  const spot=placeLoot(this.map,supported,avoid.length?[...this.loot,...avoid]:this.loot,this.relays?.length?this.relays:this.map.relays||[]);if(!spot)return null;
   const drop={...item,uid:++this.lootId,...spot};delete drop.motion;delete drop.spawnFrom;drop.y=(Number.isInteger(point.floor)||point.role!==undefined)?spot.y:Math.max(spot.y,point.y??spot.y);this.loot.push(drop);startLootFall(this,drop);this.lootVersion++;return drop;
  }
  dropWeapon(point,id,rarity=0,ammo=weapon(id).magazine){return this.dropLoot(point,{id,weapon:true,rarity,count:1,ammo});}
@@ -205,7 +206,7 @@ export class RoyaleSimulation extends Simulation {
   if(p.downed)return false;
   const item=p.inventory[index];if(!item||index===0)return;
   // Drop at the feet: this always remains on the same reachable collision surface.
-  if(!this.dropLoot(p,item))return false;p.inventory[index]=null;p.reloadEnd=0;p.burstLeft=0;p.use=null;this.syncInventory(p);
+  if(!this.dropLoot(p,{...item,droppedBy:p.id,pickupAfter:this.time+1.5}))return false;p.inventory[index]=null;p.reloadEnd=0;p.burstLeft=0;p.use=null;this.syncInventory(p);
   this.emit('royale-cue',{player:p.id,cue:'item-drop',x:p.x,y:p.y,z:p.z});
  }
  takeLoot(p,item){
@@ -232,6 +233,7 @@ export class RoyaleSimulation extends Simulation {
   this.emit('royale-cue',{cue:'chest-open',player:p.id,x:chest.x,y:chest.y,z:chest.z});return true;
  }
  interact(p,input,dt){
+  if(!input.interact)p.swapDoneHeld=false;
   if(!canFight(p))return;
   if(input.editing)return;if(frontierInteract(this,p,input,dt))return;if(seasonInteract(this,p,input,dt))return;
   if(input.interact&&!p.interactLatch&&toggleDoor(this,p)){p.interactLatch=true;return;}
@@ -242,10 +244,12 @@ export class RoyaleSimulation extends Simulation {
    p.chestProgress+=dt;
    if(p.chestProgress>=.8){this.openChest(p,chest);p.chestProgress=0;p.chestId=null;}
   }else{p.chestProgress=0;p.chestId=null;}
-  if(input.interact&&!p.interactLatch&&!chest){
-   const item=nearbyItems(this,'loot',p,3).filter(i=>!i.ammoType&&this.accessible(p,i,3)).sort((a,b)=>dist(p,a)-dist(p,b))[0];
-   if(item)this.takeLoot(p,item);
-  }
+  const item=input.interact&&!p.swapDoneHeld&&!chest?nearbyItems(this,'loot',p,3).filter(i=>!i.ammoType&&!i.resource&&!(i.droppedBy===p.id&&i.pickupAfter>this.time)&&this.accessible(p,i,3)).sort((a,b)=>dist(p,a)-dist(p,b))[0]:null;
+  if(item&&pickupNeedsSwap(p,item)){
+   if(p.swapUid!==item.uid||p.swapSelected!==p.slot){p.swapUid=item.uid;p.swapProgress=0;p.swapSelected=p.slot;}
+   if(this.time-p.lastDamage<.25)p.swapProgress=0;else p.swapProgress+=dt;
+   if(p.swapProgress>=SWAP_HOLD_SECONDS){if(this.takeLoot(p,item))p.swapDoneHeld=true;p.swapUid=null;p.swapProgress=0;}
+  }else{p.swapUid=null;p.swapProgress=0;if(item&&!p.interactLatch)this.takeLoot(p,item);}
   p.interactLatch=!!input.interact;
  }
  beginUse(p){
@@ -345,7 +349,7 @@ export class RoyaleSimulation extends Simulation {
    for(const b of this.projectiles)if(b.owner===id)b.owner=botId;for(const b of this.builds)if(b.owner===id)b.owner=botId;
    this.players.set(botId,p);this.emit('leave',{name:p.name});
   }else this.removePlayer(id);
-  if(this.options.recurring&&isWarmup(this.stage))this.addBots();
+  if(this.options.recurring&&isWarmup(this.stage)){this.addBots();this.advanceWarmupClock();}
  }
  removePlayer(id){const p=this.players.get(id);if(p&&this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant&&p.health>0){p.connected=false;this.damage(p,null,p.health+p.shield+1,'Disconnected');}super.removePlayer(id);if(this.matchTeams?.[p?.team]){const team=this.matchTeams[p.team];team.members=team.members.filter(member=>member!==id);if(!team.members.length)delete this.matchTeams[p.team];}if(!isWarmup(this.stage))resolveDownedTeams(this);}
  playerAction(id,action){
@@ -372,9 +376,13 @@ export class RoyaleSimulation extends Simulation {
   }
   if(action==='spectate'&&p.health>0){this.damage(p,null,p.health+p.shield+1,'Left round');if(p.flight==='transport'){p.health=0;this.eliminate(p);}}
  }
- resetPublicWarmup(){this.queueEnds=this.time+PUBLIC_ROYALE.warmupSeconds;this.stage=RP.ISLAND;this.lastCountdown=null;this.startReason=null;}
+ resetPublicWarmup(){this.queueEnds=0;this.stage=RP.ISLAND;this.lastCountdown=null;this.startReason=null;}
  advanceWarmupClock(unsteppedSeconds=0){
   if(this.phase!=='playing'||!isWarmup(this.stage))return;if(this.options.training){this.queueEnds=this.time+3600;return;}
+  if(this.options.recurring){
+   if(!this.humanContestants().length){if(this.queueEnds)this.resetPublicWarmup();return;}
+   if(!this.queueEnds){this.queueEnds=this.time+PUBLIC_ROYALE.warmupSeconds;this.stage=RP.ISLAND;this.lastCountdown=null;unsteppedSeconds=0;}
+  }
   // The host's physics loop intentionally drops long frame gaps. Translate
   // those elapsed seconds into the existing replicated deadline, so warmup
   // uses elapsed host time and checkpoints preserve the remaining wait.
@@ -406,6 +414,7 @@ export class RoyaleSimulation extends Simulation {
    const commands=p.bot?null:this.movementInput(p,dt);
    let input=commands?.input||(p.bot?this.botInput(p):this.inputs.get(p.id));
    if(!input||!p.bot&&this.time-p.lastInput>.4)input={yaw:p.yaw,pitch:p.pitch,slot:p.slot};
+   input=gateBuildFire(p,input);
    p.executedShotTime=input.shotTime;if(this.options.training&&!p.bot){p.tutorial??={};if(Math.hypot(input.forward||0,input.strafe||0)>.1)p.tutorial.move=true;if(input.fire)p.tutorial.fire=true;if(p.sliding)p.tutorial.slide=true;if(this.builds.some(b=>b.owner===p.id))p.tutorial.build=true;if(input.editing)p.tutorial.edit=true;if(p.fall?.source==='shockwave')p.tutorial.boost=true;}
    if(p.lifeState==='REVIVED'&&this.time-p.revivedAt>2)p.lifeState='ALIVE';
    if(p.downed){p.traversal=null;
@@ -512,8 +521,8 @@ export class RoyaleSimulation extends Simulation {
  restore(checkpoint){battlePreparation.delete(this);super.restore(checkpoint);const base=isWarmup(this.stage)?SPAWN_ISLAND:ROYALE_MAP;this.worldBoxes=(base.authored||base.boxes).filter(b=>!b.buildId).map(b=>({...b}));this.map={...base,boxes:[]};rebuildMap(this);this.nav=navigation(base);return this;}
  snapshot({includeLoot=true,includeBuilds=true}={}){
   const state=super.snapshot();state.options={...state.options,map:this.map.id};
-  state.players=state.players.map(p=>{const source=this.players.get(p.id);return Object.assign(p,{tutorial:source.tutorial?{...source.tutorial}:null,training:!!this.options.training,traversal:source.traversal?structuredClone(source.traversal):null,traversalLock:source.traversalLock,vaultProgress:source.vaultProgress,boss:source.boss,maxHealth:source.maxHealth,maxShield:source.maxShield,contestant:source.contestant,lateSpectator:source.lateSpectator,fall:source.fall?{...source.fall}:null,redeploy:source.redeploy,forceGlider:source.forceGlider,launchVelocity:source.launchVelocity?{...source.launchVelocity}:null,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,editing:source.editing,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestProgress:source.chestProgress||0});});
-  state.royale={doors:structuredClone(this.doors||{}),vault:this.vault?{...this.vault}:null,relays:structuredClone(this.relays||[]),smokes:structuredClone(this.smokes||[]),markers:(this.markers||[]).filter(m=>m.until>this.time).map(m=>({...m})),stage:this.stage,accepting:acceptsContestants(this.stage),practice:isWarmup(this.stage),contestants:[...this.players.values()].filter(p=>p.contestant).length,round:this.round,...(includeBuilds?{builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage)}:{}),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,...(includeLoot?{loot:this.loot.map(i=>({...i})),chests:this.chests.map(({contents,...c})=>({...c}))}:{}),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds,humanContestants:this.humanContestants().length,botContestants:[...this.players.values()].filter(p=>p.bot&&p.contestant).length,humanLimit:Math.min(this.options.capacity,MAX_HUMANS),startReason:this.startReason};
+  state.players=state.players.map(p=>{const source=this.players.get(p.id);return Object.assign(p,{tutorial:source.tutorial?{...source.tutorial}:null,training:!!this.options.training,traversal:source.traversal?structuredClone(source.traversal):null,traversalLock:source.traversalLock,swapUid:source.swapUid,swapProgress:source.swapProgress||0,vaultProgress:source.vaultProgress,boss:source.boss,maxHealth:source.maxHealth,maxShield:source.maxShield,contestant:source.contestant,lateSpectator:source.lateSpectator,fall:source.fall?{...source.fall}:null,redeploy:source.redeploy,forceGlider:source.forceGlider,launchVelocity:source.launchVelocity?{...source.launchVelocity}:null,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,editing:source.editing,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestProgress:source.chestProgress||0});});
+  state.royale={doors:structuredClone(this.doors||{}),vault:this.vault?{...this.vault}:null,relays:structuredClone(this.relays||[]),smokes:structuredClone(this.smokes||[]),markers:(this.markers||[]).filter(m=>m.until>this.time).map(m=>({...m})),stage:this.stage,accepting:acceptsContestants(this.stage),practice:isWarmup(this.stage),contestants:[...this.players.values()].filter(p=>p.contestant).length,round:this.round,...(includeBuilds?{builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage)}:{}),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,...(includeLoot?{loot:this.loot.map(i=>({...i})),chests:this.chests.map(({contents,...c})=>({...c}))}:{}),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds,countdownStarted:!!this.queueEnds,humanContestants:this.humanContestants().length,botContestants:[...this.players.values()].filter(p=>p.bot&&p.contestant).length,humanLimit:Math.min(this.options.capacity,MAX_HUMANS),startReason:this.startReason};
   state.royale.teams=Object.values(this.matchTeams||{}).filter(t=>t.members.length).map(t=>({...t,members:[...t.members]}));state.royale.winnerTeam=this.winnerTeam??-1;state.royale.teamsAlive=livingTeams(this.options,this.players.values()).size;
   return state;
  }

@@ -1,7 +1,7 @@
 name: Test and publish Ravelfront
 on:
   push:
-    branches: [main, match-setup, better-together, ravelfront, field-update, spectator-ready-120, loading-ready-122]
+    branches: [main, match-setup, better-together, ravelfront, field-update, spectator-ready-120, loading-ready-122, field-refinement-124]
     paths-ignore:
       - public/room-test.html
       - public/room-test.js
@@ -29,7 +29,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]')"
+      - name: Verify field resupply, deliberate input, countdown and UI
+        if: contains(github.event.head_commit.message, '[field-refinement]')
+        run: |
+          node --test tests/field-refinement.test.js tests/recurring-royale.test.js tests/royale-countdown.test.js tests/world-overhaul.test.js tests/chat.test.js tests/spectator-status.test.js tests/royale-teammate-bots.test.js tests/loading-screen.test.js tests/updates.test.js
+          node scripts/field-refinement-network-check.mjs
+          npx playwright install --with-deps chromium
+          node scripts/field-refinement-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[field-refinement]')
+        with:
+          name: field-refinement-checks
+          path: test-results/field-refinement
+          retention-days: 7
       - name: Verify cinematic loading transitions
         if: contains(github.event.head_commit.message, '[loading-art]')
         run: |
@@ -183,14 +196,14 @@ jobs:
           path: test-results/egg-shop
           retention-days: 7
       - run: npm run test:relay
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]')"
       - run: npm run test:realtime
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]')"
       - name: Verify authoritative countdown, human-only early departure and shared Bus transition
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]')"
         run: node scripts/countdown-network-check.mjs
       - name: Verify Royale phases, spectator cutoff, falling loot and host migration
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]')"
+        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]')"
         run: node scripts/royale-flow-check.mjs
       - name: Verify deployed game relay
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]')
@@ -659,7 +672,7 @@ jobs:
           RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
 
   check-release-safety:
-    if: github.ref == 'refs/heads/spectator-ready-120' || github.ref == 'refs/heads/loading-ready-122'
+    if: github.ref == 'refs/heads/spectator-ready-120' || github.ref == 'refs/heads/loading-ready-122' || github.ref == 'refs/heads/field-refinement-124'
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -725,3 +738,27 @@ jobs:
       - run: node scripts/kestrel-browser-check.mjs
         env:
           RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
+
+  verify-field-refinement-live:
+    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[field-refinement]') }}
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/recurring-royale-live-check.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/field-refinement-browser-check.mjs
+        env:
+          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: field-refinement-live
+          path: test-results/field-refinement
+          retention-days: 7

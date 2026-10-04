@@ -9,10 +9,7 @@ import {launchPlayer} from './airborne.js';
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 export function initializeSeason(sim){
  sim.smokes=[];sim.relays=[];
- for(const poi of sim.map.districts.filter(p=>['observatory','factory','town'].includes(p.id)||['factory','town'].includes(p.kind)).slice(0,3)){
-  const socket=sim.map.floorLoot.find(l=>l.poi===poi.id&&!l.roof&&l.floor===0&&canStand(sim.map,l));
-  if(socket)sim.relays.push({id:poi.id,name:poi.name,x:socket.x,y:socket.y,z:socket.z,cooldown:0,progress:0,user:null});
- }
+ sim.relays=(sim.map.relays||[]).map(r=>({...r,cooldown:0,progress:0,user:null}));
  const poi=sim.map.districts.find(p=>p.id==='observatory'),spots=sim.map.floorLoot.filter(l=>l.poi===poi.id&&!l.roof&&l.floor===0&&canStand(sim.map,l));
  const house=sim.map.buildings[sim.map.bossHouse],spot=house?{x:house.x-1.5,y:house.baseY,z:house.z-3}:spots[0];if(!spot)return;
  const b=Simulation.prototype.addPlayer.call(sim,SEASON.boss.id,{name:SEASON.boss.name,color:'#3b3938',accent:'#e99b49',outfit:'outfit-ember',backbling:'backbling-royal'},true);
