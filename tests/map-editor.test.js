@@ -1,4 +1,7 @@
 import test from 'node:test';
+import * as THREE from 'three';
+import {makeMapObject,registerModel,disposeMapGroup} from '../src/map-object-view.js';
+import {updateWorldDamage} from '../src/damage-visuals.js';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -64,4 +67,11 @@ test('copies have independent solids, doors and loot, and explicit furniture edi
 test('decoded layout data is immutable and reused without copying it each movement frame',()=>{
  const bundle={yard:layout()},encoder=new SnapshotEncoder(),decoder=new SnapshotDecoder(),first=decoder.decode(encoder.encode({type:'state',state:{players:[],time:1,mapLayouts:bundle}}).frame),next=decoder.decode(encoder.encode({type:'state',state:{players:[],time:2,mapLayouts:bundle}}).frame);
  assert.equal(first.state.mapLayouts,next.state.mapLayouts);assert.ok(Object.isFrozen(first.state.mapLayouts.yard.objects[0].position));assert.throws(()=>first.state.mapLayouts.yard.objects[0].position[0]=999);assert.equal(next.state.mapLayouts.yard.objects[0].position[0],5);
+});
+
+test('loaded imported models disappear with their shared collider destruction and restore cleanly',async()=>{
+ const asset='a'.repeat(64),model=new THREE.Group();model.add(new THREE.Mesh(new THREE.BoxGeometry(2,2,2),new THREE.MeshLambertMaterial()));registerModel(asset,{root:model,dimensions:[2,2,2]});
+ const kit={block(g,x,y,z,w,h,d,color){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color}));mesh.position.set(x,y,z);g.add(mesh);return mesh;}},record={...recordForModel(),asset},world=new THREE.Group(),group=makeMapObject(record,kit);world.add(group);await new Promise(r=>setImmediate(r));assert.equal(group.userData.modelReady,true);
+ updateWorldDamage(world,{'editor-model-check-0':{destroyed:true,health:0,maxHealth:100}},'destroyed');assert.equal(group.visible,false);updateWorldDamage(world,{},'restored');assert.equal(group.visible,true);disposeMapGroup(world);
+ function recordForModel(){return {id:'model-check',kind:'model',name:'Model',position:[0,0,0],rotation:0,scale:[1,1,1],collision:true,dimensions:[2,2,2]};}
 });

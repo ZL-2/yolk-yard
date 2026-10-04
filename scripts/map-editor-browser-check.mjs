@@ -12,7 +12,7 @@ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-a
 context.setDefaultTimeout(60000);context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));page.on('pageerror',e=>errors.push(e.message));
 await context.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:"window.YOLK_NETWORK={relay:'ws://127.0.0.1:9002/game'};"}));
 await context.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Map Workshop Check'}));});
-const action=(p,a)=>p.locator(`[data-editor-action="${a}"]`);
+const action=(p,a)=>p.locator(`[data-editor-action="${a}"]`).first();
 async function ready(p){await p.waitForFunction(()=>{const e=window.__yolkTest?.editor();return e?.doc&&!e.busy&&!!e.previewMap&&!e.closed;});}
 async function open(p){await p.goto(origin+'/?qa&workshop='+Date.now());await p.locator('#loading-screen').waitFor({state:'hidden'});for(const key of ['R','A','V','E','L','F','R','O','N','T'])await p.keyboard.press('Key'+key);await p.locator('#owner-code').fill(code);await p.locator('#owner-form button').click();await p.locator('[data-action=owner-map-editor]').click();await p.locator('#map-editor').waitFor();await ready(p);}
 async function property(name,value,axis){const selector=`[data-map-property="${name}"]${axis===undefined?'':`[data-axis="${axis}"]`}`,field=page.locator(selector);await field.fill(String(value));await field.press('Tab');await page.waitForTimeout(180);await ready(page);}

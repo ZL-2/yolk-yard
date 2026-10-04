@@ -39,6 +39,7 @@ export function makeMapObject(record,kit,{base,markers=false,loadModels=true}={}
  else if(src?.type==='box'){
   if(base?.theme==='frontier'){const a=new FrontierArt();a.wallDetail(src.spec);a.bake(content);}else {const b=src.spec;kit.block(content,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color??(typeof b.color==='number'?b.color:kit.palette[b.color]||0x82928f));}
  }else if(record.kind==='model'){
+  root.userData.damageObjectId='editor-'+record.id+'-0';
   const [w,h,d]=record.dimensions;const fallback=kit.block(content,0,h/2,0,w,h,d,color??0x648083);fallback.userData.keepDynamic=true;fallback.userData.modelFallback=true;
   if(loadModels)void cachedModel(record.asset).then(({root:model})=>{if(root.userData.disposed||!root.parent&&root.userData.abandoned)return;fallback.removeFromParent();const clone=model.clone(true);if(color!=null)clone.traverse(m=>{if(m.isMesh){m.material=m.material.clone();m.material.color.setHex(color);m.userData.ownedMaterial=true;}});content.add(clone);root.userData.modelReady=true;}).catch(e=>{root.userData.modelError=e.message;});
  }else if(['pine','oak','palm'].includes(record.kind))treeModel(content,{x:0,y:0,z:0,h:prefab(record.kind).size[1],kind:record.kind,seed:17},kit);
