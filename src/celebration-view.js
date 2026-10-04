@@ -1,6 +1,6 @@
 import * as T from 'three';
 const gold=0xe9b94f;
-function mesh(parent,geometry,color,x=0,y=0,z=0){const m=new T.Mesh(geometry,new T.MeshLambertMaterial({color}));m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m;}
+function mesh(parent,geometry,color,x=0,y=0,z=0){const m=new T.Mesh(geometry,new T.MeshLambertMaterial({color}));m.position.set(x,y,z);m.castShadow=true;m.userData.ownedMaterial=true;parent.add(m);return m;}
 export function makeVictoryCrown(){
  const g=new T.Group();g.name='Victory Crown';
  mesh(g,new T.CylinderGeometry(.23,.21,.12,16,1,true),gold,0,.06,0);
