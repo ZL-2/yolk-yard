@@ -34,8 +34,8 @@ test('Rook telegraphs his winch, a shot interrupts it, and cover blocks pulling'
  b.bossWindup={target:p.id,until:3};s.time=3.1;s.map.boxes=[{x:0,y:0,z:-6,w:3,h:4,d:1}];bossInput(s,b);assert.equal(p.flight,'ground');
  s.map.boxes=[];b.bossWindup={target:p.id,until:3};bossInput(s,b);assert.equal(p.grounded,false);assert.ok(p.vy>0);assert.ok(p.launchVelocity.z>0);
 });
-test('Nyx smoke blocks her own firing and relocates her patrol',()=>{
- const {s,p}=flat(),b=s.addPlayer('nyx-test',{name:'Nyx Test'},true);Object.assign(b,{boss:true,bossId:'lieutenant-nyx',x:0,y:0,z:0,home:{x:0,y:0,z:0},targetId:p.id,scanAt:100,aggroAt:0,abilityAt:0,lastDamage:1,ammo:[0,6],patrol:[{x:-2,y:0,z:0},{x:2,y:0,z:0}],patrolIndex:0,pitch:0,yaw:0});Object.assign(p,{x:0,z:-15});s.time=2;const input=bossInput(s,b);assert.equal(input.fire,false);assert.equal(s.smokes.length,1);assert.equal(b.patrolIndex,1);assert.ok(s.smokes[0].until-s.time<=4);
+test('Nyx telegraphs her relocation before smoke, moves to the marked position and never fires through it',()=>{
+ const {s,p}=flat(),b=s.addPlayer('nyx-test',{name:'Nyx Test'},true);Object.assign(b,{boss:true,bossId:'lieutenant-nyx',x:0,y:0,z:0,home:{x:0,y:0,z:0},targetId:p.id,scanAt:100,aggroAt:0,abilityAt:0,lastDamage:1,ammo:[0,6],patrol:[{x:-2,y:0,z:0},{x:2,y:0,z:0}],patrolIndex:0,pitch:0,yaw:0});Object.assign(p,{x:0,z:-15});s.time=2;const input=bossInput(s,b);assert.equal(input.fire,false);assert.equal(s.smokes.length,0);assert.equal(b.patrolIndex,1);assert.deepEqual(b.bossVeil.goal,b.patrol[1]);assert.deepEqual(s.snapshot().players.find(q=>q.id===b.id).bossVeil.goal,b.patrol[1]);s.time+=.7;const relocation=bossInput(s,b);assert.equal(relocation.fire,false);assert.equal(s.smokes.length,1);b.yaw=-Math.PI/2;assert.ok(bossInput(s,b).forward>0);assert.ok(s.smokes[0].until-s.time<=4);bossInput(s,b);assert.equal(s.smokes.length,1);
 });
 test('keyed boss caches reject missing keys and damage interruptions, consume a key once and conserve rewards',()=>{
  const {s,p}=flat();const cache={id:'rook-hold',key:'rookKeycard',name:'Harbor Hold',x:0,y:0,z:-1,opened:false};s.bossCaches=[cache];s.time=10;

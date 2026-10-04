@@ -24,6 +24,15 @@ export function initializeSeason(sim){
 }
 export function bossInput(sim,p){
  const def=bossDefinition(p.bossId||p.id),input={yaw:p.yaw,pitch:p.pitch||0,slot:1,forward:0,strafe:0,interact:false};
+ if(p.bossVeil){
+  const veil=p.bossVeil;input.fire=false;
+  if(sim.time>=veil.until)p.bossVeil=null;
+  else{
+   if(sim.time<veil.releaseAt)return input;
+   if(!veil.released){veil.released=true;sim.smokes.push({id:++sim.lootId,x:p.x,y:p.y+1.3,z:p.z,radius:3.2,until:sim.time+4});}
+   const yaw=Math.atan2(p.x-veil.goal.x,p.z-veil.goal.z);input.yaw=p.yaw+Math.max(-.026,Math.min(.026,wrap(yaw-p.yaw)));input.forward=dist(p,veil.goal)>.6&&Math.abs(wrap(yaw-p.yaw))<.4?.4:0;return input;
+  }
+ }
  if(sim.time>=(p.scanAt||0)){p.scanAt=sim.time+.2;let best=null,bestD=def.notice;
   for(const target of sim.players.values()){if(target===p||!target.contestant||target.health<=0||target.spectating||target.flight!=='ground')continue;const d=dist(p,target);if(d>bestD)continue;const from={x:p.x,y:p.y+1.55,z:p.z},dy=target.y+.9-from.y,len=Math.hypot(target.x-p.x,dy,target.z-p.z)||1,v={x:(target.x-p.x)/len,y:dy/len,z:(target.z-p.z)/len};if(wallDistance(sim.map,from,v,len)<len-.4||smokeBlocks(sim,from,{...target,y:target.y+.9}))continue;best=target;bestD=d;}
   if(best?.id!==p.targetId)p.aggroAt=sim.time+def.reaction;p.targetId=best?.id||null;
@@ -39,7 +48,7 @@ export function bossInput(sim,p){
  }
  if(target&&!farHome&&sim.time>p.aggroAt&&sim.time>=(p.abilityAt||0)){
   if(def.ability==='winch'&&dist(p,target)>7&&dist(p,target)<24){p.abilityAt=sim.time+14;p.bossWindup={target:target.id,until:sim.time+.95};sim.emit('royale-cue',{cue:'boss-windup',player:p.id,x:p.x,y:p.y,z:p.z});return input;}
-  if(def.ability==='veil'&&sim.time-p.lastDamage<3){p.abilityAt=sim.time+18;sim.smokes.push({id:++sim.lootId,x:p.x,y:p.y+1.3,z:p.z,radius:3.2,until:sim.time+4});p.patrolIndex=(p.patrolIndex+1)%p.patrol.length;p.targetId=null;p.patrolWait=0;sim.emit('royale-cue',{cue:'boss-veil',player:p.id,x:p.x,y:p.y,z:p.z});}
+  if(def.ability==='veil'&&sim.time-p.lastDamage<3&&p.patrol?.length){p.abilityAt=sim.time+18;p.patrolIndex=(p.patrolIndex+1)%p.patrol.length;p.bossVeil={goal:{...p.patrol[p.patrolIndex]},releaseAt:sim.time+.65,until:sim.time+4.65,released:false};p.targetId=null;p.patrolWait=0;input.fire=false;sim.emit('royale-cue',{cue:'boss-veil',player:p.id,x:p.x,y:p.y,z:p.z});return input;}
  }
  let goal=farHome?p.home:target;
  if(!goal&&p.patrol?.length){goal=p.patrol[p.patrolIndex%p.patrol.length];if(dist(p,goal)<.85){if(!p.patrolWait)p.patrolWait=sim.time+1.6;if(sim.time>=p.patrolWait){p.patrolIndex++;p.patrolWait=0;goal=p.patrol[p.patrolIndex%p.patrol.length];}}}
@@ -56,7 +65,7 @@ export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
  const shield=source==='Storm'?0:Math.min(p.shield,amount);p.shield-=shield;const dealt=Math.min(p.health,amount-shield);p.health-=dealt;p.lastDamage=sim.time;
  sim.emit('hit',{player:attacker?.id,target:p.id,amount:shield+dealt,precision,shield:shield>0,shotId,weapon:source,x:p.x,y:p.y+1.4,z:p.z,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z});
  if(shield&&p.shield===0)sim.emit('royale-cue',{cue:'shield-break',player:p.id,x:p.x,y:p.y,z:p.z});
- if(p.health===0&&!p.bossDefeated){p.bossDefeated=true;p.spectating=true;p.flight='out';p.reloadEnd=0;p.bossWindup=null;
+ if(p.health===0&&!p.bossDefeated){p.bossDefeated=true;p.spectating=true;p.flight='out';p.reloadEnd=0;p.bossWindup=null;p.bossVeil=null;
   sim.dropLoot(p,{id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:MYTHIC_WEAPONS[def.id].magazine||weapon(def.weapon).magazine});
   if(def.ability==='rig'){sim.dropLoot(p,{id:'jumpRig',rarity:5,count:1,charges:SEASON.rig.charges,rechargeAt:0,readyAt:0});sim.dropAmmo(p,'medium',60);sim.dropLoot(p,{id:'asterKeycard',count:1,rarity:4});}
   if(def.ability==='winch'){sim.dropLoot(p,{id:'anchorWinch',rarity:5,count:1,charges:2,rechargeAt:0,readyAt:0});sim.dropLoot(p,{id:'rookKeycard',count:1,rarity:4});sim.dropAmmo(p,'shells',12);sim.dropLoot(p,{id:'metal',resource:'metal',count:60,rarity:0});}
