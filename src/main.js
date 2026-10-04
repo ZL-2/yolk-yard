@@ -1533,20 +1533,28 @@ document.addEventListener('click',e=>{
  if(e.target.closest('[data-build-control="edit"]')){const p=state?.players.find(p=>p.id===localId);if(p)buildUI.beginEdit(state,predicted?{...p,...predicted}:p,view.buildMap);}
  if(e.target.closest('button')){sound.unlock();sound.cue('ui-select',null,.45);}
 });
-// Native desktop dragging, touch dragging, and keyboard reordering share one action.
-let touchDrag=null;
+// Pointer capture keeps mouse/touch drops working across the modal's inert backdrop.
+let inventoryDrag=null,inventoryDragSlot=null,inventoryDragPreview=null,suppressInventoryClickUntil=0;
 dialog.addEventListener('change',e=>{if(e.target.matches('[data-training-weapon]')&&sim?.options.training)sim.playerAction(localId,'training-weapon-'+e.target.value);});
 dialog.addEventListener('click',e=>{const drop=e.target.closest('[data-supply-drop]');if(drop){const action='inventory-supply-'+drop.dataset.supplyDrop;if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});}});
-let inventoryDragSlot=null;
 const applyInventoryDrag=(x,y)=>{const target=inventoryDropTarget(dialog,x,y),from=inventoryDragSlot;if(!Number.isInteger(from)||from<1||from>5)return;if(target?.kind==='drop')inventoryAction('drop',from);else if(target?.kind==='swap'&&target.slot>0&&target.slot!==from)inventoryAction('swap',target.slot,from);};
-dialog.addEventListener('dragstart',e=>{const slot=e.target.closest('[data-royale-slot]');if(!slot||Number(slot.dataset.royaleSlot)===0)return;inventoryDragSlot=Number(slot.dataset.royaleSlot);royaleUI.dragging=true;e.dataTransfer.setData('text/plain',String(inventoryDragSlot));e.dataTransfer.effectAllowed='move';slot.classList.add('dragging');});
-document.addEventListener('dragover',e=>{if(royaleUI.dragging&&dialogType==='royale-inventory'&&inventoryDropTarget(dialog,e.clientX,e.clientY)){e.preventDefault();e.dataTransfer.dropEffect='move';}});
-document.addEventListener('drop',e=>{if(!royaleUI.dragging||dialogType!=='royale-inventory')return;e.preventDefault();applyInventoryDrag(e.clientX,e.clientY);royaleUI.dragging=false;inventoryDragSlot=null;});
-dialog.addEventListener('dragend',()=>{royaleUI.dragging=false;inventoryDragSlot=null;royaleUI.inventoryKey='';royaleUI.updateInventory(state?.players.find(p=>p.id===localId));});
-dialog.addEventListener('pointerdown',e=>{const slot=e.target.closest('[data-royale-slot]');if(slot&&Number(slot.dataset.royaleSlot)>0&&e.pointerType==='touch'){touchDrag={from:Number(slot.dataset.royaleSlot),x:e.clientX,y:e.clientY};inventoryDragSlot=touchDrag.from;slot.setPointerCapture(e.pointerId);}});
-dialog.addEventListener('pointermove',e=>{if(touchDrag&&Math.hypot(e.clientX-touchDrag.x,e.clientY-touchDrag.y)>8){royaleUI.dragging=true;e.preventDefault();}},{passive:false});
-dialog.addEventListener('pointerup',e=>{if(!touchDrag)return;const dragged=royaleUI.dragging;touchDrag=null;if(dragged)applyInventoryDrag(e.clientX,e.clientY);royaleUI.dragging=false;inventoryDragSlot=null;royaleUI.inventoryKey='';});
-dialog.addEventListener('pointercancel',()=>{touchDrag=null;royaleUI.dragging=false;inventoryDragSlot=null;});
+function finishInventoryDrag(refresh=true){inventoryDrag?.node.classList.remove('dragging');inventoryDrag=null;inventoryDragSlot=null;inventoryDragPreview?.remove();inventoryDragPreview=null;royaleUI.dragging=false;royaleUI.inventoryKey='';if(refresh)royaleUI.updateInventory(state?.players.find(p=>p.id===localId));}
+dialog.addEventListener('pointerdown',e=>{
+ const slot=e.target.closest('[data-royale-slot]'),from=Number(slot?.dataset.royaleSlot);
+ if(dialogType!=='royale-inventory'||!slot||from<1||from>5||!slot.querySelector('.item-art')||e.button!==0)return;
+ inventoryDrag={from,x:e.clientX,y:e.clientY,pointer:e.pointerId,node:slot,moved:false};inventoryDragSlot=from;royaleUI.dragging=true;slot.setPointerCapture(e.pointerId);
+});
+dialog.addEventListener('pointermove',e=>{
+ if(!inventoryDrag||e.pointerId!==inventoryDrag.pointer)return;
+ if(Math.hypot(e.clientX-inventoryDrag.x,e.clientY-inventoryDrag.y)>8&&!inventoryDrag.moved){
+  inventoryDrag.moved=true;inventoryDrag.node.classList.add('dragging');inventoryDragPreview=document.createElement('div');inventoryDragPreview.className='inventory-drag-preview';inventoryDragPreview.setAttribute('aria-hidden','true');inventoryDragPreview.append(inventoryDrag.node.querySelector('.item-art img').cloneNode());dialog.append(inventoryDragPreview);
+ }
+ if(inventoryDrag.moved){e.preventDefault();inventoryDragPreview.style.left=e.clientX+'px';inventoryDragPreview.style.top=e.clientY+'px';}
+},{passive:false});
+dialog.addEventListener('pointerup',e=>{if(!inventoryDrag||e.pointerId!==inventoryDrag.pointer)return;const moved=inventoryDrag.moved;if(moved){suppressInventoryClickUntil=performance.now()+200;applyInventoryDrag(e.clientX,e.clientY);}finishInventoryDrag(moved);});
+dialog.addEventListener('pointercancel',finishInventoryDrag);
+dialog.addEventListener('click',e=>{if(performance.now()<suppressInventoryClickUntil){e.preventDefault();e.stopImmediatePropagation();}},{capture:true});
+dialog.addEventListener('keydown',e=>{if(e.key==='Escape'&&inventoryDrag){e.preventDefault();e.stopPropagation();finishInventoryDrag();}});
 dialog.addEventListener('keydown',e=>{if(dialogType!=='royale-inventory')return;const slot=e.target.closest('[data-royale-slot]');if(slot&&e.altKey&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const from=Number(slot.dataset.royaleSlot),to=1+((from-1+(e.key==='ArrowRight'?1:4))%5);inventoryAction('swap',to,from);dialog.querySelector(`[data-royale-slot="${to}"]`)?.focus();}});
 document.addEventListener('wheel',e=>{if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
 document.addEventListener("contextmenu", (e) => {

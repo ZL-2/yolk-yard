@@ -18,12 +18,12 @@ try{
  for(const viewport of [{width:1440,height:900},{width:1280,height:720},{width:1024,height:640},{width:800,height:600}]){
   await page.setViewportSize(viewport);await page.waitForTimeout(250);
   const layout=await page.locator('#dialog').evaluate(d=>{const footer=d.querySelector('.inventory-actions').getBoundingClientRect(),cards=[...d.querySelectorAll('.inventory-ammo,[data-royale-slot]')].map(e=>e.getBoundingClientRect());return {scroll:d.scrollHeight> d.clientHeight+2,bodyScroll:d.querySelector('.dialog-body').scrollHeight>d.querySelector('.dialog-body').clientHeight+2,footerBottom:footer.bottom,cards:cards.map(r=>({top:r.top,bottom:r.bottom,left:r.left,right:r.right}))};});
-  assert.equal(layout.scroll,false,'inventory fits '+JSON.stringify(viewport));assert.equal(layout.bodyScroll,false);assert.ok(layout.footerBottom<=viewport.height);assert.equal(layout.cards.length,14);assert.ok(layout.cards.every(r=>r.top>=0&&r.bottom<=viewport.height));metrics.viewports.push({viewport,layout});
+  metrics.viewports.push({viewport,layout});assert.equal(layout.scroll,false,'inventory fits '+JSON.stringify(viewport));assert.equal(layout.bodyScroll,false);assert.ok(layout.footerBottom<=viewport.height);assert.equal(layout.cards.length,14);assert.ok(layout.cards.every(r=>r.top>=0&&r.bottom<=viewport.height));
  }
  await page.setViewportSize({width:1280,height:720});await page.screenshot({path:out+'/inventory.png'});
  // Drag across the real modal backdrop, beyond the inventory dialog's left edge.
  const slot=page.locator('#dialog [data-royale-slot="1"]'),box=await slot.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2-15,box.y+box.height/2,{steps:5});await page.mouse.move(40,box.y+box.height/2,{steps:25});await page.mouse.up();
- await page.locator('#dialog [data-royale-slot="1"] .empty-slot-mark').waitFor({state:'visible'});metrics.dropOutsidePanel=true;
+ await page.locator('#dialog [data-royale-slot="1"] .empty-slot-mark').waitFor({state:'visible',timeout:10000});metrics.dropOutsidePanel=true;
  await page.locator('#dialog [data-action=resume]').click();await page.keyboard.press('Escape');
  await page.evaluate(()=>{document.querySelector('#dialog').close();});
  if(!live){
@@ -38,6 +38,6 @@ try{
   await page.evaluate(()=>{window.__chatPanel.open();});await page.locator('#chat-regression #chat-channel').focus();await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__chatPanel.opened),false);await page.evaluate(()=>{clearInterval(window.__chatTimer);document.querySelector('#chat-regression').remove();});metrics.chatNativeChannelStable=true;
  }
  if(live){const version=await page.evaluate(async()=>fetch('./version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()));assert.equal(version.appVersion,JSON.parse(readFileSync(new URL('../package.json',import.meta.url))).version);assert.equal(String(version.release),RELEASE_NOTES[0].number);if(process.env.GITHUB_SHA)assert.equal(version.build,process.env.GITHUB_SHA);metrics.version=version;}
- assert.deepEqual(errors,[]);await writeFile(out+'/metrics.json',JSON.stringify(metrics,null,2));console.log('PASS Field refinement UI: saved sound toggle, four fitted inventory viewports, native backdrop drop, '+(!live?'stable chat channel and close':'published version')+'; '+JSON.stringify(metrics));
-}catch(e){await page.screenshot({path:out+'/failure.png'}).catch(()=>{});console.log('FAIL UI',(await page.locator('body').innerText()).slice(-2000));throw e;}
+ assert.deepEqual(errors,[]);await writeFile(out+'/metrics.json',JSON.stringify(metrics,null,2));console.log('PASS Field refinement UI: saved sound toggle, four fitted inventory viewports, backdrop drop, '+(!live?'stable chat channel and close':'published version')+'; '+JSON.stringify(metrics));
+}catch(e){await writeFile(out+'/metrics.json',JSON.stringify(metrics,null,2));await page.screenshot({path:out+'/failure.png'}).catch(()=>{});console.log('FAIL UI',JSON.stringify(metrics),(await page.locator('body').innerText()).slice(-2000));throw e;}
 finally{await browser.close();await vite?.close();}

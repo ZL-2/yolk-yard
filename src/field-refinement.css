@@ -39,6 +39,10 @@
 #dialog[data-kind="royale-inventory"] .inventory-section-title span{font-size:10px}
 #dialog[data-kind="royale-inventory"] .royale-inventory-grid{gap:9px}
 #dialog[data-kind="royale-inventory"] .royale-slot{height:100px;padding:4px}
+#dialog[data-kind="royale-inventory"] .royale-slot{touch-action:none;user-select:none;cursor:grab}
+#dialog[data-kind="royale-inventory"] .royale-slot.dragging{opacity:.55;outline:2px dashed #9df0d9;cursor:grabbing}
+.inventory-drag-preview{position:fixed;transform:translate(-50%,-50%);width:110px;height:76px;border:2px solid #9df0d9;border-radius:8px;background:#153645df;pointer-events:none;z-index:20}
+.inventory-drag-preview img{width:100%;height:100%;object-fit:contain}
 #dialog[data-kind="royale-inventory"] .item-art{height:52px}
 #dialog[data-kind="royale-inventory"] #inventory-selected-name{font-size:12px;margin:7px 0}
 #dialog[data-kind="royale-inventory"] .inventory-actions{flex:none;display:flex;gap:6px;margin:0;padding:9px 0 0;flex-wrap:nowrap}
