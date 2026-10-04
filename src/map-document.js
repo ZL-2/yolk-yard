@@ -5,6 +5,8 @@ export class MapDocument{
  record(id){return this.layout.objects.find(o=>o.id===id)||this.sources.has(id)&&sourceRecord(this.sources.get(id))||null;}
  change(next){next=validateLayout(next,this.base.id);if(JSON.stringify(next)===JSON.stringify(this.layout))return false;this.undoStack.push(this.layout);if(this.undoStack.length>50)this.undoStack.shift();this.redoStack=[];this.layout=next;return true;}
  set(record){return this.change({...this.layout,objects:[...this.layout.objects.filter(o=>o.id!==record.id),record]});}
+ setMany(records){const ids=new Set(records.map(r=>r.id));return this.change({...this.layout,objects:[...this.layout.objects.filter(o=>!ids.has(o.id)),...records]});}
+ removeMany(ids){const selected=new Set(ids),removed=[...selected].map(id=>this.record(id)).filter(r=>r?.source&&r.id===r.source).map(r=>({...r,removed:true}));return this.change({...this.layout,objects:[...this.layout.objects.filter(o=>!selected.has(o.id)),...removed]});}
  remove(id){const r=this.record(id);if(!r)return;if(r.source&&r.id===r.source)this.set({...r,removed:true});else this.change({...this.layout,objects:this.layout.objects.filter(o=>o.id!==id)});}
  restore(id){this.change({...this.layout,objects:this.layout.objects.filter(o=>o.id!==id)});}
  undo(){if(!this.undoStack.length)return false;this.redoStack.push(this.layout);this.layout=this.undoStack.pop();return true;}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import * as THREE from 'three';
-import {makeMapObject,registerModel,disposeMapGroup} from '../src/map-object-view.js';
+import {makeMapObject,registerModel,disposeMapGroup,bakeObject} from '../src/map-object-view.js';
 import {updateWorldDamage} from '../src/damage-visuals.js';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
@@ -9,6 +9,7 @@ import {join} from 'node:path';
 import {BASE_MAPS,baseMap,getMap,installPublishedLayouts,useMatchLayouts} from '../src/maps.js';
 import {emptyLayout,validateLayout,compileLayout,baseObjects,sourceRecord,prefabBoxes} from '../src/map-layout.js';
 import {MapDocument} from '../src/map-document.js';
+import {transformSelection,cameraTranslation} from '../src/map-editor-tools.js';
 import {Simulation} from '../src/simulation.js';
 import {RoyaleSimulation} from '../src/royale.js';
 import {MapStore,validateGlb} from '../server/realtime/map-store.js';
@@ -18,6 +19,27 @@ import {rayBox,canStand} from '../src/physics.js';
 
 const record=(kind='wall',position=[5,0,5])=>({id:'test-object',kind,name:'Test wall',position,rotation:0,scale:[1,1,1],collision:true});
 const layout=(id='yard',objects=[record()])=>({...emptyLayout(id),objects});
+test('selection transforms rotate about one pivot, retain exact solids and bound every scale',()=>{
+ const records=[{...record(),id:'a',position:[-2,0,0]},{...record(),id:'b',position:[2,0,0],scale:[4,2,1]}];
+ const result=transformSelection(records,{origin:[0,0,0],position:[10,3,20],rotation:85,scale:[3,1,1]});
+ assert.deepEqual(result.map(r=>r.rotation),[90,90]);assert.deepEqual(result.map(r=>r.scale[0]),[2,8]);
+ assert.ok(Math.abs(result[0].position[0]-10)<1e-8);assert.ok(Math.abs(result[0].position[2]-24)<1e-8);assert.ok(Math.abs(result[1].position[2]-16)<1e-8);assert.equal(result[0].position[1],3);
+ assert.equal(records[0].rotation,0);assert.equal(records[1].scale[0],4);
+ const decorative=transformSelection([{...records[0],collision:false}],{origin:[0,0,0],position:[0,0,0],rotation:23,scale:[.001,.001,.001]});assert.equal(decorative[0].rotation,23);assert.deepEqual(decorative[0].scale,[.1,.1,.1]);
+});
+test('batch edits, deletion and native restoration are atomic undo steps',()=>{
+ const base=baseMap('yard'),doc=new MapDocument(base),native=sourceRecord(baseObjects(base).find(r=>r.type!=='spawn'));
+ const records=[{...native,position:[native.position[0]+2,...native.position.slice(1)]},{...record(),id:'added-a'},{...record(),id:'added-b'}];doc.setMany(records);assert.equal(doc.undoStack.length,1);
+ const before=JSON.stringify(doc.layout);doc.removeMany(records.map(r=>r.id));assert.equal(doc.undoStack.length,2);assert.equal(doc.record(native.id).removed,true);assert.equal(doc.record('added-a'),null);
+ doc.undo();assert.equal(JSON.stringify(doc.layout),before);doc.undo();assert.equal(doc.layout.objects.length,0);doc.redo();assert.equal(JSON.stringify(doc.layout),before);
+ const history=doc.undoStack.length;assert.throws(()=>doc.setMany(records.map(r=>({...r,scale:[99,1,1]}))),/scale/);assert.equal(doc.undoStack.length,history);assert.equal(JSON.stringify(doc.layout),before);
+});
+test('camera flight follows the view while Q/E elevates and diagonal speed stays bounded',()=>{
+ assert.deepEqual(cameraTranslation([0,-.6,-.8],[1,0,0],{forward:1,speed:10,dt:.5}),[0,-3,-4]);
+ assert.deepEqual(cameraTranslation([0,0,-1],[1,0,0],{vertical:1,speed:10,dt:.5}),[0,5,0]);
+ assert.ok(Math.abs(Math.hypot(...cameraTranslation([0,0,-1],[1,0,0],{forward:1,strafe:1,vertical:1,speed:10,dt:.5}))-5)<1e-8);
+ assert.deepEqual(cameraTranslation([0,0,-1],[1,0,0],{speed:10,dt:.5}),[0,0,0]);
+});
 export function fixtureGlb(extra={}){
  const positions=new Float32Array([0,0,0,1,0,0,0,1,0]),bin=Buffer.from(positions.buffer),doc={asset:{version:'2.0'},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],meshes:[{primitives:[{attributes:{POSITION:0}}]}],buffers:[{byteLength:bin.length}],bufferViews:[{buffer:0,byteOffset:0,byteLength:bin.length}],accessors:[{bufferView:0,componentType:5126,count:3,type:'VEC3',min:[0,0,0],max:[1,1,0]}],...extra};const text=JSON.stringify(doc),json=Buffer.from(text+' '.repeat((4-text.length%4)%4)),bytes=Buffer.alloc(28+json.length+bin.length);bytes.writeUInt32LE(0x46546c67,0);bytes.writeUInt32LE(2,4);bytes.writeUInt32LE(bytes.length,8);bytes.writeUInt32LE(json.length,12);bytes.writeUInt32LE(0x4e4f534a,16);json.copy(bytes,20);bytes.writeUInt32LE(bin.length,20+json.length);bytes.writeUInt32LE(0x004e4942,24+json.length);bin.copy(bytes,28+json.length);return bytes;
 }
@@ -74,4 +96,8 @@ test('loaded imported models disappear with their shared collider destruction an
  const kit={block(g,x,y,z,w,h,d,color){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color}));mesh.position.set(x,y,z);g.add(mesh);return mesh;}},record={...recordForModel(),asset},world=new THREE.Group(),group=makeMapObject(record,kit);world.add(group);await new Promise(r=>setImmediate(r));assert.equal(group.userData.modelReady,true);
  updateWorldDamage(world,{'editor-model-check-0':{destroyed:true,health:0,maxHealth:100}},'destroyed');assert.equal(group.visible,false);updateWorldDamage(world,{},'restored');assert.equal(group.visible,true);disposeMapGroup(world);
  function recordForModel(){return {id:'model-check',kind:'model',name:'Model',position:[0,0,0],rotation:0,scale:[1,1,1],collision:true,dimensions:[2,2,2]};}
+});
+
+test('changing color survives baking vertex-colored map scenery',()=>{
+ const group=new THREE.Group(),geometry=new THREE.BoxGeometry(1,1,1),colors=new Float32Array(geometry.attributes.position.count*3).fill(1);geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));const material=new THREE.MeshLambertMaterial({vertexColors:true,color:new THREE.Color(.5,.25,.75)});group.add(new THREE.Mesh(geometry,material));bakeObject(group);const baked=group.children[0].geometry.attributes.color;assert.equal(baked.getX(0),.5);assert.equal(baked.getY(0),.25);assert.equal(baked.getZ(0),.75);disposeMapGroup(group);material.dispose();
 });
