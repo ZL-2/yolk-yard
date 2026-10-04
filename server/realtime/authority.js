@@ -1,3 +1,4 @@
+import {bindCrownStore,attachCrown} from '../../src/crowns.js';
 import {timingPhase,roomTiming,recordTiming,startTiming,finishTiming} from './timing.js';
 import {SnapshotInterest} from '../../src/snapshot-interest.js';
 import {randomInt,randomUUID} from 'node:crypto';
@@ -26,6 +27,7 @@ export class MatchAuthority{
   const key=`yolk-yard-v${VERSION}-${PUBLIC_ROYALE.code}`;
   if(this.rooms.has(key))return this.rooms.get(key);
   const sim=new RoyaleSimulation({...publicRoyaleOptions(),seed:randomInt(1,2147483647)});
+  bindCrownStore(sim,{load:id=>id?this.relay.progression.account(id).crowns:null,save:(id,record)=>{this.relay.progression.account(id).crowns=record;this.relay.progression.dirty=true;void this.relay.progression.save();}});
   const hostPeer={id:key,token:randomUUID(),virtualRoom:true,ws:null,links:new Map(),pending:[],pendingBytes:0,seq:0,acked:0,clientSeq:0,history:[],historyBytes:0,lastSeen:Date.now(),rewardPublic:true};
   const room={key,code:PUBLIC_ROYALE.code,owner:'server',hostPeer,sim,recurring:true,visibility:'public',members:new Map(),chat:new ChatRoom(),encoders:new Map(),eventCursors:new Map(),age:0,frameAt:0,progressAt:0,kicked:new Set()};
   this.relay.peers.set(key,hostPeer);this.rooms.set(key,room);sim.startRound();this.publish(room);return room;
@@ -60,7 +62,9 @@ export class MatchAuthority{
    // Joining this fixed roster replaces a bot; it never allocates another room
    // or trims the promised 48 contestants through generic workload admission.
    const plan=room.recurring?{ok:!spectator||this.capacity.spectators(room)<MAX_SPECTATORS,reason:'The public spectator seats are full. Try again shortly.'}:this.capacity.plan(room.sim.options,{key:room.key,humans:this.capacity.humans(room)+this.capacity.pending(room.key)+(!spectator&&!reserved?added:0),spectators:this.capacity.spectators(room)+this.capacity.pending(room.key,true)+(spectator&&!reserved?added:0),botLimit:room.sim.botLimit});if(!plan.ok)return reject(plan.reason),true;
+   if([...room.members.values()].some(o=>o!==peer&&o.ws&&o.progressId===peer.progressId))return reject('This saved player is already in the public match in another tab.'),true;
    const p=room.sim.admitPlayer(peer.id,profile,admission);if(!p)return reject('This room is full.'),true;
+   if(room.recurring)attachCrown(room.sim,p,peer.progressId);
    peer.authorityRoom=room.key;peer.authorityId=p.id;peer.controlReady=false;p.loading=true;room.members.set(p.id,peer);room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));
    this.send(peer,{type:'data',channel:entry.channel,data:{type:'welcome',id:p.id,hostId:room.owner,members:this.members(room),code:room.code,version:VERSION,serverAuthority:true}});this.broadcast(room);return true;
   }

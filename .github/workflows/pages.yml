@@ -1,7 +1,7 @@
 name: Test and publish Ravelfront
 on:
   push:
-    branches: [main, match-setup, better-together, ravelfront, field-update, spectator-ready-120, loading-ready-122, field-refinement-124]
+    branches: [main, match-setup, better-together, ravelfront, field-update, spectator-ready-120, loading-ready-122, field-refinement-124, crowns-coast-127]
     paths-ignore:
       - public/room-test.html
       - public/room-test.js
@@ -33,15 +33,18 @@ jobs:
       - name: Verify field resupply, deliberate input, countdown and UI
         if: contains(github.event.head_commit.message, '[field-refinement]')
         run: |
-          node --test tests/field-refinement.test.js tests/recurring-royale.test.js tests/royale-countdown.test.js tests/world-overhaul.test.js tests/chat.test.js tests/spectator-status.test.js tests/royale-teammate-bots.test.js tests/loading-screen.test.js tests/updates.test.js
+          node --test tests/crowns-bosses-emotes.test.js tests/season-one.test.js tests/keybinds.test.js tests/rewards-afk.test.js tests/snapshot-codec.test.js tests/field-refinement.test.js tests/recurring-royale.test.js tests/royale-countdown.test.js tests/world-overhaul.test.js tests/chat.test.js tests/spectator-status.test.js tests/royale-teammate-bots.test.js tests/loading-screen.test.js tests/updates.test.js
           node scripts/field-refinement-network-check.mjs
           npx playwright install --with-deps chromium
           node scripts/field-refinement-browser-check.mjs
+          node scripts/crowns-coast-browser-check.mjs
       - uses: actions/upload-artifact@v4
         if: always() && contains(github.event.head_commit.message, '[field-refinement]')
         with:
           name: field-refinement-checks
-          path: test-results/field-refinement
+          path: |
+            test-results/field-refinement
+            test-results/crowns-coast
           retention-days: 7
       - name: Verify cinematic loading transitions
         if: contains(github.event.head_commit.message, '[loading-art]')
@@ -756,9 +759,14 @@ jobs:
       - run: node scripts/field-refinement-browser-check.mjs
         env:
           RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
+      - run: node scripts/crowns-coast-browser-check.mjs
+        env:
+          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: field-refinement-live
-          path: test-results/field-refinement
+          path: |
+            test-results/field-refinement
+            test-results/crowns-coast
           retention-days: 7

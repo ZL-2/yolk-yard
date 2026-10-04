@@ -1,3 +1,4 @@
+import {MYTHIC_WEAPONS} from './bosses.js';
 import {AMMO_RULES,RARITY_SCALE,UTILITY_WEAPONS,ammoTypeFor} from './weapon-balance.js';
 import {weapon,clamp} from './data.js';
 export const RARITIES=[
@@ -9,6 +10,11 @@ export const AMMO_CAPS=Object.fromEntries(Object.entries(AMMO_RULES).map(([id,r]
 export const ammoType=ammoTypeFor;
 export const ROYALE_GUN_IDS=['sprinter','scatter','needle','zipper','thumper','anchor','duet','pip','peeper','doubleyolk','comet'];
 export const ITEMS={
+ rookKeycard:{name:'Harbor Hold Keycard',kind:'keycard',duration:0,stack:1,color:'#e8b958',icon:'▣'},
+ nyxKeycard:{name:'Woodland Cache Keycard',kind:'keycard',duration:0,stack:1,color:'#83b68d',icon:'▣'},
+ anchorWinch:{name:'Anchor Winch',rarity:5,kind:'winch',duration:.15,stack:1,color:'#ffd46b',icon:'↟'},
+ veilProjector:{name:'Veil Projector',rarity:5,kind:'veil',duration:.3,stack:3,color:'#ffd46b',icon:'◌'},
+ victoryCrown:{name:'Victory Crown',rarity:5,kind:'crown',duration:0,stack:1,color:'#ffd46b',icon:'♛'},
  asterKeycard:{name:'Voss Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#80d9ed',icon:'▣'},
  jumpRig:{name:'Kestrel Jump Rig',rarity:5,kind:'jumpRig',duration:.16,stack:1,color:'#ffd46b',icon:'↟'},
  smoke:{name:'Smoke Canister',kind:'smoke',duration:.4,stack:3,color:'#c5d0cc',icon:'◌'},
@@ -22,7 +28,7 @@ export const ITEMS={
  impulse:{name:'Impulse Charge',kind:'impulse',duration:.35,stack:3,color:'#ec9fff',icon:'◎'},
  launchpad:{name:'Launch Pad',kind:'launchpad',duration:.6,stack:2,color:'#f9ca65',icon:'↟'},
 };
-export const itemInfo=item=>!item?{name:'Empty slot',color:'#7c8a98',icon:''}:item.pickaxe?{name:'Pickaxe',color:'#7aaddb',icon:''}:item.weapon?{...weapon(item.id),color:(RARITIES[item.rarity||0]||{color:'#ffd46b'}).color,icon:'',name:weapon(item.id).name}:ITEMS[item.id]||{name:item.id,color:'#d6caa5',icon:'▥'};
+export const itemInfo=item=>!item?{name:'Empty slot',color:'#7c8a98',icon:''}:item.pickaxe?{name:'Pickaxe',color:'#7aaddb',icon:''}:item.weapon?{...weapon(item.id),color:(RARITIES[item.rarity||0]||{color:'#ffd46b'}).color,icon:'',name:item.rarity===5&&MYTHIC_WEAPONS[item.bossId]?.id===item.id?MYTHIC_WEAPONS[item.bossId].name:weapon(item.id).name}:ITEMS[item.id]||{name:item.id,color:'#d6caa5',icon:'▥'};
 // 32 contestants / 512 m island. Opening loot time grows; later stages tighten.
 export const STORM_STEPS=[
  {radius:225,wait:115,close:65,dps:1},{radius:160,wait:35,close:50,dps:2},

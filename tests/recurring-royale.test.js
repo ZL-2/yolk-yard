@@ -97,7 +97,7 @@ test('48 contestants and 16 spectators fit the wire codec and server-verified pu
  const f=fixture();try{
   const a=f.admit(f.user('Rewards'));f.room.sim.time=f.room.sim.queueEnds;f.room.sim.advanceWarmupClock();
   for(let i=0;i<16;i++)assert.ok(f.room.sim.admitPlayer('watch-'+i,safeProfile({name:'Watch '+i}),{spectator:true,publicSpectator:true}));
-  const state=f.room.sim.snapshot(),wire={type:'authority-state',state};assert.equal(state.players.filter(p=>!p.boss).length,64);assert.equal(state.players.filter(p=>p.boss).length,1);
+  const state=f.room.sim.snapshot(),wire={type:'authority-state',state};assert.equal(state.players.filter(p=>!p.boss).length,64);assert.equal(state.players.filter(p=>p.boss).length,3);
   assert.deepEqual(new SnapshotDecoder().decode(JSON.parse(JSON.stringify(new SnapshotEncoder().encode(wire).frame))),JSON.parse(JSON.stringify(wire)));
   f.relay.progression.frame(f.room.hostPeer,rewardFrame(state,'server',{}));const at=f.relay.progression.clock();f.relay.progression.clock=()=>at+1;f.relay.progression.frame(f.room.hostPeer,rewardFrame(state,'server',{}));const match=[...f.relay.progression.matches.values()].at(-1);assert.ok(match);assert.equal(match.custom,false);assert.equal(match.players.size,48);assert.equal(match.players.get(a.p.id).identity,a.p.progressId);
   assert.equal([...match.players.values()].filter(p=>!p.bot).length,1);

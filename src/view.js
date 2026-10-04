@@ -1,3 +1,4 @@
+import {decorateBoss,updateCelebration} from './celebration-view.js';
 import {authoredBoxes} from './building.js';
 import {RenderPool} from './render-pool.js';
 import {makeHumanoid,animateHumanoid,humanoidDiagnostics} from './humanoid.js';
@@ -735,11 +736,13 @@ export class View {
     for(const egg of this.partyEggs||[])egg.visible=!playing;
     this.actors.visible = playing;
     this.effects.visible = playing;
-    this.gunGroup.visible = playing && canFight(local) && (!local.inventory || local.flight==='ground');
+    this.gunGroup.visible = playing && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
     if (!playing) {
       this.clearOutgoing(this);
       this.preview(profile);
-      this.animateLobbyCharacter(this.menuEgg,this.lobbyMotion,dt);
+      if(this.lobbyEmote?.until&&this.clock>=this.lobbyEmote.until)this.lobbyEmote=null;
+      if(this.lobbyEmote){this.menuEgg.rotation.y=.2;if(this.menuEgg.userData.held)this.menuEgg.userData.held.visible=false;const p={health:100,grounded:true,emote:this.lobbyEmote,crownWins:this.lobbyCrownWins||0};animateHumanoid(this.menuEgg,p,dt,this.clock,{menu:true});updateCelebration(this.menuEgg,p,this.clock,g=>this.disposeGroup(g));}
+      else {this.animateLobbyCharacter(this.menuEgg,this.lobbyMotion,dt);updateCelebration(this.menuEgg,{health:100},this.clock,g=>this.disposeGroup(g));}
       this.lobbyStage.userData.update?.(dt);
       for(const teammate of this.partyEggs||[])this.animateLobbyCharacter(teammate,teammate.userData.lobbyMotion,dt,.17);
       const partyCount=this.partyEggs?.length||0,partyOffset=partyCount===1?1.4:partyCount===3?1.5:0,narrow=this.camera.aspect<.85;
@@ -759,10 +762,11 @@ export class View {
         p.z,
       );
       this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
-      if (killer || local.downed) {
-        const back = new THREE.Vector3(Math.sin(p.yaw), 0.35, Math.cos(p.yaw)).normalize();
+      if (killer || local.downed || local.emote) {
+        const cameraYaw=local.emote?(this.emoteLook?.yaw??p.yaw)+Math.PI:p.yaw;
+        const back = new THREE.Vector3(Math.sin(cameraYaw), local.emote?.2:.35, Math.cos(cameraYaw)).normalize();
         const origin = {x:p.x, y:p.y+(p.downed?.8:1.6), z:p.z};
-        const distance = Math.max(0.1, wallDistance(getMap(state.options.map), origin, back, 3.5)-0.2);
+        const distance = Math.max(0.1, wallDistance(getMap(state.options.map), origin, back, local.emote?4.2:3.5)-0.2);
         this.camera.position.set(origin.x+back.x*distance, origin.y+back.y*distance, origin.z+back.z*distance);
         this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
       }
@@ -773,7 +777,7 @@ export class View {
       this.gunGroup.visible=this.gunGroup.visible&&draw.visible;
       const w = gun(local),
         scoped = w.optic === "scope" || w.optic === "prism";
-      const aiming = !!(canFight(local) && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
+      const aiming = !!(canFight(local) && !local.emote && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
       if(!Number.isFinite(this.aimBlend))this.aimBlend=0;
       this.aimBlend += (Number(aiming) - this.aimBlend) * (1-Math.exp(-Math.log(20)*dt/w.adsTime));
       const fov=aiming?adsFov(w,this.settings.fov):this.settings.fov;
@@ -854,7 +858,7 @@ export class View {
         // Transport passengers share one simulation position; the airship
         // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;
-        if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.75)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && !p.downed && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
+        if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.75)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && !p.emote && !p.downed && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
         seen.add(p.id);
         this.actorBounds.center.set(p.x,p.y+.9,p.z);
         if(playing&&!this.actorFrustum.intersectsSphere(this.actorBounds)){const hidden=this.models.get(p.id);if(hidden)hidden.visible=false;continue;}
@@ -875,15 +879,15 @@ export class View {
           );
           const aura = new THREE.Mesh(new THREE.CapsuleGeometry(.37,1.1,5,10),new THREE.MeshBasicMaterial({color:0x83e6ff,transparent:true,opacity:.18,depthWrite:false,wireframe:true}));
           aura.position.y=.95;model.add(aura);model.userData.bonusAura=aura;
-          model.userData.signature = sig;
+          model.userData.signature = sig;if(p.boss)decorateBoss(model,p);
           const name = label(
             p.name,
             teammates(state.options,p,local)
               ? teamStyle(state.players,p).color
-              : "#ffffff",
+              : p.boss?"#ffda82":"#ffffff",
           );
           name.position.y = 2.15;model.userData.nameplate=name;
-          name.visible = !state.royale||teammates(state.options,p,local);
+          name.visible = !!p.boss||!state.royale||teammates(state.options,p,local);
           model.add(name);
           this.actors.add(model);
           this.models.set(p.id, model);
@@ -920,7 +924,7 @@ export class View {
           if(harvesting&&model.userData.shopTool)animatePickaxe(model.userData.shopTool,model.userData.arms,p.pickaxe,state.time-(p.swingAt??-100));
           const throwT=(this.clock-(model.userData.throwStart??-Infinity))/.78;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1)throwArms(model.userData.arms,throwT);
-          model.userData.held.visible=draw.visible&&canFight(p);
+          model.userData.held.visible=draw.visible&&canFight(p)&&!p.emote;
           model.userData.held.rotation.set(p.pitch + hands.rotation[0] + recoil * .045 + draw.rotation[0], hands.rotation[1]+draw.rotation[1], hands.rotation[2]+draw.rotation[2]);
           model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
           const sprint=p.sprintBlend||0;model.userData.held.position.y-=sprint*.3;model.userData.held.position.x+=sprint*.08;model.userData.held.rotation.x+=sprint*.65;model.userData.held.rotation.z+=sprint*.2;
@@ -947,6 +951,7 @@ export class View {
         aura.material.opacity=.13+Math.sin(this.clock*5)*.025;
         if(p.inventory&&poseDue)this.royaleView.animateActor(model,p,this.clock,poseDt);
         if(model.userData.nameplate)model.userData.nameplate.position.y=bodyHeight(p)+.3;
+        updateCelebration(model,p,state.time,g=>this.disposeGroup(g));
         if(poseDue)animateHumanoid(model,{...p,shotRecoil:model.userData.armRecoil||0},poseDt,state.time,{distance:0});
 
       }

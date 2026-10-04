@@ -125,5 +125,21 @@ export function authorFrontierWorld(c){
   const socket=floorLoot.find(l=>l.poi===id&&!l.roof&&l.floor===0&&!chests.some(ch=>Math.hypot(ch.x-l.x,ch.z-l.z)<4&&Math.abs(ch.y-l.y)<2));
   if(socket)relays.push({id,name:LOCATION_IDENTITIES[id].title,x:socket.x,y:socket.y,z:socket.z});
  }
- return {doors,traversal,vault,relays,shieldBarrels,bossHouse:buildings.indexOf(house)};
+ // Rook's salvage deck and Nyx's repaired fire lookout share real collision.
+ const sx=196,sz=192,sy=Math.max(yAt(sx,sz),yAt(sx,sz-14))+3.2;
+ put(sx,sy-.25,sz,12,.25,18,0x405c68,{indestructible:true});
+ for(const side of [-1,1]){put(sx+side*5.7,sy,sz,.3,1.1,18,0x8299a1);put(sx+side*5.7,sy+1.1,sz,.4,.15,18,0xd8b56a);}
+ put(sx,sy,sz+8.5,11,.9,.35,0x405c68);
+ for(let i=0;i<8;i++){const top=sy-2.8+i*.4;put(sx,top-.4,sz-14+i*.6,3,.4,1,0x78898c,{indestructible:true});}
+ sign('ROOK / SALVAGE COMMAND',sx,sy+3,sz+7);
+ const woods=c.districts.find(p=>p.id==='woods'),wy=yAt(woods.x,woods.z)+23.3;
+ put(woods.x,wy-.25,woods.z,9,.25,9,0x6e775b,{indestructible:true});
+ for(const side of [-1,1]){put(woods.x-4.3,wy,woods.z+side*2.8,.15,1,3.4,0x88957c);put(woods.x+4.3,wy,woods.z+side*3,.15,1,3,0x88957c);put(woods.x,wy,woods.z+side*4.3,9,1,.15,0x88957c);}
+ const low={x:woods.x+6,y:yAt(woods.x+6,woods.z),z:woods.z},high={x:woods.x+3.5,y:wy,z:woods.z};
+ traversal.push({id:'nyx-lookout-ascender',type:'ascender',from:low,to:high,via:[{x:low.x,y:wy,z:low.z}],speed:9});navLinks.push({from:low,to:high,traversal:true});
+ sign('NYX / NIGHTGLASS LOOKOUT',woods.x,wy+3,woods.z);
+ const cacheSocket=floorLoot.find(p=>p.poi==='woods'&&!p.roof&&p.floor===0);
+ const bossSites=[{bossId:'marshal-rook',x:sx,y:sy,z:sz,patrol:[{x:sx-3,y:sy,z:sz-4},{x:sx+3,y:sy,z:sz+4}],cache:{id:'rook-hold',key:'rookKeycard',name:'Harbor Hold',x:sx,y:sy,z:sz+6}},
+ {bossId:'lieutenant-nyx',x:woods.x,y:wy,z:woods.z,patrol:[{x:woods.x-2,y:wy,z:woods.z-2},{x:woods.x+2,y:wy,z:woods.z+2}],cache:{id:'nyx-cache',key:'nyxKeycard',name:'Woodland Cache',x:cacheSocket.x,y:cacheSocket.y,z:cacheSocket.z}}];
+ return {doors,traversal,vault,relays,shieldBarrels,bossSites,bossHouse:buildings.indexOf(house)};
 }

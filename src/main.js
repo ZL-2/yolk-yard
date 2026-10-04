@@ -1,3 +1,7 @@
+import {emoteWheel} from './emote-ui.js';
+import {EMOTES} from './emotes.js';
+import {CROWN_ICON} from './crowns.js';
+import './crowns-emotes.css';
 import {SoundVisuals} from './sound-visuals.js';
 import {inventoryDropTarget} from './inventory-drag.js';
 import {gateBuildFire} from './field-refinement.js';
@@ -129,6 +133,7 @@ let stats = read("yolk-stats", { matches: 0, kills: 0, wins: 0 }),
   options = matchOptions({map:"yard", mode:"ffa", fill:true});
 const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},stats.eggs||0),matchEarnings={total:0,status:'Match verification pending'};
 let progressMatch='';
+let crownStatus=read('ravelfront-crown-status',{season:1,wins:0,owned:false,unlocked:false}),crownStatusKey='';
 let menuSection=['locker','shop','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
 const menuShopStates={};
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
@@ -852,12 +857,26 @@ function scoresHTML(s = state) {
     )
     .join("")}</tbody></table>`;
 }
+function sendPlayerAction(action){if(sim&&!sim.remote)sim.playerAction(localId,action);else net?.send({type:'player-action',action});}
+function openEmotes(){
+ const p=state?.players.find(p=>p.id===localId);
+ if(screen==='game'&&p?.emote){sendPlayerAction('emote-cancel');return;}
+ if(screen==='menu'&&view.lobbyEmote){view.lobbyEmote=null;return;}
+ if(screen==='game'&&(!p||p.health<=0||p.spectating||p.downed||p.flight==='transport')){toast('Emotes are available while standing on the ground.');return;}
+ keys.clear();input.fire=false;input.aim=false;touch.fire=false;paused=true;document.exitPointerLock?.();
+ modal('EMOTES',emoteWheel(screen==='menu'?{crownWins:crownStatus.wins,crownEmoteUnlocked:crownStatus.unlocked}:p),'emotes');
+}
+function playEmote(id){
+ const def=EMOTES.find(e=>e.id===id);if(!def)return;
+ if(screen==='menu'){if(def.locked&&!crownStatus.unlocked)return;view.lobbyEmote={id,start:view.clock,until:def.duration?view.clock+def.duration:0};view.lobbyCrownWins=crownStatus.wins;dialog.close();dialogType='';return;}
+ sendPlayerAction('emote-'+id);buildUI.cancel();buildControls.buildMode=false;void resume();
+}
 function resultsMenu() {
   const p = state.players.find((p) => p.id === localId);
 
   modal(
-    state.royale ? wonRoyale(state,localId) ? "FRONTIER SECURED!" : "Round complete" : "That’s a wrap.",
-    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${state.options.recurring?'<p>Next public round starts automatically in 10 seconds.</p>':sim&&!sim.remote || net?.isHost ? '<button class="primary" data-action="quick-rematch">REMATCH · SAME RULES</button><button data-action="rematch">CHANGE RULES</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">BACK TO LOBBY</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
+    state.royale ? wonRoyale(state,localId) ? p?.crownedVictory?"CROWNED VICTORY!":"FRONTIER SECURED!" : "Round complete" : "That’s a wrap.",
+    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${p?.crown&&wonRoyale(state,localId)?`<div class="crown-result">${CROWN_ICON}<strong>${p.crownedVictory?'CROWNED VICTORY · '+p.crownWins+' THIS SEASON':'VICTORY CROWN EARNED · CARRY IT INTO YOUR NEXT PUBLIC MATCH'}</strong></div><button data-action="emotes">CELEBRATE</button>`:''}${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${state.options.recurring?'<p>Next public round starts automatically in 10 seconds.</p>':sim&&!sim.remote || net?.isHost ? '<button class="primary" data-action="quick-rematch">REMATCH · SAME RULES</button><button data-action="rematch">CHANGE RULES</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">BACK TO LOBBY</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
     "results",
   );
 }
@@ -889,6 +908,10 @@ function processEvents() {
     if(e.type==='duo-marker'&&e.player!==localId&&e.team!==state.players.find(p=>p.id===localId)?.team)continue;
     view.event(e, localId);
     recordSeasonEvent(e,state,localId);if(['boss-defeated','relay-captured','rig-used','elimination','hit'].includes(e.type)&&e.player===localId){const earned=masteryRewards().filter(id=>!eggWallet.value.owned.includes(id));if(earned.length)eggWallet.change(w=>({...w,owned:[...new Set([...w.owned,...earned])]})).then(()=>toast('Season 1 cosmetic reward unlocked · Locker')).catch(()=>{});}
+    if(e.type==='crown-picked-up'||e.type==='crown-dropped')notice(e.name+(e.type==='crown-picked-up'?' picked up a Victory Crown':' dropped a Victory Crown'));
+    if(e.type==='crown-victory'&&e.player===localId)notice(e.crowned?'CROWNED VICTORY · '+e.wins+' this season':'VICTORY CROWN EARNED');
+    if(e.type==='boss-cache-open')notice(e.name.toUpperCase()+' UNLOCKED');
+    if(e.type==='boss-interrupted'&&e.player===localId)notice('ROOK’S WINCH INTERRUPTED');
     if(e.type==='vault-open')notice('VOSS VAULT UNLOCKED · Epic requisitions secured',3500);if(e.type==='boss-defeated')notice('VOSS DEFEATED · Keycard, legendary rifle & mythic Jump Rig dropped',4500);if(e.type==='relay-captured'&&e.player===localId)notice('SIGNAL LIVE · Contacts revealed. Your location is exposed.',3500);
     const me = state.players.find((p) => p.id === localId);
     sound.event(e,me,state);
@@ -1202,6 +1225,8 @@ const actions = {
  'royale-drop-one':()=>inventoryAction('drop-one'),
  'royale-split':()=>inventoryAction('split'),
 
+  emotes:openEmotes,
+  'crown-drop':()=>sendPlayerAction('crown-drop'),
   chat: () => chat.open(),
   'chat-controls':()=>{dialog.close();dialogType='';chat.showControls();},
   'save-room-name':()=>{
@@ -1364,6 +1389,7 @@ document.addEventListener("pointerlockchange", () => {
     pauseMenu();
 });
 function pressControl(code) {
+  if(settings.keybinds.emotes.includes(code)){openEmotes();return;}
   if(code.startsWith('Wheel')&&state?.royale){
     const p=state.players.find(p=>p.id===localId),pose=predicted?{...p,...predicted}:p;
     const eligible=!!p&&p.health>0&&p.flight==='ground'&&buildUI.eligible(state,pose,view.buildMap);
@@ -1456,6 +1482,7 @@ document.addEventListener("keydown", (e) => {
   if (settings.keybinds.chat.includes(e.code) && net?.ready && screen!=="menu") {
     e.preventDefault();if(!e.repeat)chat.open();return;
   }
+  if(screen==='menu'&&settings.keybinds.emotes.includes(e.code)){e.preventDefault();if(!e.repeat)openEmotes();return;}
   if (screen !== 'game') return;
   if (e.code === 'Escape') {
     e.preventDefault();
@@ -1531,6 +1558,7 @@ document.addEventListener('click',e=>{
  }
  if(e.target.closest('[data-build-control="repair"]')){if(sim)sim.playerAction(localId,'build-repair');else net?.send({type:'player-action',action:'build-repair'});}
  if(e.target.closest('[data-build-control="edit"]')){const p=state?.players.find(p=>p.id===localId);if(p)buildUI.beginEdit(state,predicted?{...p,...predicted}:p,view.buildMap);}
+ const emote=e.target.closest('[data-emote]');if(emote)playEmote(emote.dataset.emote);
  if(e.target.closest('button')){sound.unlock();sound.cue('ui-select',null,.45);}
 });
 // Pointer capture keeps mouse/touch drops working across the modal's inert backdrop.
@@ -1617,7 +1645,7 @@ document.addEventListener("graphics-lost", () => {
 });
 function frameInput() {
   const active = !document.hidden && !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && state?.players.find(p => p.id === localId)?.health > 0;
-  const combat=active&&canFight(state?.players.find(p=>p.id===localId));
+  const combat=active&&state?.phase==='playing'&&canFight(state?.players.find(p=>p.id===localId));
   if(active&&!combat){buildControls.buildMode=false;buildUI.cancel();}
   buildControls.yaw=input.yaw;buildControls.pitch=input.pitch;
   buildControls.buildFacing=snappedFacing(input.yaw,buildControls.buildMode?buildControls.buildFacing:undefined);
@@ -1671,17 +1699,18 @@ let lastTime = performance.now(),
   lobbyClock = 0;
 const inputClock=new InputClock();
 function pumpNetworkInput(now=performance.now()) {
-  if(!net?.ready||net.migrating||state?.phase!=="playing"||document.hidden||(sim&&!sim.remote&&!net.serverAuthority)){inputClock.reset(now);return;}
+  if(!net?.ready||net.migrating||!["playing","results"].includes(state?.phase)||document.hidden||(sim&&!sim.remote&&!net.serverAuthority)){inputClock.reset(now);return;}
   const commands=[];
   for(let step=0,count=inputClock.take(now);step<count;step++){
     const i=frameInput();
       commands.push(i);
       connectionReport.network.sent(i.seq,now);
       const me = state.players.find((p) => p.id === localId);
-      if (me?.health > 0) {
+      if (me?.health > 0 && state.phase==='playing') {
         if (!predicted) predicted = { ...me,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null,launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+        predicted.emote=me.emote?{...me.emote}:null;
         const beforeMove={x:predicted.x,z:predicted.z};
-        predictMovement(predicted, i, getMap(state.options.map), 1 / 60, state.royale);
+        predictMovement(predicted, i, getMap(state.options.map), 1 / 60, state.royale, state.time);
         predicted.vx=(predicted.x-beforeMove.x)*60;predicted.vz=(predicted.z-beforeMove.z)*60;
         predicted.moving = Math.abs(i.forward) + Math.abs(i.strafe) > 0.1;
         {
@@ -1694,6 +1723,7 @@ function pumpNetworkInput(now=performance.now()) {
   }
   net.inputBatch(commands);
 }
+const emoteButton=document.createElement('button');emoteButton.id='emote-button';emoteButton.dataset.action='emotes';document.body.append(emoteButton);
 const soundVisuals=new SoundVisuals(document.getElementById('hud'));
 const triggerGuard={};
 const performanceHUD=new PerformanceHUD(document.body);
@@ -1744,6 +1774,11 @@ function loop(now) {
   }
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
+  document.body.classList.toggle('is-emoting',screen==='game'&&!!me?.emote);
+  emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game'&&(!me||me.spectating||me.health<=0||me.flight==='transport'||me.downed);
+  const emoteButtonText=(screen==='menu'?!!view.lobbyEmote:!!me?.emote)?'STOP EMOTE':'EMOTES · '+bindingLabel(settings.keybinds.emotes[0]||'KeyO');if(emoteButton.textContent!==emoteButtonText)emoteButton.textContent=emoteButtonText;
+  view.emoteLook={yaw:input.yaw,pitch:input.pitch};
+  if(me&&state?.options.recurring){const record={season:1,wins:me.crownWins||0,unlocked:!!me.crownEmoteUnlocked,owned:!!me.crown};const key=JSON.stringify(record);if(key!==crownStatusKey){crownStatusKey=key;crownStatus=record;save('ravelfront-crown-status',record);}}
   const currentProgress=(state?.royale?.matchId||net?.code||'local')+':'+state?.round;
   if(currentProgress!==progressMatch){progressMatch=currentProgress;matchEarnings.total=0;matchEarnings.status=me?.friendSpectator?'Spectating · No Marks':net?.serverAuthority?'Match verification pending':net?'Private custom · No Marks':'Practice · No currency rewards';}
 
@@ -1847,6 +1882,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
       triangles: view?.renderer.info.render.triangles,
       presentation: view?.diagnostics(),
     }),
+    celebrations:()=>({localVisible:!!view.models.get(localId)?.visible,localPose:view.models.get(localId)?.userData.human?.pose,crownProp:!!view.models.get(localId)?.userData.crownRecord?.visible,cameraPosition:view.camera.position.toArray(),bossNames:[...view.models].filter(([id])=>state?.players.find(p=>p.id===id)?.boss).map(([id,m])=>({id,visible:m.userData.nameplate?.visible}))}),
     network: () =>
       Object.values(net?.peer?.connections || {})
         .flat()

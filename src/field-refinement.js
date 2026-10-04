@@ -5,7 +5,7 @@ export const RELAY_LOOT_CLEARANCE=3.4;
 export const ROYALE_BOT_RANGE=Object.freeze({vision:70,engage:62});
 import {ITEMS} from './royale-data.js';
 export function pickupNeedsSwap(p,item){
- if(!item||item.resource||item.ammoType)return false;
+ if(!item||item.resource||item.ammoType||item.crown)return false;
  if(p.inventory.slice(1).some(i=>!i))return false;
  if(!item.weapon&&p.inventory.some(i=>i?.id===item.id&&i.count<(ITEMS[item.id]?.stack||1)))return false;
  return true;

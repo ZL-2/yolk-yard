@@ -1,3 +1,4 @@
+import {startEmote,cancelEmote,emoteInput} from './emotes.js';
 import {watcherAction} from './spectator-status.js';
 import {COMBAT_LIMITS,UTILITY_WEAPONS} from './weapon-balance.js';
 import {arenaSpawnPoints} from './arena-spawns.js';
@@ -115,7 +116,7 @@ export class Simulation {
       lastDamage: -100,
       respawnAt: 0,
       killerId: null,
-      crown: null,
+      crown: null,emote:null,
       ack: 0,
       lastInput: 0,
     };
@@ -268,6 +269,8 @@ export class Simulation {
   }
   playerAction(id, action) {
     const p = this.players.get(id);
+    if(p&&action==='emote-cancel'){cancelEmote(p);return;}
+    if(p&&action.startsWith('emote-')&&['playing','results'].includes(this.phase)){startEmote(this,p,action.slice(6));return;}
     if(watcherAction(this,p,action))return;
     if(p?.friendSpectator)return;
     if (!p || p.bot || this.phase !== "playing" ||
@@ -336,7 +339,7 @@ export class Simulation {
       lastDamage: this.time,
       respawnAt: 0,
       killerId: null,
-      crown: null,
+      crown: null,emote:null,
     });
     beginEquip(p,this.time);
     this.inputs.delete(p.id);this.remoteInputs.delete(p.id);
@@ -363,7 +366,7 @@ export class Simulation {
     dt = clamp(dt, 0, 1 / 30);
     this.time += dt;
     this.recordPoses();this.tickActivity(dt);
-    if (this.phase !== "playing") return;
+    if (this.phase !== "playing") {for(const p of this.players.values())if(p.emote)emoteInput(this,p,this.inputs.get(p.id)||{});return;}
     this.remaining = Math.max(0, this.remaining - dt);
     for (const p of this.players.values()) {
       if (p.spectating) continue;
@@ -376,7 +379,7 @@ export class Simulation {
       let input = commands?.input || (p.bot ? this.botInput(p) : this.inputs.get(p.id));
       if (!input || (!p.bot && this.time - p.lastInput > 0.4))
         input = { yaw: p.yaw, pitch: p.pitch, slot: p.slot };
-      p.executedShotTime=input.shotTime;
+      input=emoteInput(this,p,input);p.executedShotTime=input.shotTime;
       if (input.slot !== undefined && input.slot !== p.slot) {
         p.slot = input.slot === 1 ? 1 : 0;
         p.reloadEnd = 0;
@@ -384,7 +387,7 @@ export class Simulation {
         beginEquip(p,this.time,true);
       }
       const previousPosition = { x: p.x, y: p.y, z: p.z };
-      this.moveWithCommands(p,input,dt,commands);
+      this.moveWithCommands(p,input,dt,p.emote&&commands?{...commands,steps:commands.steps.map(step=>({...step,yaw:p.emote.yaw,pitch:0,forward:0,strafe:0}))}:commands);
       p.vx=(p.x-previousPosition.x)/dt;p.vz=(p.z-previousPosition.z)/dt;
       p.moving = Math.hypot(p.x - previousPosition.x, p.z - previousPosition.z) > 0.001;
 
@@ -904,7 +907,7 @@ export class Simulation {
       "awaitingEntry",
       "spawnRequested",
       "moving",
-      "crown",
+      "crown", "emote", "crownWins", "crownEmoteUnlocked", "crownedVictory",
       "ack",
       "aim",
     ];

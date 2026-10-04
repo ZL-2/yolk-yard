@@ -14,3 +14,5 @@ export function socialDataPath(){
  if(persistentMount(DATA_MOUNT))return DATA_MOUNT+'/social.json';
  return process.env.YOLK_OWNER_DATA_PATH?dirname(process.env.YOLK_OWNER_DATA_PATH)+'/ravelfront-social.json':'/tmp/ravelfront-social.json';
 }
+
+export function progressionDataPath(){if(process.env.RAVEL_REWARD_DATA_PATH)return process.env.RAVEL_REWARD_DATA_PATH;if(persistentMount(DATA_MOUNT))return DATA_MOUNT+'/progress.json';return process.env.YOLK_OWNER_DATA_PATH?dirname(process.env.YOLK_OWNER_DATA_PATH)+'/ravelfront-progress.json':'/tmp/ravelfront-progress.json';}

@@ -1,3 +1,4 @@
+import {progressionDataPath} from './data-path.js';
 import {createHash,randomUUID} from 'node:crypto';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {dirname} from 'node:path';
@@ -7,7 +8,7 @@ import {MAX_CONTESTANTS,MAX_SPECTATORS} from '../../src/royale-phases.js';
 const warmup=new Set(['waiting','spawn-island','starting']);
 const bounded=(v,max=1e7)=>Number.isFinite(v)?Math.min(max,Math.max(-max,v)):0;
 export class ProgressionService{
- constructor(relay,{clock=()=>Date.now()/1000,path=process.env.RAVEL_REWARD_DATA_PATH||(process.env.YOLK_OWNER_DATA_PATH?dirname(process.env.YOLK_OWNER_DATA_PATH)+'/ravelfront-progress.json':'/tmp/ravelfront-progress.json')}={}){this.relay=relay;this.clock=clock;this.path=path;this.matches=new Map();this.inputTargets=new Map();this.accounts=new Map();this.ready=this.load();this.dirty=false;this.saveChain=Promise.resolve();}
+ constructor(relay,{clock=()=>Date.now()/1000,path=progressionDataPath()}={}){this.relay=relay;this.clock=clock;this.path=path;this.matches=new Map();this.inputTargets=new Map();this.accounts=new Map();this.ready=this.load();this.dirty=false;this.saveChain=Promise.resolve();}
  async load(){if(!this.path)return;try{for(const [id,a]of JSON.parse(await readFile(this.path,'utf8')))this.accounts.set(id,a);}catch{}}
  identity(token){return typeof token==='string'&&/^[a-f0-9]{32,64}$/.test(token)?createHash('sha256').update(token).digest('hex'):null;}
  async register(peer,token){peer.progressId=this.identity(token)||randomUUID();await this.ready;for(const receipt of this.account(peer.progressId).receipts.slice(-30))this.relay.send(peer,{type:'reward',receipt});}

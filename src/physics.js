@@ -223,7 +223,7 @@ function movePlayerStep(p, input, map, dt) {
   const speed =
     (p.inventory ? ROYALE_MOVEMENT.walk+(ROYALE_MOVEMENT.sprint-ROYALE_MOVEMENT.walk)*(p.sprinting?p.sprintBlend:0) : weapon(p.weapon).speed*(1+(TACTICAL_SPRINT.arenaMultiplier-1)*(p.sprinting?p.sprintBlend:0))) *
     (input.aim ? gun(p).adsMove : 1) *
-    (p.crown != null ? 0.88 : 1)*(p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
+    (p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
   let mx=(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)*speed,mz=(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)*speed;
   if(p.sliding){
     let vx=p.slideVX||0,vz=p.slideVZ||0,v=Math.hypot(vx,vz);

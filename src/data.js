@@ -1,9 +1,10 @@
+import {MYTHIC_WEAPONS} from './bosses.js';
 import { safeName } from './moderation.js';
 import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Rebuilt arena collision geometry must not mix with older clients.
-export const VERSION = 36;
+export const VERSION = 37;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -174,8 +175,13 @@ export const weapon = (id) => WEAPONS.find((w) => w.id === id) || ROYALE_WEAPONS
 export const gun = (p, slot=p.slot) => {
  if (!p.inventory) return weapon(slot === 1 ? "pip" : p.weapon);
  const item=p.inventory[slot], base=weapon(item?.weapon ? item.id : 'pip');
- const rarity=Math.max(0,Math.min(4,item?.rarity||0)),key=base.id+rarity;
- if(!royaleStats.has(key)) royaleStats.set(key,rarityVariant(base,rarity));
+ const mythic=item?.rarity===5?MYTHIC_WEAPONS[item.bossId]:null;
+ const rarity=Math.max(0,Math.min(5,item?.rarity||0)),key=base.id+rarity+':'+(mythic?item.bossId:'');
+ if(!royaleStats.has(key)){
+  const v=rarityVariant(base,Math.min(4,rarity));
+  if(mythic&&mythic.id===base.id)Object.assign(v,{name:mythic.name,rarity:5,damage:base.damage*mythic.damage,reload:base.reload*mythic.reload,reloadEmpty:base.reloadEmpty*mythic.reload,spread:base.spread*(mythic.spread||1),adsSpread:base.adsSpread*(mythic.spread||1),interval:base.interval*(mythic.interval||1),magazine:mythic.magazine||base.magazine,firstShot:mythic.firstShot??base.firstShot});
+  royaleStats.set(key,v);
+ }
  return royaleStats.get(key);
 };
 export const mode = (id) => MODES.find((m) => m.id === id) || MODES.find(m => m.id === "ffa");

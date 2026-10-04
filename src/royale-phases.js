@@ -5,5 +5,5 @@ export const acceptsContestants=stage=>isWarmup(stage);
 export const MAX_CONTESTANTS=48,MAX_HUMANS=48,DEFAULT_CONTESTANTS=48,WARMUP_SECONDS=30;
 export const OFFLINE_WARMUP_SECONDS=10;
 export const MAX_SPECTATORS=16;
-// Voss is an NPC, never a contestant or a spectator seat.
-export const MAX_SNAPSHOT_ACTORS=MAX_CONTESTANTS+MAX_SPECTATORS+1;
+// Three boss NPCs never consume contestant or spectator seats.
+export const MAX_SNAPSHOT_ACTORS=MAX_CONTESTANTS+MAX_SPECTATORS+3;

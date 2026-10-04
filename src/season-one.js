@@ -1,5 +1,6 @@
+import {BOSSES} from './bosses.js';
 // Season rules shared by host, dedicated authority, prediction and presentation.
-export const SEASON=Object.freeze({number:1,name:'Operation Breakwater',boss:{id:'warden-aster',name:'Commandant Voss',health:600,shield:400,weapon:'sprinter',rarity:4,leash:26,notice:38,reaction:1.35,burst:.42,cycle:3.4,aimError:.04},rig:{charges:3,recharge:12,cooldown:1.2,vertical:19,horizontal:18},flight:{glide:16,dive:13,launch:20,glideFall:4.8,diveFall:20},slide:{slope:.2,gravity:18,cap:10.5}});
+export const SEASON=Object.freeze({number:1,name:'Operation Breakwater',boss:BOSSES[0],rig:{charges:3,recharge:12,cooldown:1.2,vertical:19,horizontal:18},flight:{glide:16,dive:13,launch:20,glideFall:4.8,diveFall:20},slide:{slope:.2,gravity:18,cap:10.5}});
 const eastern=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',hourCycle:'h23'});
 let windowMinute=-Infinity,windowValue;
 export function publicWindow(now=Date.now()){const minute=Math.floor(now/60000);if(minute!==windowMinute){windowMinute=minute;const hour=Number(eastern.format(new Date(now)));windowValue=Object.freeze({open:hour>=7&&hour<19,label:'7 AM – 7 PM Eastern',timezone:'America/New_York'});}return windowValue;}

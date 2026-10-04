@@ -1,3 +1,4 @@
+import {emotePose} from './emotes.js';
 import * as T from 'three';
 import {mergeGeometries,mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -145,9 +146,10 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  if(grounded&&!h.grounded)h.land=1;h.grounded=grounded;h.land=Math.max(0,h.land-dt*5);
  const airborne=['dive','glide','launch'].includes(p.flight),dead=p.health!==undefined&&p.health<=0;
  h.air+=(Number(airborne)-h.air)*(1-Math.exp(-dt*7));h.death+=(Number(dead)-h.death)*(1-Math.exp(-dt*6));
+ const emote=p.emote?{id:p.emote.id,t:Math.max(0,time-p.emote.start)}:null;
  const previousPose=h.pose;h.lowerState=dead?'elimination':p.downed?(speed>.1?'crawling':'downed'):p.reviving?'reviving':p.sliding?'sliding':p.crouching?(speed>.1?'crouch-moving':'crouch-idle'):!grounded?(p.vy>0?'jump':'fall'):p.sprinting?'sprint':speed>.1?'walking':'standing';
  h.upperState=p.downed?(p.reviverId?'being-revived':'downed'):p.reviving?'reviving':p.reloadEnd>time?'reloading':p.shotRecoil>.02?'firing':p.building?(p.editing?'editing':'building'):p.aim?'ads':'ready';
- h.pose=dead?'elimination':p.downed?(p.reviverId?'being-revived':speed>.1?'crawling':'downed'):p.reviving?'reviving':p.sliding?'sliding':p.crouching?(speed>.1?'crouch-moving':'crouch-idle'):p.flight==='dive'?'skydive':p.flight==='glide'?'glide':!grounded?(p.vy>0?'jump':'fall'):p.building?(p.editing?'edit':'build'):p.use?'use':p.swingAt&&time-p.swingAt<.55?'melee':p.reloadEnd>time?'reload':p.equipUntil>time?(p.equipHolster&&time-p.equipStarted<p.equipHolster?'holster':'draw'):p.aim?'aim':p.sprinting?'sprint':h.speed>5.5?'run':h.speed>.2?'locomotion':'idle';
+ h.pose=dead?'elimination':emote?'emote-'+emote.id:p.downed?(p.reviverId?'being-revived':speed>.1?'crawling':'downed'):p.reviving?'reviving':p.sliding?'sliding':p.crouching?(speed>.1?'crouch-moving':'crouch-idle'):p.flight==='dive'?'skydive':p.flight==='glide'?'glide':!grounded?(p.vy>0?'jump':'fall'):p.building?(p.editing?'edit':'build'):p.use?'use':p.swingAt&&time-p.swingAt<.55?'melee':p.reloadEnd>time?'reload':p.equipUntil>time?(p.equipHolster&&time-p.equipStarted<p.equipHolster?'holster':'draw'):p.aim?'aim':p.sprinting?'sprint':h.speed>5.5?'run':h.speed>.2?'locomotion':'idle';
  if(previousPose!==h.pose){h.fromPose=previousPose;h.transition=0;}h.transition=Math.min(1,(h.transition||0)+dt*7);
  const forward=-vx*Math.sin(p.yaw||0)-vz*Math.cos(p.yaw||0),side=vx*Math.cos(p.yaw||0)-vz*Math.sin(p.yaw||0),moving=Math.min(1,h.speed/2),step=cycleDistance*.54/2*moving;
  const blend=1-Math.exp(-dt*14);for(const [key,on]of [['crouch',p.crouching&&!p.sliding],['compact',p.lowCrouch],['slide',p.sliding],['down',p.downed],['revive',p.reviving]])h[key]=(h[key]||0)+(Number(!!on)-(h[key]||0))*blend;
@@ -192,12 +194,15 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   if(h.down>.01)foot.lerp(V(sideSign*.2,.12,.43+Math.sin(phase)*.10*moving),h.down);
   if(h.revive>.01)foot.lerp(V(sideSign*.15,sideSign<0?.10:.13,sideSign<0?-.32:.25),h.revive);
   if(dead)foot=V(sideSign*.23,.12,-.12);
+  if(emote)foot=V(...emotePose(emote.id,emote.t,sideSign).foot);
   solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,V(sideSign*.15,.5,-1));const footBone=b['foot'+S];footBone.quaternion.copy(footBone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(h.mesh.getWorldQuaternion(new T.Quaternion())));if(!stance)footBone.rotateX(-lift*1.5);
  }
+ if(emote){const pose=emotePose(emote.id,emote.t,1);b.hips.position.x+=pose.sway;b.hips.position.y+=pose.bob;b.chest.rotation.z=pose.sway*.5;}
  const held=model.userData.held,arms=model.userData.arms;
  if(held&&arms){held.updateMatrixWorld(true);h.mesh.updateMatrixWorld(true);}
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R';let target;
-  if(p.traversal)target=V(sideSign*.24,1.95,-.08);
+  if(emote)target=V(...emotePose(emote.id,emote.t,sideSign).hand);
+  else if(p.traversal)target=V(sideSign*.24,1.95,-.08);
   else if(airborne)target=p.flight==='glide'?V(sideSign*.33,1.93,-.06):V(sideSign*.61,1.42+Math.sin(time*2.1+sideSign)*.025,-.17);
   else if(p.building)target=V(sideSign*.25,1.22-lower+(sideSign>0?Math.sin(time*8)*.035:0),-.38);
   else if(p.use)target=V(sideSign*.22,(sideSign>0?1.53:1.2)-lower,-.3);
@@ -209,7 +214,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   h['handTarget'+S]??=target.clone();h['handTarget'+S].lerp(target,1-Math.exp(-dt*(h.transition<1?16:40)));
   solveChain(h,'arm'+S,'forearm'+S,'hand'+S,h['handTarget'+S],V(sideSign*.65,1.0,.25));
   const hand=b['hand'+S];let handQ=h.mesh.getWorldQuaternion(new T.Quaternion());
-  if(held?.visible&&arms&&!airborne&&!p.traversal&&!p.use&&!p.building){handQ=arms.userData.limbs.find(l=>l.side===sideSign).hand.getWorldQuaternion(new T.Quaternion());}
+  if(held?.visible&&arms&&!emote&&!airborne&&!p.traversal&&!p.use&&!p.building){handQ=arms.userData.limbs.find(l=>l.side===sideSign).hand.getWorldQuaternion(new T.Quaternion());}
   hand.quaternion.copy(hand.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(handQ));hand.rotateX(-.12);
 
  }
