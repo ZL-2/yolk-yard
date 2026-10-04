@@ -1495,6 +1495,7 @@ document.addEventListener("keydown", (e) => {
   if (settings.keybinds.chat.includes(e.code) && net?.ready && screen!=="menu") {
     e.preventDefault();if(!e.repeat)chat.open();return;
   }
+  if(screen==='menu'&&ownerConsole.progress>0)return;
   if(screen==='menu'&&settings.keybinds.emotes.includes(e.code)){e.preventDefault();if(!e.repeat)openEmotes();return;}
   if (screen !== 'game') return;
   if (e.code === 'Escape') {
@@ -1939,7 +1940,7 @@ try{sessionStorage.removeItem('ravelfront-update-pending');}catch{}
 // Each deployment emits its build identifier next to index.html.
 const updates = new UpdateWatcher({
   build: __BUILD_ID__,
-  isInMatch: () => screen === "game" || state?.phase === "playing",
+  isInMatch: () => screen === "game" || screen === "editor" || state?.phase === "playing",
   fetchVersion: async () => {
     const url = new URL("version.json", location.href);
     url.searchParams.set("t", Date.now());

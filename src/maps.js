@@ -3,7 +3,7 @@ import {SPAWN_ISLAND} from './spawn-island.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {groundAt} from './terrain.js';
 import {createRavelArenas} from './ravel-arenas.js';
-import {compileLayout,validateLayout,layoutKey} from './map-layout.js';
+import {compileLayout,validateLayout,layoutKey,MAP_LIMITS} from './map-layout.js';
 export const MAPS=createRavelArenas();
 export const BASE_MAPS=[ROYALE_MAP,SPAWN_ISLAND,...MAPS];
 export const baseMap=id=>BASE_MAPS.find(m=>m.id===id)||MAPS[0];
@@ -12,6 +12,7 @@ let publishedLayouts=emptyBundle,matchLayouts=null,matchKey='';
 const compiledMaps=new WeakMap(),bundleKeys=new WeakMap();
 export function validateLayoutBundle(value){
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>BASE_MAPS.length)throw Error('Invalid map collection.');
+ if(JSON.stringify(value).length>MAP_LIMITS.bundleBytes)throw Error('Published maps exceed the shared layout size limit. Export a backup and reduce unused objects.');
  const bundle={};for(const [id,doc]of Object.entries(value)){if(!BASE_MAPS.some(m=>m.id===id))throw Error('Unknown map.');bundle[id]=validateLayout(doc,id);compileLayout(baseMap(id),bundle[id]);}
  return bundle;
 }

@@ -1,7 +1,7 @@
 // The editor and both match authorities compile the same bounded layout format.
 // Layouts contain data only; uploaded models never supply executable scene code.
 export const MAP_LAYOUT_VERSION=1;
-export const MAP_LIMITS=Object.freeze({edits:1600,additions:250,assets:24,bytes:1_000_000,scaleMin:.1,scaleMax:8});
+export const MAP_LIMITS=Object.freeze({edits:1600,additions:250,assets:24,bytes:1_000_000,bundleBytes:500_000,scaleMin:.1,scaleMax:8});
 export const MAP_PREFABS=Object.freeze([
  {id:'block',name:'Block',category:'Structure',size:[4,4,4],material:'brick',color:'#82928f'},
  {id:'wall',name:'Concrete wall',category:'Structure',size:[8,3,.4],material:'brick',color:'#82928f'},
