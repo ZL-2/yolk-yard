@@ -1,3 +1,4 @@
+import {buildMapObjects} from './map-object-view.js';
 import {buildFrontierArena} from './frontier-art.js';
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
@@ -5,7 +6,7 @@ import { surfaceAt } from "./maps.js";
 
 // Static architecture is baked by material after construction to keep school-laptop draw calls low.
 export function buildArena(world, map, kit) {
-  if(map.theme==='frontier')return buildFrontierArena(world,map);
+  if(map.theme==='frontier'){buildFrontierArena(world,map);buildMapObjects(world,map,kit);return;}
   const { block, ball, cylinder, mat, palette } = kit;
   const colors = { path: 0xded4b8, plaza: 0xe7d6b9, asphalt: 0x526c79 };
   block(

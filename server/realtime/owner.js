@@ -7,9 +7,9 @@ const json=(res,status,data,origin)=>{
   res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...(origin?{'Access-Control-Allow-Origin':origin,'Vary':'Origin'}:{})});
   res.end(JSON.stringify(data));
 };
-const readBody=async(req)=>{
+const readBody=async(req,limit=2048)=>{
   const parts=[];let size=0;
-  for await(const part of req){size+=part.length;if(size>2048)throw Error('Body too large');parts.push(part);}
+  for await(const part of req){size+=part.length;if(size>limit)throw Object.assign(Error('Upload exceeds the size limit'),{status:413});parts.push(part);}
   return JSON.parse(Buffer.concat(parts).toString('utf8'));
 };
 const safeMode=mode=>['menu','lobby','ffa','teams','royale'].includes(mode)?mode:'menu';
@@ -56,6 +56,24 @@ export class OwnerService {
       res.writeHead(204,{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Vary':'Origin'});res.end();return;
     }
     try{
+      if(req.url==='/owner/maps'&&req.method==='POST'){
+        const body=await readBody(req,1_100_000);
+        if(!this.authorized(req,body)){json(res,401,{error:'Owner access expired. Lock and unlock Owner Access again.'},origin);return;}
+        const maps=relay.mapStore;if(!maps){json(res,503,{error:'Map editor service is not installed yet.'},origin);return;}
+        await maps.ready;let data;
+        if(body.action==='list')data=maps.overview();
+        else if(body.action==='get')data=maps.get(body.mapId);
+        else if(['save','publish'].includes(body.action))data=await maps.update(body.mapId,body.layout,body.expectedVersion,body.action==='publish');
+        else throw Error('Unknown map action');
+        json(res,200,data,origin);return;
+      }
+      if(req.url==='/owner/map-assets'&&req.method==='POST'){
+        const body=await readBody(req,12_000_000);
+        if(!this.authorized(req,body)){json(res,401,{error:'Owner access expired. Unlock Owner Access again.'},origin);return;}
+        if(!relay.mapStore)throw Error('Map editor service is unavailable');
+        if(typeof body.bytes!=='string'||!/^[A-Za-z0-9+/]*={0,2}$/.test(body.bytes))throw Error('Invalid model upload');
+        const asset=await relay.mapStore.upload(Buffer.from(body.bytes,'base64'),body);json(res,200,{asset},origin);return;
+      }
       if(req.url==='/owner/activity'&&req.method==='POST'){
         if(!this.digest){json(res,503,{error:'Owner analytics are not configured'},origin);return;}
         const body=await readBody(req);json(res,this.activity(body)?200:400,{ok:true},origin);return;
@@ -87,6 +105,6 @@ export class OwnerService {
           past:this.past.slice(-100).reverse(),historyPersistent:Boolean(this.storePath),at:Date.now()},origin);return;
       }
       json(res,404,{error:'Not found'},origin);
-    }catch{json(res,400,{error:'Invalid request'},origin);}
+    }catch(error){json(res,error.status||400,{error:req.url?.startsWith('/owner/map')?error.message:'Invalid request'},origin);}
   }
 }

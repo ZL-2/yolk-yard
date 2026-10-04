@@ -5,6 +5,12 @@ function records(value,key='id'){return Object.fromEntries(value.map(row=>[row[k
 // Broadcast recipients share immutable state objects. Normalize each once;
 // per-connection baselines and recovery checkpoints remain independent.
 const normalizedStates=new WeakMap(),normalizedCheckpoints=new WeakMap();
+// A pinned layout is immutable for the lifetime of a round. Reuse its normalized
+// value so unchanged authoring data is never walked/copied per frame or entrant.
+const normalizedLayouts=new WeakMap(),decodedLayouts=new WeakMap();
+function immutableLayout(layout){if(!decodedLayouts.has(layout)){const value=structuredClone(layout),freeze=v=>{if(v&&typeof v==='object'){for(const child of Object.values(v))freeze(child);Object.freeze(v);}return v;};decodedLayouts.set(layout,freeze(value));}return decodedLayouts.get(layout);}
+function cloneSnapshot(message){const copy={...message};for(const key of ['state','checkpoint'])if(copy[key]?.mapLayouts)copy[key]={...copy[key],mapLayouts:undefined};const result=structuredClone(copy);for(const key of ['state','checkpoint'])if(message[key]?.mapLayouts)result[key].mapLayouts=immutableLayout(message[key].mapLayouts);return result;}
+function snapshotLayout(layout){if(!normalizedLayouts.has(layout))normalizedLayouts.set(layout,JSON.parse(JSON.stringify(layout)));return normalizedLayouts.get(layout);}
 // A broadcast batch owns its memo, so mutable simulation objects are never
 // cached across ticks. Recipient groups share player/world clones and diffs.
 export class SnapshotBatch {
@@ -37,7 +43,7 @@ export class SnapshotBatch {
    for(const field of Object.keys(source)){
     if(field===name&&source[name]){const world={};cached[name]=world;
      for(const collection of Object.keys(source[name])){if(collection==='players'&&Array.isArray(source[name][collection])){world[collection]=this.players(source[name][collection]);continue;}const cloned=this.clone(source[name][collection]);if(cloned!==undefined)world[collection]=Array.isArray(cloned)&&['loot','chests','builds'].includes(collection)?this.index(cloned,collection==='loot'?'uid':'id'):cloned;}
-    }else if(field==='players'&&Array.isArray(source[field]))cached[field]=this.players(source[field]);else{const cloned=this.clone(source[field]);if(cloned!==undefined)cached[field]=recordKeys.includes(field)&&Array.isArray(cloned)?this.index(cloned):cloned;}
+    }else if(field==='mapLayouts'&&source[field])cached[field]=snapshotLayout(source[field]);else if(field==='players'&&Array.isArray(source[field]))cached[field]=this.players(source[field]);else{const cloned=this.clone(source[field]);if(cloned!==undefined)cached[field]=recordKeys.includes(field)&&Array.isArray(cloned)?this.index(cloned):cloned;}
    }
   }
   return value;
@@ -64,7 +70,7 @@ function normalize(message){
  const {state,checkpoint,...body}=message,value=JSON.parse(JSON.stringify(body));
  for(const [key,source,cache]of [['state',state,normalizedStates],['checkpoint',checkpoint,normalizedCheckpoints]])if(source){
   let cached=cache.get(source);
-  if(!cached){cached=JSON.parse(JSON.stringify(source));
+  if(!cached){cached=JSON.parse(JSON.stringify({...source,mapLayouts:undefined}));if(source.mapLayouts)cached.mapLayouts=snapshotLayout(source.mapLayouts);
    const world=key==='state'?cached.royale:cached.simulation;
    for(const [name,id]of [['loot','uid'],['chests','id'],['builds','id']])if(Array.isArray(world?.[name]))world[name]=records(world[name],id);
    for(const name of recordKeys)if(Array.isArray(cached[name]))cached[name]=records(cached[name]);
@@ -145,8 +151,8 @@ export class SnapshotDecoder {
   // Omit sleeping world collections BEFORE cloning; retain the immutable baseline.
   const payload={...rest};
   if(frame.omitWorld?.length&&rest.state?.royale){payload.state={...rest.state,royale:{...rest.state.royale}};for(const key of frame.omitWorld)if(['loot','chests','builds','worldDamage'].includes(key))delete payload.state.royale[key];}
-  const message=structuredClone(payload);
-  if(checkpoint&&(frame.full||Object.hasOwn(frame.patch||{},'checkpoint')))message.checkpoint=structuredClone(checkpoint);
+  const message=cloneSnapshot(payload);
+  if(checkpoint&&(frame.full||Object.hasOwn(frame.patch||{},'checkpoint')))message.checkpoint=cloneSnapshot({checkpoint}).checkpoint;
   for(const key of recordKeys)if(message.state?.[key])message.state[key]=Object.values(message.state[key]);
   if(message.checkpoint?.simulation?.players)message.checkpoint.simulation.players=Object.values(message.checkpoint.simulation.players);
   for(const key of ['loot','chests','builds']){if(message.state?.royale?.[key])message.state.royale[key]=Object.values(message.state.royale[key]);if(message.checkpoint?.simulation?.[key])message.checkpoint.simulation[key]=Object.values(message.checkpoint.simulation[key]);}

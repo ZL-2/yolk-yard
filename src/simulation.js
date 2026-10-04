@@ -21,7 +21,7 @@ import {
   clamp,
   rng,
 } from "./data.js";
-import { getMap, navigation, surfaceAt } from "./maps.js";
+import { getMap, navigation, surfaceAt,captureMapLayouts,mapBundleKey,validateLayoutBundle } from "./maps.js";
 import {MAX_SPECTATORS} from './royale-phases.js';
 import {
   muzzleOrigin, canStand,
@@ -46,7 +46,9 @@ const BOT_NAMES = [
 export class Simulation {
   constructor(options = {}) {
     this.options = matchOptions(options);
-    this.map = getMap(this.options.map);
+    this.mapLayouts=options.mapLayouts?validateLayoutBundle(options.mapLayouts):captureMapLayouts();
+    this.mapLayoutKey=mapBundleKey(this.mapLayouts);
+    this.map = getMap(this.options.map,this.mapLayouts);
     this.nav = navigation(this.map);
     this.random = rng(options.seed || Date.now());
     this.players = new Map();
@@ -220,7 +222,7 @@ export class Simulation {
     const next = matchOptions(options);
     for (const p of [...this.players.values()]) if (p.bot) this.removePlayer(p.id);
     this.options = next;
-    this.map = getMap(next.map);
+    this.map = getMap(next.map,this.mapLayouts);
     this.nav = navigation(this.map);
     this.remaining = next.minutes * 60;
     return true;
@@ -857,7 +859,8 @@ export class Simulation {
   restore(checkpoint) {
     const {players,randomState,...fields}=structuredClone(checkpoint);
     Object.assign(this,fields);this.players=new Map(players.map(p=>[p.id,p]));this.inputs=new Map();this.remoteInputs=new Map();
-    this.map=getMap(this.options.map);this.nav=navigation(this.map);this.random=rng(1);this.random.restore(randomState);
+    this.mapLayouts=validateLayoutBundle(this.mapLayouts||{});this.mapLayoutKey=mapBundleKey(this.mapLayouts);
+    this.map=getMap(this.options.map,this.mapLayouts);this.nav=navigation(this.map);this.random=rng(1);this.random.restore(randomState);
     for(const p of this.players.values()){p.fireLatch=false;p.popperLatch=false;p.lastInput=this.time;}
     return this;
   }
@@ -913,6 +916,7 @@ export class Simulation {
     ];
     return {
       version: VERSION,
+      mapLayouts:this.mapLayouts,mapLayoutKey:this.mapLayoutKey,
       time: this.time,
       round: this.round,
       phase: this.phase,

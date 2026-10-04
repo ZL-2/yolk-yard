@@ -56,6 +56,8 @@ import {KeybindEditor} from "./keybind-editor.js";
 import './field-update.css';
 import './frontier-ui.css';
 import './field-refinement.css';
+import {refreshPublishedMaps} from './map-service.js';
+import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
 import { CONTROLS, normalizeBindings, bindingDown, bindingLabel, wheelIntent } from "./keybinds.js";
 import { RELEASES, RELEASE } from "./releases.js";
@@ -191,7 +193,15 @@ const touch = {
 $("#app").innerHTML =
   `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><i id="scope-spread" aria-hidden="true"></i><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">OPERATOR ELIMINATED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div id="arena-stamina" hidden><span>TACTICAL SPRINT</span><progress id="arena-stamina-fill" max="100" value="100"></progress></div><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Field ready</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="crouch">CROUCH / SLIDE</button><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
 const dialog = $("#dialog");
-const ownerConsole=new OwnerConsole({wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
+let mapEditor=null;
+async function openOwnerMapEditor(overview){
+ if(screen!=='menu'||mapEditor)return;
+ const {MapEditor}=await import('./map-editor.js');
+ dialog.close();dialogType='';paused=true;screen='editor';
+ mapEditor=new MapEditor({owner:ownerConsole,overview,onClose:()=>{mapEditor=null;screen='menu';paused=false;view.mapId=null;renderMenu();void refreshPublishedMaps(true);void ownerConsole.refresh();}});
+ try{await mapEditor.open();}catch(error){mapEditor?.close();toast('Map editor could not open: '+error.message);}
+}
+const ownerConsole=new OwnerConsole({onMapEditor:openOwnerMapEditor,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 startAnonymousVisits(()=>screen==='game'?(state?.royale?'royale':state?.options?.mode==='teams'?'teams':'ffa'):screen==='lobby'?'lobby':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(eggWallet.value.balance);if(eggShop?.root?.isConnected)eggShop.render();if(screen==='menu'&&menuSection==='career')renderMenu(true);}});
@@ -591,6 +601,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   options=matchOptions({...next,session:'online',recurring:false});autoQueue=false;
   if(launch?.hostRun||!launch){matchEarnings.total=0;matchEarnings.status='Player-hosted match · No verified Marks';progressMatch='';}
   const visibility=launch?.hostRun||!launch?'private':visibilityOverride||'public';
+  busy=true;await refreshPublishedMaps();
   beginSim();
   if(launch?.admission)sim.assignTeam?.(sim.players.get("host"),launch.admission);
   busy = true;
@@ -883,6 +894,7 @@ function resultsMenu() {
 let lastWorldKey="";
 function handleState() {
   if (!state) return;
+  try{useMatchLayouts(state.mapLayouts||{},state.mapLayoutKey);}catch(error){toast('Invalid map layout: '+error.message);return;}
   const worldKey=(state.royale?.matchId||'')+':'+state.round+':'+state.options.map;
   if(state.royale&&lastWorldKey!==worldKey){lastWorldKey=worldKey;pendingInputs=[];predicted=null;keys.clear();queuedActions.clear();guestFire.reset();const me=state.players.find(p=>p.id===localId);if(me){input.slot=me.slot;input.yaw=me.yaw;input.pitch=me.pitch;}buildControls.buildMode=false;buildUI.cancel();}
   if (state.phase === "playing" && lastPhase !== "playing") {
@@ -1182,6 +1194,7 @@ function inventoryAction(action,index,from){
  if(dialogType==='royale-inventory')royaleUI.updateInventory(state.players.find(p=>p.id===localId));
 }
 const actions = {
+ 'owner-map-editor':()=>ownerConsole.openMapEditor(),
  'owner-refresh':()=>ownerConsole.refresh(),
  'owner-logout':()=>ownerConsole.logout(),
  'play':()=>playMenu(),
@@ -1730,6 +1743,7 @@ const performanceHUD=new PerformanceHUD(document.body);
 const lobbyStatus=new LobbyStatus();
 const snapshotTimes=new WeakMap();
 function loop(now) {
+  if(screen==='editor'){lastTime=now;requestAnimationFrame(loop);return;}
   lobbyStatus.update(now,now-lastTime,net,screen);
   performanceHUD.update(now,now-lastTime,net,settings,screen==='game'&&!document.hidden);
   pumpNetworkInput(now);
@@ -1839,6 +1853,7 @@ try {
   view = new View($("#world"), settings);
   view.buildControls=buildControls;view.buildMap=getMap('sunnybreak');
   renderMenu();
+  void refreshPublishedMaps();
   initializeParty();
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
@@ -1853,6 +1868,7 @@ try {
 // Development-only diagnostics. Vite removes this branch from the published bundle.
 if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
+    editor:()=>mapEditor,
     party:()=>({id:party?.id,party:party?.party,ready:party?.ready}),
     partyMembers:()=>view?.partyEggs?.length||0,
     chatRead: () => ({rows:chat.inbox.rows,open:chat.opened,muted:[...chat.inbox.muted],chatEnabled:net?.chatEnabled}),

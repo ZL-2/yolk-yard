@@ -3,8 +3,31 @@ import {SPAWN_ISLAND} from './spawn-island.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {groundAt} from './terrain.js';
 import {createRavelArenas} from './ravel-arenas.js';
+import {compileLayout,validateLayout,layoutKey} from './map-layout.js';
 export const MAPS=createRavelArenas();
-export const getMap = (id) => id === "hatchery-atoll" ? SPAWN_ISLAND : id === "sunnybreak" ? ROYALE_MAP : MAPS.find((m) => m.id === id) || MAPS[0];
+export const BASE_MAPS=[ROYALE_MAP,SPAWN_ISLAND,...MAPS];
+export const baseMap=id=>BASE_MAPS.find(m=>m.id===id)||MAPS[0];
+const emptyBundle=Object.freeze({});
+let publishedLayouts=emptyBundle,matchLayouts=null,matchKey='';
+const compiledMaps=new WeakMap(),bundleKeys=new WeakMap();
+export function validateLayoutBundle(value){
+ if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>BASE_MAPS.length)throw Error('Invalid map collection.');
+ const bundle={};for(const [id,doc]of Object.entries(value)){if(!BASE_MAPS.some(m=>m.id===id))throw Error('Unknown map.');bundle[id]=validateLayout(doc,id);compileLayout(baseMap(id),bundle[id]);}
+ return bundle;
+}
+export function mapBundleKey(bundle){if(!bundleKeys.has(bundle))bundleKeys.set(bundle,layoutKey(bundle));return bundleKeys.get(bundle);}
+export function installPublishedLayouts(bundle){publishedLayouts=validateLayoutBundle(bundle);return publishedLayouts;}
+export const captureMapLayouts=()=>publishedLayouts;
+export function useMatchLayouts(bundle,key){
+ if(!bundle){matchLayouts=null;matchKey='';return;}
+ if(key&&key===matchKey)return;
+ const checked=validateLayoutBundle(bundle);matchLayouts=checked;matchKey=key||mapBundleKey(checked);
+}
+export function getMap(id,bundle=matchLayouts||publishedLayouts){
+ const base=baseMap(id);if(!bundle[base.id]?.objects?.length)return base;
+ if(!compiledMaps.has(bundle))compiledMaps.set(bundle,new Map());const cache=compiledMaps.get(bundle);
+ if(!cache.has(base.id))cache.set(base.id,compileLayout(base,bundle[base.id]));return cache.get(base.id);
+}
 export function surfaceAt(map, x, z) {
   let y = groundAt(map,x,z);
   for (const b of map.boxes)

@@ -7,7 +7,7 @@ const api=()=>{
   try{const url=new URL(endpoint);if(!['wss:','ws:'].includes(url.protocol))return null;url.protocol=url.protocol==='wss:'?'https:':'http:';url.pathname='/owner';url.search='';url.hash='';return url.href.replace(/\/$/,'');}catch{return null;}
 };
 export class OwnerConsole {
-  constructor({modal,screen,dialog,wallet,onWalletChange}){this.wallet=wallet;this.onWalletChange=onWalletChange;this.addingEggs=false;this.modal=modal;this.screen=screen;this.dialog=dialog;this.token=null;this.expires=0;this.progress=0;this.last=0;this.taps=0;this.lastTap=0;
+  constructor({modal,screen,dialog,wallet,onWalletChange,onMapEditor}){this.onMapEditor=onMapEditor;this.wallet=wallet;this.onWalletChange=onWalletChange;this.addingEggs=false;this.modal=modal;this.screen=screen;this.dialog=dialog;this.token=null;this.expires=0;this.progress=0;this.last=0;this.taps=0;this.lastTap=0;
     this.dialog.addEventListener('submit',e=>{if(e.target.id==='owner-eggs-form'){e.preventDefault();void this.addEggs(e.target);}});
     document.addEventListener('keydown',e=>this.key(e));
     document.addEventListener('click',e=>{
@@ -30,7 +30,7 @@ export class OwnerConsole {
     let response;
     try{response=await fetch(url+path,{...options,headers:{...(options.body?{'Content-Type':'text/plain;charset=UTF-8'}:{})},cache:'no-store'});}
     catch{throw Error('Could not reach the game server. Check your connection and try again.');}
-    if(!response.ok){let message='Owner service unavailable';try{message=(await response.json()).error||message;}catch{}throw Error(message);}
+    if(!response.ok){let message='Owner service unavailable';try{message=(await response.json()).error||message;}catch{}throw Object.assign(Error(message),{status:response.status});}
     return response.json();
   }
   async unlock(code){try{const result=await this.request('/login',{method:'POST',body:JSON.stringify({code})});this.token=result.token;this.expires=result.expires;await this.refresh();}catch(e){const status=this.dialog.querySelector('#owner-error');if(status)status.textContent=e.message;}}
@@ -40,7 +40,7 @@ export class OwnerConsole {
       const data=await this.request('/summary',{method:'POST',body:JSON.stringify({token:this.token})});
       const row=(s,past)=>`<tr><td>${escape(s.id?.slice(0,8))}</td><td>${escape(s.mode)}</td><td>${new Date(s.started).toLocaleString()}</td><td>${past?new Date(s.ended).toLocaleString():'Online'}</td><td>${Math.max(0,Math.round(((past?s.ended:data.at)-s.started)/60000))}m</td></tr>`;
       const table=(entries,past)=>`<div class="owner-table-scroll"><table class="controls-table"><thead><tr><th>Session</th><th>Area</th><th>Started</th><th>Ended</th><th>Length</th></tr></thead><tbody>${entries.length?entries.map(s=>row(s,past)).join(''):'<tr><td colspan="5">None yet</td></tr>'}</tbody></table></div>`;
-      this.modal('Owner overview',`<div class="owner-metrics"><div><b>${data.online}</b><span>ACTIVE VISITORS</span></div><div><b>${data.visits}</b><span>TOTAL VISITS</span></div><div><b>${data.relayConnections}</b><span>GAME CONNECTIONS</span></div><div><b>${data.activeRooms.length}</b><span>ACTIVE ROOMS</span></div></div><p class="hint">Anonymous visits only; no IP addresses or chat. ${data.historyPersistent?'Session history is stored on the server.':'History resets if the relay restarts until persistent storage is configured.'}</p><div class="owner-toolbar"><button class="secondary" data-action="owner-refresh">REFRESH</button><button class="plain" data-action="owner-logout">LOCK</button></div><h3>Marks wallet</h3><p class="hint">Adds Marks to your current browser profile. Purchases and balance do not sync across devices.</p><p>Balance: <strong id="owner-egg-balance">${this.wallet.value.balance.toLocaleString()}</strong> Marks</p><form id="owner-eggs-form"><label for="owner-egg-amount">MARKS TO ADD</label><input id="owner-egg-amount" class="field" type="number" min="1" max="1000000" step="1" value="1000" required><button class="primary" type="submit">ADD MARKS</button></form><p id="owner-egg-status" role="status" aria-live="polite"></p><h3>Live rooms</h3><div class="owner-table-scroll"><table class="controls-table"><thead><tr><th>Mode</th><th>Players</th><th>Capacity</th><th>Phase</th></tr></thead><tbody>${data.activeRooms.length?data.activeRooms.map(r=>`<tr><td>${escape(r.mode)}</td><td>${Number(r.players)||0}</td><td>${Number(r.capacity)||0}</td><td>${escape(r.phase)}</td></tr>`).join(''):'<tr><td colspan="4">No live rooms</td></tr>'}</tbody></table></div><h3>Active sessions</h3>${table(data.active,false)}<h3>Past sessions (latest 100)</h3>${table(data.past,true)}`, 'owner-dashboard');
+      this.modal('Owner overview',`<div class="owner-metrics"><div><b>${data.online}</b><span>ACTIVE VISITORS</span></div><div><b>${data.visits}</b><span>TOTAL VISITS</span></div><div><b>${data.relayConnections}</b><span>GAME CONNECTIONS</span></div><div><b>${data.activeRooms.length}</b><span>ACTIVE ROOMS</span></div></div><p class="hint">Anonymous visits only; no IP addresses or chat. ${data.historyPersistent?'Session history is stored on the server.':'History resets if the relay restarts until persistent storage is configured.'}</p><div class="owner-toolbar"><button class="secondary" data-action="owner-refresh">REFRESH</button><button class="plain" data-action="owner-logout">LOCK</button></div><h3>Map editor</h3><p class="hint">Place objects and imported GLB models, edit existing scenery, save drafts and publish layouts for new rounds.</p><button class="primary" data-action="owner-map-editor">OPEN MAP EDITOR</button><p id="owner-map-status" role="status"></p><h3>Marks wallet</h3><p class="hint">Adds Marks to your current browser profile. Purchases and balance do not sync across devices.</p><p>Balance: <strong id="owner-egg-balance">${this.wallet.value.balance.toLocaleString()}</strong> Marks</p><form id="owner-eggs-form"><label for="owner-egg-amount">MARKS TO ADD</label><input id="owner-egg-amount" class="field" type="number" min="1" max="1000000" step="1" value="1000" required><button class="primary" type="submit">ADD MARKS</button></form><p id="owner-egg-status" role="status" aria-live="polite"></p><h3>Live rooms</h3><div class="owner-table-scroll"><table class="controls-table"><thead><tr><th>Mode</th><th>Players</th><th>Capacity</th><th>Phase</th></tr></thead><tbody>${data.activeRooms.length?data.activeRooms.map(r=>`<tr><td>${escape(r.mode)}</td><td>${Number(r.players)||0}</td><td>${Number(r.capacity)||0}</td><td>${escape(r.phase)}</td></tr>`).join(''):'<tr><td colspan="4">No live rooms</td></tr>'}</tbody></table></div><h3>Active sessions</h3>${table(data.active,false)}<h3>Past sessions (latest 100)</h3>${table(data.past,true)}`, 'owner-dashboard');
     }catch(e){this.token=null;this.open();const status=this.dialog.querySelector('#owner-error');if(status)status.textContent=e.message;}
   }
   async addEggs(form){
@@ -64,6 +64,12 @@ export class OwnerConsole {
       this.onWalletChange?.();
     }catch(error){status.textContent=error.message;}
     finally{this.addingEggs=false;button.disabled=false;}
+  }
+  async openMapEditor(){
+    const button=this.dialog.querySelector('[data-action="owner-map-editor"]');if(button)button.disabled=true;
+    try{if(!this.token||this.expires<=Date.now()){this.open();return;}const overview=await this.request('/maps',{method:'POST',body:JSON.stringify({token:this.token,action:'list'})});if(this.screen()!=='menu')return;await this.onMapEditor?.(overview);}
+    catch(error){const status=this.dialog.querySelector('#owner-map-status');if(status)status.textContent=error.status===404?'The map editor server update is still deploying. Try again shortly.':error.message;}
+    finally{if(button?.isConnected)button.disabled=false;}
   }
   logout(){void this.request('/logout',{method:'POST',body:JSON.stringify({token:this.token})}).catch(()=>{});this.token=null;this.expires=0;this.dialog.close();}
 }

@@ -29,7 +29,7 @@ export class FrontierArt{
   this.cylinder(x+w*.32,h+.8,z-d*.27,.06,1.6);this.box(x+w*.32,h+1.61,z-d*.27,.8,.05,.12,'amber');
  }
  wallDetail(b){
-  const {x,z,w,d,h,y=0}=b,color=FRONTIER_COLORS[b.color]||FRONTIER_COLORS.concrete;
+  const {x,z,w,d,h,y=0}=b,color=(typeof b.color==='number'?b.color:FRONTIER_COLORS[b.color])||FRONTIER_COLORS.concrete;
   this.box(x,y+h/2,z,w,h,d,color);
   if(b.kind==='building'){
    const longX=w>d;for(let at=-Math.max(w,d)/2+1.1;at<Math.max(w,d)/2-.65;at+=2.4)for(const sign of [-1,1]){
@@ -59,7 +59,7 @@ export function buildFrontierArena(world,map){
  const a=new FrontierArt();a.box(0,-.45,0,map.size*2+100,.6,map.size*2+100,map.district==='freight port'?0x4c7887:0x657d72);a.box(0,-.13,0,map.size*2,.26,map.size*2,map.ground);
  for(const [i,[x,z,w,d,c]]of map.lanes.entries())a.box(x,.02+i*.003,z,w,.03,d,c==='road'?0x4c6067:0x91a099);
  for(const [x,z,w,d]of map.lanes)if(w>d)for(let px=x-w/2+3;px<x+w/2;px+=6)a.box(px,.048,z,2.1,.012,.1,'amber');else for(let pz=z-d/2+3;pz<z+d/2;pz+=6)a.box(x,.048,pz,.1,.012,2.1,'amber');
- for(const b of map.boxes)a.wallDetail(b);
+ for(const b of map.boxes)if(!b.editorObject)a.wallDetail(b);
  for(const p of map.landmarks){if(p.type==='radar')a.radar(p.x,p.z,p.y);if(p.type==='crane')a.crane(p.x,p.z);if(p.type==='chimneys'){for(const dx of [-3,3]){a.cylinder(p.x+dx,9,p.z,1.4,18,'rust');a.cylinder(p.x+dx,15,p.z,1.44,.55,'canvas');}a.building(p.x,p.z,12,13,7,'slate');}if(p.type==='factory')a.building(p.x,p.z,25,8,8,'rust');if(p.type==='ship'){a.box(p.x,-.4,p.z,32,2.2,9,'slate');a.building(p.x+9,p.z,8,7,7,'canvas');a.container(p.x-7,p.z,12,5,3,'rust',.7);}}
  for(let i=0;i<12;i++){const angle=i*Math.PI/6,r=map.size+18,x=Math.sin(angle)*r,z=Math.cos(angle)*r;if(map.district==='uplink compound'){a.rock(x,1,z,5,4,5);a.pine(x+3,z+2,7+i%3);}else if(i%3===0)a.building(x,z,10,9,5+i%3,'slate');}
  for(const x of [-map.size+3,map.size-3])for(const z of [-25,25])a.lamp(x,z);

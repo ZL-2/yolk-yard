@@ -44,6 +44,7 @@ function makeRenderer(options){
 const materials = new Map(),
   boxGeo = new THREE.BoxGeometry(1, 1, 1),
   sphereGeo = new THREE.SphereGeometry(1, 16, 12);
+boxGeo.userData.shared=sphereGeo.userData.shared=true;
 function mat(color) {
   if (!materials.has(color))
     materials.set(
@@ -127,6 +128,7 @@ function label(text, color = "#ffffff", compact = false, critical = false, runs 
   sprite.scale.set(2.5, 0.47, 1);
   return sprite;
 }
+export const worldKit={block,ball,cylinder,mat,palette};
 export class View {
   constructor(canvas, settings) {
     this.canvas = canvas;
@@ -286,12 +288,14 @@ export class View {
     group.clear();
   }
   prepareBattleMap(){
+    const layout=getMap('sunnybreak').layoutKey||'';
+    if(this.preparedBattle&&this.preparedBattle.layout!==layout){this.disposeGroup(this.preparedBattle.group);this.preparedBattle=null;}
     if(this.mapId==='sunnybreak'||this.preparedBattle?.done)return;
     if(!this.preparedBattle){
       const map=getMap('sunnybreak'),group=new THREE.Group();
       // Use the same IDs as prediction/destruction when the first battle packet arrives.
       map.authored??=authoredBoxes(map);
-      this.preparedBattle={group,steps:buildIslandSteps(group,map.authored?{...map,boxes:map.authored}:map,{block,ball,cylinder,mat,palette}),done:false};
+      this.preparedBattle={group,layout,steps:buildIslandSteps(group,map.authored?{...map,boxes:map.authored}:map,{block,ball,cylinder,mat,palette}),done:false};
     }
     const pending=this.preparedBattle,deadline=performance.now()+4;
     do{pending.done=pending.steps.next().done;}while(!pending.done&&performance.now()<deadline);
@@ -302,7 +306,10 @@ export class View {
     }
   }
   loadMap(id) {
-    if (id === this.mapId) return;
+    const layout=getMap(id).layoutKey||'';
+    if (id === this.mapId&&this.mapLayout===layout) return;
+    this.mapLayout=layout;
+    if(this.preparedBattle&&this.preparedBattle.layout!==(getMap('sunnybreak').layoutKey||'')){this.disposeGroup(this.preparedBattle.group);this.preparedBattle=null;}
     this.mapId = id;
     this.needsMapCompile=true;
     const map = getMap(id);

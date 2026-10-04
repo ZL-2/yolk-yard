@@ -41,13 +41,14 @@ for(const link of navLinks)for(const p of [link.from,link.to]){p.x*=footprint;p.
 export const SPAWN_REGIONS=Array.from({length:8},(_,sector)=>({id:sector,points:[]}));
 for(let z=-48;z<=48;z+=4.2)for(let x=-48;x<=48;x+=4.2){if(boxes.some(b=>b.y<5.1&&b.y+b.h>3.2&&Math.abs(b.x-x)<b.w/2+1.1&&Math.abs(b.z-z)<b.d/2+1.1))continue;const sector=Math.floor(((Math.atan2(z,x)+Math.PI*2)%(Math.PI*2))/(Math.PI/4));SPAWN_REGIONS[sector].points.push([x,z]);}
 const spawns=SPAWN_REGIONS.flatMap(r=>r.points);
-export function distributedSpawn(players,random=Math.random){
+export function distributedSpawn(players,random=Math.random,points=spawns){
+ const regions=points===spawns?SPAWN_REGIONS:SPAWN_REGIONS.map(r=>({id:r.id,points:points.filter(([x,z])=>Math.floor(((Math.atan2(z,x)+Math.PI*2)%(Math.PI*2))/(Math.PI/4))===r.id)}));
  const occupied=[...players].filter(p=>p.health>0&&Number.isFinite(p.x)),offset=Math.floor(random()*8);
- const candidates=SPAWN_REGIONS.map((r,i)=>({...r,order:(i-offset+8)%8,count:occupied.filter(p=>r.points.some(([x,z])=>Math.hypot(p.x-x,p.z-z)<5)).length})).sort((a,b)=>a.count-b.count||a.order-b.order);
+ const candidates=regions.map((r,i)=>({...r,order:(i-offset+8)%8,count:occupied.filter(p=>r.points.some(([x,z])=>Math.hypot(p.x-x,p.z-z)<5)).length})).sort((a,b)=>a.count-b.count||a.order-b.order);
  for(const region of candidates){const points=[...region.points];for(let i=points.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[points[i],points[j]]=[points[j],points[i]];}
   const point=points.find(([x,z])=>occupied.every(p=>Math.hypot(p.x-x,p.z-z)>3));if(point)return {point,region:region.id};
  }
- return {point:spawns.reduce((best,p)=>Math.min(...occupied.map(o=>Math.hypot(o.x-p[0],o.z-p[1])))>Math.min(...occupied.map(o=>Math.hypot(o.x-best[0],o.z-best[1])))?p:best,spawns[0]),region:0};
+ return {point:points.reduce((best,p)=>Math.min(...occupied.map(o=>Math.hypot(o.x-p[0],o.z-p[1])))>Math.min(...occupied.map(o=>Math.hypot(o.x-best[0],o.z-best[1])))?p:best,points[0]),region:0};
 }
 
 export const SPAWN_ISLAND={id:'hatchery-atoll',name:'Kestrel Forward Airfield',revision:5,size,navCell:1.5,navMax:25,theme:'royale',sky:0xb0c7d1,ground:0x798a70,accent:0xe0b866,boxes,props,trees,navLinks,spawns,pickups:[],floorLoot:[],chests:[],buildings:[],shelters:[],lanes:[],landmarks:[],doors:[],traversal:[],bases:[[-20,0],[20,0]],zone:[0,0,0],districts:[{name:'Kestrel Airfield',x:-25,z:0,color:0xdab975}],roads,signs,parkedTransport,terrain:{size,cell,n,heights,max:3.2}};
