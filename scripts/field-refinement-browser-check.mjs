@@ -3,7 +3,6 @@ import {chromium} from 'playwright';
 import {createServer} from 'vite';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {readFileSync} from 'node:fs';
-import {RELEASE_NOTES} from '../src/releases.js';
 const live=process.env.RAVEL_FRONTEND_URL,origin=(live||'http://127.0.0.1:5201').replace(/\/$/,''),out='test-results/field-refinement';
 const vite=live?null:await createServer({server:{host:'127.0.0.1',port:5201,strictPort:true,watch:null}});await vite?.listen();
 await mkdir(out,{recursive:true});
@@ -37,7 +36,7 @@ try{
   const select=page.locator('#chat-regression #chat-channel');await select.focus();await page.keyboard.press('Space');await page.waitForTimeout(700);await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');assert.equal(await select.inputValue(),'team');await page.locator('#chat-regression .chat-hud-close').click();assert.equal(await page.evaluate(()=>window.__chatClosed),true);
   await page.evaluate(()=>{window.__chatPanel.open();});await page.locator('#chat-regression #chat-channel').focus();await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__chatPanel.opened),false);await page.evaluate(()=>{clearInterval(window.__chatTimer);document.querySelector('#chat-regression').remove();});metrics.chatNativeChannelStable=true;
  }
- if(live){const version=await page.evaluate(async()=>fetch('./version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()));assert.equal(version.appVersion,JSON.parse(readFileSync(new URL('../package.json',import.meta.url))).version);assert.equal(String(version.release),RELEASE_NOTES[0].number);if(process.env.GITHUB_SHA)assert.equal(version.build,process.env.GITHUB_SHA);metrics.version=version;}
+ if(live){const [version,history]=await page.evaluate(async()=>Promise.all(['version.json','release-history.json'].map(path=>fetch('./'+path+'?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()))));assert.equal(version.appVersion,JSON.parse(readFileSync(new URL('../package.json',import.meta.url))).version);assert.equal(history.build,version.build);assert.equal(String(version.release),String(history.releases[0].number));if(process.env.GITHUB_SHA)assert.equal(version.build,process.env.GITHUB_SHA);metrics.version=version;}
  assert.deepEqual(errors,[]);await writeFile(out+'/metrics.json',JSON.stringify(metrics,null,2));console.log('PASS Field refinement UI: saved sound toggle, four fitted inventory viewports, backdrop drop, '+(!live?'stable chat channel and close':'published version')+'; '+JSON.stringify(metrics));
 }catch(e){await writeFile(out+'/metrics.json',JSON.stringify(metrics,null,2));await page.screenshot({path:out+'/failure.png'}).catch(()=>{});console.log('FAIL UI',JSON.stringify(metrics),(await page.locator('body').innerText()).slice(-2000));throw e;}
 finally{await browser.close();await vite?.close();}
