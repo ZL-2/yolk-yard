@@ -54,7 +54,7 @@ export class SoundVisuals{
   for(let i=0;i<Math.max(cues.length,this.icons.length);i++){
    const c=cues[i];let node=this.icons[i];if(!node&&c){node=document.createElement('span');node.innerHTML=`<i class="sound-arc"></i><svg viewBox="0 0 24 24" aria-hidden="true"><path/></svg><img src="${BOSS_SOUND_ICON}" alt="" decoding="async"/>`;this.node.append(node);this.icons.push(node);}
    if(!node)continue;node.hidden=!c;if(!c)continue;
-   if(node.dataset.kind!==c.kind){node.dataset.kind=c.kind;node.className='sound-direction '+c.kind;node.setAttribute('aria-label',c.kind);node.querySelector('img').hidden=c.kind!=='boss';node.querySelector('svg').hidden=c.kind==='boss';node.querySelector('path').setAttribute('d',paths[c.kind]);}
+   if(node.dataset.kind!==c.kind){node.dataset.kind=c.kind;node.className='sound-direction '+c.kind;node.setAttribute('aria-label',c.kind);node.querySelector('img').toggleAttribute('hidden',c.kind!=='boss');node.querySelector('svg').toggleAttribute('hidden',c.kind==='boss');node.querySelector('path').setAttribute('d',paths[c.kind]);}
    node.style.setProperty('--bearing',c.angle+'rad');node.style.opacity=c.strength;
   }
  }

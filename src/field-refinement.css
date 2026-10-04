@@ -4,6 +4,7 @@
 .sound-direction svg{position:absolute;width:23px;height:23px;left:-11.5px;top:-126px;transform:rotate(calc(-1 * var(--bearing)));fill:currentColor;stroke:currentColor;stroke-width:.6}
 .sound-direction img{position:absolute;width:34px;height:34px;object-fit:contain;left:-17px;top:-136px;transform:rotate(calc(-1 * var(--bearing)))}
 .sound-direction[hidden],.sound-direction svg[hidden],.sound-direction img[hidden]{display:none}
+.sound-direction.boss svg{display:none}
 .sound-arc{position:absolute;left:-34px;top:-103px;width:68px;height:28px;border-top:3px solid currentColor;border-radius:50%;opacity:.75}
 .royale-spectator-count svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle}
 .royale-spectator-count{display:flex;align-items:center;gap:5px}
