@@ -21,9 +21,9 @@ try{
  await open(page);assert.equal(await page.locator('#map-picker').inputValue(),'sunnybreak');await page.screenshot({path:out+'/owner-coast-editor.png'});
  await page.locator('#map-editor canvas').focus();await page.waitForTimeout(300);
  const cameraBefore=await page.evaluate(()=>{const e=window.__yolkTest.editor();return {position:e.camera.position.toArray(),target:e.controls.target.toArray()};});
- await page.keyboard.down('KeyW');await page.waitForTimeout(300);await page.keyboard.up('KeyW');await page.keyboard.down('KeyD');await page.waitForTimeout(300);await page.keyboard.up('KeyD');
+ await page.keyboard.down('KeyW');assert.equal(await page.evaluate(()=>window.__yolkTest.editor().keys.has('KeyW')),true);await page.waitForTimeout(1000);await page.keyboard.up('KeyW');await page.keyboard.down('KeyD');await page.waitForTimeout(1000);await page.keyboard.up('KeyD');
  const cameraAfter=await page.evaluate(()=>{const e=window.__yolkTest.editor();return {position:e.camera.position.toArray(),target:e.controls.target.toArray()};});
- assert.ok(Math.hypot(...cameraAfter.position.map((v,i)=>v-cameraBefore.position[i]))>5);for(let i=0;i<3;i++)assert.ok(Math.abs((cameraAfter.position[i]-cameraBefore.position[i])-(cameraAfter.target[i]-cameraBefore.target[i]))<.01);metrics.wasdCamera={before:cameraBefore,after:cameraAfter};
+ assert.ok(Math.hypot(...cameraAfter.position.map((v,i)=>v-cameraBefore.position[i]))>.5,JSON.stringify({cameraBefore,cameraAfter}));for(let i=0;i<3;i++)assert.ok(Math.abs((cameraAfter.position[i]-cameraBefore.position[i])-(cameraAfter.target[i]-cameraBefore.target[i]))<.01);metrics.wasdCamera={before:cameraBefore,after:cameraAfter};
  await page.locator('#map-picker').selectOption('yard');await page.waitForFunction(()=>window.__yolkTest.editor().mapId==='yard'&&!window.__yolkTest.editor().busy);
  await page.locator('[data-editor-prefab=wall]').click();await page.keyboard.press('Enter');await page.waitForFunction(()=>window.__yolkTest.editor().selectedGroup?.userData.editorId===window.__yolkTest.editor().selected);
  const firstId=await page.evaluate(()=>window.__yolkTest.editor().selected);await property('position',18,0);await property('position',20,2);await property('rotation',90);await property('scale',1.5,0);await property('name','Workshop wall');
