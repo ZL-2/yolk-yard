@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {LOADING_ART,createLoadingRotation,loadingMarkup,showLoading,hideLoading} from '../src/loading-screen.js';
+import {LOADING_ART,createLoadingRotation,loadingMarkup,showLoading,hideLoading,waitUntilLoadingHidden} from '../src/loading-screen.js';
 test('loading presentation includes status and cancellable match connection without false percentages',()=>{
  const html=loadingMarkup('CONNECTING','Preparing room',true);
  assert.ok(html.includes('RAVELFRONT')&&html.includes('role="status"')&&html.includes('cancel-connect'));
@@ -41,4 +41,9 @@ test('a completed load stays visible for two seconds and then dismisses',async()
  showLoading('READY','Ready');const started=performance.now();hideLoading();
  assert.equal(root.hidden,false);await new Promise(resolve=>setTimeout(resolve,2050));
  assert.ok(performance.now()-started>=2000);assert.equal(root.hidden,true);delete globalThis.document;
+});
+test('briefing readiness waits for actual loading dismissal and releases its observer',async()=>{
+ const root={hidden:false};let callback,disconnected=false,ready=false;
+ globalThis.document={querySelector:()=>root};globalThis.MutationObserver=class{constructor(fn){callback=fn;}observe(target,options){assert.equal(target,root);assert.deepEqual(options.attributeFilter,['hidden']);}disconnect(){disconnected=true;}};
+ try{const pending=waitUntilLoadingHidden().then(()=>ready=true);await Promise.resolve();assert.equal(ready,false);callback();await Promise.resolve();assert.equal(ready,false);root.hidden=true;callback();await pending;assert.equal(ready,true);assert.equal(disconnected,true);await waitUntilLoadingHidden();const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');assert.ok(main.includes('waitUntilLoadingHidden().then(()=>showWelcomeBack())'));}finally{delete globalThis.document;delete globalThis.MutationObserver;}
 });

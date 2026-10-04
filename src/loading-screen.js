@@ -49,3 +49,8 @@ export function hideLoading(force=false){
  else if(hideTimer===null){const current=generation;hideTimer=setTimeout(()=>{hideTimer=null;if(current===generation)hideLoading();},remaining);}
 }
 export function waitForLoading(){return Promise.all([imagePromise,new Promise(resolve=>setTimeout(resolve,Math.max(0,MIN_LOADING_MS-(performance.now()-shownAt))))]);}
+// Wait for actual readiness, including map/shader preparation, not just a timer.
+export function waitUntilLoadingHidden(){
+ const root=document.querySelector('#loading-screen');if(!root||root.hidden)return Promise.resolve();
+ return new Promise(resolve=>{const observer=new MutationObserver(()=>{if(root.hidden){observer.disconnect();resolve();}});observer.observe(root,{attributes:true,attributeFilter:['hidden']});});
+}

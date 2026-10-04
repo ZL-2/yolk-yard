@@ -4,14 +4,17 @@ import {createServer} from 'vite';
 import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
 import {startRealtimeServer} from '../server/realtime/index.js';
 import {LOADING_ART,loadingMarkup} from '../src/loading-screen.js';
+import {readFileSync} from 'node:fs';
+import {RELEASE_NOTES} from '../src/releases.js';
+const appVersion=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')).version;
 const live=process.env.RAVEL_FRONTEND_URL,origin=(live||'http://127.0.0.1:5198').replace(/\/$/,''),out='test-results/loading-art';
 let app,vite,browser,temp;const errors=[],pages=[],metrics={live:!!live,assets:[]};
-async function page(name,staticOnly=false){
+async function page(name,staticOnly=false,briefing=false){
  const context=await browser.newContext({viewport:{width:1440,height:900}});
  if(!live)await context.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:"window.YOLK_NETWORK={relay:'ws://127.0.0.1:9002/game'};"}));
  if(staticOnly)await context.route(/\/(?:src\/main\.js|assets\/index-[^/]+\.js)(?:\?.*)?$/,r=>r.fulfill({contentType:'application/javascript',body:''}));
  const p=await context.newPage();pages.push(p);p.setDefaultTimeout(60000);p.on('pageerror',e=>errors.push(e.message));
- await p.addInitScript(name=>{localStorage.setItem('ravelfront-season-1-dismissed','yes');localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));},name);
+ await p.addInitScript(({name,briefing})=>{if(!briefing)localStorage.setItem('ravelfront-season-1-dismissed','yes');localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));window.__briefingOrder=[];new MutationObserver(()=>{const dialog=document.querySelector('.season-launch[open]');if(dialog&&!window.__briefingOrder.length)window.__briefingOrder.push({loadingHidden:document.querySelector('#loading-screen')?.hidden===true});}).observe(document,{attributes:true,childList:true,subtree:true});},{name,briefing});
  await p.goto(origin+'/?qa&loading='+Date.now());return p;
 }
 async function decoded(p,art){return p.evaluate(async file=>{const img=new Image();img.src=new URL(file,location.href).href;await img.decode();return {file,width:img.naturalWidth,height:img.naturalHeight};},art.file);}
@@ -36,6 +39,7 @@ try{
  for(const kind of ['connect','exit']){await preview.evaluate(html=>document.querySelector('#loading-screen').innerHTML=html,loadingMarkup(kind==='exit'?'RETURNING TO LOBBY':'ESTABLISHING MATCH UPLINK',kind==='exit'?'Preparing your operator in the lobby.':'Connecting to the room service.',kind==='connect',{kind,art:LOADING_ART.matches[1]}));await shot(preview,kind);}
  const host=await page('Loading Captain');await host.locator('#loading-screen').waitFor({state:'hidden'});await host.locator('#menu [data-action=play-custom]').waitFor({state:'visible'});
  assert.equal(await host.locator('vite-error-overlay').count(),0);
+ const firstVisit=await page('Briefing Order',false,true);await firstVisit.locator('.season-launch[open]').waitFor({state:'visible'});assert.deepEqual(await firstVisit.evaluate(()=>window.__briefingOrder),[{loadingHidden:true}]);await shot(firstVisit,'briefing-after-loading');await firstVisit.locator('#season-hide').check();await firstVisit.locator('.season-enter').click();await firstVisit.reload();await firstVisit.locator('#loading-screen').waitFor({state:'hidden'});assert.equal(await firstVisit.locator('.season-launch').count(),0);assert.equal(await firstVisit.evaluate(()=>localStorage.getItem('ravelfront-season-1-dismissed')),'yes');metrics.briefingAfterLoading=true;metrics.dismissalPersists=true;await firstVisit.context().close();
  if(!live){
   await host.locator('#menu [data-action=play-custom]').click();await host.locator('#setup-mode').selectOption('ffa');await host.locator('#setup-bots').selectOption('2');
   const connecting=await host.evaluate(()=>new Promise((resolve,reject)=>{const dialog=document.querySelector('dialog');const timer=setTimeout(()=>{observer.disconnect();reject(Error('Connecting modal was not opened'));},15000);const observer=new MutationObserver(()=>{const art=dialog.querySelector('.ravel-loading');if(dialog.dataset.kind!=='connecting'||!dialog.open||!art)return;observer.disconnect();clearTimeout(timer);const result={open:dialog.open,art:art.dataset.loadingArt,rootArt:document.querySelector('#loading-screen .ravel-loading').dataset.loadingArt};dialog.querySelector('[data-action=cancel-connect]').click();resolve(result);});observer.observe(dialog,{attributes:true,childList:true,subtree:true});document.querySelector('[data-action=create-room]').click();}));
@@ -54,7 +58,7 @@ try{
   assert.equal(await guest.evaluate(()=>window.__yolkTest.read().screen),'menu');assert.equal(await host.evaluate(()=>window.__yolkTest.read().screen),'game');
   await host.keyboard.press('Escape');await host.locator('dialog [data-action=leave-confirm]').click();await host.locator('#loading-screen').waitFor({state:'hidden'});
  }else{
-  const version=await host.evaluate(async()=>fetch('./version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()));assert.equal(version.appVersion,'4.2.1');assert.equal(String(version.release),'122');if(process.env.GITHUB_SHA)assert.equal(version.build,process.env.GITHUB_SHA);metrics.version=version;
+  const version=await host.evaluate(async()=>fetch('./version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()));assert.equal(version.appVersion,appVersion);assert.equal(String(version.release),RELEASE_NOTES[0].number);if(process.env.GITHUB_SHA)assert.equal(version.build,process.env.GITHUB_SHA);metrics.version=version;
  }
  assert.deepEqual(errors,[]);await writeFile(out+'/metrics.json',JSON.stringify(metrics,null,2));console.log('PASS Loading art: startup, four decoded match assets, readable live overlays, '+(live?'production version and lobby':'cancel recovery, host/guest entry and both lobby returns')+'; '+JSON.stringify(metrics));
 }catch(error){for(const p of pages)if(!p.isClosed()){console.log('FAIL UI',(await p.locator('body').innerText()).slice(-1600));await shot(p,'failure').catch(()=>{});}throw error;}

@@ -6,7 +6,7 @@ import {lobbyNavigation} from './lobby-ui.js';
 import './menu-hub.css';
 import {crosshairRadius} from './combat.js';
 import {showWelcomeBack} from './welcome-back.js';
-import {loadingMarkup,showLoading,hideLoading,waitForLoading} from './loading-screen.js';
+import {loadingMarkup,showLoading,hideLoading,waitForLoading,waitUntilLoadingHidden} from './loading-screen.js';
 import {predictionCorrection} from './network-stats.js';
 import {InputClock} from './input-clock.js';
 import {RemoteSimulation} from './remote-simulation.js';
@@ -1790,7 +1790,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void showWelcomeBack().then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(()=>showWelcomeBack()).then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);
