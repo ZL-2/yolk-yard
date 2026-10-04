@@ -31,7 +31,7 @@ export function decorateBoss(model,p){
 }
 export function updateCelebration(model,p,time,dispose){
  if(p.crown&&!model.userData.victoryCrown){const c=makeVictoryCrown();c.position.y=1.98;model.add(c);model.userData.victoryCrown=c;}
- const c=model.userData.victoryCrown;if(c){c.visible=!!p.crown&&p.health>0;c.position.y=1.98+Math.sin(time*3)*.018;c.rotation.y=Math.sin(time*.6)*.08;}
+ const c=model.userData.victoryCrown;if(c){c.visible=!!p.crown&&p.health>0&&p.emote?.id!=='crown';c.position.y=1.98+Math.sin(time*3)*.018;c.rotation.y=Math.sin(time*.6)*.08;}
  const show=p.emote?.id==='crown';
  if(show&&(!model.userData.crownRecord||model.userData.crownRecordWins!==p.crownWins)){
   if(model.userData.crownRecord){model.userData.crownRecord.removeFromParent();dispose(model.userData.crownRecord);}
