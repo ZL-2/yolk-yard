@@ -10,3 +10,6 @@ body.in-royale #emote-button{bottom:132px}#emote-button[hidden]{display:none!imp
 .sound-direction.boss,.sound-direction.crown{color:#ffd46b}.crown-result{display:flex;align-items:center;justify-content:center;gap:12px;color:#ffdc86;background:#2b301f;padding:12px;border:1px solid #c59e46;border-radius:8px}.crown-result svg{width:36px;height:36px;fill:#ffd46b}
 body.is-emoting #crosshair,body.is-emoting #scope{display:none!important}
 @media(max-height:650px){body.in-royale #emote-button{bottom:105px;font-size:10px;padding:5px 10px}.inventory-crown{padding:4px}}
+
+body:not(.in-royale) #emote-button{left:auto;right:20px;bottom:82px;transform:none}
+@media(max-width:800px){body:not(.in-royale) #emote-button{right:12px;bottom:110px}}
