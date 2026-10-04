@@ -1,0 +1,31 @@
+name: Verify published Crowns of the Coast
+on:
+  push:
+    branches: [crowns-coast-127]
+    paths:
+      - scripts/crowns-coast-browser-check.mjs
+      - .github/workflows/crowns-coast-live.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/crowns-coast-browser-check.mjs
+        env:
+          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: published-crown-emote-checks
+          path: test-results/crowns-coast
+          retention-days: 7
