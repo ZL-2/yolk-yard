@@ -1,4 +1,5 @@
 import {decorateBoss,updateCelebration} from './celebration-view.js';
+import {updateBossAlert} from './boss-alert-view.js';
 import {authoredBoxes} from './building.js';
 import {RenderPool} from './render-pool.js';
 import {makeHumanoid,animateHumanoid,humanoidDiagnostics} from './humanoid.js';
@@ -958,6 +959,7 @@ export class View {
         aura.material.opacity=.13+Math.sin(this.clock*5)*.025;
         if(p.inventory&&poseDue)this.royaleView.animateActor(model,p,this.clock,poseDt);
         if(model.userData.nameplate)model.userData.nameplate.position.y=bodyHeight(p)+.3;
+        if(p.boss)updateBossAlert(model,p,state.time,bodyHeight(p),distance);
         updateCelebration(model,p,state.time,g=>this.disposeGroup(g));
         if(poseDue)animateHumanoid(model,{...p,shotRecoil:model.userData.armRecoil||0},poseDt,state.time,{distance:0});
 

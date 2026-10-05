@@ -1,5 +1,6 @@
 import {LobbyMusic} from './lobby-music.js';
-// Original procedural sound palette. Every sound is generated locally, with no samples/CDN.
+import {BossVoiceAudio} from './boss-voice-audio.js';
+// Gameplay effects are procedural; boss voice clips use the supplied reference.
 import {FIREARM_SOUNDS,synthesizeShot,reloadSequence} from './firearm-audio.js';
 import {gun} from './data.js';
 import {getMap} from './maps.js';
@@ -89,7 +90,7 @@ for(const [i,id]of Object.keys(ITEMS).entries()){
 }
 export const SHOT_PALETTE={sprinter:[145,1200,.15],scatter:[78,700,.25],needle:[62,2100,.33],zipper:[210,1900,.10],thumper:[52,500,.45],anchor:[100,1100,.19],duet:[185,1800,.14],pip:[240,1800,.12],peeper:[105,2500,.21],doubleyolk:[95,900,.21],comet:[520,2400,.18]};
 export class Sound {
- constructor(){this.lobbyMusic=new LobbyMusic();this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];}
+ constructor(){this.lobbyMusic=new LobbyMusic();this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];this.bossAudio=new BossVoiceAudio(this);}
  unlock(){
   this.lobbyMusic.unlock();
   if(!this.ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(Audio){this.ctx=new Audio();this.master=this.ctx.createGain();this.compressor=this.ctx.createDynamicsCompressor();this.master.connect(this.compressor).connect(this.ctx.destination);this.master.gain.value=this.volume;const size=this.ctx.sampleRate*2;this.noiseBuffer=this.ctx.createBuffer(1,size,this.ctx.sampleRate);const a=this.noiseBuffer.getChannelData(0);let seed=12345;for(let i=0;i<size;i++){seed=(seed*1664525+1013904223)>>>0;a[i]=seed/2147483648-1;}}}
@@ -150,8 +151,9 @@ export class Sound {
   }
   if(loop){loop.gain.gain.setTargetAtTime(Math.max(0,target)*volume*this.ambienceVolume,this.ctx.currentTime,.3);if(!target){if(!loop.silentAt)loop.silentAt=this.clock;if(this.clock-loop.silentAt>1.5){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();this.loops.delete(id);}}else loop.silentAt=0;}
  }
- stopWorld(){for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;}
+ stopWorld(){this.bossAudio.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;}
  event(e,me,state){
+  if(e.type==='boss-voice')this.bossAudio.event(e,state,me);
   if(e.type==='round')this.cue('round-start');
   if(e.type==='royale-cue'){
    // Personal inventory cues are local, spatial actions are audible to nearby operators.
@@ -168,10 +170,11 @@ export class Sound {
  update(state,me,dt,playing){
   this.clock+=dt;this.listener=me;
   if(!playing||!me||me.downed||!(me.reloadEnd>state?.time))this.cancelReload();
-  if(!playing||!state||!me){if(this.loops.size)this.stopWorld();return;}
+  if(!playing||!state||!me){if(this.loops.size||this.bossAudio.active.size)this.stopWorld();this.bossAudio.update(state,me,false);return;}
   const royale=state.royale,ground=me.flight==='ground'||!royale;
   this.stepClocks??=new Map();
   const map=getMap(state.options?.map);
+  this.bossAudio.update(state,me,playing,map);
   for(const p of state.players||[]){if(p.health<=0||p.sliding||p.downed||!p.grounded||p.flight&&p.flight!=='ground'||Math.hypot(p.x-me.x,p.z-me.z)>(p.crouching?8:p.sprinting?26:20))continue;
    const speed=Math.hypot(p.vx||0,p.vz||0),previous=this.stepClocks.get(p.id)||0,next=previous+speed*dt/(p.sprinting?1:.85);this.stepClocks.set(p.id,next);
    if(Math.floor(next)>Math.floor(previous)&&speed>.8){const support=map?.boxes?.find(b=>Math.abs(b.y+b.h-p.y)<.08&&Math.abs(b.x-p.x)<b.w/2&&Math.abs(b.z-p.z)<b.d/2),surface=support?(['wood','metal'].includes(support.material)?support.material:'stone'):'soil';this.cue('step-'+surface,p,(p.id===me.id?.75:.6)*(p.crouching?.45:1));}
