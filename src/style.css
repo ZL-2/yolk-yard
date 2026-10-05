@@ -1871,3 +1871,4 @@ body.in-royale .match-center{display:none}
 
 /* Keyboard controls remain available; remove redundant in-match action buttons. */
 .in-royale .build-hud>.build-action-buttons{display:none}
+#dialog[data-kind="pause"] .split-actions button{background:#254655;color:#fff3dd}

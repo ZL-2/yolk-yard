@@ -1221,7 +1221,7 @@ const actions = {
  'season-guide':()=>showWelcomeBack({force:true}),
  'quick-rematch':()=>{if(sim&&!sim.remote&&state?.phase==='results'&&(!net||net.isHost)){closeDialog();launchRound();}},
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
- 'start-training':()=>{if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();closeDialog();},
+ 'start-training':()=>{if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
  'career':()=>selectMenuSection('career'),
  'find-public':()=>setupMenu(),
  'public-join':()=>queuePublicRoyale(false),
@@ -1400,6 +1400,8 @@ dialog.addEventListener("cancel", (e) => {
   else closeDialog();
 });
 document.addEventListener("pointerlockchange", () => {
+  // A capture request can finish after a menu opens. Keep menu buttons usable.
+  if(document.pointerLockElement&&(paused||dialog.open||chat.opened||screen!=="game")){document.exitPointerLock();return;}
   if (
     !document.pointerLockElement &&
     screen === "game" &&
