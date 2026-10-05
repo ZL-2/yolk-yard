@@ -47,7 +47,7 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
     });
   });
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,host,resolve);});
-  return {server,relay,owner,mapStore,async close(){relay.deployment.close();await relay.serviceStatus.close();cpuQuota.close();relay.close();for(const ws of sockets.clients)ws.terminate();await new Promise(r=>sockets.close(r));await new Promise(r=>server.close(r));await owner.close();await relay.parties.store.flush();await mapStore.close();}};
+  return {server,relay,owner,mapStore,async close(){relay.deployment.close();await relay.serviceStatus.close();cpuQuota.close();const relayClosed=relay.close();for(const ws of sockets.clients)ws.terminate();await new Promise(r=>sockets.close(r));await new Promise(r=>server.close(r));await owner.close();await relayClosed;await relay.parties.store.flush();await mapStore.close();}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const app=await startRealtimeServer();console.log(`Ravelfront relay listening on ${app.server.address().port}`);

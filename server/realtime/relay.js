@@ -35,6 +35,9 @@ export class RealtimeRelay {
             if(this.peers.size>=1000)throw Error('Server full');
             peer={id,token:randomUUID(),ws,links:new Map(),pending:[],pendingBytes:0,seq:0,acked:0,clientSeq:0,history:[],historyBytes:0,lastSeen:Date.now(),rateAt:Date.now(),frames:0,bytes:0};
             this.peers.set(id,peer);this.sessions.add(peer);if(id===this.publicHost.key&&this.publicHost.enabled)this.publicHost.registered(peer,m);void this.progression.register(peer,m.progressToken);
+            // The elected alias shares its proven live member's progression identity,
+            // including browsers that cannot persist a local storage credential.
+            if(id===this.publicHost.key&&this.publicHost.enabled&&m.publicHostProof){const owner=this.peers.get(m.publicHostProof.id);if(owner?.progressId)peer.progressId=owner.progressId;}
           }
           clearTimeout(registration);peer.detachedAt=0;peer.lastSeen=Date.now();this.authority.connection(peer,true);
           ws.send(JSON.stringify({type:'ready',id:peer.id,resumed:!!m.resume,resume:peer.token,protocol:2}));
@@ -146,5 +149,5 @@ export class RealtimeRelay {
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
-  close(){this.authority.close();void this.progression.close();this.parties.close();clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');}
+  close(){this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');return Promise.all([this.progression.close(),this.parties.close()]);}
 }
