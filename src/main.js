@@ -927,7 +927,7 @@ function processEvents() {
     if(e.type==='crown-victory'&&e.player===localId)notice(e.crowned?'CROWNED VICTORY · '+e.wins+' this season':'VICTORY CROWN EARNED');
     if(e.type==='boss-cache-open')notice(e.name.toUpperCase()+' UNLOCKED');
     if(e.type==='boss-interrupted'&&e.player===localId)notice('ROOK’S WINCH INTERRUPTED');
-    if(e.type==='vault-open')notice('VOSS VAULT UNLOCKED · Epic requisitions secured',3500);if(e.type==='boss-defeated')notice(bossDefeatMessage(e),4500);if(e.type==='relay-captured'&&e.player===localId)notice('SIGNAL LIVE · Contacts revealed. Your location is exposed.',3500);
+    if(e.type==='vault-open')notice((e.name||'Vault').toUpperCase()+' UNLOCKED · Epic requisitions secured',3500);if(e.type==='boss-defeated')notice(bossDefeatMessage(e),4500);if(e.type==='relay-captured'&&e.player===localId)notice('SIGNAL LIVE · Contacts revealed. Your location is exposed.',3500);
     const me = state.players.find((p) => p.id === localId);
     sound.event(e,me,state);
     if(e.type==='duo-marker')sound.cue(e.kind==='danger'?'danger-ping':'world-ping',null,.75);
