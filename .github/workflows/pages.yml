@@ -33,12 +33,13 @@ jobs:
       - name: Verify field gameplay, collision performance, multiplayer and browser visuals
         if: contains(github.event.head_commit.message, '[field-polish]')
         run: |
-          node --test tests/field-polish.test.js tests/field-refinement.test.js tests/streaming-performance.test.js tests/bot-runtime.test.js tests/render-performance.test.js tests/snapshot-codec.test.js tests/royale-teammate-bots.test.js tests/world-overhaul.test.js tests/crowns-bosses-emotes.test.js tests/season-one.test.js tests/recurring-royale.test.js tests/royale-countdown.test.js tests/owner.test.js tests/updates.test.js tests/map-editor.test.js tests/authority-performance.test.js tests/remote-input.test.js tests/hitbox.test.js tests/bot-movement-speed.test.js tests/service-status.test.js
+          node --test tests/vault-grappler.test.js tests/weapon-balance.test.js tests/weapon-stats.test.js tests/audio.test.js tests/field-polish.test.js tests/field-refinement.test.js tests/streaming-performance.test.js tests/bot-runtime.test.js tests/render-performance.test.js tests/snapshot-codec.test.js tests/royale-teammate-bots.test.js tests/world-overhaul.test.js tests/crowns-bosses-emotes.test.js tests/season-one.test.js tests/recurring-royale.test.js tests/royale-countdown.test.js tests/owner.test.js tests/updates.test.js tests/map-editor.test.js tests/authority-performance.test.js tests/remote-input.test.js tests/hitbox.test.js tests/bot-movement-speed.test.js tests/service-status.test.js
           node scripts/field-refinement-network-check.mjs
           node scripts/map-editor-network-check.mjs
           PROFILE_OUT=test-results/field-polish/full-match.json node scripts/kestrel-performance-check.mjs
           node scripts/field-performance-check.mjs
           npx playwright install --with-deps chromium
+          node scripts/vault-grappler-browser-check.mjs
           node scripts/field-polish-browser-check.mjs
           node scripts/field-refinement-browser-check.mjs
           node scripts/crowns-coast-browser-check.mjs
@@ -47,6 +48,7 @@ jobs:
         with:
           name: field-polish-checks
           path: |
+            test-results/vault-grappler
             test-results/field-polish
             test-results/field-refinement
             test-results/crowns-coast

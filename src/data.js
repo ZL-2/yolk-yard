@@ -4,7 +4,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Immediate pickups and revised Royale combat require matching clients.
-export const VERSION = 39;
+export const VERSION = 40;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -180,8 +180,8 @@ export const gun = (p, slot=p.slot) => {
  const mythic=item?.rarity===5?MYTHIC_WEAPONS[item.bossId]:null;
  const rarity=Math.max(0,Math.min(5,item?.rarity||0)),key=base.id+rarity+':'+(mythic?item.bossId:'');
  if(!royaleStats.has(key)){
-  const v=rarityVariant(base,Math.min(4,rarity));
-  if(mythic&&mythic.id===base.id)Object.assign(v,{name:mythic.name,rarity:5,damage:base.damage*mythic.damage,reload:base.reload*mythic.reload,reloadEmpty:base.reloadEmpty*mythic.reload,spread:base.spread*(mythic.spread||1),adsSpread:base.adsSpread*(mythic.spread||1),interval:base.interval*(mythic.interval||1),magazine:mythic.magazine||base.magazine,firstShot:mythic.firstShot??base.firstShot});
+  const v=rarityVariant(base,rarity);
+  if(mythic&&mythic.id===base.id)Object.assign(v,{name:mythic.name,rarity:5});
   royaleStats.set(key,v);
  }
  const stats=royaleStats.get(key);if(item)itemStats.set(item,{id:item.id,rarity:item.rarity,bossId:item.bossId,weapon:item.weapon,stats});return stats;

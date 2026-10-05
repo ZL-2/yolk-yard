@@ -839,11 +839,11 @@ export class View {
         if(this.heldItemKey!==itemKey){
           if(this.heldItem){this.heldItem.removeFromParent();this.disposeGroup(this.heldItem);}
           this.heldItem=null;this.heldItemKey=itemKey;
-          if(itemKey){this.heldItem=heldItem.pickaxe&&shopItem(local.pickaxe)?makeShopPickaxe(local.pickaxe):this.royaleView.itemModel(heldItem,false);this.heldItem.userData.firstPerson=true;this.heldItem.scale.setScalar(.4);this.heldItem.position.set(-.05,-.08,-.28);this.gunGroup.add(this.heldItem);}
+          if(itemKey){this.heldItem=heldItem.pickaxe&&shopItem(local.pickaxe)?makeShopPickaxe(local.pickaxe):this.royaleView.itemModel(heldItem,false);this.heldItem.userData.firstPerson=true;this.heldItem.scale.setScalar(heldItem.id==='anchorWinch'?.85:.4);this.heldItem.position.set(-.05,-.08,-.28);this.gunGroup.add(this.heldItem);}
         }
         if(!heldItem?.weapon&&this.localArms)utilityArms(this.localArms,heldItem?.id,local.use?(state.time-local.use.start)/(local.use.end-local.use.start):-1,this.clock);
         if(this.heldItem&&heldItem?.pickaxe)animatePickaxe(this.heldItem,this.localArms,local.pickaxe,state.time-(local.swingAt??-100));
-        else if(this.heldItem)this.heldItem.rotation.z=local.use?Math.sin(this.clock*8)*.15:0;
+        else if(this.heldItem){this.heldItem.rotation.z=local.use?Math.sin(this.clock*8)*.15:0;if(heldItem?.id==='anchorWinch'){this.heldItem.position.z=-.28+Math.max(0,.15-(state.time-(local.grapple?.start??-100)))*.45;const cup=this.heldItem.getObjectByName('grappler-plunger');if(cup)cup.visible=!local.grapple||local.grapple.phase==='return';}}
         if(this.localArms){this.localArms.rotation.x=local.use ? -.35+Math.sin(this.clock*6)*.06 : 0;}
 
         if(local.use){this.gunGroup.position.y+=.08+Math.sin(this.clock*8)*.015;this.gunGroup.rotation.x=-.3;}

@@ -1,3 +1,4 @@
+import {updateGrapplers} from './grappler-view.js';
 import {buildMapObjects} from './map-object-view.js';
 import {updateWorldDamage} from './damage-visuals.js';
 import {WorldDetails,WORLD_STREAMING} from './world-streaming.js';
@@ -209,7 +210,7 @@ export class RoyaleView{
  chestModel(supply=false,epic=false){const g=chestModel(this.kit,supply,epic);bake(g.userData.lid,false,true);bake(g,false,true);return g;}
  update(state,local,dt,playing){
   this.root.visible=playing&&!!state?.royale;if(!this.root.visible)return;
-  const r=state.royale,t=this.view.clock,kit=this.kit;
+  const r=state.royale,t=this.view.clock,kit=this.kit;updateGrapplers(this,state,local);
   this.seasonMeshes??=new Map();const activeSeason=new Set();
   for(const s of [...state.players.filter(p=>p.bossWindup).map(p=>({id:p.id,x:p.x,y:p.y+.06,z:p.z,kind:'telegraph'})),...state.players.filter(p=>p.bossVeil).map(p=>({id:p.id,x:p.x,y:p.y+1.55,z:p.z,goal:p.bossVeil.goal,kind:'laser'})),...(r.smokes||[]).map(x=>({...x,kind:'smoke'})),...(r.relays||[]).map(x=>({...x,kind:'relay'}))]){const key=s.kind+s.id;activeSeason.add(key);let mesh=this.seasonMeshes.get(key);if(!mesh){if(s.kind==='laser'){mesh=new THREE.Group();const line=new THREE.Line(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3)),new THREE.LineBasicMaterial({color:0xff554c,transparent:true,opacity:.9}));line.frustumCulled=false;line.userData.ownedMaterial=true;const marker=new THREE.Mesh(new THREE.RingGeometry(.18,.3,16),new THREE.MeshBasicMaterial({color:0xff554c,side:THREE.DoubleSide}));marker.rotation.x=-Math.PI/2;marker.userData.ownedMaterial=true;mesh.add(line,marker);}else if(s.kind==='telegraph'){mesh=new THREE.Mesh(new THREE.RingGeometry(1.1,1.35,24),new THREE.MeshBasicMaterial({color:0xffc563,transparent:true,opacity:.8,side:THREE.DoubleSide}));mesh.rotation.x=-Math.PI/2;}else if(s.kind==='smoke'){mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(1,2),new THREE.MeshBasicMaterial({color:0xc1c6bb,transparent:true,opacity:.94,depthWrite:false}));mesh.userData.ownedMaterial=true;mesh.scale.setScalar(s.radius);}else{const g=new THREE.Group(),k=artKit(this.kit);k.rounded(g,0,.6,0,.75,1.2,.6,0x304b54,.06);k.rounded(g,0,1.05,-.32,.5,.3,.06,0x65d6c8,.02);k.beam(g,[0,1.2,0],[0,4,0],.045,0xa7c2bd);k.torus(g,0,3.5,0,.4,.04,0xdfb567);bake(g,false,true);mesh=g;}this.root.add(mesh);this.seasonMeshes.set(key,mesh);}mesh.position.set(s.x,s.y,s.z);if(s.kind==='laser'){const a=mesh.children[0].geometry.attributes.position;a.setXYZ(0,0,0,0);a.setXYZ(1,s.goal.x-s.x,s.goal.y+.08-s.y,s.goal.z-s.z);a.needsUpdate=true;mesh.children[1].position.set(s.goal.x-s.x,s.goal.y+.08-s.y,s.goal.z-s.z);}if(s.kind==='smoke'){mesh.rotation.y=t*.04;mesh.material.opacity=Math.min(.94,(s.until-state.time)*.8);}}
   for(const [key,m]of this.seasonMeshes)if(!activeSeason.has(key)){m.removeFromParent();this.view.disposeGroup(m);this.seasonMeshes.delete(key);}
@@ -255,7 +256,8 @@ export class RoyaleView{
   const item=p.building?{id:'blueprint'}:p.inventory?.[p.slot];
   const itemKey=p.health>0&&!p.downed&&!p.reviving&&!p.emote&&!flying&&item&&!item.weapon&&!item.pickaxe?item.id:null;
   if(model.userData.utilityKey!==itemKey){if(model.userData.utility){model.userData.utility.removeFromParent();this.view.disposeGroup(model.userData.utility);}model.userData.utility=null;model.userData.utilityKey=itemKey;if(itemKey){const prop=this.itemModel(item,false);prop.scale.setScalar(.6);prop.position.set(.36,.7,-.35);model.add(prop);model.userData.utility=prop;}}
-  if(model.userData.utility){model.userData.utility.position.y=p.use?1.15+Math.sin(t*7)*.02:.7;if(item?.pickaxe){const swing=Math.max(0,1-(this.view.lastStateTime-(p.swingAt??-100))/.45);model.userData.utility.rotation.x=-Math.sin(swing*Math.PI)*1.5;}}
+  if(model.userData.utility&&item?.id==='anchorWinch'){model.userData.utility.position.set(.3,1.13,-.42);model.userData.utility.rotation.x=p.pitch;const cup=model.userData.utility.getObjectByName('grappler-plunger');if(cup)cup.visible=!p.grapple||p.grapple.phase==='return';}
+  else if(model.userData.utility){model.userData.utility.position.y=p.use?1.15+Math.sin(t*7)*.02:.7;if(item?.pickaxe){const swing=Math.max(0,1-(this.view.lastStateTime-(p.swingAt??-100))/.45);model.userData.utility.rotation.x=-Math.sin(swing*Math.PI)*1.5;}}
 
   if(pose.air>.01){model.rotation.y=pose.yaw;model.rotation.x=model.rotation.x*(1-pose.air)+pose.pitch;model.rotation.z=model.rotation.z*(1-pose.air)+pose.roll;model.position.y+=pose.bob;}
 

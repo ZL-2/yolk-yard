@@ -10,9 +10,9 @@ export const AMMO_CAPS=Object.fromEntries(Object.entries(AMMO_RULES).map(([id,r]
 export const ammoType=ammoTypeFor;
 export const ROYALE_GUN_IDS=['sprinter','scatter','needle','zipper','thumper','anchor','duet','pip','peeper','doubleyolk','comet'];
 export const ITEMS={
- rookKeycard:{name:'Harbor Hold Keycard',kind:'keycard',duration:0,stack:1,color:'#e8b958',icon:'▣'},
- nyxKeycard:{name:'Woodland Cache Keycard',kind:'keycard',duration:0,stack:1,color:'#83b68d',icon:'▣'},
- anchorWinch:{name:'Anchor Winch',rarity:5,kind:'winch',duration:.15,stack:1,color:'#ffd46b',icon:'↟'},
+ rookKeycard:{name:'Rook Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#e8b958',icon:'▣'},
+ nyxKeycard:{name:'Nyx Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#83b68d',icon:'▣'},
+ anchorWinch:{name:'Rook’s Mythic Grappler',rarity:5,kind:'winch',duration:.15,stack:1,color:'#ffd46b',icon:'↟'},
  veilProjector:{name:'Veil Projector',rarity:5,kind:'veil',duration:.3,stack:3,color:'#ffd46b',icon:'◌'},
  victoryCrown:{name:'Victory Crown',rarity:5,kind:'crown',duration:0,stack:1,color:'#ffd46b',icon:'♛'},
  asterKeycard:{name:'Voss Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#80d9ed',icon:'▣'},

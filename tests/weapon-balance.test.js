@@ -1,3 +1,4 @@
+import {WEAPON_RARITIES} from '../src/weapon-rarities.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Simulation} from '../src/simulation.js';
@@ -16,7 +17,7 @@ const guns=[...WEAPONS,...ROYALE_WEAPONS];
 function arena(id){const s=new Simulation({bots:0,seed:11}),p=s.addPlayer('a',{name:'Alpha',weapon:id}),t=s.addPlayer('b',{name:'Bravo'});s.phase='playing';s.time=10;s.map={...s.map,size:1200,boxes:[],pickups:[]};Object.assign(p,{weapon:id,x:0,y:0,z:0,health:100,grounded:true,aim:true,pitch:0,yaw:0,slot:0,ammo:[100,14],reserve:[100,84],reloadEnd:0,equipUntil:0,nextShot:0,shieldUntil:0,weaponCooldowns:{},accuracyState:[{spread:0,adsBlend:1},{}]});Object.assign(t,{x:0,y:0,z:-12,health:10000,shieldUntil:0,spectating:false});return {s,p,t};}
 test('every firearm has a complete central role and controlled rarity progression',()=>{
  assert.equal(guns.length,11);assert.equal(Object.keys(COMBAT_PROFILES).length,11);
- for(const base of guns)for(let rarity=0;rarity<5;rarity++){const w=gun({slot:1,inventory:[null,{id:base.id,weapon:true,rarity}]});assert.ok(w.purpose&&w.weakness&&w.damage>0&&w.reload>0&&w.adsTime>0&&w.equipTime>0&&w.bloomRecovery>0&&w.recoilRecovery>0);assert.equal(w.damage,base.damage*RARITY_SCALE[rarity].damage);assert.equal(w.critical,base.critical);assert.equal(w.magazine,base.magazine);assert.equal(w.interval,base.interval);assert.ok(w.hitRadius<=.08);assert.ok(Math.abs(w.interval*60-Math.round(w.interval*60))<1e-9);assert.equal(w.roundsPerSecond,(w.burst||1)/w.interval);}
+ for(const base of guns)for(let rarity=0;rarity<5;rarity++){const w=gun({slot:1,inventory:[null,{id:base.id,weapon:true,rarity}]});assert.ok(w.purpose&&w.weakness&&w.damage>0&&w.reload>0&&w.adsTime>0&&w.equipTime>0&&w.bloomRecovery>0&&w.recoilRecovery>0);assert.equal(w.damage,WEAPON_RARITIES[base.id].damage[rarity]/base.pellets);assert.equal(w.critical,base.critical);assert.equal(w.magazine,WEAPON_RARITIES[base.id].magazine[rarity]);assert.equal(w.interval,base.interval);assert.ok(w.hitRadius<=.08);assert.ok(Math.abs(w.interval*60-Math.round(w.interval*60))<1e-9);assert.equal(w.roundsPerSecond,(w.burst||1)/w.interval);}
 });
 test('actual body/head damage follows central falloff at five representative ranges',()=>{
  for(const base of guns.filter(w=>!w.projectile))for(const rarity of [0,4])for(const distance of [2,12,40,100,Math.min(base.range-1,350)])for(const head of [false,true]){

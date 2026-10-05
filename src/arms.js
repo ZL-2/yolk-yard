@@ -228,6 +228,7 @@ export function utilityArms(rig,id,progress=-1,time=0){
  else if(id==='bandage'){left=[-.42+lift*.38,-.25+lift*.06,-.17];right=[.07,-.2,-.17];}
  else if(id==='medkit'){left=[-.35,-.28,-.22];right=[.02,-.23+lift*.08,-.2+(progress>=0?Math.sin(time*8)*.025:0)];}
  else if(['popper','splash','impulse'].includes(id))right=[.06+lift*.25,-.2+lift*.12,-.2+lift*.34];
+ else if(id==='anchorWinch'){left=[-.12,-.18,-.52];right=[.01,-.2,-.24];}
  else if(id==='launchpad'){left[1]-=lift*.28;right[1]-=lift*.28;}
  actionArms(rig,[left,right],-.15-lift*.25);
 }

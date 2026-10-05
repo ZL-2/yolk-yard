@@ -1,3 +1,4 @@
+import {grappleAim} from './grappler.js';
 import {bossDefeatMessage} from './bosses.js';
 import {showFrontMessage,updateFrontMessage} from './front-message.js';
 import {emoteWheel} from './emote-ui.js';
@@ -76,7 +77,7 @@ import {
   clamp,
 } from "./data.js";
 import { MAPS, getMap } from "./maps.js";
-import { movePlayer } from "./physics.js";
+import { movePlayer,wallDistance } from "./physics.js";
 import { Simulation } from "./simulation.js";
 import { Network, cleanCode, formatCode } from "./network.js";
 import {MAX_SPECTATORS,MAX_HUMANS,MAX_CONTESTANTS,WARMUP_SECONDS} from './royale-phases.js';
@@ -556,7 +557,7 @@ function callbacks() {
       const me = s.players.find((p) => p.id === localId);
       if (!me) return;
       pendingInputs = pendingInputs.filter((i) => i.seq > me.ack);
-      predicted = { ...me, ammo: [...me.ammo], reserve: [...me.reserve], traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null, launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+      predicted = { ...me, ammo: [...me.ammo], reserve: [...me.reserve], grapple:me.grapple?structuredClone(me.grapple):null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null, launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
       for (const i of pendingInputs)
         predictMovement(predicted, i, getMap(s.options.map), 1 / 60, s.royale);
       if (me.health > 0 && lastHealth <= 0) {
@@ -1078,14 +1079,14 @@ function hud() {
   if (p.health > 0) spawnIntentUntil = 0;
   if (p.health <= 0 && !p.spawnRequested && performance.now() > spawnIntentUntil && document.pointerLockElement)
     document.exitPointerLock();
-  const armed=canFight(p)&&(!state.royale||p.flight==='ground'&&!!p.inventory?.[p.slot]?.weapon);
+  const grappling=canFight(p)&&p.inventory?.[p.slot]?.id==='anchorWinch',armed=canFight(p)&&(!state.royale||p.flight==='ground'&&!!p.inventory?.[p.slot]?.weapon);
   const aiming = armed &&
     (actionDown("aim") || touch.aim) &&
     p.health > 0 &&
     !paused &&
     p.reloadEnd <= state.time;
   $("#crosshair").style.display =
-    p.health > 0 && armed && !paused && !(aiming&&['scope','prism'].includes(gun(p).optic)) ? "block" : "none";
+    p.health > 0 && (armed||grappling) && !paused && !(aiming&&['scope','prism'].includes(gun(p).optic)) ? "block" : "none";
   // Convert the host's current angular shot spread to a screen-space radius.
   $('#crosshair').classList.toggle('weapon-lowered',!!(p.tacticalSprint||p.sprintRecovery>0||p.traversal));
   const spread = (!sim||sim.remote?predicted?.shotSpread:null)??p.shotSpread??gun(p).spread;
@@ -1093,6 +1094,7 @@ function hud() {
   $("#crosshair").style.setProperty("--crosshair-gap", `${Math.max(0,radius)}px`);
   $('#crosshair').classList.toggle('accuracy-ready',!!(((!sim||sim.remote)&&predicted?.firstShot)||p.firstShot));
   $('#crosshair').dataset.category=gun(p).category;
+  $('#crosshair').classList.toggle('grappler-reticle',grappling);$('#crosshair').classList.toggle('grappler-invalid',grappling&&!grappleAim(sim&&!sim.remote?sim.map:getMap(state.options.map),predicted||p,wallDistance).valid);
   $('#scope-spread').style.width=$('#scope-spread').style.height=`${2*radius}px`;$('#scope-spread').hidden=radius<2;
   $('#crosshair').classList.toggle('pellet-reticle',gun(p).pellets>1);
   $("#center-dot").hidden = !settings.centerDot || aiming;
@@ -1723,7 +1725,7 @@ function pumpNetworkInput(now=performance.now()) {
       connectionReport.network.sent(i.seq,now);
       const me = state.players.find((p) => p.id === localId);
       if (me?.health > 0 && state.phase==='playing') {
-        if (!predicted) predicted = { ...me,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null,launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+        if (!predicted) predicted = { ...me,grapple:me.grapple?structuredClone(me.grapple):null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null,launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
         predicted.emote=me.emote?{...me.emote}:null;
         const beforeMove={x:predicted.x,z:predicted.z};
         predictMovement(predicted, i, getMap(state.options.map), 1 / 60, state.royale, state.time);
@@ -1793,7 +1795,7 @@ function loop(now) {
   const me = state?.players.find((p) => p.id === localId);
   document.body.classList.toggle('is-emoting',screen==='game'&&!!me?.emote);
   emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game'&&(!me||me.spectating||me.health<=0||me.flight==='transport'||me.downed);
-  const emoteButtonText=(screen==='menu'?!!view.lobbyEmote:!!me?.emote)?'STOP EMOTE':'EMOTES · '+bindingLabel(settings.keybinds.emotes[0]||'KeyO');if(emoteButton.textContent!==emoteButtonText)emoteButton.textContent=emoteButtonText;
+  const emoteButtonText=(screen==='menu'?!!view.lobbyEmote:!!me?.emote)?'STOP EMOTE':screen==='game'?'EMOTES':'EMOTES · '+bindingLabel(settings.keybinds.emotes[0]||'KeyO');if(emoteButton.textContent!==emoteButtonText)emoteButton.textContent=emoteButtonText;
   const emoteCameraKey=me?.emote?me.id+':'+me.emote.id+':'+me.emote.start:null;
   if(emoteCameraKey&&view.emoteCameraKey!==emoteCameraKey){input.yaw=me.emote.yaw;input.pitch=0;}
   view.emoteCameraKey=emoteCameraKey;view.emoteLook={yaw:input.yaw,pitch:input.pitch};
@@ -1874,6 +1876,7 @@ try {
 if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
     editor:()=>mapEditor,
+    grappler:()=>({held:view.heldItemKey,model:view.heldItem?.name,ropes:[...(view.royaleView.grappleMeshes||[])].map(([id,m])=>({id,visible:m.visible,uuid:m.uuid,points:m.children[0].geometry.attributes.position.count})),doorMeshes:view.royaleView.doorMeshes?.size||0}),
     notify:text=>toast(text),
     scenery:()=>({labels:(()=>{let n=0;view.world.traverse(m=>{if(m.isSprite)n++;});return n;})(),loot:view.royaleView.loot.size,chests:view.royaleView.chests.size}),
     party:()=>({id:party?.id,party:party?.party,ready:party?.ready}),

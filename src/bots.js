@@ -1,3 +1,4 @@
+import {restores,recoverySwapSlot} from './bot-recovery.js';
 import {isWarmup} from './royale-phases.js';
 import {itemById} from './nearby-items.js';
 import {gun,weapon,mode,clamp} from './data.js';
@@ -73,6 +74,7 @@ export function botInput(sim,p){
   const item=itemById(sim,'loot',task.uid);
   if(!item)brain.decision=0;else if(sim.accessible(p,item)){
    if(item.weapon&&p.inventory.every(Boolean)){const similar=p.inventory.findIndex(i=>i?.weapon&&weapon(i.id).role===weapon(item.id).role);if(similar>0)slot=similar;}
+   if(!item.weapon&&restores(p,item)&&p.inventory.every(Boolean)&&!p.inventory.some(i=>i?.id===item.id&&i.count<(ITEMS[item.id]?.stack||1))){const swap=recoverySwapSlot(p);if(swap>0)slot=swap;}
    interact=!p.interactLatch;
   }
  }
@@ -114,4 +116,4 @@ export function botInput(sim,p){
  return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,combatAim:visible&&!brain.utility}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
 }
 import {teammates} from './teams.js';
-import {ammoType} from './royale-data.js';
+import {ammoType,ITEMS} from './royale-data.js';

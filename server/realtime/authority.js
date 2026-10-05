@@ -53,7 +53,6 @@ export class MatchAuthority{
   if(m.type==='hello'){
    const reject=reason=>this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason}});
    if(m.version!==VERSION||room.kicked.has(peer.progressId))return reject('Refresh the game or choose another room.'),true;
-   if(room.recurring&&!publicWindow(this.now?.()??Date.now()).open)return reject('Public Royale opens 7 AM – 7 PM Eastern. Private matches are always available.'),true;
    const profile=safeProfile(m.profile);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
    const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission||room.recurring&&!admission)return reject('Party reservation expired. Join the public match from Play.'),true;
    room.sim.advanceWarmupClock?.();

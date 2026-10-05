@@ -1,3 +1,5 @@
+import {restores,recoverySlot,recoverySwapSlot} from './bot-recovery.js';
+import {vaultOpen} from './vaults.js';
 import {nearbyItems,itemById} from './nearby-items.js';
 import {ROYALE_BOT_RANGE} from './field-refinement.js';
 import {gun,weapon,mode} from './data.js';
@@ -18,7 +20,7 @@ export function selectWeapon(p,target){
   const accuracy=w.pellets>1?Math.min(1,10/Math.max(1,distance)):w.adsSpread?Math.min(1,.45/(Math.max(1,distance)*w.adsSpread)):1;
   const burst=w.damage*w.pellets*falloffAt(w,distance)*accuracy,pressure=burst*w.roundsPerSecond;
   const rangeCost=distance<near?(near-distance)*.7:distance>far?(distance-far)*.65:0;
-  return pressure*.24+burst*.16+24-rangeCost+(item.ammo>0?12:-12)+(slot===p.slot?6:0)-(w.projectile&&distance<w.minRange+3?120:0)-(distance>w.range?200:0)-(w.stableScope&&distance<12?22:0);};
+  return pressure*.24+burst*(w.pellets>1&&distance<=far?.45:.16)+24-rangeCost+(item.ammo>0?12:-12)+(slot===p.slot?6:0)-(w.projectile&&distance<w.minRange+3?120:0)-(distance>w.range?200:0)-(w.stableScope&&distance<12?22:0);};
  let best=-Infinity,chosen=p.slot;for(const candidate of options){const value=score(candidate);if(value>best){best=value;chosen=candidate.slot;}}return chosen;
 }
 export function usefulLoot(p,item){
@@ -26,8 +28,8 @@ export function usefulLoot(p,item){
  if(item.resource)return p.materials[item.resource]<teamPolicy.materialTarget?30:0;
  const empty=p.inventory.slice(1).filter(i=>!i).length;
  if(item.weapon){const weapons=p.inventory.filter(i=>i?.weapon);if(!weapons.length)return 100;const w=weapon(item.id),similar=weapons.find(i=>weapon(i.id).role===w.role);if(similar)return (item.rarity||0)>(similar.rarity||0)?25+(item.rarity||0)*5:0;if(weapons.length<3&&empty)return 45;return 0;}
- const def=ITEMS[item.id];if(!def)return 0;const stack=p.inventory.find(i=>i?.id===item.id);if(!empty&&(!stack||stack.count>=def.stack))return 0;
- return def.kind==='heal'?(p.health<70?65:22):def.kind==='shield'?(p.shield<50?60:25):def.kind==='splash'?50:empty&&p.inventory.filter(i=>i&&!i.weapon&&!i.pickaxe).length<2?14:0;
+ const def=ITEMS[item.id];if(!def)return 0;const stack=p.inventory.find(i=>i?.id===item.id),recover=restores(p,item);if(!empty&&(!stack||stack.count>=def.stack)&&(!recover||recoverySwapSlot(p)<1))return 0;
+ return recover?90:def.kind==='heal'?22:def.kind==='shield'?25:def.kind==='splash'?30:empty&&p.inventory.filter(i=>i&&!i.weapon&&!i.pickaxe).length<2?14:0;
 }
 export function coverPoint(sim,p,enemy){
  let best=null,score=Infinity;
@@ -49,15 +51,15 @@ export function stormPriority(sim,p,skill){
  const x=s.nextX+Math.cos(angle)*r,z=s.nextZ+Math.sin(angle)*r;
  return {kind:'rotate',urgent:outside||s.closing&&travel+8>=s.seconds,goal:{x,z,y:groundAt(sim.map,x,z)},travel};
 }
-function lootObjective(sim,p,brain,nearSquad,unarmed=false){
+function lootObjective(sim,p,brain,nearSquad,unarmed=false,recover=false){
  for(const item of nearbyItems(sim,'loot',p,unarmed?40:28)){
-  if(unarmed&&!item.weapon||!nearSquad(item)||brain.unreachable?.[item.uid]>sim.time||usefulLoot(p,item)<=0)continue;
+  if(!vaultOpen(sim,item.vaultId)||recover&&!restores(p,item)||unarmed&&!item.weapon||!nearSquad(item)||brain.unreachable?.[item.uid]>sim.time||usefulLoot(p,item)<=0)continue;
   const known=brain.lootMemory[item.uid];if(known&&sim.time-known.at<.75||seesPoint(sim,p,item))brain.lootMemory[item.uid]={uid:item.uid,at:sim.time};
  }
  let best=null,bestValue=0;
  for(const [uid,known]of Object.entries(brain.lootMemory)){
   const item=itemById(sim,'loot',known.uid);if(!item||sim.time-known.at>35){delete brain.lootMemory[uid];continue;}
-  if(unarmed&&!item.weapon||brain.unreachable?.[item.uid]>sim.time||!nearSquad(item))continue;
+  if(!vaultOpen(sim,item.vaultId)||recover&&!restores(p,item)||unarmed&&!item.weapon||brain.unreachable?.[item.uid]>sim.time||!nearSquad(item))continue;
   const value=usefulLoot(p,item)/(1+dist(p,item)*.055);if(value>bestValue){bestValue=value;best=item;}
  }
  return best?{kind:'loot',goal:{x:best.x,y:best.y,z:best.z},uid:best.uid}:null;
@@ -65,7 +67,7 @@ function lootObjective(sim,p,brain,nearSquad,unarmed=false){
 function chestObjective(sim,p,brain,nearSquad,radius=20){
  let best=null,nearest=Infinity;
  for(const c of nearbyItems(sim,'chests',p,radius)){
-  const d=dist(p,c);if(d>=nearest||!nearSquad(c)||brain.unreachable?.[c.id]>sim.time||c.opened||c.landAt>sim.time||d>radius)continue;
+  const d=dist(p,c);if(!vaultOpen(sim,c.vaultId)||d>=nearest||!nearSquad(c)||brain.unreachable?.[c.id]>sim.time||c.opened||c.landAt>sim.time||d>radius)continue;
   if(d<BOT_WORLD_SENSES.chestHumRadius||seesPoint(sim,p,c)){best=c;nearest=d;}
  }
  return best?{kind:'chest',goal:{x:best.x,y:best.y,z:best.z},id:best.id}:null;
@@ -82,7 +84,6 @@ export function chooseObjective(sim,p,brain,skill,target){
   let best=null,nearest=Infinity;for(const q of sim.map.floorLoot||[])if(q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35){const d=dist(p,q);if(d<nearest){nearest=d;best=q;}}
   if(best)return {kind:'search-room',goal:best,id:best.id};
  }
- if(anchor&&dist(p,anchor)>teamPolicy.regroupDistance&&(!underFire||!target||dist(p,target)>10))return {kind:'follow',goal:followGoal(sim,p,anchor),id:anchor.id};
  if(threat){
   if(unarmed){const cover=coverPoint(sim,p,target);if(cover)return {kind:'cover',goal:cover};const dx=p.x-target.x,dz=p.z-target.z,len=Math.hypot(dx,dz)||1;return {kind:'retreat',goal:{x:p.x+dx/len*8,y:p.y,z:p.z+dz/len*8}};}
   const low=p.health<skill.retreat||p.reloadEnd>sim.time||p.ammo[p.slot]===0;
@@ -93,8 +94,10 @@ export function chooseObjective(sim,p,brain,skill,target){
  if(storm)return storm;
  if(brain.assistUntil>sim.time&&p.health>=skill.retreat&&(!p.inventory||p.inventory.some(i=>i?.weapon&&i.ammo>0))){const mate=sim.players.get(brain.assistMate);if(mate?.health>0&&teammates(sim.options,p,mate))return {kind:'support',goal:{x:mate.x+brain.side*5,y:mate.y,z:mate.z}};}
  if(royale){
-  const heal=p.inventory.findIndex(i=>i&&((ITEMS[i.id]?.kind==='heal'&&p.health<80)||(ITEMS[i.id]?.kind==='shield'&&p.shield<Math.min(100,ITEMS[i.id].cap||100))||(i.id==='splash'&&(p.health<85||p.shield<70))));
+  const heal=recoverySlot(p);
   if(heal>=1&&!underFire){if(target){const cover=coverPoint(sim,p,target);if(cover&&dist(p,cover)>1)return {kind:'cover',goal:cover};}return {kind:'heal',goal:{x:p.x,y:p.y,z:p.z},slot:heal};}
+  if(!underFire&&(p.health<100||p.shield<100)){const recover=lootObjective(sim,p,brain,nearSquad,false,true)||chestObjective(sim,p,brain,nearSquad,28);if(recover)return recover;}
+  if(anchor&&dist(p,anchor)>teamPolicy.regroupDistance)return {kind:'follow',goal:followGoal(sim,p,anchor),id:anchor.id};
   // Items become known by proximity + LOS. Authored rooms guide searches, not hidden rolls.
   const loot=lootObjective(sim,p,brain,nearSquad);if(loot)return loot;
   const weapons=p.inventory.filter(i=>i?.weapon),needs=weapons.length<2||!weapons.some(i=>i.ammo+p.bank[ammoType(i.id)]>10)||p.shield<35;

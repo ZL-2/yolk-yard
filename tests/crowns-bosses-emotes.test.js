@@ -18,11 +18,11 @@ import {movePlayer,canStand} from '../src/physics.js';
 import {ProgressionService} from '../server/realtime/progression.js';
 import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
 function battle(recurring=false){const s=new RoyaleSimulation({capacity:4,bots:3,fill:true,seed:31,recurring}),p=s.addPlayer('host',{name:'Host'});s.startRound();assert.equal(s.beginBattle(),true);Object.assign(p,{flight:'ground',grounded:true,shieldUntil:0,x:0,y:0,z:0});return {s,p};}
-function flat(){const {s,p}=battle();s.map={size:256,boxes:[],terrain:null};s.worldBoxes=[];s.relays=[];s.chests=[];s.loot=[];s.players=new Map([[p.id,p]]);s.stage='active';p.lastDamage=-100;p.yaw=0;p.pitch=0;return {s,p};}
+function flat(){const {s,p}=battle(true);bindCrownStore(s,{load(){},save(){}});s.map={size:256,boxes:[],terrain:null};s.worldBoxes=[];s.relays=[];s.chests=[];s.loot=[];s.players=new Map([[p.id,p]]);s.stage='active';p.lastDamage=-100;p.yaw=0;p.pitch=0;return {s,p};}
 test('three bosses have valid supports and patrols, consume no contestant seats and carry personalized Mythics',()=>{
  const {s}=battle();assert.equal([...s.players.values()].filter(p=>p.contestant).length,4);
  for(const def of BOSSES){const b=s.players.get(def.id);assert.ok(b.boss);assert.ok(canStand(s.map,b));assert.equal(b.contestant,false);assert.ok(b.patrol.every(q=>canStand(s.map,q)),def.name+' patrol');assert.equal(b.inventory[1].rarity,5);assert.equal(gun(b).name,MYTHIC_WEAPONS[def.id].name);assert.equal(itemInfo(b.inventory[1]).name,gun(b).name);assert.ok(gun(b).damage>gun({...b,inventory:[null,{id:def.weapon,weapon:true,rarity:4}]}).damage);}
- assert.equal(s.bossCaches.length,2);assert.ok(s.map.traversal.some(t=>t.id==='nyx-lookout-ascender'));assert.ok(s.map.bossSites.every(site=>canStand(s.map,site.cache)));
+ assert.equal(s.vaults.length,3);assert.ok(s.map.traversal.some(t=>t.id==='nyx-lookout-ascender'));assert.ok(s.map.bossSites.every(site=>canStand(s.map,site.cache)));
 });
 test('each boss drops its own Mythic, special item, correct ammo and key exactly once; no kill/placement credit',()=>{
  const {s,p}=battle(),alive=s.alive;
@@ -30,9 +30,9 @@ test('each boss drops its own Mythic, special item, correct ammo and key exactly
  assert.equal(p.kills,0);assert.equal(s.alive,alive);
 });
 test('Rook telegraphs his winch, a shot interrupts it, and cover blocks pulling',()=>{
- const {s,p}=flat(),def=BOSSES[1],b={id:def.id,bossId:def.id,boss:true,x:0,y:0,z:0,home:{x:0,y:0,z:0},health:650,shield:350,pitch:0,yaw:0,targetId:p.id,scanAt:100,aggroAt:0,abilityAt:0,ammo:[0,8],patrol:[]};s.players.set(b.id,b);Object.assign(p,{x:0,z:-12});s.time=2;assert.equal(bossInput(s,b).fire,undefined);assert.ok(b.bossWindup);s.damage(b,p,5,'Test');assert.equal(b.bossWindup,null);
+ const {s,p}=flat(),def=BOSSES[1],b={id:def.id,bossId:def.id,boss:true,vy:0,grounded:true,flight:'ground',x:0,y:0,z:0,home:{x:0,y:0,z:0},health:650,shield:350,pitch:0,yaw:0,targetId:p.id,scanAt:100,aggroAt:0,abilityAt:0,ammo:[0,8],patrol:[]};s.players.set(b.id,b);Object.assign(p,{x:0,z:-12});s.time=2;assert.equal(bossInput(s,b).fire,undefined);assert.ok(b.bossWindup);s.damage(b,p,5,'Test');assert.equal(b.bossWindup,null);
  b.bossWindup={target:p.id,until:3};s.time=3.1;s.map.boxes=[{x:0,y:0,z:-6,w:3,h:4,d:1}];bossInput(s,b);assert.equal(p.flight,'ground');
- s.map.boxes=[];b.bossWindup={target:p.id,until:3};bossInput(s,b);assert.equal(p.grounded,false);assert.ok(p.vy>0);assert.ok(p.launchVelocity.z>0);
+ s.map.boxes=[];b.bossWindup={target:p.id,until:3};bossInput(s,b);assert.equal(p.grounded,true);assert.equal(p.launchVelocity,null);assert.equal(b.grapple.phase,'hook');for(let i=0;i<60;i++)movePlayer(b,{},s.map,1/60);assert.ok(b.z<-5);assert.equal(p.z,-12);
 });
 test('Nyx telegraphs her relocation before smoke, moves to the marked position and never fires through it',()=>{
  const {s,p}=flat(),b=s.addPlayer('nyx-test',{name:'Nyx Test'},true);Object.assign(b,{boss:true,bossId:'lieutenant-nyx',x:0,y:0,z:0,home:{x:0,y:0,z:0},targetId:p.id,scanAt:100,aggroAt:0,abilityAt:0,lastDamage:1,ammo:[0,6],patrol:[{x:-2,y:0,z:0},{x:2,y:0,z:0}],patrolIndex:0,pitch:0,yaw:0});Object.assign(p,{x:0,z:-15});s.time=2;const input=bossInput(s,b);assert.equal(input.fire,false);assert.equal(s.smokes.length,0);assert.equal(b.patrolIndex,1);assert.deepEqual(b.bossVeil.goal,b.patrol[1]);assert.deepEqual(s.snapshot().players.find(q=>q.id===b.id).bossVeil.goal,b.patrol[1]);s.time+=.7;const relocation=bossInput(s,b);assert.equal(relocation.fire,false);assert.equal(s.smokes.length,1);b.yaw=-Math.PI/2;assert.ok(bossInput(s,b).forward>0);assert.ok(s.smokes[0].until-s.time<=4);bossInput(s,b);assert.equal(s.smokes.length,1);
@@ -43,9 +43,9 @@ test('keyed boss caches reject missing keys and damage interruptions, consume a 
  p.inventory[1]={id:'rookKeycard',count:1};p.lastDamage=s.time;seasonInteract(s,p,{interact:true},1/60);assert.equal(p.cacheProgress,0);p.lastDamage=-100;
  for(let i=0;i<91;i++)seasonInteract(s,p,{interact:true},1/60);assert.equal(cache.opened,true);assert.equal(p.inventory[1],null);assert.ok(s.loot.some(i=>i.weapon&&i.rarity>=3));const n=s.loot.length;seasonInteract(s,p,{interact:true},1/60);assert.equal(s.loot.length,n);
 });
-test('Anchor Winch needs a real surface, recharges two charges and keeps drops on cooldown; Veil has finite smoke',()=>{
- const {s,p}=flat(),winch={id:'anchorWinch',count:1,charges:2,rechargeAt:0};assert.equal(useSeasonItem(s,p,winch),false);assert.equal(winch.charges,2);
- s.map.boxes=[{x:0,y:0,z:-12,w:4,h:4,d:1}];assert.equal(useSeasonItem(s,p,winch),true);assert.equal(winch.charges,1);assert.equal(p.grounded,false);assert.ok(p.vy>0);s.time+=14;assert.equal(winchCharges(winch,s.time),2);
+test('Mythic Grappler has unlimited shots, a surface latch and cooldown; Veil has finite smoke',()=>{
+ const {s,p}=flat(),winch={id:'anchorWinch',count:1};assert.equal(useSeasonItem(s,p,winch),true);assert.equal(p.grapple.valid,false);assert.equal(useSeasonItem(s,p,winch),false);s.time+=2;
+ s.map.boxes=[{x:0,y:0,z:-12,w:4,h:4,d:1}];assert.equal(useSeasonItem(s,p,winch),true);assert.equal(p.grapple.valid,true);for(let i=0;i<40;i++)movePlayer(p,{},s.map,1/60);assert.ok(p.z<-5);assert.equal(winchCharges(winch,s.time),Infinity);assert.equal(p.fall?.immune||false,false);
  assert.equal(useSeasonItem(s,p,{id:'veilProjector'}),true);assert.equal(s.smokes.at(-1).until-s.time,6);
 });
 test('first victory grants next-match crown; crowned victory increments and unlocks the display once',()=>{
@@ -57,7 +57,7 @@ test('crown transfers without using equipment slots, is unique, drops on elimina
  const q=s.addPlayer('guest',{name:'Guest'});Object.assign(q,{x:crown.x,y:crown.y,z:crown.z,flight:'ground',grounded:true,health:100,spectating:false,contestant:true,shieldUntil:0});for(let i=1;i<6;i++)q.inventory[i]={id:'sprinter',weapon:true,ammo:30,rarity:0,count:1};assert.equal(takeCrown(s,q,crown),true);assert.equal(q.inventory.filter(Boolean).length,6);assert.equal(s.loot.filter(i=>i.crown).length,0);s.damage(q,p,999,'Test');assert.equal(q.crown,false);const n=s.loot.filter(i=>i.crown).length;assert.equal(n,1);s.eliminate(q);assert.equal(s.loot.filter(i=>i.crown).length,n);
 });
 test('bots, spectators and already-crowned players cannot pick crowns; custom practice cannot award season wins',()=>{
- const {s,p}=flat(),crown={id:'victoryCrown',crown:true,uid:999,x:0,y:0,z:0};p.crown=true;assert.equal(takeCrown(s,p,crown),false);p.crown=false;p.downed=true;assert.equal(takeCrown(s,p,crown),false);p.downed=false;p.bot=true;assert.equal(takeCrown(s,p,crown),false);p.bot=false;p.spectating=true;assert.equal(takeCrown(s,p,crown),false);p.spectating=false;awardCrowns(s,[p]);assert.equal(p.crown,false);
+ const {s,p}=flat(),crown={id:'victoryCrown',crown:true,uid:999,x:0,y:0,z:0};p.crown=true;assert.equal(takeCrown(s,p,crown),false);p.crown=false;p.downed=true;assert.equal(takeCrown(s,p,crown),false);p.downed=false;p.bot=true;assert.equal(takeCrown(s,p,crown),false);p.bot=false;p.spectating=true;assert.equal(takeCrown(s,p,crown),false);p.spectating=false;s.options.recurring=false;awardCrowns(s,[p]);assert.equal(p.crown,false);
 });
 test('crowns have no movement or damage advantage or slowdown',()=>{
  const map={size:256,boxes:[]},make=crown=>({x:0,y:0,z:0,yaw:0,pitch:0,inventory:inventory(),health:100,flight:'ground',grounded:true,stamina:100,crown});const a=make(false),b=make(true);for(let n=0;n<60;n++){movePlayer(a,{forward:1},map,1/60);movePlayer(b,{forward:1},map,1/60);}assert.equal(a.z,b.z);assert.ok(Math.abs(a.z+5)<.01);
@@ -71,7 +71,7 @@ test('crown records persist across a service restart and reconnect by server ide
 });
 test('crown, emote, Mythic owner and boss cache state survive wire deltas and host recovery',()=>{
  const {s,p}=battle();p.crown=true;p.crownWins=17;p.crownEmoteUnlocked=true;s.playerAction(p.id,'emote-crown');const wire={state:s.snapshot()},encoder=new SnapshotEncoder(),decoder=new SnapshotDecoder();assert.deepEqual(decoder.decode(JSON.parse(JSON.stringify(encoder.encode(wire).frame))),JSON.parse(JSON.stringify(wire)));
- const copy=new RoyaleSimulation().restore(s.checkpoint());assert.equal(copy.players.get(p.id).emote.id,'crown');assert.equal(copy.players.get(p.id).crownWins,17);assert.equal(copy.bossCaches.length,2);
+ const copy=new RoyaleSimulation().restore(s.checkpoint());assert.equal(copy.players.get(p.id).emote.id,'crown');assert.equal(copy.players.get(p.id).crownWins,17);assert.equal(copy.vaults.length,3);
 });
 test('three normal emotes plus the earned Crown Record start only in valid states',()=>{
  assert.equal(EMOTES.length,4);const {s,p}=flat();for(const id of ['salute','shuffle','cheer']){s.time+=1;assert.equal(startEmote(s,p,id),true);assert.equal(p.emote.id,id);}s.time+=1;assert.equal(startEmote(s,p,'crown'),false);p.crownEmoteUnlocked=true;assert.equal(startEmote(s,p,'crown'),true);p.emote=null;

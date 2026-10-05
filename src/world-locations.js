@@ -69,13 +69,13 @@ export function authorFrontierWorld(c){
  // Carve an actual below-grade room and entrance. Terrain collision and terrain
  // rendering share these samples; there is no invisible ground inside the vault.
  const house=buildings.find(b=>b.poi==='observatory'&&b.type==='command'),vx=house.x,vz=house.z,vy=house.baseY-6;
- const entrance={x:vx,y:house.baseY,z:vz+29},reader={x:vx+1.35,y:vy,z:vz+10.4};
+ const entrance={x:vx,y:house.baseY,z:vz+29},reader={x:vx+1.35,y:vy+.67,z:vz+10.4};
  for(let iz=0;iz<terrain.n;iz++)for(let ix=0;ix<terrain.n;ix++){const x=ix*terrain.cell-terrain.size,z=iz*terrain.cell-terrain.size,inside=Math.abs(x-vx)<=11&&Math.abs(z-vz)<=9,channel=Math.abs(x-vx)<=3&&z>=vz+8&&z<=vz+28;if(inside||channel)terrain.heights[iz*terrain.n+ix]=vy-.2;else if(Math.abs(x-vx)<=5&&z>vz+28&&z<=vz+33)terrain.heights[iz*terrain.n+ix]=house.baseY;}
  const vaultWall=(x,y,z,w,h,d)=>put(x,y,z,w,h,d,0x42535d,{indestructible:true,vaultShell:true,material:'metal'});
  vaultWall(vx,vy-.25,vz,22,.25,18);vaultWall(vx,vy-.25,vz+19,4.8,.25,22);vaultWall(vx,vy+5.3,vz,22,.5,18);
  for(const side of [-1,1]){vaultWall(vx+side*10.8,vy,vz,.6,5.4,18);vaultWall(vx+side*6.3,vy,vz+8.8,8.6,5.4,.6);vaultWall(vx+side*2.8,vy,vz+18,.4,6.2,19);}
  vaultWall(vx,vy,vz-8.8,22,5.4,.6);vaultWall(vx,vy+3.4,vz+8.8,4,2,.6);
- const gate=door(vx,vy,vz+8.8,4,3.4,{vault:true,material:'metal'});
+ const gate=door(vx,vy,vz+8.8,4,3.4,{vault:true,vaultId:'aster-vault',material:'metal'});
  put(vx,vy,vz+29,4.8,house.baseY-vy,3.1,0x788b8b,{indestructible:true,kind:'step'});
  for(let i=0;i<18;i++){const z=vz+27.6-i*1.03,top=house.baseY-i/3;put(vx,vy,z,4.8,top-vy,1.05,0x788b8b,{indestructible:true,kind:'step'});}
  // Raised bridge and side approach preserve the front-door route above the stairwell.
@@ -92,7 +92,7 @@ export function authorFrontierWorld(c){
  for(const z of [-6,-2,2,6])for(const side of [-1,1])put(vx+side*10.45,vy+.15,vz+z,.14,4.8,.25,0xb0a16a,{indestructible:true});
  put(vx,vy+.25,vz-8.4,7,3,.12,0x263f49,{indestructible:true});sign('VOSS / STRATEGIC RESERVE',vx,vy+2.5,vz-8.2);
  sign('ASTER ARCHIVE / AUTHORIZED PERSONNEL',vx,house.baseY+2.8,entrance.z+1);sign('VOSS VAULT',vx,vy+3.8,vz+9.2);
- const vault={id:'aster-vault',doorId:gate.id,x:vx,y:vy,z:vz,entrance,reader,stairs:[{x:vx,y:house.baseY,z:vz+27},{x:vx,y:vy+3,z:vz+18},{x:vx,y:vy,z:vz+10.5}],house:buildings.indexOf(house)};
+ const vault={id:'aster-vault',bossId:'warden-aster',key:'asterKeycard',name:'Voss Strategic Reserve',doorId:gate.id,x:vx,y:vy,z:vz,entrance,reader,stairs:[{x:vx,y:house.baseY,z:vz+27},{x:vx,y:vy+3,z:vz+18},{x:vx,y:vy,z:vz+10.5}],house:buildings.indexOf(house)};
  // A covered forest refuge and a dry drainage tunnel are physically traversable.
  for(const [name,x,z,w,d,h]of [['HUSH REFUGE',-38,67,14,18,4],['PORT DRAIN',126,188,5,18,3]]){
   const y=yAt(x,z),rock=name==='HUSH REFUGE';for(const side of [-1,1])put(x+side*w/2,y,z,rock?2:.55,h,d,rock?0x68746a:0x677b80,{material:'brick'});put(x,y+h,z,w+2,rock?2:.6,d,rock?0x6a7765:0x62767b,{material:'brick'});sign(name,x,y+h-.7,z+d/2+.2);floorLoot.push({x,y,z,poi:rock?'landmark-12':'landmark-13',role:'weapon',chance:1,source:'ground'});
@@ -138,8 +138,34 @@ export function authorFrontierWorld(c){
  const low={x:woods.x+6,y:yAt(woods.x+6,woods.z),z:woods.z},high={x:woods.x+3.5,y:wy,z:woods.z};
  traversal.push({id:'nyx-lookout-ascender',type:'ascender',from:low,to:high,via:[{x:low.x,y:wy,z:low.z}],speed:9});navLinks.push({from:low,to:high,traversal:true});
  sign('NYX / NIGHTGLASS LOOKOUT',woods.x,wy+3,woods.z);
- const cacheSocket=floorLoot.find(p=>p.poi==='woods'&&!p.roof&&p.floor===0);
+ // Two nearby walk-in reserves: a dockside armored cargo hold and a forest bunker.
+ // These are real sealed rooms, with independent readers, gates and locked loot.
+ const reserve=(id,bossId,key,name,poi,x,z,color)=>{
+  const y=yAt(x,z)+.1;
+  for(let iz=0;iz<terrain.n;iz++)for(let ix=0;ix<terrain.n;ix++){
+   const tx=ix*terrain.cell-terrain.size,tz=iz*terrain.cell-terrain.size;
+   if(Math.abs(tx-x)<=8&&Math.abs(tz-z)<=8||Math.abs(tx-x)<=4&&tz>z+8&&tz<=z+13)terrain.heights[iz*terrain.n+ix]=y-.1;
+  }
+  const shell=(dx,dy,dz,w,h,d)=>put(x+dx,y+dy,z+dz,w,h,d,color,{indestructible:true,vaultShell:true,material:'metal'});
+  shell(0,-.25,0,12,.25,12);shell(0,4.2,0,12,.5,12);
+  shell(-5.8,0,0,.4,4.2,12);shell(5.8,0,0,.4,4.2,12);shell(0,0,-5.8,12,4.2,.4);
+  for(const side of [-1,1])shell(side*3.75,0,5.8,4.5,4.2,.4);
+  shell(0,3.2,5.8,3,1,.4);
+  const gate=door(x,y,z+5.8,3,3.2,{vault:true,vaultId:id,material:'metal'});
+  for(const [i,[dx,dz,source]]of [[-3,-2,'epic'],[3,-2,'epic'],[-3,2,'chest'],[3,2,'chest']].entries())chests.push({id:id+'-chest-'+i,x:x+dx,y,z:z+dz,poi,source,chance:1,vaultId:id,room:'vault'});
+  for(const [i,type]of ['medium','shells','heavy'].entries())floorLoot.push({x:x-2+i*2,y,z,poi,role:'ammo',ammoType:type,chance:1,vaultId:id});
+  for(const side of [-1,1]){barrel(x+side*4,y,z-4,name);prop('vault-rack',x+side*5,z, .7,7,3,y,{decorative:true});}
+  if(poi==='woods'){shell(0,4.7,0,13,.6,13);for(const dx of [-4,4])put(x+dx,y+5.3,z,2,.3,8,0x6e795e,{indestructible:true});}
+  else for(const dz of [-4,-2,0,2,4])shell(-5.55,.2,dz,.12,3.7,.18);
+  const reader={x:x+1.1,y,z:z+7.4},entrance={x,y,z:z+11};
+  navLinks.push({from:entrance,to:reader});sign(name.toUpperCase(),x,y+3.6,z+6.1);
+  return {id,bossId,key,name,doorId:gate.id,x,y,z,reader,entrance,stairs:[]};
+ };
+ const rookVault=reserve('rook-vault','marshal-rook','rookKeycard','Rook Harbor Hold','docks',212,192,0x39566a);
+ const nyxVault=reserve('nyx-vault','lieutenant-nyx','nyxKeycard','Nyx Nightglass Bunker','woods',woods.x-20,woods.z,0x52604d);
+ const vaults=[vault,rookVault,nyxVault];
  const bossSites=[{bossId:'marshal-rook',x:sx,y:sy,z:sz,patrol:[{x:sx-3,y:sy,z:sz-4},{x:sx+3,y:sy,z:sz+4}],cache:{id:'rook-hold',key:'rookKeycard',name:'Harbor Hold',x:sx,y:sy,z:sz+6}},
- {bossId:'lieutenant-nyx',x:woods.x,y:wy,z:woods.z,patrol:[{x:woods.x-2,y:wy,z:woods.z-2},{x:woods.x+2,y:wy,z:woods.z+2}],cache:{id:'nyx-cache',key:'nyxKeycard',name:'Woodland Cache',x:cacheSocket.x,y:cacheSocket.y,z:cacheSocket.z}}];
- return {doors,traversal,vault,relays,shieldBarrels,bossSites,bossHouse:buildings.indexOf(house)};
+ {bossId:'lieutenant-nyx',x:woods.x,y:wy,z:woods.z,patrol:[{x:woods.x-2,y:wy,z:woods.z-2},{x:woods.x+2,y:wy,z:woods.z+2}],cache:{id:'nyx-cache',key:'nyxKeycard',name:nyxVault.name,...nyxVault.reader,vaultId:nyxVault.id}}];
+ bossSites[0].cache={id:'rook-hold',key:'rookKeycard',name:rookVault.name,...rookVault.reader,vaultId:rookVault.id};
+ return {doors,traversal,vault,vaults,relays,shieldBarrels,bossSites,bossHouse:buildings.indexOf(house)};
 }

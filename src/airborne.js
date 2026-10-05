@@ -9,7 +9,7 @@ export const LAUNCH_RULES=Object.freeze({
  launchpad:{immune:true,redeploy:true,forceGlider:true},
  bus:{immune:true,redeploy:true,forceGlider:false},
 });
-export function resetAirborne(p){p.fall=null;p.landing=null;p.launchVelocity=null;p.redeploy=false;p.forceGlider=false;}
+export function resetAirborne(p){p.fall=null;p.landing=null;p.launchVelocity=null;p.redeploy=false;p.forceGlider=false;p.grapple=null;}
 export function launchPlayer(p,{source='normal',vy=0,vx=0,vz=0,...overrides}={}){
  const rule={...(LAUNCH_RULES[source]||LAUNCH_RULES.normal),...overrides};
  p.fall={apex:p.y,immune:!!rule.immune,source};p.landing=null;p.grounded=false;p.vy=vy;

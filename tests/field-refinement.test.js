@@ -24,7 +24,7 @@ test('every chest gun is Uncommon or better, Epic stays Epic+, all chests includ
  for(let n=0;n<1000;n++){const i=rollItem(random,'ground','utility');if(i.id==='mini')assert.equal(i.count,3);if(i.id==='flask')assert.equal(i.count,1);}
 });
 test('vault has five ammo reserves, eight barrels span four curated locations, relays remain accessible',()=>{
- const {s}=battle();assert.equal(s.map.shieldBarrels.length,8);assert.equal(new Set(s.map.shieldBarrels.map(p=>p.location)).size,4);
+ const {s}=battle();assert.equal(s.map.shieldBarrels.length,12);assert.equal(new Set(s.map.shieldBarrels.map(p=>p.location)).size,6);
  assert.equal(s.loot.filter(l=>l.ammoType&&Math.abs(l.y-s.map.vault.y)<.3&&Math.abs(l.x-s.map.vault.x)<9&&Math.abs(l.z-s.map.vault.z)<5).length,5);
  assert.equal(s.relays.length,3);for(const r of s.relays){assert.ok(canStand(s.map,r),'operator can reach relay');assert.ok(s.loot.every(i=>clearOfRelays(i,[r])));}
  for(const r of s.relays){const drop=s.dropWeapon(r,'sprinter',2);assert.ok(drop);assert.ok(clearOfRelays(drop,s.relays));}

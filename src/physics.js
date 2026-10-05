@@ -1,4 +1,5 @@
 import {TACTICAL_SPRINT} from './world-rules.js';
+import {stepGrapple} from './grappler.js';
 import {SEASON} from './season-one.js';
 import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon, gun } from "./data.js";
@@ -178,6 +179,7 @@ function movePlayerStep(p, input, map, dt) {
     1.48,
   );
   if (p.flight === 'transport') return;
+  if(stepGrapple(p,input,map,dt,canStand,groundAt))return;
   p.traversalLock=Math.max(0,(p.traversalLock||0)-dt);
   if(p.traversal){
     const ride=p.traversal,line=map.traversal?.find(l=>l.id===ride.id);

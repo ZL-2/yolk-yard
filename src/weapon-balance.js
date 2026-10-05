@@ -1,6 +1,8 @@
+import {WEAPON_RARITIES} from './weapon-rarities.js';
+export {WEAPON_RARITIES};
 // Original Ravelfront balance. World units; the Royale island is 512 wide.
 // Spread is a full cone angle in radians. Cadence matches the shared 60 Hz simulation.
-export const BALANCE_REVISION=1;
+export const BALANCE_REVISION=2;
 export const COMBAT_LIMITS=Object.freeze({arenaHealth:100,royaleHealth:100,royaleShield:100,lagCompensation:.18,triggerBuffer:.12,holsterTime:.12});
 export const AMMO_RULES=Object.freeze({light:{cap:300,weight:30,min:24,max:36,pickup:36},medium:{cap:300,weight:38,min:24,max:36,pickup:30},shells:{cap:48,weight:22,min:4,max:8,pickup:6},heavy:{cap:36,weight:8,min:3,max:5,pickup:4},rockets:{cap:8,weight:2,min:1,max:2,pickup:1}});
 export const RARITY_SCALE=Object.freeze([{damage:1,reload:1,structure:1},{damage:1.025,reload:.98,structure:1.0125},{damage:1.05,reload:.96,structure:1.025},{damage:1.075,reload:.94,structure:1.0375},{damage:1.10,reload:.92,structure:1.05}]);
@@ -20,5 +22,5 @@ export const COMBAT_PROFILES={
 };
 export const UTILITY_WEAPONS=Object.freeze({pickaxe:{damage:20,critical:1,environment:50,structure:75,weakMultiplier:2,interval:.45,range:3.2},popper:{damage:85,critical:1,buildDamage:130,interval:1,useTime:.35,speed:18,lift:4,gravity:13,fuse:2.5,hitRadius:.10,splashRadius:3.5,splashFalloff:1.1,selfDamage:.80,minRange:0,range:60}});
 export function combatProfile(id){const c={...DEFAULTS,...COMBAT_PROFILES[id]};if(!COMBAT_PROFILES[id])throw Error('Unknown weapon balance: '+id);return {...c,id,ammoPickup:c.ammoPickup??AMMO_RULES[c.ammoType].pickup,reserveCap:AMMO_RULES[c.ammoType].cap,aimSpread:c.spread?c.adsSpread/c.spread:0,spreadMax:c.bloomMax,shotBloom:c.bloomStep,spreadRecovery:c.bloomRecovery/30,movementSpread:1,roundsPerSecond:(c.burst||1)/c.interval,falloffStart:c.falloff[1][0],falloffEnd:c.falloff.at(-1)[0],minimumDamage:c.damage*c.falloff.at(-1)[1]};}
-export function rarityVariant(w,rarity){const level=Math.max(0,Math.min(4,Math.floor(rarity)||0)),s=RARITY_SCALE[level];return {...w,rarity:level,damage:w.damage*s.damage,minimumDamage:w.minimumDamage*s.damage,buildDamage:w.buildDamage*s.structure,reload:w.reload*s.reload,reloadEmpty:w.reloadEmpty*s.reload};}
+export function rarityVariant(w,rarity){const table=WEAPON_RARITIES[w.id],level=Math.max(0,Math.min(table.damage.length-1,Math.floor(rarity)||0)),damage=table.damage[level]/w.pellets,scale=damage/w.damage;return {...w,rarity:level,rarityReference:table.reference,damage,minimumDamage:w.minimumDamage*scale,buildDamage:w.buildDamage*scale,reload:table.reload[level],reloadEmpty:table.reload[level],magazine:table.magazine[level]};}
 export const ammoTypeFor=id=>COMBAT_PROFILES[id]?.ammoType||DEFAULTS.ammoType;

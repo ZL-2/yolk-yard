@@ -10,6 +10,7 @@ const paths={
  boss:'m3 6 5 5 4-8 4 8 5-5-2 12H5ZM5 20h14',
  crown:'m3 6 5 5 4-8 4 8 5-5-2 12H5ZM5 20h14',
  explosion:'m12 2 2 6 6-4-3 7 5 2-6 2 2 7-6-4-4 4 1-7-7-2 7-2-3-7 6 4Z',
+ rareChest:'M2 8h20v12H2Zm2-4h16v4H4Zm6 6v5h4v-5Zm-3 0v10m10-10v10M12 1v2',
  chest:'M3 9h18v11H3Zm1-5h16v5H4Zm6 6v5h4v-5Z',
  glider:'M2 10c2-9 18-9 20 0H2Zm1 1 8 9h2l8-9M12 10v10',
  activity:'M4 4h6v6H4Zm10 0h6v6h-6ZM4 14h6v6H4Zm10 0h6v6h-6Z',
@@ -21,7 +22,7 @@ export function audibleVisualEvent(e){
  if(e.type==='royale-cue'&&['crown-pulse','crown-pickup'].includes(e.cue))return {kind:'crown',point:e,range:60,ttl:1.5};
  if(e.type==='royale-cue'&&['boss-windup','boss-veil'].includes(e.cue))return {kind:'boss',point:e,range:45,ttl:1.2};
  if(e.type==='explosion')return {kind:'explosion',point:e,range:190,ttl:1.25};
- if(e.type==='royale-cue'&&['land','jump','build-place','harvest-hit','chest-open','glider-deploy','glider-cut','barrel-break'].includes(e.cue))return {kind:e.cue.startsWith('glider')?'glider':e.cue==='chest-open'?'chest':'activity',point:e,range:e.cue.startsWith('glider')?24:e.cue==='chest-open'?16:20,ttl:.7};
+ if(e.type==='royale-cue'&&['land','jump','build-place','harvest-hit','chest-open','glider-deploy','glider-cut','barrel-break'].includes(e.cue))return {kind:e.cue.startsWith('glider')?'glider':e.cue==='chest-open'?(e.rare?'rareChest':'chest'):'activity',point:e,range:e.cue.startsWith('glider')?24:e.cue==='chest-open'?16:20,ttl:.7};
  return null;
 }
 export class SoundVisuals{
@@ -43,7 +44,7 @@ export class SoundVisuals{
    if(p.flight==='glide')add('glider:'+p.id,'glider',p,24,.22);
    else if((p.flight==='ground'||!state.royale)&&p.grounded!==false&&p.moving&&!p.crouching&&!p.sliding&&!p.downed&&Math.hypot(p.vx||0,p.vz||0)>.8)add('footsteps:'+p.id,p.boss?'boss':'footsteps',p,p.sprinting?26:20,.28);
   }
-  if(state.royale)for(const c of nearbyItems(state.royale,'chests',listener,12))if(!c.opened&&!(c.landAt>state.time))add('chest:'+c.id,'chest',c,12,.25);
+  if(state.royale)for(const c of nearbyItems(state.royale,'chests',listener,12))if(!c.opened&&!(c.landAt>state.time))add('chest:'+c.id,c.epic?'rareChest':'chest',c,12,.25);
   for(const [id,c]of this.signals)if(c.until<=now)this.signals.delete(id);
   // At most eight sectors/icons during the active match.
   const sectors=new Map();for(const c of this.signals.values()){

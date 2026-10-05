@@ -1,3 +1,4 @@
+import {rarityVariant} from './weapon-balance.js';
 import {clearOfRelays} from './field-refinement.js';
 import {WORLD_RULES} from './world-rules.js';
 import {AMMO_RULES} from './weapon-balance.js';
@@ -20,7 +21,7 @@ export function rollItem(random,source='ground',role='mixed'){
  const category=role==='mixed'?weighted([{id:'weapon',weight:52},{id:'utility',weight:26},{id:'ammo',weight:22}],random).id:role;
  const entries=LOOT_TABLE.filter(e=>e.sources.includes(source)&&(category==='weapon'?e.weapon:category==='ammo'?e.category==='ammo':!e.weapon&&e.category!=='ammo'));
  const e=weighted(entries,random);
- if(e.weapon)return {id:e.id,weapon:true,count:1,rarity:rarity(e,source,random),ammo:weapon(e.id).magazine};
+ if(e.weapon){const tier=rarity(e,source,random);return {id:e.id,weapon:true,count:1,rarity:tier,ammo:rarityVariant(weapon(e.id),tier).magazine};}
  if(e.category==='ammo')return {id:e.id,ammoType:e.id,count:quantity(random,e.min,e.max),rarity:0};
  return {id:e.id,count:quantity(random,...e.counts),rarity:e.rarity};
 }

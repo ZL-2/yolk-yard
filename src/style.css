@@ -1864,3 +1864,13 @@ body.in-royale .match-center{display:none}
 
 /* Charge feedback overlays real item art without rebuilding inventory each tick. */
 .item-art{position:relative;display:block;width:100%;height:49px}.royale-slot .item-art img{height:100%;width:100%;object-fit:contain}.rig-recharge{position:absolute;height:100%;aspect-ratio:1;left:50%;top:0;transform:translateX(-50%);overflow:visible;pointer-events:none}.rig-recharge circle{fill:none;stroke-width:3}.rig-track{stroke:#101e2ddd}.rig-fill{stroke:#81f2df;stroke-dasharray:100;transform:rotate(-90deg);transform-origin:30px 30px;stroke-linecap:round;transition:stroke-dashoffset .07s linear}.royale-slot .rig-seconds{position:absolute;right:0;bottom:0;color:#fff;background:#0b1b29ec;padding:1px 3px;border-radius:3px;font-size:10px;line-height:1.1}#dialog[data-kind="royale-inventory"] .item-art{height:70px}#dialog[data-kind="royale-inventory"] .item-art img{height:100%}@media(max-width:750px){#dialog[data-kind="royale-inventory"] .item-art{height:50px}}
+
+/* Multiline names preserve personalized Mythic names in hotbar and inventory. */
+.in-royale .royale-hotbar .royale-slot{height:104px}
+.in-royale .royale-hotbar .royale-slot .slot-name{position:absolute;left:3px;right:3px;bottom:3px;font-size:8px;line-height:10px;white-space:normal;text-overflow:clip;overflow:visible;overflow-wrap:anywhere}
+.in-royale .royale-hotbar .item-art{top:20px;height:42px}.in-royale .royale-hotbar .royale-slot b{bottom:45px}
+#dialog[data-kind="royale-inventory"] .royale-slot .slot-name{display:block;position:absolute;bottom:20px;left:5px;right:5px;font-size:9px;line-height:11px;white-space:normal;text-overflow:clip;overflow-wrap:anywhere}
+#dialog[data-kind="royale-inventory"] .royale-slot{height:146px}
+.crosshair.grappler-reticle{--crosshair-gap:10px!important}.grappler-reticle .crosshair-arm{border-color:white!important}
+.crosshair.grappler-invalid:after{content:'×';color:#f15f65;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:23px;line-height:1}
+.grappler-invalid .center-dot{visibility:hidden}.sound-direction.rareChest{color:#71c7ff}
