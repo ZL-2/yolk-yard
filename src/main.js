@@ -252,7 +252,7 @@ function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!pa
 function renderLeaderboard(focus=false){const box=$('#menu .frontier-leaderboard');if(!box)return;const scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup(menuModel());box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus)box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}
 async function refreshLeaderboards(force=false){
  if(screen!=='menu'||menuSection!=='play'||!party?.ready||leaderboardPending||!force&&performance.now()-leaderboardFetchedAt<30000)return;
- leaderboardPending=true;try{leaderboards=await party.request('leaderboards');leaderboardError='';}catch(error){leaderboardError=error.message;}finally{leaderboardPending=false;leaderboardFetchedAt=performance.now();renderLeaderboard();}
+ leaderboardPending=true;try{let progressToken;try{progressToken=localStorage.getItem('ravelfront-progress-token');}catch{}leaderboards=await party.request('leaderboards',{progressToken});leaderboardError='';}catch(error){leaderboardError=error.message;}finally{leaderboardPending=false;leaderboardFetchedAt=performance.now();renderLeaderboard();}
 }
 setInterval(()=>{void refreshLeaderboards();},30000);
 function refreshPublicMatch(){

@@ -14,7 +14,8 @@ export class ProgressionService{
  identity(token){return typeof token==='string'&&/^[a-f0-9]{32,64}$/.test(token)?createHash('sha256').update(token).digest('hex'):null;}
  async register(peer,token){peer.progressId=this.identity(token)||randomUUID();await this.ready;for(const receipt of this.account(peer.progressId).receipts.slice(-30))this.relay.send(peer,{type:'reward',receipt});}
  account(id){if(!this.accounts.has(id))this.accounts.set(id,{receipts:[],pairs:[],earned:[],encounters:[]});return this.accounts.get(id);}
- bindPublicPlayer(peer,socialId){const identity=this.relay.parties?.store.identities.get(socialId);if(!identity||!peer.progressId)return;const a=this.account(peer.progressId);a.socialId=socialId;a.publicName=identity.profile.name;this.dirty=true;this.leaderboardCache=null;}
+ bindPublicPlayer(peer,socialId){const identity=this.relay.parties?.store.identities.get(socialId);if(!identity||!peer.progressId)return;const a=this.account(peer.progressId);if(a.socialId===socialId&&a.publicName===identity.profile.name)return;a.socialId=socialId;a.publicName=identity.profile.name;this.dirty=true;this.leaderboardCache=null;}
+ restoreLeaderboardViewer(token,socialId){const progressId=this.identity(token);if(progressId&&this.accounts.has(progressId))this.bindPublicPlayer({progressId},socialId);}
  recordPublicStat(p,metric){if(p.bot)return;const a=this.account(p.identity),totals=publicTotals(a);totals[metric]++;this.dirty=true;this.leaderboardCache=null;}
  leaderboards(socialId){const now=this.clock();if(!this.leaderboardCache||now-this.leaderboardCache.time>30)this.leaderboardCache={time:now,ranks:rankPublicPlayers(this.accounts,this.relay.parties?.store.identities)};return {updatedAt:this.leaderboardCache.time,...publicLeaderboardView(this.leaderboardCache.ranks,socialId)};}
  unbindInput(peer,key){const targets=this.inputTargets.get(peer);if(!targets)return;targets.delete(key);if(!targets.size)this.inputTargets.delete(peer);}

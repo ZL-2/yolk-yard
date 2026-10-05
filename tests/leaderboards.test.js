@@ -33,3 +33,10 @@ test('two usable leaderboard tabs escape names and sit between Quality Update an
  const profile={name:'Operator'},markup=lobbyMarkup({profile,balance:0,id:'self',online:true}),box=markup.indexOf('class="frontier-leaderboard"');assert.ok(markup.indexOf('QUALITY UPDATE')<box);assert.ok(box<markup.indexOf('CUSTOM PRIVATE MATCH'));
  const board={rows:[{rank:1,name:'<img onerror=bad>',kills:17,wins:3,you:true}],self:null},html=leaderboardMarkup({profile,leaderboardTab:'wins',leaderboards:{wins:board}});assert.match(html,/data-leaderboard-tab="kills"/);assert.match(html,/data-leaderboard-tab="wins"[^>]*aria-selected="true"/);assert.match(html,/&lt;img onerror=bad&gt;/);assert.equal(html.includes('<img onerror=bad>'),false);assert.match(html,/MAIN MATCH WINS/);
 });
+
+test('the lobby restores prior public totals with the existing private progression credential before another match',async()=>{
+ const identities=new Map([['saved-social',{profile:{name:'Returning Operator'}}],['other-social',{profile:{name:'Unrelated Operator'}}]]),service=new ProgressionService({parties:{store:{identities}},send(){}},{path:null});await service.ready;
+ const token='a'.repeat(32),id=service.identity(token);service.accounts.set(id,{receipts:[{id:'prior-public',mode:'royale',eligible:true,custom:false,kills:14,won:true}]});
+ service.restoreLeaderboardViewer('b'.repeat(32),'other-social');assert.equal(service.leaderboards('other-social').kills.self,null);assert.equal(service.accounts.size,1,'unknown credentials do not create new accounts');
+ service.restoreLeaderboardViewer(token,'saved-social');const board=service.leaderboards('saved-social');assert.equal(board.kills.self.kills,14);assert.equal(board.wins.self.wins,1);assert.equal(board.kills.self.name,'Returning Operator');service.dirty=false;service.restoreLeaderboardViewer(token,'saved-social');assert.equal(service.dirty,false,'unchanged polling does not rewrite the progression file');await service.close();
+});
