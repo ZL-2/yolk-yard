@@ -153,7 +153,7 @@ export class Sound {
  }
  stopWorld(){this.bossAudio.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;}
  event(e,me,state){
-  if(e.type==='boss-voice')this.bossAudio.event(e,state,me);
+  if(e.type==='boss-voice'){const listener=me?.spectating?state.players.find(p=>p.id===this.listener?.id)||me:me;return this.bossAudio.event(e,state,listener);}
   if(e.type==='round')this.cue('round-start');
   if(e.type==='royale-cue'){
    // Personal inventory cues are local, spatial actions are audible to nearby operators.

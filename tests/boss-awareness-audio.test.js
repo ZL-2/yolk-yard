@@ -4,6 +4,7 @@ import {BOSSES} from '../src/bosses.js';
 import {initializeBossAwareness,scanBossAwareness,alertBossToDamage,bossAlertVisual,BOSS_AWARENESS} from '../src/boss-awareness.js';
 import {BOSS_VOICE_CLIPS,BOSS_VOICE_BANKS,BOSS_VOICE_RULES,requestBossVoice,bossCombatVoice,bossVoiceTick} from '../src/boss-voice.js';
 import {bossVoiceAllowed,bossVoiceSpatial,BossVoiceAudio} from '../src/boss-voice-audio.js';
+import {Sound} from '../src/audio.js';
 import {RoyaleSimulation} from '../src/royale.js';import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
 function encounter(def=BOSSES[0]){
  const boss={id:def.id,bossId:def.id,boss:true,health:def.health,spectating:false,flight:'ground',x:0,y:0,z:0,yaw:0,home:{x:0,y:0,z:0}},player={id:'human',contestant:true,health:100,spectating:false,flight:'ground',x:0,y:0,z:-12};
@@ -53,6 +54,12 @@ test('clip atlas is bounded, non-overlapping, locally served; every cue resolves
 });
 test('boss audio is disabled in warmup, on transport, outside matches; ground players and spectators at ground can hear it',()=>{
  const state={royale:{practice:false}};assert.equal(bossVoiceAllowed(state,{flight:'ground'}),true);assert.equal(bossVoiceAllowed(state,{flight:'ground'},false),false);assert.equal(bossVoiceAllowed({royale:{practice:true}},{flight:'ground'}),false);assert.equal(bossVoiceAllowed(state,{flight:'transport'}),false);assert.equal(bossVoiceAllowed({}, {flight:'ground'}),false);
+});
+test('Sound delivers spectator voice cues at the currently watched player rather than the eliminated player',()=>{
+ const watched={id:'watched',x:12,flight:'ground'},spectator={id:'viewer',spectating:true,flight:'out'},state={players:[watched,spectator]},event={type:'boss-voice'};let heard;
+ const sound={listener:{...watched,x:0},bossAudio:{event:(e,s,listener)=>{assert.equal(e,event);assert.equal(s,state);heard=listener;return 'scheduled';}}};
+ assert.equal(Sound.prototype.event.call(sound,event,spectator,state),'scheduled');assert.equal(heard,watched,'use the latest watched coordinates, not the previous frame');
+ Sound.prototype.event.call(sound,event,watched,state);assert.equal(heard,watched);state.players=[spectator];Sound.prototype.event.call(sound,event,spectator,state);assert.equal(heard,spectator,'missing watched player remains phase-gated');
 });
 test('voice gain falls with 3D distance, is silent beyond range, pans left/right and muffles behind scenery',()=>{
  const listener={x:0,y:0,z:0,yaw:0},source={x:2,y:1.55,z:0};assert.equal(bossVoiceSpatial(listener,source,36).gain,1);assert.ok(bossVoiceSpatial(listener,{...source,x:20},36).gain<.5);assert.equal(bossVoiceSpatial(listener,{...source,x:36},36).gain,0);assert.equal(bossVoiceSpatial(listener,{...source,x:0,y:50},36).gain,0);assert.ok(bossVoiceSpatial(listener,source,36).pan>0);assert.ok(bossVoiceSpatial(listener,{...source,x:-2},36).pan<0);const wall=bossVoiceSpatial(listener,source,36,true);assert.equal(wall.gain,.23);assert.ok(wall.cutoff<bossVoiceSpatial(listener,source,36).cutoff);
