@@ -1,0 +1,29 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {createServer} from 'vite';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+const run=promisify(execFile),out='test-results/shadowstep',origin='http://127.0.0.1:5211';await mkdir(out,{recursive:true});
+const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage','--remote-debugging-port=9222']}),vite=await createServer({server:{host:'127.0.0.1',port:5211,strictPort:true,watch:null}});await vite.listen();
+const agent=async args=>run('npx',['--yes','agent-browser','--cdp','9222',...args],{timeout:60000,maxBuffer:1024*1024});
+const errors=[],metrics={};let page;
+try{
+ await agent(['open',origin+'/?qa']);await agent(['wait','--load','networkidle']);await agent(['eval',"document.querySelector('.season-close')?.click()"]);
+ const overlay=await agent(['eval',"document.querySelector('vite-error-overlay') ? 'ERROR_OVERLAY' : 'OK'"]);assert.ok(!overlay.stdout.includes('ERROR_OVERLAY'));const snapshot=await agent(['snapshot','-i']);assert.match(snapshot.stdout,/button/i);await writeFile(out+'/initial-snapshot.txt',snapshot.stdout);await agent(['screenshot',out+'/initial.png']);await agent(['open','about:blank']);
+ console.log('PASS agent-browser verification: dev page loads and controls render without an error overlay.');
+ page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-dismissed','yes');localStorage.setItem('ravelfront-crown-status',JSON.stringify({season:1,wins:3,owned:true,unlocked:true}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Shadow Check'}));});
+ await page.goto(origin+'/?qa');await page.locator('#loading-screen').waitFor({state:'hidden'});await page.waitForFunction(()=>window.__yolkTest.celebrations().lobbyCrown);
+ await page.screenshot({path:out+'/lobby-crown.png'});metrics.lobbyCrown=true;
+ await page.locator('[data-action=training]').click();await page.locator('[data-action=start-training]').click();await page.locator('#loading-screen').waitFor({state:'hidden'});
+ assert.equal(await page.locator('#emote-button').isVisible(),false);assert.equal(await page.locator('.lag-diagnostics').count(),0);assert.equal(await page.locator('.royale-tools').count(),0);assert.equal(await page.locator('.build-action-buttons').isVisible(),false);
+ await page.mouse.click(720,450);await page.waitForTimeout(200);
+ await page.evaluate(()=>window.__yolkTest.fixture(s=>{const p=s.players.get(window.__yolkTest.read().localId);p.inventory[5]={id:'shadowstep',count:1,rarity:5,charges:3,rechargeAt:0,readyAt:0};s.syncInventory(p);window.__yolkTest.pose({x:18,y:0,z:30,yaw:0,pitch:0,slot:5,grounded:true,flight:'ground',vy:0});}));
+ await page.waitForFunction(()=>document.querySelector('[data-royale-slot="5"] b')?.textContent==='3/3');await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
+ await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id===window.__yolkTest.read().localId).inventory[5]?.charges===2);
+ metrics.charges=2;await page.waitForFunction(()=>!document.querySelector('[data-rig-slot="5"]').hidden);await page.screenshot({path:out+'/shadowstep-recharging.png'});
+ await page.keyboard.press('KeyI');await page.locator('#dialog[data-kind=royale-inventory]').waitFor({state:'visible'});await page.screenshot({path:out+'/compact-inventory.png'});await page.locator('#dialog [data-action=resume]').click();
+ assert.deepEqual(errors,[]);await writeFile(out+'/browser.json',JSON.stringify(metrics));console.log('PASS Shadowstep charge input, recharge ring, compact HUD and lobby crown '+JSON.stringify(metrics));
+}catch(error){await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/browser.json',JSON.stringify({metrics,errors,error:String(error)}));throw error;}
+finally{await browser.close();await vite.close();}

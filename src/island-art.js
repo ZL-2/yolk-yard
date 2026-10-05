@@ -8,16 +8,15 @@ export function dressIslandBuilding(g,b,raw){
  for(let f=0;f<floors;f++){
   const fy=y+f*4.2;
   for(const dz of [-d/2,d/2]){
-   box(g,x,fy+3.05,z+dz,3.3,.12,.5,s.trim);
-   for(const dx of [-1.66,1.66])box(g,x+dx,fy+1.5,z+dz,.13,3,.5,s.wood);
-   for(const side of [-1,1]){const span=(w-3.2)/2,xx=x+side*(1.6+span/2),ww=Math.min(2.3,span-1);
-    box(g,xx,fy+.91,z+dz,ww+.25,.12,.64,s.trim);box(g,xx,fy+3.06,z+dz,ww+.25,.12,.53,s.trim);
-    for(const edge of [-1,1])box(g,xx+edge*ww/2,fy+2,z+dz,.09,2.12,.43,s.trim);
+   if(f===0){box(g,x,fy+3.05,z+dz,3.3,.12,.5,s.trim);for(const dx of [-1.66,1.66])box(g,x+dx,fy+1.5,z+dz,.13,3,.5,s.wood);}
+   for(const side of [-1,1]){const span=(w-3.2)/2,xx=x+side*(1.6+span/2),ww=Math.min(1.1,span-1);
+    box(g,xx,fy+1.35,z+dz,ww+.25,.08,.5,s.trim);box(g,xx,fy+2.4,z+dz,ww+.25,.08,.5,s.trim);
+    for(const edge of [-1,1])box(g,xx+edge*ww/2,fy+1.875,z+dz,.06,1.05,.43,s.trim);
    }
   }
   for(const dx of [-w/2,w/2]){
    box(g,x+dx,fy+4.15,z,.44,.15,d+.25,s.trim);
-   for(let q=0;q<3;q++){const zz=z-d/2+(q+.5)*d/3,opening=Math.min(2.4,d/3-1.2);box(g,x+dx,fy+.91,zz,.65,.12,opening+.2,s.trim);for(const side of [-1,1])box(g,x+dx,fy+2,zz+side*opening/2,.43,2.12,.08,s.trim);}
+   box(g,x+dx,fy+1.35,z,.5,.08,1.3,s.trim);box(g,x+dx,fy+2.4,z,.5,.08,1.3,s.trim);for(const side of [-1,1])box(g,x+dx,fy+1.875,z+side*.55,.43,1.05,.06,s.trim);
   }
   // A narrow central rug and floor bands give each level a readable orientation.
   box(g,x+.2,fy+.015,z,2.5,.025,d-3,b.kind==='hatchery'?0x69aeba:b.kind==='farm'?0xbda56b:0xc29578);

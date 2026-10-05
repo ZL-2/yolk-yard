@@ -172,7 +172,10 @@ jobs:
         if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[capacity-update]') && !contains(github.event.head_commit.message, '[private-social]')
         run: |
           if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" == "true" ]]; then
-            node --test tests/lag-diagnostics.test.js tests/performance-hud.test.js tests/network-stats.test.js
+            node --test tests/shadowstep-field.test.js tests/boss-awareness-audio.test.js tests/updates.test.js tests/field-polish.test.js tests/vault-grappler.test.js tests/snapshot-codec.test.js tests/season-one.test.js tests/crowns-bosses-emotes.test.js tests/audio.test.js tests/authority-performance.test.js tests/remote-input.test.js tests/bot-runtime.test.js tests/field-refinement.test.js tests/bot-movement-speed.test.js tests/recurring-royale.test.js tests/performance-hud.test.js tests/network-stats.test.js
+            npx playwright install --with-deps chromium
+            node scripts/shadowstep-browser-check.mjs
+            node scripts/kestrel-performance-check.mjs
           else
             npm run test:field
           fi
@@ -180,6 +183,12 @@ jobs:
             npx playwright install --with-deps chromium
             npm run test:field-browser
           fi
+      - uses: actions/upload-artifact@v4
+        if: always() && contains(github.event.head_commit.message, '[lag-hotfix]')
+        with:
+          name: shadowstep-verification
+          path: test-results/shadowstep
+          retention-days: 7
       - name: Verify workload admission, batched state, bots and multiplayer continuity
         if: contains(github.event.head_commit.message, '[capacity-update]')
         run: npm run test:capacity

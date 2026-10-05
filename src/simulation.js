@@ -49,7 +49,7 @@ export class Simulation {
     this.mapLayouts=options.mapLayouts?validateLayoutBundle(options.mapLayouts):captureMapLayouts();
     this.mapLayoutKey=mapBundleKey(this.mapLayouts);
     this.map = getMap(this.options.map,this.mapLayouts);
-    this.nav = navigation(this.map);
+    this.nav = options.deferNavigation?null:navigation(this.map);
     this.random = rng(options.seed || Date.now());
     this.players = new Map();
     this.inputs = new Map();

@@ -21,6 +21,8 @@ export const SOUND_CUES={
  'ui-back':[note(440,.07,.055,'sine',280)],
  'ui-error':[note(180,.15,.06,'triangle',90)],
  'queue-found':[note(440),note(554,.15,.1,'sine',0,.1),note(660,.23,.1,'sine',0,.2)],
+ 'public-join':[note(523,.12,.055,'sine'),note(784,.18,.06,'sine',0,.13)],
+ 'shadowstep':[note(160,.15,.1,'triangle',920),note(880,.18,.075,'sine',120,.03)],
  'countdown':[note(800,.07,.07)],'round-start':[note(330,.15),note(440,.16,.12,'triangle',0,.13),note(660,.4,.12,'sine',0,.25)],
  'transport-horn':[note(196,.55,.1,'sawtooth',220),note(294,.6,.055,'triangle')],
  'transport-exit':[noise(600,.45,.18),note(320,.23,.07,'sine',100)],

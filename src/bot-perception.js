@@ -5,7 +5,7 @@ import {wallDistance,dist} from './physics.js';
 import {eyeHeight,bodyHeight} from './stance.js';
 import {wrapAngle,BOT_WORLD_SENSES} from './bot-config.js';
 import {nearbyPlayers} from './bot-work.js';
-export const hostile=(sim,p,t)=>t!==p&&t.health>0&&!t.spectating&&t.flight!=='transport'&&!teammates(sim.options,p,t);
+export const hostile=(sim,p,t)=>t!==p&&t.health>0&&!t.spectating&&t.flight!=='transport'&&!(t.aimBreakUntil>sim.time)&&!teammates(sim.options,p,t);
 export function seesPoint(sim,p,t){const o={x:p.x,y:p.y+eyeHeight(p),z:p.z},d={x:t.x-o.x,y:t.y+bodyHeight(t)*.66-o.y,z:t.z-o.z},len=Math.hypot(d.x,d.y,d.z)||1;return !smokeBlocks(sim,o,{x:t.x,y:t.y+1,z:t.z})&&wallDistance(sim.map,o,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.08;}
 export function newBrain(sim,p){return {memory:{},eventId:Math.max(0,sim.eventId-32),perceiveAt:0,decision:0,aimAt:0,nextBurst:0,burstUntil:0,turnAt:sim.time,checkAt:sim.time+1,lastX:p.x,lastZ:p.z,side:sim.random()<.5?-1:1,visited:{},lootMemory:{},objective:'survey',target:null,targetUntil:0};}
 function hear(sim,p,brain,id,point,kind,damage=0){

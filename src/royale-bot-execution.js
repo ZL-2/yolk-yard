@@ -10,7 +10,7 @@ export function executeRoyaleIntent(sim,p,input){
  const brain=p.brain,now=sim.time,dt=clamp(now-(brain.executionAt??now-1/60),0,.05);brain.executionAt=now;
  const skill=skillFor(sim),target=brain.memory?.[brain.target],w=gun(p,input.slot??p.slot);
  let yaw=input.desiredYaw??input.yaw,pitch=input.desiredPitch??input.pitch,fire=input.fire;
- if(input.combatAim&&sim.players.get(brain.target)?.health>0&&target?.visible&&now-target.seenAt<.65){
+ if(input.combatAim&&sim.players.get(brain.target)?.health>0&&!(sim.players.get(brain.target)?.aimBreakUntil>now)&&target?.visible&&now-target.seenAt<.65){
   const distance=Math.hypot(target.x-p.x,target.z-p.z);
   if(brain.executionWeapon!==w.id){brain.executionWeapon=w.id;brain.aimAt=Math.max(brain.aimAt||0,now+Math.max(.65,skill.reaction));brain.burstUntil=0;brain.nextBurst=brain.aimAt;brain.errorAt=0;}
   if(now>=(brain.errorAt||0)){

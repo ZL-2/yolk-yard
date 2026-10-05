@@ -749,8 +749,8 @@ export class View {
       this.clearOutgoing(this);
       this.preview(profile);
       if(this.lobbyEmote?.until&&this.clock>=this.lobbyEmote.until)this.lobbyEmote=null;
-      if(this.lobbyEmote){this.menuEgg.rotation.y=Math.atan2(this.menuEgg.position.x-this.camera.position.x,this.menuEgg.position.z-this.camera.position.z);if(this.menuEgg.userData.held)this.menuEgg.userData.held.visible=false;const p={health:100,grounded:true,emote:this.lobbyEmote,crownWins:this.lobbyCrownWins||0};animateHumanoid(this.menuEgg,p,dt,this.clock,{menu:true});updateCelebration(this.menuEgg,p,this.clock,g=>this.disposeGroup(g));}
-      else {this.animateLobbyCharacter(this.menuEgg,this.lobbyMotion,dt);updateCelebration(this.menuEgg,{health:100},this.clock,g=>this.disposeGroup(g));}
+      if(this.lobbyEmote){this.menuEgg.rotation.y=Math.atan2(this.menuEgg.position.x-this.camera.position.x,this.menuEgg.position.z-this.camera.position.z);if(this.menuEgg.userData.held)this.menuEgg.userData.held.visible=false;const p={health:100,grounded:true,emote:this.lobbyEmote,crownWins:this.lobbyCrownWins||0,crown:!!this.lobbyCrown};animateHumanoid(this.menuEgg,p,dt,this.clock,{menu:true});updateCelebration(this.menuEgg,p,this.clock,g=>this.disposeGroup(g));}
+      else {this.animateLobbyCharacter(this.menuEgg,this.lobbyMotion,dt);updateCelebration(this.menuEgg,{health:100,crown:!!this.lobbyCrown},this.clock,g=>this.disposeGroup(g));}
       this.lobbyStage.userData.update?.(dt);
       for(const teammate of this.partyEggs||[])this.animateLobbyCharacter(teammate,teammate.userData.lobbyMotion,dt,.17);
       const partyCount=this.partyEggs?.length||0,partyOffset=partyCount===1?1.4:partyCount===3?1.5:0,narrow=this.camera.aspect<.85;

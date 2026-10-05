@@ -4,6 +4,7 @@ import {showFrontMessage,updateFrontMessage} from './front-message.js';
 import {emoteWheel} from './emote-ui.js';
 import {EMOTES} from './emotes.js';
 import {CROWN_ICON} from './crowns.js';
+import {PublicJoinChime} from './public-join-chime.js';
 import './crowns-emotes.css';
 import {SoundVisuals} from './sound-visuals.js';
 import {inventoryDropTarget} from './inventory-drag.js';
@@ -48,7 +49,6 @@ import "./style.css";
 import "./lobby.css";
 import './settings-layout.css';
 import {PerformanceHUD,PERFORMANCE_DEFAULTS} from './performance-hud.js';
-import {LagDiagnostics} from './lag-diagnostics.js';
 import './performance-hud.css';
 import {LobbyStatus} from './lobby-status.js';
 import './lobby-status.css';
@@ -251,6 +251,11 @@ function refreshPublicMatch(){
  const card=$('#menu .public-royale-card');if(!card)return;
  const focused=card.contains(document.activeElement)?document.activeElement.dataset.action:null;
  card.innerHTML=publicRoyaleMarkup(menuModel());if(focused)card.querySelector(`[data-action="${focused}"]`)?.focus({preventScroll:true});
+}
+const publicJoinChime=new PublicJoinChime();
+function publicMatchChanged(match){
+ if(publicJoinChime.update(match,screen==='menu'&&!document.hidden))sound.cue('public-join');
+ refreshPublicMatch();
 }
 function renderMenu(force=false) {
  const root=$('#menu'),model=menuModel();
@@ -558,7 +563,7 @@ function callbacks() {
       const me = s.players.find((p) => p.id === localId);
       if (!me) return;
       pendingInputs = pendingInputs.filter((i) => i.seq > me.ack);
-      predicted = { ...me, ammo: [...me.ammo], reserve: [...me.reserve], grapple:me.grapple?structuredClone(me.grapple):null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null, launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+      predicted = { ...me, ammo: [...me.ammo], reserve: [...me.reserve], grapple:me.grapple?structuredClone(me.grapple):null,shadowstep:me.shadowstep?{...me.shadowstep}:null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null, launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
       for (const i of pendingInputs)
         predictMovement(predicted, i, getMap(s.options.map), 1 / 60, s.royale);
       if (me.health > 0 && lastHealth <= 0) {
@@ -928,7 +933,7 @@ function processEvents() {
     if(e.type==='crown-victory'&&e.player===localId)notice(e.crowned?'CROWNED VICTORY · '+e.wins+' this season':'VICTORY CROWN EARNED');
     if(e.type==='boss-cache-open')notice(e.name.toUpperCase()+' UNLOCKED');
     if(e.type==='boss-interrupted'&&e.player===localId)notice('ROOK’S WINCH INTERRUPTED');
-    if(e.type==='vault-open')notice((e.name||'Vault').toUpperCase()+' UNLOCKED · Epic requisitions secured',3500);if(e.type==='boss-defeated')notice(bossDefeatMessage(e),4500);if(e.type==='relay-captured'&&e.player===localId)notice('SIGNAL LIVE · Contacts revealed. Your location is exposed.',3500);
+    if(e.type==='vault-open')notice((e.name||'Vault').toUpperCase()+' UNLOCKED · Epic requisitions secured',3500);if(e.type==='boss-defeated'&&e.player===localId)notice(bossDefeatMessage(e),4500);if(e.type==='relay-captured'&&e.player===localId)notice('SIGNAL LIVE · Contacts revealed. Your location is exposed.',3500);
     const me = state.players.find((p) => p.id === localId);
     sound.event(e,me,state);
     if(e.type==='duo-marker')sound.cue(e.kind==='danger'?'danger-ping':'world-ping',null,.75);
@@ -1179,7 +1184,7 @@ function initializeParty(){
   status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'&&screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
-  'public-match':refreshPublicMatch,
+  'public-match':publicMatchChanged,
   'social-changed':scheduleSocialRefresh,
   'party-notice':m=>toast(m.message),
   'friend-request':m=>{toast(m.name+' sent a friend request. Open Social to accept or decline.');sound.cue('queue-found');scheduleSocialRefresh();},
@@ -1726,7 +1731,7 @@ function pumpNetworkInput(now=performance.now()) {
       connectionReport.network.sent(i.seq,now);
       const me = state.players.find((p) => p.id === localId);
       if (me?.health > 0 && state.phase==='playing') {
-        if (!predicted) predicted = { ...me,grapple:me.grapple?structuredClone(me.grapple):null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null,launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+        if (!predicted) predicted = { ...me,grapple:me.grapple?structuredClone(me.grapple):null,shadowstep:me.shadowstep?{...me.shadowstep}:null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null,launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
         predicted.emote=me.emote?{...me.emote}:null;
         const beforeMove={x:predicted.x,z:predicted.z};
         predictMovement(predicted, i, getMap(state.options.map), 1 / 60, state.royale, state.time);
@@ -1746,12 +1751,10 @@ const emoteButton=document.createElement('button');emoteButton.id='emote-button'
 const soundVisuals=new SoundVisuals(document.getElementById('hud'));
 const triggerGuard={};
 const performanceHUD=new PerformanceHUD(document.body);
-const lagDiagnostics=new LagDiagnostics(document.body);
 const lobbyStatus=new LobbyStatus();
 const snapshotTimes=new WeakMap();
 function loop(now) {
-  const diagnosticStart=performance.now(),diagnosticFrame=now-lastTime;
-  if(screen==='editor'){lagDiagnostics.root.hidden=true;lagDiagnostics.active=false;lastTime=now;requestAnimationFrame(loop);return;}
+  if(screen==='editor'){lastTime=now;requestAnimationFrame(loop);return;}
   lobbyStatus.update(now,now-lastTime,net,screen);
   performanceHUD.update(now,now-lastTime,net,settings,screen==='game'&&!document.hidden);
   pumpNetworkInput(now);
@@ -1797,7 +1800,7 @@ function loop(now) {
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
   document.body.classList.toggle('is-emoting',screen==='game'&&!!me?.emote);
-  emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game'&&(!me||me.spectating||me.health<=0||me.flight==='transport'||me.downed);
+  emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game';
   const emoteButtonText=(screen==='menu'?!!view.lobbyEmote:!!me?.emote)?'STOP EMOTE':screen==='game'?'EMOTES':'EMOTES · '+bindingLabel(settings.keybinds.emotes[0]||'KeyO');if(emoteButton.textContent!==emoteButtonText)emoteButton.textContent=emoteButtonText;
   const emoteCameraKey=me?.emote?me.id+':'+me.emote.id+':'+me.emote.start:null;
   if(emoteCameraKey&&view.emoteCameraKey!==emoteCameraKey){input.yaw=me.emote.yaw;input.pitch=0;}
@@ -1825,8 +1828,8 @@ function loop(now) {
     renderPlayer.yaw = input.yaw;
     renderPlayer.pitch = input.pitch;
   }
+  view.lobbyCrown=!!crownStatus.owned;
   const presentation=(!sim||sim.remote)&&state?guestPresentation.frame(state,renderPlayer,now,dt):{state,player:renderPlayer};
-  const diagnosticRenderStart=performance.now();
   view.update(
     presentation.state,
     (!sim||sim.remote)&&presentation.player?.health>0?presentation.player:me,
@@ -1836,7 +1839,6 @@ function loop(now) {
     !paused && !chat.opened && !buildControls.editing && (actionDown("aim") || touch.aim),
     profile,
   );
-  const diagnosticRenderMs=performance.now()-diagnosticRenderStart;
   // Keep the screen through map construction and asynchronous shader preparation.
   if(!busy&&!view.mapCompile)hideLoading();
   if (hudClock > 0.06) {
@@ -1859,7 +1861,6 @@ function loop(now) {
   updateFrontMessage($("#toast"),now < toastUntil);
   for (const row of $("#feed").children)
     if (Number(row.dataset.expire) < now) row.remove();
-  lagDiagnostics.update(now,diagnosticFrame,performance.now()-diagnosticStart,diagnosticRenderMs,state,net,view,connectionReport,screen);
   requestAnimationFrame(loop);
 }
 try {
@@ -1916,7 +1917,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
       triangles: view?.renderer.info.render.triangles,
       presentation: view?.diagnostics(),
     }),
-    celebrations:()=>({lobbyYaw:view.menuEgg.rotation.y,lobbyPosition:view.menuEgg.position.toArray(),localVisible:!!view.models.get(localId)?.visible,localPose:view.models.get(localId)?.userData.human?.pose,crownProp:!!view.models.get(localId)?.userData.crownRecord?.visible,cameraPosition:view.camera.position.toArray(),bossNames:[...view.models].filter(([id])=>state?.players.find(p=>p.id===id)?.boss).map(([id,m])=>({id,visible:m.userData.nameplate?.visible}))}),
+    celebrations:()=>({lobbyCrown:!!view.menuEgg?.userData.victoryCrown?.visible,lobbyYaw:view.menuEgg.rotation.y,lobbyPosition:view.menuEgg.position.toArray(),localVisible:!!view.models.get(localId)?.visible,localPose:view.models.get(localId)?.userData.human?.pose,crownProp:!!view.models.get(localId)?.userData.crownRecord?.visible,cameraPosition:view.camera.position.toArray(),bossNames:[...view.models].filter(([id])=>state?.players.find(p=>p.id===id)?.boss).map(([id,m])=>({id,visible:m.userData.nameplate?.visible}))}),
     network: () =>
       Object.values(net?.peer?.connections || {})
         .flat()

@@ -80,7 +80,9 @@ export function chooseObjective(sim,p,brain,skill,target){
  if(storm?.urgent)return storm;
  // A landed bot needs a gun before taking fights or following a distant squad.
  // Visibility of an opponent must never block a reachable first gun pickup.
- if(unarmed){const first=lootObjective(sim,p,brain,()=>true,true)||chestObjective(sim,p,brain,()=>true,32);if(first)return first;
+ if(unarmed){
+  if(target?.visible&&dist(p,target)<2.6)return {kind:'melee',goal:target,enemy:target};
+  const first=lootObjective(sim,p,brain,()=>true,true)||chestObjective(sim,p,brain,()=>true,32);if(first)return first;
   let best=null,nearest=Infinity;for(const q of sim.map.floorLoot||[])if(q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35){const d=dist(p,q);if(d<nearest){nearest=d;best=q;}}
   if(best)return {kind:'search-room',goal:best,id:best.id};
  }

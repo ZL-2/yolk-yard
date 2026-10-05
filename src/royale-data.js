@@ -14,6 +14,7 @@ export const ITEMS={
  nyxKeycard:{name:'Nyx Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#83b68d',icon:'▣'},
  anchorWinch:{name:'Rook’s Mythic Grappler',rarity:5,kind:'winch',duration:.15,stack:1,color:'#ffd46b',icon:'↟'},
  veilProjector:{name:'Veil Projector',rarity:5,kind:'veil',duration:.3,stack:3,color:'#ffd46b',icon:'◌'},
+ shadowstep:{name:'Nyx’s Mythic Shadowstep',rarity:5,kind:'shadowstep',duration:.05,stack:1,color:'#ffd46b',icon:'»'},
  victoryCrown:{name:'Victory Crown',rarity:5,kind:'crown',duration:0,stack:1,color:'#ffd46b',icon:'♛'},
  asterKeycard:{name:'Voss Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#80d9ed',icon:'▣'},
  jumpRig:{name:'Kestrel Jump Rig',rarity:5,kind:'jumpRig',duration:.16,stack:1,color:'#ffd46b',icon:'↟'},

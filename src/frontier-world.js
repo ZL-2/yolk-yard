@@ -4,7 +4,7 @@ import {dist,direction,wallDistance,canStand} from './physics.js';
 import {rebuildMap} from './building.js';
 import {WORLD_RULES} from './world-rules.js';
 export {WORLD_RULES};
-export function initializeFrontier(sim){sim.doors=Object.fromEntries((sim.map.doors||[]).map(d=>[d.id,{open:false,changedAt:-100}]));sim.vaults=mapVaults(sim.map).map(v=>({id:v.id,open:false,openedAt:0}));sim.vault=sim.vaults[0]||null;rebuildMap(sim);}
+export function initializeFrontier(sim,{rebuild=true}={}){sim.doors=Object.fromEntries((sim.map.doors||[]).map(d=>[d.id,{open:false,changedAt:-100}]));sim.vaults=mapVaults(sim.map).map(v=>({id:v.id,open:false,openedAt:0}));sim.vault=sim.vaults[0]||null;if(rebuild)rebuildMap(sim);}
 export function doorNear(map,p,range=WORLD_RULES.doorRange){const d=direction(p.yaw);let best,bestDistance=Infinity;for(const o of map.doors||[]){const x=o.x-p.x,z=o.z-p.z,r=x*x+z*z,score=r+(p.y-o.y)**2;if(Math.abs(p.y-o.y)<2&&r<range*range&&score<bestDistance&&x*d.x+z*d.z>-.1){best=o;bestDistance=score;}}return best;}
 export function setDoor(sim,door,open,p=null){
  if(!door||door.vault&&open&&!vaultOpen(sim,door.vaultId||sim.map.vault?.id)||sim.worldDamage['world-door-'+door.id]?.destroyed)return false;

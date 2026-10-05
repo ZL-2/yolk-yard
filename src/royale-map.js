@@ -60,22 +60,20 @@ for(const [bi,b] of buildings.entries()){
  wall(0,0,w,d,.25,-.25,'foundation');
  for(let f=0;f<floors;f++){
   const y=f*4.2;
-  // Front and rear doors are full-height openings. Windows are real openings, not painted panels.
+  // Ground-floor entrances; small high windows cannot masquerade as walking routes.
   for(const side of [-1,1]){
    const dz=side*d/2,span=(w-3.2)/2;
-   wall(0,dz,3.2,.35,1.15,y+3.05,'lintel');
+   if(f===0)wall(0,dz,3.2,.35,1.15,y+3.05,'lintel');else wall(0,dz,3.2,.35,4.2,y);
    for(const sx of [-1,1]){
-    const mid=sx*(1.6+span/2),ww=Math.min(2.3,span-1.0);
-    wall(mid,dz,span,.35,.9,y);wall(mid,dz,span,.35,1.1,y+3.1);
-    for(const edge of [-1,1])wall(mid+edge*(ww/2+(span-ww)/4),dz,(span-ww)/2,.35,2.2,y+.9);
+    const mid=sx*(1.6+span/2),ww=Math.min(1.1,span-1.0);
+    wall(mid,dz,span,.35,1.35,y);wall(mid,dz,span,.35,1.8,y+2.4);
+    for(const edge of [-1,1])wall(mid+edge*(ww/2+(span-ww)/4),dz,(span-ww)/2,.35,1.05,y+1.35);
    }
   }
   for(const side of [-1,1]){
-   for(let q=0;q<3;q++){
-    const sideLength=d-.35,mid=-sideLength/2+(q+.5)*sideLength/3,len=sideLength/3,opening=Math.min(2.4,len-1.2);
-    wall(side*w/2,mid,.35,len,.9,y);wall(side*w/2,mid,.35,len,1.1,y+3.1);
-    for(const end of [-1,1])wall(side*w/2,mid+end*(opening/2+(len-opening)/4),.35,(len-opening)/2,2.2,y+.9);
-   }
+   const len=d-.35,opening=1.1;
+   wall(side*w/2,0,.35,len,1.35,y);wall(side*w/2,0,.35,len,1.8,y+2.4);
+   for(const end of [-1,1])wall(side*w/2,end*(opening/2+(len-opening)/4),.35,(len-opening)/2,1.05,y+1.35);
   }
   // Open-tread stairs leave a return corridor linking every floor and the roof.
   const sx=-w/2+1.8,run=d-4,steps=12,sign=1;
@@ -166,4 +164,4 @@ for(const [x,z,kind] of [[116,-173,'crate'],[122,-172,'barrels'],[145,-127,'crat
 // Material assignments and stable IDs are shared by harvesting, destruction and rendering.
 for(const [i,b]of boxes.entries())b.objectId=b.doorId?'world-door-'+b.doorId:'world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
-export const ROYALE_MAP={id:'sunnybreak',revision:8,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,material:'brick'};
+export const ROYALE_MAP={id:'sunnybreak',revision:9,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,material:'brick'};

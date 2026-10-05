@@ -208,6 +208,7 @@ export function lootModel(item,raw,{ground=true}={}){
  const c=Number('0x'+(item.weapon?RARITIES[item.rarity||0].color:ITEMS[item.id]?.color||'#d9b967').slice(1));
  if(['asterKeycard','rookKeycard','nyxKeycard'].includes(item.id)){rounded(g,0,.24,0,.64,.43,.055,0x2e5b72,.035);rounded(g,-.13,.25,-.04,.19,.23,.02,0xb9e0de,.01);rounded(g,.13,.28,-.04,.2,.04,.02,0xe7c26d,.005);rounded(g,.13,.19,-.04,.2,.025,.02,0x83bbd0,.005);}
  else if(item.id==='jumpRig'){rounded(g,0,.35,0,.58,.75,.3,0x283c45,.07);for(const side of [-1,1]){cylinder(g,side*.27,.35,0,.13,.67,0x829491,12);cone(g,side*.27,-.08,0,.13,.19,0xd9ad5b,.7);beam(g,[side*.16,.65,-.16],[side*.16,.03,-.16],.035,0x172d38);}rounded(g,0,.48,.18,.32,.17,.08,0xedc068,.02);}
+ else if(item.id==='shadowstep'){g.name='Nyx Shadowstep phase gauntlet';rounded(g,0,.3,0,.46,.5,.32,0x253443,.05);for(const x of [-.14,0,.14]){box(g,x,.33,-.19,.065,.32,.04,0x997eff);box(g,x,.33,-.22,.025,.22,.03,0xcfbdff);}torus(g,0,.06,0,.22,.035,0xe8bd60).rotation.x=Math.PI/2;rounded(g,0,.53,0,.24,.09,.38,0x6e6398,.02);}
  else if(item.id==='victoryCrown'){g.add(makeVictoryCrown());}
  else if(item.id==='anchorWinch'){
   g.name='Mythic plunger grappler';rounded(g,0,.27,0,.24,.29,.49,0x8b63aa,.04);rounded(g,0,.38,.02,.27,.13,.29,0x787b80,.025);

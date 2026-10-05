@@ -8,6 +8,16 @@ const normalizedStates=new WeakMap(),normalizedCheckpoints=new WeakMap();
 // A pinned layout is immutable for the lifetime of a round. Reuse its normalized
 // value so unchanged authoring data is never walked/copied per frame or entrant.
 const normalizedLayouts=new WeakMap(),decodedLayouts=new WeakMap();
+// Only frozen, detached loot records qualify for cross-frame reuse.
+const frozenValues=new WeakMap();
+const immutableValues=new WeakSet();
+function deeplyFrozen(value,visiting=new WeakSet()){
+ if(!value||typeof value!=='object')return true;
+ if(immutableValues.has(value))return true;
+ if(!Object.isFrozen(value)||visiting.has(value))return false;
+ visiting.add(value);const immutable=Object.values(value).every(child=>deeplyFrozen(child,visiting));visiting.delete(value);
+ if(immutable)immutableValues.add(value);return immutable;
+}
 function immutableLayout(layout){if(!decodedLayouts.has(layout)){const value=structuredClone(layout),freeze=v=>{if(v&&typeof v==='object'){for(const child of Object.values(v))freeze(child);Object.freeze(v);}return v;};decodedLayouts.set(layout,freeze(value));}return decodedLayouts.get(layout);}
 function cloneSnapshot(message){const copy={...message};for(const key of ['state','checkpoint'])if(copy[key]?.mapLayouts)copy[key]={...copy[key],mapLayouts:undefined};const result=structuredClone(copy);for(const key of ['state','checkpoint'])if(message[key]?.mapLayouts)result[key].mapLayouts=immutableLayout(message[key].mapLayouts);return result;}
 function snapshotLayout(layout){if(!normalizedLayouts.has(layout))normalizedLayouts.set(layout,JSON.parse(JSON.stringify(layout)));return normalizedLayouts.get(layout);}
@@ -21,6 +31,10 @@ export class SnapshotBatch {
   if(typeof source==='string'||typeof source==='boolean')return source;
   if(typeof source!=='object')return undefined;
   if(this.values.has(source))return this.values.get(source);
+  if(Object.isFrozen(source)&&deeplyFrozen(source)){
+   if(frozenValues.has(source))return frozenValues.get(source);
+   const value=Array.isArray(source)?source.map(row=>this.clone(row)):JSON.parse(JSON.stringify(source));frozenValues.set(source,value);return value;
+  }
   const value=JSON.parse(JSON.stringify(source));this.values.set(source,value);
   return value;
  }

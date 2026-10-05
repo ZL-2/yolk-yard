@@ -41,7 +41,7 @@ export class MatchAuthority{
   const countdownSeconds=warmup&&sim.queueEnds>0?Math.max(0,Math.ceil(sim.queueEnds-sim.time)):0;
   const estimatedSeconds=results?Math.max(0,Math.ceil((room.restartAt??room.age+PUBLIC_ROYALE.restartSeconds)-room.age)):Math.max(0,Math.ceil((sim.stormSteps.at(-1)?.end||600)+20-(warmup?0:sim.elapsed)))+countdownSeconds;
   const availability=publicWindow(this.now?.()??Date.now());
-  return {availability,code:room.code,version:VERSION,round:sim.round,matchId:sim.matchId,stage:sim.stage,phase:sim.phase,capacity:sim.options.capacity,difficulty:sim.options.difficulty,humanPlayers,spectators,botPlayers:players.filter(p=>p.bot&&p.contestant).length,alive:warmup?sim.options.capacity:sim.alive,joinable:availability.open&&warmup,countdownStarted:!!(warmup&&sim.queueEnds),countdownSeconds,estimatedSeconds,restartSeconds:results?estimatedSeconds:0,availableSeats:Math.max(0,sim.options.capacity-this.capacity.humans(room)-this.capacity.pending(room.key)),availableSpectators:Math.max(0,MAX_SPECTATORS-this.capacity.spectators(room)-this.capacity.pending(room.key,true))};
+  return {availability,code:room.code,version:VERSION,joinSerial:room.joinSerial||0,round:sim.round,matchId:sim.matchId,stage:sim.stage,phase:sim.phase,capacity:sim.options.capacity,difficulty:sim.options.difficulty,humanPlayers,spectators,botPlayers:players.filter(p=>p.bot&&p.contestant).length,alive:warmup?sim.options.capacity:sim.alive,joinable:availability.open&&warmup,countdownStarted:!!(warmup&&sim.queueEnds),countdownSeconds,estimatedSeconds,restartSeconds:results?estimatedSeconds:0,availableSeats:Math.max(0,sim.options.capacity-this.capacity.humans(room)-this.capacity.pending(room.key)),availableSpectators:Math.max(0,MAX_SPECTATORS-this.capacity.spectators(room)-this.capacity.pending(room.key,true))};
  }
  create(peer,m){
   this.send(peer,{type:'authority-error',reason:'Custom matches run on the player host. The recurring public Royale is the only server-run match; join it from Play.'});
@@ -64,6 +64,7 @@ export class MatchAuthority{
    if([...room.members.values()].some(o=>o!==peer&&o.ws&&o.progressId===peer.progressId))return reject('This saved player is already in the public match in another tab.'),true;
    const p=room.sim.admitPlayer(peer.id,profile,admission);if(!p)return reject('This room is full.'),true;
    if(room.recurring)attachCrown(room.sim,p,peer.progressId);
+   if(room.recurring&&!room.members.has(p.id))room.joinSerial=(room.joinSerial||0)+1;
    peer.authorityRoom=room.key;peer.authorityId=p.id;peer.controlReady=false;p.loading=true;room.members.set(p.id,peer);room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));
    this.send(peer,{type:'data',channel:entry.channel,data:{type:'welcome',id:p.id,hostId:room.owner,members:this.members(room),code:room.code,version:VERSION,serverAuthority:true}});this.broadcast(room);return true;
   }

@@ -51,6 +51,11 @@ export function botInput(sim,p){
  const unarmed=!!p.inventory&&!p.inventory.some(i=>i?.weapon&&(i.ammo>0||p.bank[ammoType(i.id)]>0));
  let slot=selectWeapon(p,target),w=gun(p,slot);
  if(p.use){brain.utility=null;if(visible||now-(brain.attackedAt??-100)<.6)sim.cancelUse?.(p);else return {yaw:p.yaw,pitch:p.pitch,slot:p.use.slot,forward:0,strafe:0,swapSlot:-1};}
+ // A chest search is a committed hold, including the ticks between tactical scans.
+ if(p.chestId&&p.chestProgress>0&&(!visible||dist(p,target)>8)&&now-(brain.attackedAt??-100)>1){
+  const chest=itemById(sim,'chests',p.chestId);
+  if(chest&&!chest.opened&&sim.accessible(p,chest,3.3))return {yaw:p.yaw,pitch:p.pitch,slot:p.slot,forward:0,strafe:0,interact:true,swapSlot:-1};
+ }
  if(now>=brain.decision||!brain.task||brain.weapon!==w.id){
   brain.weapon=w.id;brain.decision=now+Math.max(!p.inventory&&target?ARENA_BOT_COMBAT.decisionMinimum:0,skill.decision*(.85+r()*.3));brain.task=chooseObjective(sim,p,brain,skill,target);brain.objective=brain.task.kind;
   if(brain.task.kind==='fight'&&target){if(now>=(brain.sideUntil||0)){brain.side=r()<.5?-1:1;brain.sideUntil=now+ARENA_BOT_COMBAT.sideHoldMin+r()*ARENA_BOT_COMBAT.sideHoldExtra;}brain.task.goal=combatGoal(sim,p,brain,target,w,skill);const mate=squadAnchor(sim,p,brain);if(mate&&dist(brain.task.goal,mate)>teamPolicy.combatLeash)brain.task.goal=followGoal(sim,p,mate);}
@@ -78,7 +83,7 @@ export function botInput(sim,p){
    interact=!p.interactLatch;
   }
  }
- if(task.kind==='chest'&&(unarmed&&distance>8||!visible&&now-(brain.attackedAt??-100)>2)){const chest=itemById(sim,'chests',task.id);if(!chest||chest.opened)brain.decision=0;else if(sim.accessible(p,chest,3.3))interact=true;}
+ if(task.kind==='chest'&&(unarmed&&distance>8||!visible&&now-(brain.attackedAt??-100)>2)){const chest=itemById(sim,'chests',task.id);if(!chest||chest.opened)brain.decision=0;else if(sim.accessible(p,chest,3.3)){interact=true;move.mx=move.mz=0;move.jump=false;}}
  if(task.kind==='harvest'&&!visible){
   const box=sim.map.boxes.find(b=>b.objectId===task.id),enough=p.materials[task.material]>=teamPolicy.materialTarget||Object.values(p.materials).reduce((a,b)=>a+b,0)>=teamPolicy.totalMaterials;
   if(!box||sim.worldDamage?.[task.id]?.destroyed||enough){brain.decision=0;fire=false;}
@@ -103,6 +108,7 @@ export function botInput(sim,p){
    if(!friendly&&r()<skill.grenade){if(!p.inventory&&p.poppers>0){popper=true;pitch=.35;}else if(p.inventory){const index=p.inventory.findIndex(i=>i?.id==='popper');if(index>0)brain.utility={slot:index,yaw,pitch:.35,until:now+1};}}
   }
  }else if(target&&task.kind==='investigate'){yaw=Math.atan2(p.x-target.x,p.z-target.z);if(dist(p,target)<2){delete brain.memory[target.id];brain.decision=0;}}
+ if(task.kind==='melee'&&target?.visible){slot=0;yaw=Math.atan2(p.x-target.x,p.z-target.z);pitch=Math.atan2(target.y+bodyHeight(target)*.63-p.y-eyeHeight(p),Math.max(.1,distance));fire=distance<2.6;}
  if(brain.utility&&brain.utility.until>now&&['popper','impulse','launchpad'].includes(p.inventory?.[brain.utility.slot]?.id)&&!p.use){slot=brain.utility.slot;yaw=brain.utility.yaw;pitch=brain.utility.pitch;fire=!p.useLatch;}
  const desiredPitch=pitch,rawYaw=yaw;
  const turnDt=clamp(now-brain.turnAt,0,.1);brain.turnAt=now;
@@ -113,7 +119,7 @@ export function botInput(sim,p){
  if(visible&&Math.abs(wrapAngle(desiredYaw-yaw))>.2)fire=false;
  const movement=smoothArenaCombatMovement(brain,move,yaw,now,arenaCombat);
  const moving=Math.hypot(move.mx,move.mz)>.1;
- return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,combatAim:visible&&!brain.utility}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
+ return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,combatAim:visible&&!brain.utility&&task.kind!=='melee'}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:p.ammo[slot]===0&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
 }
 import {teammates} from './teams.js';
 import {ammoType,ITEMS} from './royale-data.js';

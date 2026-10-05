@@ -1,5 +1,6 @@
 import {TACTICAL_SPRINT} from './world-rules.js';
 import {stepGrapple} from './grappler.js';
+import {stepShadowstep} from './shadowstep.js';
 import {SEASON} from './season-one.js';
 import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon, gun } from "./data.js";
@@ -180,6 +181,7 @@ function movePlayerStep(p, input, map, dt) {
   );
   if (p.flight === 'transport') return;
   if(stepGrapple(p,input,map,dt,canStand,groundAt))return;
+  stepShadowstep(p,map,dt,canOccupy,groundAt,bodyHeight(p),RADIUS);
   p.traversalLock=Math.max(0,(p.traversalLock||0)-dt);
   if(p.traversal){
     const ride=p.traversal,line=map.traversal?.find(l=>l.id===ride.id);
@@ -271,7 +273,7 @@ function movePlayerStep(p, input, map, dt) {
   }
   p.jumpLatch = !!input.jump;
   const wasGrounded=p.grounded&&p.vy<=0;
-  const oldSurfaceY=p.y, followedGround=!!map.terrain&&wasGrounded&&Math.abs(p.y-groundAt(map,p.x,p.z))<.1;
+  const oldSurfaceY=p.y, followedGround=!!map.terrain&&wasGrounded&&Math.abs(p.y-groundAt(map,p.x,p.z))<.035;
   pushAxis(p, map, "x", dx);
   pushAxis(p, map, "z", dz);
   if(p.launchVelocity&&!p.grounded){pushAxis(p,map,'x',p.launchVelocity.x*dt);pushAxis(p,map,'z',p.launchVelocity.z*dt);p.launchVelocity.x*=Math.exp(-.4*dt);p.launchVelocity.z*=Math.exp(-.4*dt);}

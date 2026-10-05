@@ -22,7 +22,7 @@ export function alertBossToDamage(sim,p,attacker){
  p.bossPerception.seenAt=sim.time;p.bossPerception.searchUntil=sim.time+BOSS_AWARENESS.searchSeconds;p.aggroAt=sim.time+.25;transition(sim,p,'alerted');
 }
 export function bossHasSight(sim,p,target,smokeBlocks){
- if(!valid(target))return false;
+ if(!valid(target)||target.aimBreakUntil>sim.time)return false;
  const from={x:p.x,y:p.y+1.55,z:p.z},dy=target.y+.9-from.y,len=Math.hypot(target.x-p.x,dy,target.z-p.z)||1;
  const ray={x:(target.x-p.x)/len,y:dy/len,z:(target.z-p.z)/len};
  return wallDistance(sim.map,from,ray,len)>=len-.4&&!smokeBlocks(sim,from,{...target,y:target.y+.9});

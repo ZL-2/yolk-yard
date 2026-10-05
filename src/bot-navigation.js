@@ -19,7 +19,7 @@ function walkEdge(map,from,x,z){
 }
 export function localRoute(sim,p,goal){
  const queue=[{x:p.x,y:p.y,z:p.z,parent:-1}],seen=new Set(['0,0']),step=1.5;let best=0,bestDistance=dist(p,goal);
- for(let i=0;i<queue.length&&i<80;i++){
+ for(let i=0;i<queue.length&&i<40;i++){
   const at=queue[i];for(const [dx,dz]of [[1,0],[-1,0],[0,1],[0,-1]]){
    const x=at.x+dx*step,z=at.z+dz*step,key=Math.round((x-p.x)/step)+','+Math.round((z-p.z)/step);if(seen.has(key)||Math.hypot(x-p.x,z-p.z)>12)continue;seen.add(key);
    const q=walkEdge(sim.map,at,x,z);if(!q)continue;q.parent=i;queue.push(q);const d=dist(q,goal);if(d<bestDistance){best=queue.length-1;bestDistance=d;}if(d<1.5)break;
@@ -43,7 +43,7 @@ export function navigate(sim,p,brain,goal,skill){
  if(arrived)return {mx:0,mz:0,jump:false,interact:false};
  const revision=sim.navigationRevision??sim.buildVersion??0,movedGoal=!brain.pathGoal||dist(goal,brain.pathGoal)>4;
  if((movedGoal||now>(brain.pathAt||0)||revision!==brain.navRevision)&&!arrived){
-  if(pathBudget(sim,p)){brain.navRevision=revision;brain.pathGoal={...goal};brain.pathAt=now+1.8+sim.random()*.7;p.botPath=directRoute(sim,p,brain,goal)?[]:sim.nav.path(p,goal,p.inventory?1200:4000);}
+  if(pathBudget(sim,p)){brain.navRevision=revision;brain.pathGoal={...goal};brain.pathAt=now+1.8+sim.random()*.7;p.botPath=directRoute(sim,p,brain,goal)?[]:sim.nav.path(p,goal,p.inventory?600:4000);}
  }
  while(p.botPath?.length&&dist(p,p.botPath[0])<.65)p.botPath.shift();
  const direct=directRoute(sim,p,brain,goal),step=direct?goal:p.botPath?.[0]||goal;
@@ -56,7 +56,11 @@ export function navigate(sim,p,brain,goal,skill){
    jump=wallDistance(sim.map,{...o,y:p.y+1.7},d,1.3)>1.2&&now>(brain.nextJump||0);
    if(!jump){mx=side.x;mz=side.z;}
   }
-  if(!walkEdge(sim.map,p,p.x+mx*.7,p.z+mz*.7)&&!jump){mx=0;mz=0;brain.pathAt=0;}
+  if(!walkEdge(sim.map,p,p.x+mx*.7,p.z+mz*.7)&&!jump){
+   // Try a capsule-clear side route immediately, rather than pushing a blocked window.
+   const options=[{x:-mz*(brain.side||1),z:mx*(brain.side||1)},{x:mz*(brain.side||1),z:-mx*(brain.side||1)}],side=options.find(d=>walkEdge(sim.map,p,p.x+d.x*.7,p.z+d.z*.7));
+   mx=side?.x||0;mz=side?.z||0;brain.pathAt=0;
+  }
  }
  if(now>=brain.checkAt){
   const stuck=Math.hypot(p.x-brain.lastX,p.z-brain.lastZ)<.4&&!arrived;

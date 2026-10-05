@@ -39,19 +39,20 @@ export function surfaceAt(map, x, z) {
 
 // Layered navigation preserves both the street and the walkable deck above it.
 const navCache = new WeakMap();
-export function navigation(map) {
+export function* navigationSteps(map) {
   if(navCache.has(map)) return navCache.get(map);
   const cell = map.navCell || 1.5,
     n = Math.ceil((map.size * 2) / cell),
     origin = -map.size + cell / 2;
-  const cells = Array.from({ length: n * n }, () => []),
+  const cells = new Array(n * n),
     nodes = [];
   const navBoxes=(map.authored||map.boxes).filter(b=>!b.doorId||b.indestructible),navMap=map.doors?.length?{...map,boxes:navBoxes}:map;
   const buckets=new Map(),bucketSize=8;
   for(const b of navBoxes){for(let x=Math.floor((b.x-b.w/2-.5)/bucketSize);x<=Math.floor((b.x+b.w/2+.5)/bucketSize);x++)for(let z=Math.floor((b.z-b.d/2-.5)/bucketSize);z<=Math.floor((b.z+b.d/2+.5)/bucketSize);z++){const key=x+','+z;if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(b);}}
   const nearby=(x,z)=>buckets.get(Math.floor(x/bucketSize)+','+Math.floor(z/bucketSize))||[];
-  for (let z = 0; z < n; z++)
+  for (let z = 0; z < n; z++){
     for (let x = 0; x < n; x++) {
+      cells[z*n+x]=[];
       const px = origin + x * cell,
         pz = origin + z * cell;
       const overlapping = nearby(px,pz).filter(
@@ -83,7 +84,10 @@ export function navigation(map) {
         cells[z * n + x].push(node);
       }
     }
-  for (const a of nodes)
+    yield;
+  }
+  for (const a of nodes){
+    if(a.id%256===0)yield;
     for (const [dx, dz] of [
       [1, 0],
       [-1, 0],
@@ -104,6 +108,7 @@ export function navigation(map) {
           if(valid)a.edges.push(b.id);
         }
     }
+  }
   // Explicit stair lanes bridge coarse terrain cells. Their waypoints follow
   // the authored treads, so a narrower human capsule cannot cut across two risers.
   for(const link of map.navLinks||[]){
@@ -153,3 +158,6 @@ export function navigation(map) {
   navCache.set(map,nav);
   return nav;
 }
+
+// Synchronous compatibility for offline/arena callers; authority prepares in slices.
+export function navigation(map){const steps=navigationSteps(map);let result;do{result=steps.next();}while(!result.done);return result.value;}
