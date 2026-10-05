@@ -504,7 +504,7 @@ export class View {
     this.portraitRenderer.setSize(192,144);
     const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0x7d8c82,2.8));
     const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(-3,5,4);scene.add(light);
-    const model=this.royaleView.itemModel(item,false);model.rotation.y=['asterKeycard','scanner'].includes(item.id)?Math.PI+.45:item.id==='jumpRig'?.25:-.35;scene.add(model);
+    const model=this.royaleView.itemModel(item,false);model.rotation.y=['asterKeycard','scanner','shadowstep'].includes(item.id)?Math.PI+.45:item.id==='jumpRig'?.25:-.35;scene.add(model);
     const camera=new THREE.PerspectiveCamera(35,4/3,.05,10);camera.position.set(1.1,1,1.8);camera.lookAt(0,.2,0);
     this.portraitRenderer.render(scene,camera);const image=this.portraitRenderer.domElement.toDataURL();this.portraits.set(key,image);this.disposeGroup(model);return image;
   }
@@ -840,7 +840,7 @@ export class View {
         if(this.heldItemKey!==itemKey){
           if(this.heldItem){this.heldItem.removeFromParent();this.disposeGroup(this.heldItem);}
           this.heldItem=null;this.heldItemKey=itemKey;
-          if(itemKey){this.heldItem=heldItem.pickaxe&&shopItem(local.pickaxe)?makeShopPickaxe(local.pickaxe):this.royaleView.itemModel(heldItem,false);this.heldItem.userData.firstPerson=true;this.heldItem.scale.setScalar(heldItem.id==='anchorWinch'?.85:.4);this.heldItem.position.set(-.05,-.08,-.28);this.gunGroup.add(this.heldItem);}
+          if(itemKey){this.heldItem=heldItem.pickaxe&&shopItem(local.pickaxe)?makeShopPickaxe(local.pickaxe):this.royaleView.itemModel(heldItem,false);this.heldItem.userData.firstPerson=true;if(heldItem.id==='shadowstep')this.heldItem.rotation.y=Math.PI;this.heldItem.scale.setScalar(heldItem.id==='anchorWinch'?.85:.4);this.heldItem.position.set(-.05,-.08,-.28);this.gunGroup.add(this.heldItem);}
         }
         if(!heldItem?.weapon&&this.localArms)utilityArms(this.localArms,heldItem?.id,local.use?(state.time-local.use.start)/(local.use.end-local.use.start):-1,this.clock);
         if(this.heldItem&&heldItem?.pickaxe)animatePickaxe(this.heldItem,this.localArms,local.pickaxe,state.time-(local.swingAt??-100));
