@@ -48,6 +48,7 @@ import "./style.css";
 import "./lobby.css";
 import './settings-layout.css';
 import {PerformanceHUD,PERFORMANCE_DEFAULTS} from './performance-hud.js';
+import {LagDiagnostics} from './lag-diagnostics.js';
 import './performance-hud.css';
 import {LobbyStatus} from './lobby-status.js';
 import './lobby-status.css';
@@ -1745,10 +1746,12 @@ const emoteButton=document.createElement('button');emoteButton.id='emote-button'
 const soundVisuals=new SoundVisuals(document.getElementById('hud'));
 const triggerGuard={};
 const performanceHUD=new PerformanceHUD(document.body);
+const lagDiagnostics=new LagDiagnostics(document.body);
 const lobbyStatus=new LobbyStatus();
 const snapshotTimes=new WeakMap();
 function loop(now) {
-  if(screen==='editor'){lastTime=now;requestAnimationFrame(loop);return;}
+  const diagnosticStart=performance.now(),diagnosticFrame=now-lastTime;
+  if(screen==='editor'){lagDiagnostics.root.hidden=true;lagDiagnostics.active=false;lastTime=now;requestAnimationFrame(loop);return;}
   lobbyStatus.update(now,now-lastTime,net,screen);
   performanceHUD.update(now,now-lastTime,net,settings,screen==='game'&&!document.hidden);
   pumpNetworkInput(now);
@@ -1823,6 +1826,7 @@ function loop(now) {
     renderPlayer.pitch = input.pitch;
   }
   const presentation=(!sim||sim.remote)&&state?guestPresentation.frame(state,renderPlayer,now,dt):{state,player:renderPlayer};
+  const diagnosticRenderStart=performance.now();
   view.update(
     presentation.state,
     (!sim||sim.remote)&&presentation.player?.health>0?presentation.player:me,
@@ -1832,6 +1836,7 @@ function loop(now) {
     !paused && !chat.opened && !buildControls.editing && (actionDown("aim") || touch.aim),
     profile,
   );
+  const diagnosticRenderMs=performance.now()-diagnosticRenderStart;
   // Keep the screen through map construction and asynchronous shader preparation.
   if(!busy&&!view.mapCompile)hideLoading();
   if (hudClock > 0.06) {
@@ -1854,6 +1859,7 @@ function loop(now) {
   updateFrontMessage($("#toast"),now < toastUntil);
   for (const row of $("#feed").children)
     if (Number(row.dataset.expire) < now) row.remove();
+  lagDiagnostics.update(now,diagnosticFrame,performance.now()-diagnosticStart,diagnosticRenderMs,state,net,view,connectionReport,screen);
   requestAnimationFrame(loop);
 }
 try {
