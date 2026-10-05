@@ -18,7 +18,7 @@ try{
  await page.screenshot({path:out+'/lobby-crown.png'});metrics.lobbyCrown=true;
  await page.locator('[data-action=training]').click();await page.locator('[data-action=start-training]').click();await page.locator('#loading-screen').waitFor({state:'hidden'});
  assert.equal(await page.locator('#emote-button').isVisible(),false);assert.equal(await page.locator('.lag-diagnostics').count(),0);assert.equal(await page.locator('.royale-tools').count(),0);assert.equal(await page.locator('.build-action-buttons').isVisible(),false);
- await page.mouse.click(720,450);await page.waitForTimeout(200);
+ const resume=page.locator('#dialog [data-action=resume]');if(await resume.isVisible())await resume.click();else await page.mouse.click(720,450);await page.waitForFunction(()=>!window.__yolkTest.read().paused&&!!document.pointerLockElement);
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{const p=s.players.get(window.__yolkTest.read().localId);p.inventory[5]={id:'shadowstep',count:1,rarity:5,charges:3,rechargeAt:0,readyAt:0};s.syncInventory(p);window.__yolkTest.pose({x:18,y:0,z:30,yaw:0,pitch:0,slot:5,grounded:true,flight:'ground',vy:0});}));
  await page.waitForFunction(()=>document.querySelector('[data-royale-slot="5"] b')?.textContent==='3/3');await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
  await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id===window.__yolkTest.read().localId).inventory[5]?.charges===2);

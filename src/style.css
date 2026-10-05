@@ -1870,4 +1870,4 @@ body.in-royale .match-center{display:none}
 .grappler-invalid .center-dot{visibility:hidden}.sound-direction.rareChest{color:#71c7ff}
 
 /* Keyboard controls remain available; remove redundant in-match action buttons. */
-.in-royale .build-action-buttons{display:none}
+.in-royale .build-hud>.build-action-buttons{display:none}
