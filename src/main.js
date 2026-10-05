@@ -1,3 +1,4 @@
+import {bindCrownStore,attachCrown} from './crowns.js';
 import {grappleAim} from './grappler.js';
 import {bossDefeatMessage} from './bosses.js';
 import {showFrontMessage,updateFrontMessage} from './front-message.js';
@@ -14,6 +15,7 @@ import {recordSeasonEvent,masteryRewards} from './season-progress.js';
 import {careerMarkup} from './career-ui.js';
 import {recordCareerReceipt} from './career.js';
 import {lobbyNavigation} from './lobby-ui.js';
+import {leaderboardMarkup} from './leaderboard-ui.js';
 import './menu-hub.css';
 import {crosshairRadius} from './combat.js';
 import {showWelcomeBack} from './welcome-back.js';
@@ -141,6 +143,7 @@ const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(k
 let progressMatch='';
 let crownStatus=read('ravelfront-crown-status',{season:1,wins:0,owned:false,unlocked:false}),crownStatusKey='';
 let menuSection=['locker','shop','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
+let leaderboards=null,leaderboardTab='kills',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0;
 const menuShopStates={};
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
 let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
@@ -245,7 +248,13 @@ function remember() {
 function titleBar() {
   return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
-function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity};}
+function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
+function renderLeaderboard(focus=false){const box=$('#menu .frontier-leaderboard');if(!box)return;const scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup(menuModel());box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus)box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}
+async function refreshLeaderboards(force=false){
+ if(screen!=='menu'||menuSection!=='play'||!party?.ready||leaderboardPending||!force&&performance.now()-leaderboardFetchedAt<30000)return;
+ leaderboardPending=true;try{leaderboards=await party.request('leaderboards');leaderboardError='';}catch(error){leaderboardError=error.message;}finally{leaderboardPending=false;leaderboardFetchedAt=performance.now();renderLeaderboard();}
+}
+setInterval(()=>{void refreshLeaderboards();},30000);
 function refreshPublicMatch(){
  if(screen!=='menu'||menuSection!=='play')return;
  const card=$('#menu .public-royale-card');if(!card)return;
@@ -264,7 +273,7 @@ function renderMenu(force=false) {
   const shell=document.createElement('template');shell.innerHTML=lobbyNavigation({...model,section:menuSection});root.querySelector('.yard-nav')?.replaceWith(shell.content.querySelector('.yard-nav'));return;
  }
  root.dataset.section=menuSection;
- if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);return;}
+ if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);void refreshLeaderboards();return;}
  root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':'Career'}" tabindex="-1">${menuSection==='career'?careerMarkup({stats,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
  if(menuSection==='career')$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};
  else {
@@ -514,6 +523,7 @@ function roundIntro(){
   if(!state.royale)sound.cue(win?'victory':'round-start');
   resultAt=performance.now()+4200;
 }
+function bindPublicCrowns(sim){bindCrownStore(sim,{load:id=>sim.players.get(id)?.crownProgress,save:()=>{}});}
 function callbacks() {
   return {
     onProgress:(type,event)=>{
@@ -537,8 +547,9 @@ function callbacks() {
       chat.status.textContent=text;toast(text);
     },
     getCheckpoint:()=>sim?.checkpoint(),
+    getHostInput:()=>sim?.inputs.get(net?.id),
     onHost:(checkpoint,departed)=>{
-      sim=(checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options)).restore(checkpoint);
+      sim=checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options);if(net.officialPublic)bindPublicCrowns(sim);sim.restore(checkpoint);
       if(sim instanceof RoyaleSimulation)for(const p of sim.players.values())if(!p.bot)p.connected=p.id===net.id;
       for(const id of departed)sim.leavePlayer(id);
       state=sim.snapshot();localId=net.id;pendingInputs=[];predicted=null;
@@ -547,7 +558,7 @@ function callbacks() {
     },
     onNameRequired:()=>renamePrompt(),
     onNameAccepted:()=>{if(dialogType==='rename'){dialog.close();dialogType='';if(screen==='game')void resume();}},
-    onJoin: (id, p, admission) => !!sim?.admitPlayer(id,p,admission),
+    onJoin: (id, p, admission) => {const joined=sim?.admitPlayer(id,p,admission);if(joined&&net?.officialPublic){joined.crownProgress=admission?.crownRecord||joined.crownProgress;attachCrown(sim,joined,id);}return !!joined;},
     onLeave: (id) => sim?.leavePlayer(id),
     onRoster: ids => sim?.setConnectedHumans?.(ids),
     onPlayerAction: (id, action) => sim?.playerAction(id, action),
@@ -607,11 +618,12 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   if (busy) return;
   const next = preset?.mode ? matchOptions(preset) : getOptions();
   if (!next) return;
-  options=matchOptions({...next,session:'online',recurring:false});autoQueue=false;
-  if(launch?.hostRun||!launch){matchEarnings.total=0;matchEarnings.status='Player-hosted match · No verified Marks';progressMatch='';}
-  const visibility=launch?.hostRun||!launch?'private':visibilityOverride||'public';
+  options=matchOptions({...next,session:'online',recurring:!!launch?.recurring});autoQueue=false;
+  if(launch?.hostRun||!launch){matchEarnings.total=0;matchEarnings.status=launch?.recurring?'Public match · Waiting for participation rewards':'Player-hosted match · No verified Marks';progressMatch='';}
+  const visibility=launch?.recurring?'public':launch?.hostRun||!launch?'private':visibilityOverride||'public';
   busy=true;await refreshPublishedMaps();
   beginSim();
+  if(launch?.recurring){bindPublicCrowns(sim);attachCrown(sim,sim.players.get('host'));sim.players.get('host').crownProgress={...crownStatus};attachCrown(sim,sim.players.get('host'));}
   if(launch?.admission)sim.assignTeam?.(sim.players.get("host"),launch.admission);
   busy = true;
   modal(
@@ -623,9 +635,9 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   attempt.maxConnections=(options.mode==='royale'?Math.min(options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
   net = attempt;
   try {
-    await attempt.host(launch?.code);
+    await attempt.host(launch?.code,launch?.recurring?launch.ticket:null);
     if (attempt !== net) return;
-    attempt.setVisibility(visibility);
+    attempt.visibility=visibility;attempt.setVisibility(visibility);if(launch?.recurring){sim.startRound();autoQueue=false;}
     state=sim.snapshot();attempt.broadcast(state);attempt.publishRoom();
     localId = attempt.id;
     await waitForLoading();
@@ -1114,9 +1126,7 @@ function hud() {
     ? `${gun(p).name.toUpperCase()} / OPTIC ${gun(p).magnification||2.5}×`
     : "";
   $("#scoreboard").style.display = scoreHeld && !dialog.open ? "block" : "none";
-  if (scoreHeld)
-    $("#scoreboard").innerHTML =
-      `<h2>${m.name} · ${getMap(state.options.map).name}</h2>${scoresHTML()}`;
+  if (scoreHeld){const board=$("#scoreboard"),markup=`<h2>${m.name} · ${getMap(state.options.map).name}</h2>${scoresHTML()}`;if(board.innerHTML!==markup){const scroll=board.scrollTop;board.innerHTML=markup;board.scrollTop=scroll;}}
 }
 async function copy(text) {
   try {
@@ -1175,13 +1185,13 @@ async function launchParty(launch){
   else {spectateTarget=launch.watchId||null;ok=await joinRoom(launch.code,false,launch.ticket);}
   if(activeLaunch!==launch.id)return;
   if(!ok)throw Error('Your party could not enter that match together.');
-  if(launch.host)await party.request('host-ready',{id:launch.id});
+  if(launch.host){const admission=await party.request('host-ready',{id:launch.id});if(launch.recurring&&admission?.crownRecord){const me=sim.players.get(localId);me.crownProgress=admission.crownRecord;attachCrown(sim,me,localId);}}
   await party.request('joined',{id:launch.id});
  }catch(error){await partyRequest('failed',{id:launch.id,reason:error.message});if(activeLaunch===launch.id)activeLaunch=null;}
 }
 function initializeParty(){
  party=new PartyClient(profile,{
-  status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'&&screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');},
+  status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'){void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   'public-match':publicMatchChanged,
@@ -1219,7 +1229,7 @@ const actions = {
  'social-new-identity':()=>modal('Create New Friend Code?',`<p>This creates a separate identity with an empty friend list. It does not restore your old friendships. Your previous browser credential will be kept for recovery.</p><div class="actions"><button class="primary" data-action="social-confirm-new-identity">CREATE NEW CODE</button><button data-action="social">GO BACK</button></div>`,'social-new-identity'),
  'social-confirm-new-identity':()=>{party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
- 'quick-rematch':()=>{if(sim&&!sim.remote&&state?.phase==='results'&&(!net||net.isHost)){closeDialog();launchRound();}},
+ 'quick-rematch':()=>{if(net?.officialPublic)return toast('The next public round starts automatically.');if(sim&&!sim.remote&&state?.phase==='results'&&(!net||net.isHost)){closeDialog();launchRound();}},
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
  'start-training':()=>{if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
  'career':()=>selectMenuSection('career'),
@@ -1266,8 +1276,8 @@ const actions = {
   "team-entry-1": () => playerAction("team-entry-1"),
   "enter-yard": () => playerAction(state?.players.find(p => p.id === localId)?.awaitingEntry ? "rejoin" : "respawn"),
   setup: () => setupMenu(false),
-  "match-settings": () => setupMenu(true),
-  "save-match-settings": () => saveMatchSettings(),
+  "match-settings": () => net?.officialPublic?toast('Public match rules are fixed.'):setupMenu(true),
+  "save-match-settings": () => net?.officialPublic?toast('Public match rules are fixed.'):saveMatchSettings(),
   "apply-rematch": () => saveMatchSettings(true),
   "create-room":()=>queueParty(true),
   "join-room": joinRoom,
@@ -1300,6 +1310,7 @@ const actions = {
   },
   "cancel-connect": () => leave(),
   "start-match": () => {
+    if(net?.officialPublic)return toast('The public match starts automatically.');
     launchRound();
   },
   rematch: () => setupMenu(true),
@@ -1327,6 +1338,7 @@ const actions = {
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button,[data-action]");
   if (!b) return;
+  if(b.dataset.leaderboardTab){leaderboardTab=b.dataset.leaderboardTab==='wins'?'wins':'kills';renderLeaderboard(true);}
   if(b.dataset.socialTab){socialTab=b.dataset.socialTab;void socialMenu();}
   if(b.dataset.socialPage!==undefined){socialOffset=Number(b.dataset.socialPage);void socialMenu();}
   if(b.dataset.spectateFriend){if(state){toast('Return to the lobby before spectating a friend.');return;}b.disabled=true;void partyRequest('spectate-friend',{id:b.dataset.spectateFriend}).then(()=>{b.disabled=false;});}
@@ -1495,6 +1507,7 @@ function pointerPanelToggle(e){
 document.addEventListener('mousedown',pointerPanelToggle,true);
 document.addEventListener('wheel',pointerPanelToggle,{capture:true,passive:false});
 document.addEventListener("keydown", (e) => {
+  if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();leaderboardTab=e.key==='Home'?'kills':e.key==='End'?'wins':leaderboardTab==='kills'?'wins':'kills';renderLeaderboard(true);return;}
   if (chat.opened || e.target.matches("input,select,textarea,[contenteditable=true]")) return;
   const panel = screen==='game' && state?.royale && (!paused || ['royale-map','royale-inventory'].includes(dialogType))
     ? royalePanelAction(e.code, settings.keybinds, dialog.open ? dialogType : '') : null;
@@ -1580,7 +1593,7 @@ document.addEventListener('click',e=>{
  if(slot)inventoryAction('slot',Number(slot.dataset.royaleSlot));
  if(swap)inventoryAction('swap',Number(swap.dataset.royaleSwap));
  if(e.target.id==='royale-fullmap'){
-  const rect=e.target.getBoundingClientRect(),size=getMap(state.options.map).size;sendMarker('map',{x:(e.clientX-rect.left)/rect.width*size*2-size,z:(e.clientY-rect.top)/rect.height*size*2-size});
+  const rect=e.target.getBoundingClientRect(),size=getMap(state.royale.practice?'sunnybreak':state.options.map).size;sendMarker('map',{x:(e.clientX-rect.left)/rect.width*size*2-size,z:(e.clientY-rect.top)/rect.height*size*2-size});
  }
  if(e.target.closest('[data-build-control="repair"]')){if(sim)sim.playerAction(localId,'build-repair');else net?.send({type:'player-action',action:'build-repair'});}
  if(e.target.closest('[data-build-control="edit"]')){const p=state?.players.find(p=>p.id===localId);if(p)buildUI.beginEdit(state,predicted?{...p,...predicted}:p,view.buildMap);}
@@ -1610,7 +1623,7 @@ dialog.addEventListener('pointercancel',finishInventoryDrag);
 dialog.addEventListener('click',e=>{if(performance.now()<suppressInventoryClickUntil){e.preventDefault();e.stopImmediatePropagation();}},{capture:true});
 dialog.addEventListener('keydown',e=>{if(e.key==='Escape'&&inventoryDrag){e.preventDefault();e.stopPropagation();finishInventoryDrag();}});
 dialog.addEventListener('keydown',e=>{if(dialogType!=='royale-inventory')return;const slot=e.target.closest('[data-royale-slot]');if(slot&&e.altKey&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const from=Number(slot.dataset.royaleSlot),to=1+((from-1+(e.key==='ArrowRight'?1:4))%5);inventoryAction('swap',to,from);dialog.querySelector(`[data-royale-slot="${to}"]`)?.focus();}});
-document.addEventListener('wheel',e=>{if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
+document.addEventListener('wheel',e=>{if(scoreHeld&&screen==='game'&&!dialog.open){e.preventDefault();$('#scoreboard').scrollTop+=e.deltaY;return;}if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
 document.addEventListener("contextmenu", (e) => {
   if (screen === "game" || (dialog.open&&dialogType==='settings'&&!e.target.matches('input,textarea'))) e.preventDefault();
 });
@@ -1807,7 +1820,7 @@ function loop(now) {
   const emoteCameraKey=me?.emote?me.id+':'+me.emote.id+':'+me.emote.start:null;
   if(emoteCameraKey&&view.emoteCameraKey!==emoteCameraKey){input.yaw=me.emote.yaw;input.pitch=0;}
   view.emoteCameraKey=emoteCameraKey;view.emoteLook={yaw:input.yaw,pitch:input.pitch};
-  if(me&&state?.options.recurring){const record={season:1,wins:me.crownWins||0,unlocked:!!me.crownEmoteUnlocked,owned:!!me.crown};const key=JSON.stringify(record);if(key!==crownStatusKey){crownStatusKey=key;crownStatus=record;save('ravelfront-crown-status',record);}}
+  if(me&&!me.lateSpectator&&!me.friendSpectator&&state?.options.recurring){const record={season:1,wins:me.crownWins||0,unlocked:!!me.crownEmoteUnlocked,owned:!!me.crown};const key=JSON.stringify(record);if(key!==crownStatusKey){crownStatusKey=key;crownStatus=record;save('ravelfront-crown-status',record);if(net?.officialPublic)net.peer?.control?.({type:'public-crown',record});}}
   const currentProgress=(state?.royale?.matchId||net?.code||'local')+':'+state?.round;
   if(currentProgress!==progressMatch){progressMatch=currentProgress;matchEarnings.total=0;matchEarnings.status=me?.friendSpectator?'Spectating · No Marks':net?.serverAuthority?'Match verification pending':net?'Private custom · No Marks':'Practice · No currency rewards';}
 

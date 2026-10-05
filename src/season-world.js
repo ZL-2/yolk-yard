@@ -23,7 +23,7 @@ export function initializeSeason(sim){
   const b=Simulation.prototype.addPlayer.call(sim,def.id,{name:def.name,color:def.color,accent:def.accent,outfit:def.outfit,backbling:'backbling-royal'},true);
   if(!b)continue;Object.assign(b,{boss:true,bossId:def.id,contestant:false,spectating:false,lateSpectator:false,connected:false,team:-2,x:spot.x,y:spot.y,z:spot.z,home:{x:spot.x,y:spot.y,z:spot.z},health:def.health,shield:def.shield,maxHealth:def.health,maxShield:def.shield,grounded:true,flight:'ground',slot:1,inventory:inventory(),materials:{wood:0,brick:0,metal:0},bank:{medium:210,light:0,shells:60,heavy:36,rockets:0},stamina:100,lastDamage:-100,aggroAt:0});
   b.patrol=house?[[-1.5,-7],[1.5,-3],[1.5,6],[-1.5,3]].map(([dx,dz])=>({x:house.x+dx,y:house.baseY,z:house.z+dz})):site.patrol;b.patrolIndex=0;b.patrolWait=0;
-  b.inventory[1]={id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:MYTHIC_WEAPONS[def.id].magazine||weapon(def.weapon).magazine};b.inventory[1].ammo=gun(b).magazine;if(def.ability==='shadowstep')b.inventory[2]={id:'shadowstep',rarity:5,count:1,charges:3,rechargeAt:0};sim.syncInventory(b);initializeBossAwareness(sim,b);
+  b.inventory[1]={id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:MYTHIC_WEAPONS[def.id].magazine||weapon(def.weapon).magazine};b.inventory[1].ammo=gun(b).magazine;if(def.ability==='shadowstep')b.inventory[2]={id:'shadowstep',rarity:5,count:1,charges:6,rechargeAt:0};sim.syncInventory(b);initializeBossAwareness(sim,b);
  }
 }
 export function bossInput(sim,p){
@@ -73,7 +73,7 @@ export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
   sim.dropLoot(p,{id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:gun(p).magazine});
   if(def.ability==='rig'){sim.dropLoot(p,{id:'jumpRig',rarity:5,count:1,charges:SEASON.rig.charges,rechargeAt:0,readyAt:0});sim.dropAmmo(p,'medium',60);sim.dropLoot(p,{id:'asterKeycard',count:1,rarity:4});}
   if(def.ability==='winch'){sim.dropLoot(p,{id:'anchorWinch',rarity:5,count:1,readyAt:0});sim.dropLoot(p,{id:'rookKeycard',count:1,rarity:4});sim.dropAmmo(p,'shells',12);sim.dropLoot(p,{id:'metal',resource:'metal',count:60,rarity:0});}
-  if(def.ability==='shadowstep'){sim.dropLoot(p,{id:'shadowstep',rarity:5,count:1,charges:3,rechargeAt:0,readyAt:0});sim.dropLoot(p,{id:'nyxKeycard',count:1,rarity:4});sim.dropAmmo(p,'heavy',12);sim.dropLoot(p,{id:'mini',count:3,rarity:1});sim.dropLoot(p,{id:'wood',resource:'wood',count:60,rarity:0});}
+  if(def.ability==='shadowstep'){sim.dropLoot(p,{id:'shadowstep',rarity:5,count:1,charges:6,rechargeAt:0,readyAt:0});sim.dropLoot(p,{id:'nyxKeycard',count:1,rarity:4});sim.dropAmmo(p,'heavy',12);sim.dropLoot(p,{id:'mini',count:3,rarity:1});sim.dropLoot(p,{id:'wood',resource:'wood',count:60,rarity:0});}
   sim.emit('boss-defeated',{player:attacker?.id,target:p.id,name:def.name,x:p.x,y:p.y,z:p.z});
  }
 }

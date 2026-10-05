@@ -4,7 +4,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Immediate pickups and revised Royale combat require matching clients.
-export const VERSION = 42;
+export const VERSION = 43;
 export const WEAPONS = [
   {
     "id": "sprinter",

@@ -3,7 +3,7 @@ import {VERSION} from '../../src/data.js';
 import {matchOptions} from '../../src/match-options.js';
 import {acceptsContestants,MAX_HUMANS,MAX_SPECTATORS} from '../../src/royale-phases.js';
 import {publicWindow} from '../../src/season-one.js';
-import {PUBLIC_ROYALE} from '../../src/public-royale.js';
+import {PUBLIC_ROYALE,publicRoyaleOptions} from '../../src/public-royale.js';
 const address=code=>`yolk-yard-v${VERSION}-${code}`;
 const newCode=()=>Array.from({length:8},()=> 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[randomInt(32)]).join('');
 
@@ -35,17 +35,17 @@ export function queueMatch(service,u,m){
 }
 
 function queuePublicRoyale(service,u,m){
- const p=service.parties.get(u.party),authority=service.relay.authority,room=authority?.publicRoom;
- if(!room)throw Error('The recurring public match is reconnecting. Try again shortly or create a private match.');
- room.sim.advanceWarmupClock();
- const capacity=authority.capacity,spectator=!!m.spectate||!acceptsContestants(room.sim.stage)||room.sim.phase!=='playing';
- const free=spectator?MAX_SPECTATORS-capacity.spectators(room)-capacity.pending(room.key,true):MAX_HUMANS-capacity.humans(room)-capacity.pending(room.key);
- if(free<p.members.length)throw Error(spectator?'The public spectator seats cannot fit your party. Try again shortly.':'The public match cannot fit your party. It has 48 contestant seats.');
- const launch={id:randomUUID(),code:room.code,options:room.sim.options,creating:false,hostRun:false,recurring:true,rewardPublic:true,spectator,visibility:'public',created:Date.now()};
+ const p=service.parties.get(u.party),publicHost=service.relay.publicHost;
+ if(!publicHost?.enabled)throw Error('The public match is unavailable.');
+ const summary=publicHost.summary(),creating=publicHost.reserve(p,u),spectator=!creating&&(!!m.spectate||!!publicHost.state&&!acceptsContestants(publicHost.state.stage)||publicHost.state?.phase==='results');
+ if(!creating&&!summary.hostReady&&!publicHost.pending&&!publicHost.host)throw Error('The public host is loading or transferring. Try again shortly.');
+ if((spectator?summary.availableSpectators:summary.availableSeats)<p.members.length)throw Error('The public match cannot fit your party right now.');
+ const launch={id:randomUUID(),code:PUBLIC_ROYALE.code,options:publicRoyaleOptions(),creating,hostRun:true,recurring:true,rewardPublic:false,spectator,visibility:'public',created:Date.now()};
  p.launch=launch;p.state='queueing';
- capacity.reserve(p.id,room.key,room.sim.options,p.members.length,Infinity,spectator);
- for(const id of p.members){const token=randomUUID(),t={party:p.id,member:id,code:room.code,teamSize:1,teamFill:true,partySize:p.members.length,recurring:true,spectator,publicSpectator:spectator,expires:Date.now()+90000,token};service.tickets.set(token,t);service.users.get(id).ticket=token;}
- service.sync(p);service.dispatch(p);return launch.id;
+ for(const id of p.members){const token=randomUUID(),t={party:p.id,member:id,code:launch.code,teamSize:1,teamFill:true,partySize:p.members.length,hostRun:true,recurring:true,spectator,publicSpectator:spectator,expires:Date.now()+90000,token};service.tickets.set(token,t);service.users.get(id).ticket=token;}
+ service.sync(p);
+ if(creating)service.send(u,{type:'launch',launch:{...launch,host:true,ticket:u.ticket,admission:service.publicAdmission(service.tickets.get(u.ticket))}});else if(summary.hostReady)service.dispatch(p);
+ return launch.id;
 }
 
 export function spectateFriend(service,u,m){
@@ -56,7 +56,7 @@ export function spectateFriend(service,u,m){
  const room=location.room,capacity=service.relay.authority?.capacity,key=location.key;
  if(room&&capacity){const plan=room.recurring?{ok:capacity.spectators(room)+capacity.pending(key,true)<MAX_SPECTATORS,reason:'The public spectator seats are full. Try again shortly.'}:capacity.plan(room.sim.options,{key,humans:capacity.humans(room)+capacity.pending(key),spectators:capacity.spectators(room)+capacity.pending(key,true)+1,botLimit:room.sim.botLimit});if(!plan.ok)throw Error(plan.reason);}
  const id=randomUUID(),token=randomUUID(),launch={id,code:location.listing.code,host:false,hostRun:!room,spectator:true,watchId:location.watchId,ticket:token};
- const t={token,party:u.party,reservationId:id,member:u.id,friend:m.id,code:launch.code,spectator:true,watchId:launch.watchId,hostRun:!room,teamSize:location.listing.teamSize||1,partySize:1,expires:Date.now()+90000};
+ const t={token,party:u.party,reservationId:id,member:u.id,friend:m.id,code:launch.code,spectator:true,watchId:launch.watchId,hostRun:!room,recurring:!!location.listing.recurring,teamSize:location.listing.teamSize||1,partySize:1,expires:Date.now()+90000};
  service.tickets.set(token,t);u.ticket=token;u.spectateLaunch=launch;
  if(room)capacity.reserve(id,key,room.sim.options,1,room.sim.botLimit,true,true);
  service.send(u,{type:'launch',launch});return id;

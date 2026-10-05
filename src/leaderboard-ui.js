@@ -1,0 +1,11 @@
+const html=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const count=n=>Math.max(0,Math.floor(Number(n)||0)).toLocaleString('en-US');
+export function leaderboardMarkup({leaderboards,leaderboardTab='kills',leaderboardError='',profile}){
+ const metric=leaderboardTab==='wins'?'wins':'kills',board=leaderboards?.[metric],rows=board?.rows||[];
+ const row=p=>`<li class="frontier-rank ${p.rank<=3?'podium podium-'+p.rank:''} ${p.you?'is-you':''}"><span class="frontier-rank-number">${p.rank?'#'+p.rank:'—'}</span><strong title="${html(p.name)}">${html(p.name)}${p.you?'<small>YOU</small>':''}</strong><b>${count(p[metric])}</b></li>`;
+ const self=board?.self||{name:profile.name,rank:0,kills:0,wins:0,you:true};
+ return `<div class="frontier-board-heading"><span class="frontier-trophy" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10v7a5 5 0 0 1-10 0V3ZM7 5H3v3a4 4 0 0 0 4 4m10-7h4v3a4 4 0 0 1-4 4M12 15v5m-4 1h8"/></svg></span><div><span class="eyebrow">MAIN MATCH</span><h2>FRONTIER LEADERS</h2></div><span class="frontier-board-live">TOP 25</span></div>
+ <div class="frontier-board-tabs" role="tablist" aria-label="Leaderboard statistic">${['kills','wins'].map(tab=>`<button id="leaderboard-tab-${tab}" role="tab" data-leaderboard-tab="${tab}" aria-controls="leaderboard-ranks" aria-selected="${metric===tab}" tabindex="${metric===tab?0:-1}">${tab==='kills'?'KILLS':'WINS'}</button>`).join('')}</div>
+ <div id="leaderboard-ranks" class="frontier-board-ranks" role="tabpanel" aria-labelledby="leaderboard-tab-${metric}" tabindex="0"><div class="frontier-board-columns"><span>RANK / OPERATOR</span><span>${metric==='kills'?'KILLS':'MAIN MATCH WINS'}</span></div>${rows.length?`<ol>${rows.map(row).join('')}</ol>`:`<p class="frontier-board-empty" role="status">${!board?leaderboardError?'Rankings unavailable. Reconnecting…':'Loading rankings…':metric==='kills'?'The frontier is yours to climb.<br>Get a kill in the main match.':'Claim the first spot.<br>Win the main match.'}</p>`}</div>
+ <ol class="frontier-board-self" aria-label="Your rank">${row(self)}</ol><p class="frontier-board-note">Public match totals · Private & training excluded</p>`;
+}

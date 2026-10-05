@@ -1,3 +1,4 @@
+import {rewardFrame} from './rewards.js';
 import {isWarmup,MAX_SPECTATORS,MAX_HUMANS,MAX_SNAPSHOT_ACTORS} from './royale-phases.js';
 import {SnapshotInterest} from './snapshot-interest.js';
 import { connectionReport, errorCode, watchConnection } from './connection-report.js';
@@ -66,7 +67,7 @@ export class Network {
   makePeer(id) {
     connectionReport.set("service","Checking","Opening matchmaking connection.");
     const config = window.YOLK_NETWORK || {};
-    this.peer = relayURL() ? new RelayPeer(id) : new Peer(id, {
+    this.peer = relayURL() ? new RelayPeer(id,this.publicRegistration||{}) : new Peer(id, {
       debug: 0,
       ...config.peer,
       config: {
@@ -131,7 +132,8 @@ export class Network {
     this.serverAuthority=true;
     return new Promise((resolve,reject)=>{const finish=(error,state)=>{clearTimeout(timer);this.timers.delete(timer);this.authorityResolve=null;this.authorityReject=null;error?reject(error):resolve(state);};const timer=setTimeout(()=>finish(Error('The match server did not initialize.')),20000);this.timers.add(timer);this.authorityResolve=s=>finish(null,s);this.authorityReject=error=>finish(error);this.peer.control({type:'authority-create',options,profile,visibility,ticket});});
   }
-  async host(reservedCode) {
+  async host(reservedCode,publicTicket=null) {
+    if(publicTicket){this.officialPublic=true;this.publicRegistration={publicTicket};}
     this.isHost = true;
     this.id = "host";
     this.code = reservedCode?cleanCode(reservedCode):roomCode();
@@ -208,7 +210,7 @@ export class Network {
         clearTimeout(timeout);
         this.timers.delete(timeout);
         this.connections.set(conn.peer, conn);
-        if(!this.members.some(m=>m.id===conn.peer))this.members.push({id:conn.peer,peerId:conn.peer,order:++this.memberOrder,spectator:!!msg.admission?.spectator||!!this.snapshot?.players.find(p=>p.id===conn.peer)?.friendSpectator});
+        if(!this.members.some(m=>m.id===conn.peer))this.members.push({id:conn.peer,peerId:conn.peer,order:++this.memberOrder,spectator:!!msg.admission?.friendSpectator||!this.officialPublic&&!!msg.admission?.spectator||!!this.snapshot?.players.find(p=>p.id===conn.peer)?.friendSpectator});
         this.callbacks.onRoster?.([this.id,...[...this.connections].filter(([,c])=>c.open).map(([id])=>id)]);
         conn.send({
           type: "welcome",
@@ -252,7 +254,7 @@ export class Network {
     conn.on("error", close);
   }
   async join(code, profile, ticket) {
-    this.ticket=ticket;
+    this.ticket=ticket;this.officialPublic=cleanCode(code)==='FRONTIER';
     this.joinProfile=safeProfile(profile);
     this.code = cleanCode(code);
     if (this.code.length !== 8)
@@ -444,7 +446,7 @@ export class Network {
     } else this.send({type:'chat-report',target,reason});
   }
   setVisibility(value) {
-    if (!this.isHost) return;
+    if (!this.isHost||this.officialPublic) return;
     this.visibility = value === "public" ? "public" : "private";
     if(this.serverAuthority){this.authorityCommand({type:'visibility',value:this.visibility});return;}
     this.publishRoom();
@@ -454,15 +456,16 @@ export class Network {
     const s = this.snapshot;
     const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
     const capacity=s?.royale?Math.min(s.options.capacity,MAX_HUMANS):(s?.options.capacity||8);
-    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,public:this.visibility==='public',players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase} : null;
+    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,public:this.visibility==='public',players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase,...(this.officialPublic?{recurring:true,hostId:this.id,publicState:{stage:s.royale.stage,phase:s.phase,time:s.time,queueEnds:s.royale.queueEnds,elapsed:s.royale.elapsed,round:s.round,matchId:s.royale.matchId,alive:s.royale.alive,botPlayers:s.players.filter(p=>p.bot&&p.contestant).length,contestants:s.players.filter(p=>!p.bot&&p.contestant).map(p=>p.id),estimatedSeconds:s.phase==='results'?Math.max(0,Math.ceil((s.publicRestartAt||s.time+10)-s.time)):Math.max(0,Math.ceil((s.royale.matchEnd||600)+20-s.royale.elapsed))}}:{})} : null;
     if(relayURL()){const relay=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;relay?.publish?.(this.visibility==='public'||relay.protocol===2?listing:null);}
     else directory.publish(this.visibility==='public'?listing:null);
   }
   broadcast(state) {
     if(this.serverAuthority)return;
     this.snapshot = state;
+    if(this.officialPublic&&performance.now()-(this.lastPublicProgress||0)>=500){this.lastPublicProgress=performance.now();const hostPeer=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;if(hostPeer?.id===PREFIX+this.code)hostPeer.control({type:'public-progress',state:rewardFrame(state,this.id,this.callbacks.getHostInput?.()||{})});}
     this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
-    if (!this.lastPublish || performance.now() - this.lastPublish > 2000) { this.lastPublish = performance.now(); this.publishRoom(); }
+    if (!this.lastPublish || performance.now() - this.lastPublish > 2000 || this.lastPublishedStage!==state.royale?.stage || this.lastPublishedPhase!==state.phase) { this.lastPublish = performance.now();this.lastPublishedStage=state.royale?.stage;this.lastPublishedPhase=state.phase;this.publishRoom(); }
     state = {...state, visibility:this.visibility,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,network:{hostId:this.id,members:this.members,chatSequence:this.chatRoom.sequence}};
     const worldVersion=state.royale?`${state.royale.matchId}:${state.round}:${state.royale.lootVersion}:${state.royale.buildVersion}`:null;
     // Commit ownership changes with their recovery state: host departure must
@@ -569,13 +572,14 @@ export class Network {
     if(this.closed||!this.isHost)return;
     if(this.peer.id===PREFIX+this.code)return;
     const config=window.YOLK_NETWORK||{};
-    const alias=relayURL()?new RelayPeer(PREFIX+this.code):new Peer(PREFIX+this.code,{debug:0,...config.peer,config:{iceServers:config.iceServers||[{urls:'stun:stun.l.google.com:19302'}]}});this.aliasPeer=alias;
+    const alias=relayURL()?new RelayPeer(PREFIX+this.code,this.officialPublic?{publicHostProof:{id:this.peer.id,token:this.peer.resume?.resume}}:{}):new Peer(PREFIX+this.code,{debug:0,...config.peer,config:{iceServers:config.iceServers||[{urls:'stun:stun.l.google.com:19302'}]}});this.aliasPeer=alias;
     alias.on('open',()=>this.publishRoom());for(const type of ['reward','afk','afk-enforce'])alias.on(type,event=>this.callbacks.onProgress?.(type,event));
     alias.on('connection',conn=>this.accept(conn));
     alias.on('error',()=>{alias.destroy();this.later(()=>this.claimRoomAddress(),2500);});
     alias.on('disconnected',()=>{if(!alias.destroyed&&!this.closed){if(relayURL()){alias.destroy();this.later(()=>this.claimRoomAddress(),2500);}else alias.reconnect();}});
   }
   kick(id) {
+    if(this.officialPublic)return;
     if(this.serverAuthority){this.authorityCommand({type:'kick',id});return;}
     const conn = this.connections.get(id);
     if (conn) {

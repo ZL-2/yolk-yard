@@ -12,14 +12,14 @@ import {SnapshotEncoder,SnapshotDecoder,SnapshotBatch} from '../src/snapshot-cod
 import {snapshotLoot} from '../src/loot-snapshot.js';
 import {PublicJoinChime} from '../src/public-join-chime.js';
 function flat(){const s=new RoyaleSimulation({capacity:2,bots:0,fill:false,seed:321,building:false}),p=s.addPlayer('bot',{name:'Scout'},true),human=s.addPlayer('human',{name:'Human'});s.phase='playing';s.stage='active';s.time=10;s.map={id:'flat',theme:'royale',size:256,boxes:[],floorLoot:[],landmarks:[],districts:[]};s.nav={path:()=>[]};s.relays=[];s.smokes=[];s.loot=[];s.chests=[];s.storm={active:false};for(const q of [p,human])Object.assign(q,{x:0,y:0,z:0,health:100,shield:0,flight:'ground',grounded:true,vy:0,yaw:0,pitch:0,slot:0,inventory:inventory(),bank:{medium:0,shells:0,heavy:0,light:0,rockets:0},materials:{wood:0,brick:0,metal:0},lastDamage:-100,contestant:true,spectating:false});human.z=-20;p.brain=newBrain(s,p);return {s,p,human};}
-test('Shadowstep retains the item, recharges three charges, blocks spam and replicates a detached dash',()=>{
+test('Shadowstep retains the item, recharges six charges, blocks spam and replicates a detached dash',()=>{
  const{s,p}=flat(),item={id:'shadowstep',rarity:5,count:1};p.inventory[1]=item;p.slot=1;
- for(let i=0;i<3;i++){s.time=10+i;assert.equal(startShadowstep(p,item,s.time),true);assert.equal(startShadowstep(p,item,s.time),false);}assert.equal(item.charges,0);assert.equal(item.count,1);assert.equal(shadowRechargeState(item,17).remaining,5);assert.equal(shadowCharges(item,22),1);assert.equal(shadowCharges(item,46),3);
+ for(let i=0;i<6;i++){s.time=10+i;assert.equal(startShadowstep(p,item,s.time),true);assert.equal(startShadowstep(p,item,s.time),false);}assert.equal(item.charges,0);assert.equal(item.count,1);assert.equal(shadowRechargeState(item,17).remaining,3);assert.equal(shadowCharges(item,20),1);assert.equal(shadowCharges(item,70),6);
  const enc=new SnapshotEncoder(),dec=new SnapshotDecoder();let state=dec.decode(JSON.parse(JSON.stringify(enc.encode({state:s.snapshot()},new SnapshotBatch()).frame))).state;
- const row=state.players.find(q=>q.id===p.id);assert.ok(row.shadowstep);assert.equal(row.inventory[1].charges,3);row.shadowstep.x=999;assert.notEqual(p.shadowstep.x,999);assert.equal(hostile(s,flat().p,p),false);
+ const row=state.players.find(q=>q.id===p.id);assert.ok(row.shadowstep);assert.equal(row.inventory[1].charges,6);row.shadowstep.x=999;assert.notEqual(p.shadowstep.x,999);assert.equal(hostile(s,flat().p,p),false);
 });
-test('Shadowstep travels nine metres, stops at thin walls, and preserves fall vulnerability',()=>{
- const{s,p}=flat();p.fall={apex:40,immune:false,source:'normal'};assert.equal(startShadowstep(p,{id:'shadowstep'},s.time),true);for(let i=0;i<12;i++)movePlayer(p,{},s.map,1/60);assert.ok(Math.abs(p.z+9)<.01);assert.equal(p.landing.immune,false);
+test('Shadowstep travels nine metres, stops at thin walls, and protects its resulting fall',()=>{
+ const{s,p}=flat();p.fall={apex:40,immune:false,source:'normal'};assert.equal(startShadowstep(p,{id:'shadowstep'},s.time),true);for(let i=0;i<12;i++)movePlayer(p,{},s.map,1/60);assert.ok(Math.abs(p.z+9)<.01);assert.equal(p.landing.immune,true);
  Object.assign(p,{x:0,y:0,z:0,vy:0,grounded:true});s.map.boxes=[{x:0,y:0,z:-3,w:4,h:4,d:.1}];assert.equal(startShadowstep(p,{id:'shadowstep'},s.time+2),true);for(let i=0;i<12;i++)movePlayer(p,{},s.map,1/60);assert.ok(p.z>-2.64);assert.ok(canStand(s.map,p));
 });
 test('bots finish chest searches through scheduled intent ticks and move on to the gun',()=>{

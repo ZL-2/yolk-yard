@@ -19,21 +19,15 @@ const address=new RegExp('^yolk-yard-v'+VERSION+'-([A-Z2-9]{8})$');
 // The relay owns simulation and persistent room lifetime. Browsers submit bounded
 // input/interaction intent only; even the room leader cannot submit game state.
 export class MatchAuthority{
- constructor(relay){this.relay=relay;this.rooms=new Map();this.capacity=new MatchCapacity(this);this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),1000/60);this.timer.unref?.();}
+ constructor(relay){this.relay=relay;this.rooms=new Map();this.capacity=new MatchCapacity(this);this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),250);this.timer.unref?.();}
  roomFor(peer){return this.rooms.get(peer.authorityRoom);}
  connection(peer,connected){const room=this.roomFor(peer),p=room?.sim.players.get(peer.authorityId);if(p){p.connected=connected;if(p.activity)p.activity.last=room.sim.time;room.sim.advanceWarmupClock();}}
  send(peer,message,serialized){if(peer&&this.relay.peers.has(peer.id))this.relay.send(peer,message,serialized);}
- ensurePublicRoyale(){
-  const key=`yolk-yard-v${VERSION}-${PUBLIC_ROYALE.code}`;
-  if(this.rooms.has(key))return this.rooms.get(key);
-  const sim=new RoyaleSimulation({...publicRoyaleOptions(),seed:randomInt(1,2147483647)});
-  bindCrownStore(sim,{load:id=>id?this.relay.progression.account(id).crowns:null,save:(id,record)=>{this.relay.progression.account(id).crowns=record;this.relay.progression.dirty=true;void this.relay.progression.save();}});
-  const hostPeer={id:key,token:randomUUID(),virtualRoom:true,ws:null,links:new Map(),pending:[],pendingBytes:0,seq:0,acked:0,clientSeq:0,history:[],historyBytes:0,lastSeen:Date.now(),rewardPublic:true};
-  const room={key,code:PUBLIC_ROYALE.code,owner:'server',hostPeer,sim,recurring:true,visibility:'public',members:new Map(),chat:new ChatRoom(),encoders:new Map(),eventCursors:new Map(),age:0,frameAt:0,progressAt:0,kicked:new Set()};
-  this.relay.peers.set(key,hostPeer);this.rooms.set(key,room);sim.startRound();this.publish(room);return room;
- }
+ ensurePublicRoyale(){return this.relay.publicHost.enable();}
+
  get publicRoom(){return this.rooms.get(`yolk-yard-v${VERSION}-${PUBLIC_ROYALE.code}`);}
  publicSummary(){
+  if(this.relay.publicHost?.enabled)return this.relay.publicHost.summary();
   const room=this.publicRoom;if(!room)return null;
   const sim=room.sim,players=[...sim.players.values()],warmup=sim.phase==='playing'&&acceptsContestants(sim.stage),results=sim.phase==='results';
   const humanPlayers=players.filter(p=>!p.bot&&!p.lateSpectator&&p.connected!==false).length;
@@ -44,7 +38,7 @@ export class MatchAuthority{
   return {availability,code:room.code,version:VERSION,joinSerial:room.joinSerial||0,round:sim.round,matchId:sim.matchId,stage:sim.stage,phase:sim.phase,capacity:sim.options.capacity,difficulty:sim.options.difficulty,humanPlayers,spectators,botPlayers:players.filter(p=>p.bot&&p.contestant).length,alive:warmup?sim.options.capacity:sim.alive,joinable:availability.open&&warmup,countdownStarted:!!(warmup&&sim.queueEnds),countdownSeconds,estimatedSeconds,restartSeconds:results?estimatedSeconds:0,availableSeats:Math.max(0,sim.options.capacity-this.capacity.humans(room)-this.capacity.pending(room.key)),availableSpectators:Math.max(0,MAX_SPECTATORS-this.capacity.spectators(room)-this.capacity.pending(room.key,true))};
  }
  create(peer,m){
-  this.send(peer,{type:'authority-error',reason:'Custom matches run on the player host. The recurring public Royale is the only server-run match; join it from Play.'});
+  this.send(peer,{type:'authority-error',reason:'Custom matches run on the player host. The public Royale also runs on its elected player host; join it from Play.'});
  }
  connect(peer,other,channel){const room=this.rooms.get(other.id);if(!room)return false;this.send(peer,{type:'opened',channel});return true;}
  data(peer,other,entry){
@@ -159,6 +153,7 @@ export class MatchAuthority{
   room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));this.broadcast(room);return peer===room.hostPeer;
  }
  tick(now=performance.now()){
+  if(!this.rooms.size){this.last=now;this.accumulator=0;return;}
   this.capacity.sample(now);
   if(this.catchup){clearImmediate(this.catchup);this.catchup=null;}
   const sliceStarted=performance.now();

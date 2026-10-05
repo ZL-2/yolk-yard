@@ -1,3 +1,4 @@
+import {teammates} from './teams.js';
 import {BOSSES} from './bosses.js';
 import {nearbyItems} from './nearby-items.js';
 const bossIds=new Set(BOSSES.map(b=>b.id));
@@ -40,9 +41,9 @@ export class SoundVisuals{
    this.signals.set(key,{kind,point:{x:point.x,y:point.y,z:point.z},until:now+ttl*1000,strength:Math.max(.3,1-distance/range)});
   };
   for(const e of state.events||[])if(e.id>this.lastEvent){this.lastEvent=e.id;if(state.time-e.time>1.3||e.player===listener.id)continue;const cue=audibleVisualEvent(e);if(cue){const kind=bossIds.has(e.player)?'boss':cue.kind;add(kind+':'+(e.player||e.id),kind,cue.point,cue.range,cue.ttl);}}
-  for(const p of state.players||[]){if(p.id===listener.id||p.health<=0||p.spectating)continue;
+  for(const p of state.players||[]){if(teammates(state.options,listener,p))this.signals.delete('footsteps:'+p.id);if(p.id===listener.id||p.health<=0||p.spectating)continue;
    if(p.flight==='glide')add('glider:'+p.id,'glider',p,24,.22);
-   else if((p.flight==='ground'||!state.royale)&&p.grounded!==false&&p.moving&&!p.crouching&&!p.sliding&&!p.downed&&Math.hypot(p.vx||0,p.vz||0)>.8)add('footsteps:'+p.id,p.boss?'boss':'footsteps',p,p.sprinting?26:20,.28);
+   else if(!teammates(state.options,listener,p)&&(p.flight==='ground'||!state.royale)&&p.grounded!==false&&p.moving&&!p.crouching&&!p.sliding&&!p.downed&&Math.hypot(p.vx||0,p.vz||0)>.8)add('footsteps:'+p.id,p.boss?'boss':'footsteps',p,p.sprinting?26:20,.28);
   }
   if(state.royale)for(const c of nearbyItems(state.royale,'chests',listener,12))if(!c.opened&&!(c.landAt>state.time))add('chest:'+c.id,c.epic?'rareChest':'chest',c,12,.25);
   for(const [id,c]of this.signals)if(c.until<=now)this.signals.delete(id);

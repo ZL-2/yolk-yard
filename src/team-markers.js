@@ -1,7 +1,8 @@
 import {isTeamRoyale,teammates} from './teams.js';
 import {direction,worldHit,humanHit,dist} from './physics.js';
 import {eyeHeight} from './stance.js';
-import {surfaceAt} from './maps.js';
+import {surfaceAt,getMap} from './maps.js';
+import {isWarmup} from './royale-phases.js';
 import {itemInfo} from './royale-data.js';
 export const visibleMarkers=(state,p)=>(state.royale?.markers||[]).filter(m=>m.until>state.time&&(m.global||m.player===p?.id||m.team===p?.team&&isTeamRoyale(state.options)));
 // The client supplies intent, never marker ownership, expiry or a tracked enemy.
@@ -16,8 +17,9 @@ export function markerAction(sim,p,action){
  if(sim.time-(p.lastPingAt??-100)<.8||p.pingTimes.length>=3)return true;
  let point,label='',kind=payload.kind==='danger'?'danger':'normal';
  if(payload.kind==='map'){
-  if(!Number.isFinite(payload.x)||!Number.isFinite(payload.z)||Math.abs(payload.x)>sim.map.size||Math.abs(payload.z)>sim.map.size)return true;
-  point={x:payload.x,z:payload.z,y:surfaceAt(sim.map,payload.x,payload.z)};
+  const map=isWarmup(sim.stage)?getMap('sunnybreak',sim.mapLayouts):sim.map;
+  if(!Number.isFinite(payload.x)||!Number.isFinite(payload.z)||Math.abs(payload.x)>map.size||Math.abs(payload.z)>map.size)return true;
+  point={x:payload.x,z:payload.z,y:surfaceAt(map,payload.x,payload.z),planning:isWarmup(sim.stage)};
  }else{
   const origin={x:p.x,y:p.y+eyeHeight(p),z:p.z},ray=direction(p.yaw,p.pitch),hit=worldHit(sim.map,origin,ray,250);
   let range=hit?.distance??180;point=hit?.point||{x:origin.x+ray.x*range,y:origin.y+ray.y*range,z:origin.z+ray.z*range};

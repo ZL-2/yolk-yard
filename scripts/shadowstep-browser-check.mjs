@@ -1,3 +1,4 @@
+import {startRealtimeServer} from '../server/realtime/index.js';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {createServer} from 'vite';
@@ -5,7 +6,9 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const run=promisify(execFile),out='test-results/shadowstep',origin='http://127.0.0.1:5211';await mkdir(out,{recursive:true});
-const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage','--remote-debugging-port=9222']}),vite=await createServer({server:{host:'127.0.0.1',port:5211,strictPort:true,watch:null}});await vite.listen();
+const app=await startRealtimeServer({port:9000,host:'127.0.0.1',origins:['http://127.0.0.1:5211']});
+for(let i=0;i<29;i++)app.relay.progression.accounts.set('browser-fixture-'+i,{receipts:[],pairs:[],earned:[],encounters:[],publicName:'Field Operator '+String(i+1).padStart(2,'0'),publicTotals:{version:1,kills:89-i,wins:i%9}});
+const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage','--remote-debugging-port=9222']}),vite=await createServer({plugins:[{name:'local-public-relay',configureServer(server){server.middlewares.use((req,res,next)=>{if(req.url?.split('?')[0]!=='/network-config.js')return next();res.setHeader('Content-Type','text/javascript');res.end("window.YOLK_NETWORK={relay:'ws://127.0.0.1:9000/game'};");});}}],server:{host:'127.0.0.1',port:5211,strictPort:true,watch:null}});await vite.listen();
 const agent=async args=>run('npx',['--yes','agent-browser','--cdp','9222',...args],{timeout:60000,maxBuffer:1024*1024});
 const errors=[],metrics={};let page;
 try{
@@ -15,15 +18,29 @@ try{
  page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-dismissed','yes');localStorage.setItem('ravelfront-crown-status',JSON.stringify({season:1,wins:3,owned:true,unlocked:true}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Shadow Check'}));});
  await page.goto(origin+'/?qa');await page.locator('#loading-screen').waitFor({state:'hidden'});await page.waitForFunction(()=>window.__yolkTest.celebrations().lobbyCrown);
- await page.screenshot({path:out+'/lobby-crown.png'});metrics.lobbyCrown=true;
+ await page.locator('.frontier-board-ranks li').first().waitFor();assert.equal(await page.locator('.frontier-board-ranks li').count(),25);await page.screenshot({path:out+'/lobby-crown.png'});metrics.lobbyCrown=true;
+ const quality=await page.locator('.yard-season [data-action=updates]').boundingBox(),board=await page.locator('.frontier-leaderboard').boundingBox(),privateButton=await page.locator('[data-action=play-custom]').boundingBox();assert.ok(quality.y+quality.height<=board.y&&board.y+board.height<=privateButton.y);
+ await page.locator('[data-leaderboard-tab=wins]').click();assert.equal(await page.locator('[data-leaderboard-tab=wins]').getAttribute('aria-selected'),'true');assert.equal(await page.locator('.frontier-board-ranks li b').first().textContent(),'8');await page.screenshot({path:out+'/leaderboard-wins.png'});await page.keyboard.press('ArrowLeft');assert.equal(await page.locator('[data-leaderboard-tab=kills]').getAttribute('aria-selected'),'true');assert.equal(await page.locator('.frontier-board-ranks li b').first().textContent(),'89');metrics.leaderboardTabs=true;
+ await page.setViewportSize({width:390,height:844});await page.locator('[data-action=play-custom]').scrollIntoViewIfNeeded();const mobileBox=await page.locator('.frontier-leaderboard').boundingBox();assert.ok(mobileBox.x>=0&&mobileBox.x+mobileBox.width<=390);await page.screenshot({path:out+'/leaderboard-mobile.png'});await page.setViewportSize({width:1440,height:900});await page.locator('#menu').evaluate(el=>el.scrollTop=0);
  await page.locator('[data-action=training]').click();await page.locator('[data-action=start-training]').click();await page.locator('#loading-screen').waitFor({state:'hidden'});
  assert.equal(await page.locator('#emote-button').isVisible(),false);assert.equal(await page.locator('.lag-diagnostics').count(),0);assert.equal(await page.locator('.royale-tools').count(),0);assert.equal(await page.locator('.build-action-buttons').isVisible(),false);
  const resume=page.locator('#dialog [data-action=resume]');if(await resume.isVisible())await resume.click();else await page.mouse.click(720,450);await page.waitForFunction(()=>!window.__yolkTest.read().paused&&!!document.pointerLockElement);
- await page.evaluate(()=>window.__yolkTest.fixture(s=>{const p=s.players.get(window.__yolkTest.read().localId);p.inventory[5]={id:'shadowstep',count:1,rarity:5,charges:3,rechargeAt:0,readyAt:0};s.syncInventory(p);window.__yolkTest.pose({x:18,y:0,z:30,yaw:0,pitch:0,slot:5,grounded:true,flight:'ground',vy:0});}));
- await page.waitForFunction(()=>document.querySelector('[data-royale-slot="5"] b')?.textContent==='3/3');await page.waitForFunction(()=>{const img=document.querySelector('[data-royale-slot="5"] img');return img?.complete&&img.naturalWidth>0;});await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
- await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id===window.__yolkTest.read().localId).inventory[5]?.charges===2);
- metrics.charges=2;await page.waitForFunction(()=>!document.querySelector('[data-rig-slot="5"]').hidden);await page.screenshot({path:out+'/shadowstep-recharging.png'});
+ await page.evaluate(()=>window.__yolkTest.fixture(s=>{const p=s.players.get(window.__yolkTest.read().localId);p.inventory[5]={id:'shadowstep',count:1,rarity:5,charges:6,rechargeAt:0,readyAt:0};s.syncInventory(p);window.__yolkTest.pose({x:18,y:0,z:30,yaw:0,pitch:0,slot:5,grounded:true,flight:'ground',vy:0});}));
+ await page.waitForFunction(()=>document.querySelector('[data-royale-slot="5"] b')?.textContent==='6/6');await page.waitForFunction(()=>{const img=document.querySelector('[data-royale-slot="5"] img');return img?.complete&&img.naturalWidth>0;});await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
+ await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id===window.__yolkTest.read().localId).inventory[5]?.charges===5);
+ metrics.charges=5;await page.waitForFunction(()=>!document.querySelector('[data-rig-slot="5"]').hidden);await page.screenshot({path:out+'/shadowstep-recharging.png'});
  await page.keyboard.press('KeyI');await page.locator('#dialog[data-kind=royale-inventory]').waitFor({state:'visible'});await page.screenshot({path:out+'/compact-inventory.png'});await page.locator('#dialog [data-action=resume]').click();
+ await page.close();
+ const context=await browser.newContext({viewport:{width:1440,height:900}});page=await context.newPage();page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-dismissed','yes');localStorage.setItem('yolk-profile',JSON.stringify({name:'Browser Field Host'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));});
+ await page.goto(origin+'/?qa');await page.locator('#loading-screen').waitFor({state:'hidden'});await page.waitForFunction(()=>window.__yolkTest.party().ready);await page.locator('[data-action=public-join]').click();
+ await page.waitForFunction(()=>{const q=window.__yolkTest.read();return q.host&&q.state?.options.recurring&&q.screen==='game';});await page.locator('#loading-screen').waitFor({state:'hidden'});
+ await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.queueEnds=s.time+3600;}));
+ const enter=page.locator('#dialog [data-action=resume]');if(await enter.isVisible())await enter.click();else await page.mouse.click(720,450);await page.waitForFunction(()=>!window.__yolkTest.read().paused);
+ assert.equal(app.relay.authority.rooms.size,0);metrics.firstBrowserHostsPublic=true;await page.screenshot({path:out+'/first-public-host.png'});
+ await page.keyboard.down('Tab');await page.locator('#scoreboard').waitFor({state:'visible'});assert.equal(await page.locator('#scoreboard tbody tr').count(),48);await page.mouse.wheel(0,650);await page.waitForFunction(()=>document.querySelector('#scoreboard').scrollTop>100);metrics.scoreboardScroll=true;await page.screenshot({path:out+'/public-roster-scrolled.png'});await page.keyboard.up('Tab');
+ await page.keyboard.press('KeyM');await page.locator('#dialog[data-kind=royale-map]').waitFor({state:'visible'});const rect=await page.locator('#royale-fullmap').boundingBox();await page.locator('#royale-fullmap').click({position:{x:rect.width*.87,y:rect.height*.23}});
+ await page.waitForFunction(()=>window.__yolkTest.read().state.royale.markers.some(m=>m.planning&&Math.abs(m.x)>150));metrics.battleMapPlanning=true;await page.screenshot({path:out+'/landing-map.png'});
  assert.deepEqual(errors,[]);await writeFile(out+'/browser.json',JSON.stringify(metrics));console.log('PASS Shadowstep charge input, recharge ring, compact HUD and lobby crown '+JSON.stringify(metrics));
 }catch(error){await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/browser.json',JSON.stringify({metrics,errors,error:String(error)}));throw error;}
-finally{await browser.close();await vite.close();}
+finally{await browser.close();await vite.close();await app.close();}

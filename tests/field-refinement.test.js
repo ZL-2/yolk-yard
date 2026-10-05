@@ -44,13 +44,13 @@ test('raised front access clears the stairwell and reaches Voss door on actual c
  p.yaw=Math.PI/2;for(let i=0;i<54;i++)movePlayer(p,{forward:1},s.map,1/60);p.yaw=0;
  for(let i=0;i<20;i++)movePlayer(p,{forward:1},s.map,1/60);assert.ok(Math.abs(p.x-b.x)<1.3);assert.ok(p.z<b.z+b.d/2+2.5);assert.ok(Math.abs(p.y-b.baseY)<.3);
 });
-test('empty public warmup stays unstarted; first human gets 45s, joins inherit it, final departure clears it',()=>{
+test('empty public warmup stays unstarted; first human gets 30s, joins inherit it, final departure clears it',()=>{
  const s=new RoyaleSimulation({recurring:true,capacity:48,fill:true,seed:9});s.startRound();s.time+=100;s.advanceWarmupClock(90);assert.equal(s.queueEnds,0);
- const a=s.admitPlayer('a',{name:'A'});s.advanceWarmupClock();assert.equal(s.queueEnds-s.time,45);s.time+=40;s.advanceWarmupClock();const end=s.queueEnds;
+ const a=s.admitPlayer('a',{name:'A'});s.advanceWarmupClock();assert.equal(s.queueEnds-s.time,30);s.time+=20;s.advanceWarmupClock();const end=s.queueEnds;
  s.admitPlayer('b',{name:'B'});assert.equal(s.queueEnds,end);s.leavePlayer(a.id);assert.equal(s.queueEnds,end);s.leavePlayer('b');assert.equal(s.queueEnds,0);
- s.admitPlayer('c',{name:'C'});s.advanceWarmupClock();assert.equal(s.queueEnds-s.time,45);
+ s.admitPlayer('c',{name:'C'});s.advanceWarmupClock();assert.equal(s.queueEnds-s.time,30);
  const copy=new RoyaleSimulation().restore(s.checkpoint());assert.equal(copy.queueEnds,s.queueEnds);
- const html=publicRoyaleMarkup({publicMatch:{joinable:true,countdownStarted:false,countdownSeconds:0,availability:{open:true},availableSeats:48,phase:'playing',humanPlayers:0},online:true});assert.match(html,/data-action="public-join"/);assert.match(html,/45s ON FIRST JOIN/);
+ const html=publicRoyaleMarkup({publicMatch:{joinable:true,countdownStarted:false,countdownSeconds:0,availability:{open:true},availableSeats:48,phase:'playing',humanPlayers:0},online:true});assert.match(html,/data-action="public-join"/);assert.match(html,/30s ON FIRST JOIN/);
 });
 test('tap swaps a full inventory immediately and a held key swaps only once',()=>{
  const{s,p}=flat();for(let i=1;i<=5;i++)p.inventory[i]={id:'sprinter',weapon:true,count:1,rarity:0,ammo:30};s.syncInventory(p);const item=s.dropWeapon({x:1,y:0,z:0},'needle',2);

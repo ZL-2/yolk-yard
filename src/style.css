@@ -967,6 +967,8 @@ body.in-game #hud {
   border-radius: 16px;
   display: none;
 }
+.scoreboard {max-height:80dvh;overflow:auto;overscroll-behavior:contain;pointer-events:auto;z-index:25;}
+.scoreboard .scores thead{position:sticky;top:0;background:#172b39;}
 .scoreboard h2 {
   font-size: 1.5rem;
   margin-bottom: 18px;
