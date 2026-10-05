@@ -2,11 +2,12 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {RoyaleSimulation} from '../src/royale.js';import {inventory} from '../src/building.js';
 import {frontierInteract,setDoor,keycardRoute} from '../src/frontier-world.js';
 import {vaultOpen} from '../src/vaults.js';import {canStand,movePlayer,wallDistance} from '../src/physics.js';
-import {GRAPPLER,grappleAim,startGrapple} from '../src/grappler.js';import {useSeasonItem,bossInput} from '../src/season-world.js';
+import {GRAPPLER,grappleAim,startGrapple,grappleHookPoint} from '../src/grappler.js';import {useSeasonItem,bossInput} from '../src/season-world.js';
 import {crownsEnabled,bindCrownStore,attachCrown,awardCrowns,dropCrown,takeCrown} from '../src/crowns.js';
 import {fallDamage} from '../src/airborne.js';import {chooseObjective,usefulLoot} from '../src/bot-objectives.js';import {recoverySlot} from '../src/bot-recovery.js';
 import {skillFor} from '../src/bot-config.js';import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
 import {gun,rng} from '../src/data.js';import {WEAPON_RARITIES} from '../src/weapon-rarities.js';import {rollItem} from '../src/royale-loot.js';import {publicWindow} from '../src/season-one.js';
+import {Group} from 'three';import {RoyaleView} from '../src/royale-view.js';
 function battle(recurring=false){const s=new RoyaleSimulation({capacity:4,bots:3,seed:31,recurring}),p=s.addPlayer('host',{name:'Host'});s.startRound();s.beginBattle();s.stage='active';s.time=20;Object.assign(p,{health:100,shield:0,shieldUntil:0,flight:'ground',grounded:true,vy:0,yaw:0,pitch:0,lastDamage:-100});return {s,p};}
 function flat(){const{s,p}=battle();s.players=new Map([[p.id,p]]);s.map={size:256,boxes:[],theme:'royale'};s.worldBoxes=[];s.relays=[];s.loot=[];s.chests=[];s.storm={active:false};Object.assign(p,{x:0,y:0,z:0,slot:1,inventory:inventory()});p.inventory[1]={id:'sprinter',weapon:true,rarity:1,count:1,ammo:30};s.syncInventory(p);return {s,p};}
 function brain(){return {memory:{},lootMemory:{},unreachable:{},visited:{},attackedAt:-100,assistUntil:0};}
@@ -37,6 +38,13 @@ test('grappler travel sweeps collisions, resets prior fall height only on a real
  const{s,p}=flat();Object.assign(p,{y:6,grounded:false,fall:{apex:45,immune:false,source:'normal'}});startGrapple(p,{origin:{x:0,y:7.7,z:0},anchor:{x:0,y:7.7,z:-8},length:8,valid:true},s.time);
  for(let i=0;i<10;i++)movePlayer(p,{},s.map,1/60);assert.equal(p.fall.source,'grapple');assert.ok(p.fall.apex<7);assert.equal(p.redeploy,false);assert.equal(p.forceGlider,false);assert.ok(fallDamage({distance:30,immune:p.fall.immune})>=100);
  s.map.boxes=[{x:0,y:0,z:-4,w:3,h:20,d:.15}];for(let i=0;i<120;i++)movePlayer(p,{},s.map,1/60);assert.ok(p.z>-3.61,'thin cover added in flight cannot be tunneled through');
+});
+test('the returning plunger tracks the shooter after moving away from the launch point',()=>{
+ const g={origin:{x:0,y:2,z:0},anchor:{x:0,y:2,z:-30},phase:'return',returnAt:1,elapsed:1+GRAPPLER.returnTime},moved={x:12,y:8,z:-20},end=grappleHookPoint(g,moved);for(const axis of ['x','y','z'])assert.ok(Math.abs(end[axis]-moved[axis])<1e-8);g.elapsed=1;assert.deepEqual(grappleHookPoint(g,moved),g.anchor);
+});
+test('Rook visibly equips the grappler for his ability and restores the shotgun after the plunger returns',()=>{
+ const rv=Object.assign(Object.create(RoyaleView.prototype),{view:{disposeGroup:g=>g.clear()},flightPose:()=>({air:0}),itemModel:()=>{const g=new Group(),cup=new Group();cup.name='grappler-plunger';g.add(cup);return g;}}),model=new Group();model.userData.held=new Group();model.userData.blaster=new Group();const p={boss:true,health:100,flight:'ground',pitch:0,slot:1,inventory:[null,{id:'doubleyolk',weapon:true}],bossWindup:{until:1}};
+ rv.animateActor(model,p,0);assert.equal(model.userData.held.visible,false);assert.equal(model.userData.utilityKey,'anchorWinch');const cup=model.userData.utility.getObjectByName('grappler-plunger');assert.equal(cup.visible,true);p.bossWindup=null;p.grapple={phase:'pull'};rv.animateActor(model,p,1);assert.equal(cup.visible,false);p.grapple.phase='return';rv.animateActor(model,p,2);assert.equal(cup.visible,false);p.grapple=null;rv.animateActor(model,p,3);assert.equal(model.userData.held.visible,true);assert.equal(model.userData.utility,null);
 });
 test('Rook grapples himself toward an out-of-shotgun-range attacker without moving the attacker',()=>{
  const{s,p}=flat(),b=s.addPlayer('rook-test',{name:'Rook'},true);Object.assign(b,{boss:true,bossId:'marshal-rook',spectating:false,x:0,y:0,z:0,home:{x:0,y:0,z:0},grounded:true,flight:'ground',vy:0,health:650,shield:350,targetId:p.id,scanAt:100,aggroAt:0,abilityAt:0,ammo:[0,8],patrol:[]});Object.assign(p,{z:-20});bossInput(s,b);assert.ok(b.bossWindup);s.time+=1;bossInput(s,b);for(let i=0;i<75;i++)movePlayer(b,{},s.map,1/60);assert.ok(b.z<-12);assert.equal(p.z,-20);assert.equal(p.grapple,null);assert.equal(p.grounded,true);

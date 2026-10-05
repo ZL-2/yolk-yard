@@ -251,12 +251,13 @@ export class RoyaleView{
  animateActor(model,p,t,dt=1/60){
   this.poseDt=dt;const pose=this.flightPose(p,t,dt);
   const flying=p.flight==='dive'||p.flight==='glide'||p.flight==='launch';
-  if(model.userData.held)model.userData.held.visible=p.health>0&&!p.downed&&!p.reviving&&model.userData.draw?.visible!==false&&!p.emote&&!p.building&&!p.traversal&&!flying&&!!p.inventory?.[p.slot]&&(!!p.inventory[p.slot].weapon||!!p.inventory[p.slot].pickaxe);
-  if(model.userData.blaster)model.userData.blaster.visible=!p.building&&!flying&&!!p.inventory?.[p.slot]?.weapon;
-  const item=p.building?{id:'blueprint'}:p.inventory?.[p.slot];
+  const bossGrappling=!!(p.boss&&(p.bossWindup||p.grapple));
+  if(model.userData.held)model.userData.held.visible=p.health>0&&!p.downed&&!p.reviving&&model.userData.draw?.visible!==false&&!p.emote&&!p.building&&!p.traversal&&!flying&&!bossGrappling&&!!p.inventory?.[p.slot]&&(!!p.inventory[p.slot].weapon||!!p.inventory[p.slot].pickaxe);
+  if(model.userData.blaster)model.userData.blaster.visible=!p.building&&!flying&&!bossGrappling&&!!p.inventory?.[p.slot]?.weapon;
+  const item=bossGrappling?{id:'anchorWinch'}:p.building?{id:'blueprint'}:p.inventory?.[p.slot];
   const itemKey=p.health>0&&!p.downed&&!p.reviving&&!p.emote&&!flying&&item&&!item.weapon&&!item.pickaxe?item.id:null;
   if(model.userData.utilityKey!==itemKey){if(model.userData.utility){model.userData.utility.removeFromParent();this.view.disposeGroup(model.userData.utility);}model.userData.utility=null;model.userData.utilityKey=itemKey;if(itemKey){const prop=this.itemModel(item,false);prop.scale.setScalar(.6);prop.position.set(.36,.7,-.35);model.add(prop);model.userData.utility=prop;}}
-  if(model.userData.utility&&item?.id==='anchorWinch'){model.userData.utility.position.set(.3,1.13,-.42);model.userData.utility.rotation.x=p.pitch;const cup=model.userData.utility.getObjectByName('grappler-plunger');if(cup)cup.visible=!p.grapple||p.grapple.phase==='return';}
+  if(model.userData.utility&&item?.id==='anchorWinch'){model.userData.utility.position.set(.3,1.13,-.42);model.userData.utility.rotation.x=p.pitch;const cup=model.userData.utility.getObjectByName('grappler-plunger');if(cup)cup.visible=!p.grapple;}
   else if(model.userData.utility){model.userData.utility.position.y=p.use?1.15+Math.sin(t*7)*.02:.7;if(item?.pickaxe){const swing=Math.max(0,1-(this.view.lastStateTime-(p.swingAt??-100))/.45);model.userData.utility.rotation.x=-Math.sin(swing*Math.PI)*1.5;}}
 
   if(pose.air>.01){model.rotation.y=pose.yaw;model.rotation.x=model.rotation.x*(1-pose.air)+pose.pitch;model.rotation.z=model.rotation.z*(1-pose.air)+pose.roll;model.position.y+=pose.bob;}

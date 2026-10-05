@@ -39,7 +39,8 @@ export function stepGrapple(p,input,map,dt,occupy,ground){
  p.vy=g.vy;p.grounded=false;p.sprinting=p.tacticalSprint=false;p.crouching=p.sliding=false;p.sprintBlend=0;
  return true;
 }
-export function grappleHookPoint(g){
+export function grappleHookPoint(g,returnOrigin=g.origin){
  const t=g.phase==='hook'?Math.min(1,g.elapsed/g.hookTime):g.phase==='return'?Math.max(0,1-(g.elapsed-g.returnAt)/GRAPPLER.returnTime):1;
- return {x:g.origin.x+(g.anchor.x-g.origin.x)*t,y:g.origin.y+(g.anchor.y-g.origin.y)*t,z:g.origin.z+(g.anchor.z-g.origin.z)*t};
+ const origin=g.phase==='return'?returnOrigin:g.origin;
+ return {x:origin.x+(g.anchor.x-origin.x)*t,y:origin.y+(g.anchor.y-origin.y)*t,z:origin.z+(g.anchor.z-origin.z)*t};
 }

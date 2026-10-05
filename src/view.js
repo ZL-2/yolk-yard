@@ -843,7 +843,7 @@ export class View {
         }
         if(!heldItem?.weapon&&this.localArms)utilityArms(this.localArms,heldItem?.id,local.use?(state.time-local.use.start)/(local.use.end-local.use.start):-1,this.clock);
         if(this.heldItem&&heldItem?.pickaxe)animatePickaxe(this.heldItem,this.localArms,local.pickaxe,state.time-(local.swingAt??-100));
-        else if(this.heldItem){this.heldItem.rotation.z=local.use?Math.sin(this.clock*8)*.15:0;if(heldItem?.id==='anchorWinch'){this.heldItem.position.z=-.28+Math.max(0,.15-(state.time-(local.grapple?.start??-100)))*.45;const cup=this.heldItem.getObjectByName('grappler-plunger');if(cup)cup.visible=!local.grapple||local.grapple.phase==='return';}}
+        else if(this.heldItem){this.heldItem.rotation.z=local.use?Math.sin(this.clock*8)*.15:0;if(heldItem?.id==='anchorWinch'){this.heldItem.position.z=-.28+Math.max(0,.15-(state.time-(local.grapple?.start??-100)))*.45;const cup=this.heldItem.getObjectByName('grappler-plunger');if(cup)cup.visible=!local.grapple;}}
         if(this.localArms){this.localArms.rotation.x=local.use ? -.35+Math.sin(this.clock*6)*.06 : 0;}
 
         if(local.use){this.gunGroup.position.y+=.08+Math.sin(this.clock*8)*.015;this.gunGroup.rotation.x=-.3;}
