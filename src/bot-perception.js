@@ -4,7 +4,7 @@ import {smokeBlocks} from './season-world.js';
 import {wallDistance,dist} from './physics.js';
 import {eyeHeight,bodyHeight} from './stance.js';
 import {wrapAngle,BOT_WORLD_SENSES} from './bot-config.js';
-import {nearbyPlayers} from './bot-work.js';
+import {nearbyPlayers,botWorld,takeBotWork} from './bot-work.js';
 export const hostile=(sim,p,t)=>t!==p&&t.health>0&&!t.spectating&&t.flight!=='transport'&&!(t.aimBreakUntil>sim.time)&&!teammates(sim.options,p,t);
 export function seesPoint(sim,p,t){const o={x:p.x,y:p.y+eyeHeight(p),z:p.z},d={x:t.x-o.x,y:t.y+bodyHeight(t)*.66-o.y,z:t.z-o.z},len=Math.hypot(d.x,d.y,d.z)||1;return !smokeBlocks(sim,o,{x:t.x,y:t.y+1,z:t.z})&&wallDistance(sim.map,o,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.08;}
 export function newBrain(sim,p){return {memory:{},eventId:Math.max(0,sim.eventId-32),perceiveAt:0,decision:0,aimAt:0,nextBurst:0,burstUntil:0,turnAt:sim.time,checkAt:sim.time+1,lastX:p.x,lastZ:p.z,side:sim.random()<.5?-1:1,visited:{},lootMemory:{},objective:'survey',target:null,targetUntil:0};}
@@ -44,20 +44,30 @@ export function observe(sim,p,brain,skill){
  }
  if(sim.time<brain.perceiveAt)return;
  brain.perceiveAt=sim.time+skill.perception+sim.random()*.025;
- for(const m of Object.values(brain.memory))m.visible=false;
- for(const enemy of nearbyPlayers(sim,p,skill.vision)){
+ for(const m of Object.values(brain.memory))if(sim.time-(m.seenAt??-100)>.6)m.visible=false;
+ const nearby=nearbyPlayers(sim,p,skill.vision).filter(enemy=>hostile(sim,p,enemy));
+ // Check the active threat first, then rotate the remaining candidates so a
+ // crowded fight cannot multiply sight rays or permanently hide a farther actor.
+ const current=nearby.findIndex(o=>o.id===brain.target);if(current>0)[nearby[0],nearby[current]]=[nearby[current],nearby[0]];
+ let scans=0;const offset=brain.scanOffset||0;
+ for(let n=0;n<nearby.length;n++){const enemy=nearby[n===0?0:1+(n-1+offset)%Math.max(1,nearby.length-1)];
   if(!hostile(sim,p,enemy))continue;const d=dist(p,enemy),angle=wrapAngle(Math.atan2(p.x-enemy.x,p.z-enemy.z)-p.yaw);
-  if(d<skill.vision&&(Math.abs(angle)<skill.fov||d<20&&sim.time-(brain.memory[enemy.id]?.engagedAt??brain.memory[enemy.id]?.damageAt??-100)<2)&&seesPoint(sim,p,enemy)){
+  const inView=d<skill.vision&&(Math.abs(angle)<skill.fov||d<20&&sim.time-(brain.memory[enemy.id]?.engagedAt??brain.memory[enemy.id]?.damageAt??-100)<2);
+  const check=inView&&scans<6&&takeBotWork(sim,'sight');if(check)scans++;
+  const visible=check&&seesPoint(sim,p,enemy);
+  if(check&&!visible&&brain.memory[enemy.id])brain.memory[enemy.id].visible=false;
+  if(visible){
    const previous=brain.memory[enemy.id];brain.memory[enemy.id]={id:enemy.id,x:enemy.x,y:enemy.y,z:enemy.z,vx:enemy.vx||0,vz:enemy.vz||0,vy:enemy.vy||0,bodyScale:enemy.bodyScale||1,visible:true,seenAt:sim.time,updated:sim.time,confidence:1,health:enemy.health,weapon:gun(enemy).id,engagedAt:previous?.engagedAt,damageAt:previous?.damageAt,damage:(previous?.damage||0)*.8,kind:'visual'};
    Object.assign(brain.memory[enemy.id],{crouching:enemy.crouching,sliding:enemy.sliding,lowCrouch:enemy.lowCrouch,downed:enemy.downed});
   }else if(BOT_WORLD_SENSES.footsteps&&d<skill.steps*(enemy.crouching?.45:1)&&enemy.moving&&sim.time>(brain.footstepAt?.[enemy.id]||0)){
    brain.footstepAt??={};brain.footstepAt[enemy.id]=sim.time+.7;hear(sim,p,brain,enemy.id,enemy,'footstep');
   }
  }
+ brain.scanOffset=nearby.length>1?(offset+5)%(nearby.length-1):0;
  // A short-range callout carries the teammate's observation, never live enemy state.
  if(teamMode(sim.options)&&sim.time>(brain.shareAt||0)){
   brain.shareAt=sim.time+1.2;
-  for(const mate of sim.players.values())if(mate!==p&&mate.team===p.team&&mate.health>0&&dist(p,mate)<skill.teamRange){
+  for(const mate of botWorld(sim).teams.get(p.team)||[])if(mate!==p&&mate.team===p.team&&mate.health>0&&dist(p,mate)<skill.teamRange){
    const observation=mate.brain?.memory?.[mate.brain.target];if(observation?.visible&&sim.time-observation.seenAt<.5&&!brain.memory[observation.id])hear(sim,p,brain,observation.id,observation,'callout');
   }
  }
@@ -89,6 +99,7 @@ export function selectThreat(sim,p,brain,skill){
   const margin=immediate?14:sim.time<brain.targetUntil?32:18;
   if(best<threatScore(sim,p,brain,current)+margin)next=current;
  }
- if(next?.id!==brain.target){brain.target=next?.id||null;brain.aimAt=sim.time+skill.reaction;brain.targetUntil=sim.time+1.2;brain.decision=0;}
+ const targetId=next?.id??null;
+ if(targetId!==brain.target){brain.target=targetId;brain.aimAt=sim.time+skill.reaction;brain.targetUntil=sim.time+1.2;brain.decision=0;}
  return next||null;
 }

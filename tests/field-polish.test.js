@@ -45,10 +45,19 @@ test('unarmed landing searches a chest or room; an armed bot keeps looting with 
  const {s,p,enemy}=flat(),brain=p.brain,skill=skillFor(s);s.chests=[{id:'c',x:5,y:0,z:0}];assert.equal(chooseObjective(s,p,brain,skill,{...enemy,visible:true}).kind,'chest');s.chests=[];s.map.floorLoot=[{id:'room',role:'weapon',x:20,y:0,z:0}];assert.equal(chooseObjective(s,p,brain,skill,{...enemy,visible:true}).kind,'search-room');
  p.inventory[1]={id:'sprinter',weapon:true,rarity:1,ammo:30};s.syncInventory(p);s.dropWeapon({x:2,y:0,z:0},'doubleyolk',2);const task=chooseObjective(s,p,brain,skill,{...enemy,z:-90,visible:true});assert.equal(task.kind,'loot');
 });
-test('distance makes real bot rays less accurate; fire duty gives players a response window',()=>{
+test('finishing a consumable resumes decisions instead of remaining in a completed heal task',()=>{
+ const {s,p,enemy}=flat();s.players.delete(enemy.id);p.inventory[1]={id:'sprinter',weapon:true,rarity:1,ammo:30};s.syncInventory(p);
+ Object.assign(p.brain,{wasUsing:true,weapon:'sprinter',task:{kind:'heal',slot:2,goal:{x:0,y:0,z:0}},decision:Infinity,commitUntil:Infinity});
+ botInput(s,p);assert.equal(p.brain.wasUsing,false);assert.notEqual(p.brain.task.kind,'heal');
+});
+test('reacquiring visual contact resets the previous search deadline',()=>{
+ const {s,p,enemy}=flat();p.inventory[1]={id:'sprinter',weapon:true,rarity:1,ammo:30};s.syncInventory(p);p.brain.search={id:enemy.id,until:s.time-1};
+ botInput(s,p);assert.equal(p.brain.search,null);
+});
+test('distance makes real bot rays less accurate; actual shot cadence gives players a response window',()=>{
  const results=[];for(const distance of [8,28,58]){const {s,p,enemy}=flat();enemy.z=-distance;p.inventory[1]={id:'sprinter',weapon:true,rarity:1,ammo:30};p.slot=1;s.syncInventory(p);p.brain.target=enemy.id;p.brain.memory[enemy.id]={...enemy,visible:true,seenAt:s.time};let shots=0,hits=0,frames=0;
-  const input={slot:1,yaw:0,pitch:0,combatAim:true,worldMoveX:1,worldMoveZ:0};for(let i=0;i<3600;i++){s.time+=1/60;p.brain.memory[enemy.id].seenAt=s.time;const out=executeRoyaleIntent(s,p,input);p.yaw=out.yaw;p.pitch=out.pitch;if(out.fire){frames++;if(i%7===0){shots++;if(Number.isFinite(humanHit({x:p.x,y:p.y+1.7,z:p.z},direction(out.yaw,out.pitch),enemy).distance))hits++;}}}
-  results.push(hits/shots);assert.ok(frames/3600<.4);assert.ok(frames/3600>.12);
+  const input={slot:1,yaw:0,pitch:0,combatAim:true,worldMoveX:1,worldMoveZ:0};for(let i=0;i<3600;i++){s.time+=1/60;p.brain.memory[enemy.id].seenAt=s.time;const out=executeRoyaleIntent(s,p,input);p.yaw=out.yaw;p.pitch=out.pitch;if(out.fire){frames++;shots++;p.shotSerial=(p.shotSerial||0)+1;if(Number.isFinite(humanHit({x:p.x,y:p.y+1.7,z:p.z},direction(out.yaw,out.pitch),enemy).distance))hits++;}}
+  results.push(hits/shots);assert.ok(shots>60&&shots<120,shots);assert.ok(frames/3600<.04);
  }assert.ok(results[0]>results[1]&&results[1]>results[2],JSON.stringify(results));assert.ok(results[2]<.35,JSON.stringify(results));
  const skill=skillFor({options:{mode:'royale',difficulty:2}});assert.ok(royaleAimError(skill,60)>royaleAimError(skill,10)*2);
 });

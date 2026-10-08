@@ -47,16 +47,18 @@ export function navigate(sim,p,brain,goal,skill){
  }
  while(p.botPath?.length&&dist(p,p.botPath[0])<.65)p.botPath.shift();
  const direct=directRoute(sim,p,brain,goal),step=direct?goal:p.botPath?.[0]||goal;
- let dx=step.x-p.x,dz=step.z-p.z,len=Math.hypot(dx,dz),mx=len>.4?dx/len:0,mz=len>.4?dz/len:0,jump=false,interact=false;
+ let dx=step.x-p.x,dz=step.z-p.z,len=Math.hypot(dx,dz),mx=len>.4?dx/len:0,mz=len>.4?dz/len:0,jump=false,interact=false,avoid=false;
  if(mx||mz){
   const o={x:p.x,y:p.y+.55,z:p.z},d={x:mx,y:0,z:mz};
   if(wallDistance(sim.map,o,d,1.3)<1.1){
+   avoid=true;
    interact=true;const left={x:-mz,y:0,z:mx},right={x:mz,y:0,z:-mx};
    const side=wallDistance(sim.map,o,left,2.5)>wallDistance(sim.map,o,right,2.5)?left:right;
    jump=wallDistance(sim.map,{...o,y:p.y+1.7},d,1.3)>1.2&&now>(brain.nextJump||0);
    if(!jump){mx=side.x;mz=side.z;}
   }
   if(!walkEdge(sim.map,p,p.x+mx*.7,p.z+mz*.7)&&!jump){
+   avoid=true;
    // Try a capsule-clear side route immediately, rather than pushing a blocked window.
    const options=[{x:-mz*(brain.side||1),z:mx*(brain.side||1)},{x:mz*(brain.side||1),z:-mx*(brain.side||1)}],side=options.find(d=>walkEdge(sim.map,p,p.x+d.x*.7,p.z+d.z*.7));
    mx=side?.x||0;mz=side?.z||0;brain.pathAt=0;
@@ -64,11 +66,11 @@ export function navigate(sim,p,brain,goal,skill){
  }
  if(now>=brain.checkAt){
   const stuck=Math.hypot(p.x-brain.lastX,p.z-brain.lastZ)<.4&&!arrived;
-  if(stuck){brain.failures=(brain.failures||0)+1;if(pathBudget(sim,p)){p.botPath=localRoute(sim,p,goal);brain.pathAt=now+2;brain.side*=-1;}if(brain.failures>=2){const id=brain.task?.uid??brain.task?.id;if(id!==undefined){brain.unreachable??={};brain.unreachable[id]=now+12;brain.visited[id]=now;}brain.decision=0;brain.task=null;brain.failures=0;p.botPath=[];}}
+  if(stuck){brain.failures=(brain.failures||0)+1;brain.commitUntil=0;brain.tactic=null;if(pathBudget(sim,p)){p.botPath=localRoute(sim,p,goal);brain.pathAt=now+2;brain.side*=-1;}if(brain.failures>=2){const id=brain.task?.uid??brain.task?.id;if(id!==undefined){brain.unreachable??={};brain.unreachable[id]=now+12;brain.visited[id]=now;}brain.decision=0;brain.task=null;brain.failures=0;p.botPath=[];}}
   else brain.failures=0;
   brain.lastX=p.x;brain.lastZ=p.z;brain.checkAt=now+Math.max(.7,skill.decision*.6);
  }
- for(const other of nearbyPlayers(sim,p,1.5)){const d=Math.hypot(p.x-other.x,p.z-other.z);if(d>.01&&d<1.5){mx+=(p.x-other.x)/d*(1.5-d);mz+=(p.z-other.z)/d*(1.5-d);}}
+ for(const other of nearbyPlayers(sim,p,1.5)){const d=Math.hypot(p.x-other.x,p.z-other.z);if(d>.01&&d<1.5){avoid=true;mx+=(p.x-other.x)/d*(1.5-d);mz+=(p.z-other.z)/d*(1.5-d);}}
  if(jump)brain.nextJump=now+1.1;
- const lenMove=Math.max(1,Math.hypot(mx,mz));return {mx:mx/lenMove,mz:mz/lenMove,jump,interact};
+ const lenMove=Math.max(1,Math.hypot(mx,mz));return {mx:mx/lenMove,mz:mz/lenMove,jump,interact,moveTarget:!avoid?step:null};
 }

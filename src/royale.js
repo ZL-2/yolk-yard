@@ -17,7 +17,7 @@ import {markerAction} from './team-markers.js';
 import {newActivity,meaningfulActivity} from './activity.js';
 import {resetStance,canFight,eyeHeight} from './stance.js';
 import {REVIVE_RULES,mayDown,downPlayer,prepareRevive,tickRevives,resolveDownedTeams,rescueBotInput} from './team-survival.js';
-import {scheduledBotInput} from './bot-runtime.js';
+import {scheduledBotInput,suspendBotInput} from './bot-runtime.js';
 import {shadowCharges} from './shadowstep.js';
 import {SPAWN_ISLAND,distributedSpawn} from './spawn-island.js';
 import {isTeamRoyale,teammates,livingTeams,teamKey} from './teams.js';
@@ -516,8 +516,8 @@ export class RoyaleSimulation extends Simulation {
  }
  botInput(p){
   if(p.boss)return bossInput(this,p);
-  const rescue=rescueBotInput(this,p);if(rescue)return rescue;
-  if(p.flight!=='ground')return this.thinkBot(p);
+  const rescue=rescueBotInput(this,p);if(rescue){suspendBotInput(this,p);return rescue;}
+  if(p.flight!=='ground'){suspendBotInput(this,p);return this.thinkBot(p);}
   return scheduledBotInput(this,p,()=>this.thinkBot(p),{combat:.16,roam:.25});
  }
  thinkBot(p){
