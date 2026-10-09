@@ -35,10 +35,10 @@ test('movement activity stays on its authenticated socket and does not scan reta
  const state={round:1,matchId:'m',mode:'ffa',phase:'playing',hostId:'host',input:{yaw:0,pitch:0},players:[{id:'host',health:100,x:0,z:0},{id:'guest',health:100,x:0,z:0}],events:[]};
  const otherState={...state,players:[state.players[0]]};
  service.frame(host,state);service.frame(other,otherState);now=1;service.frame(host,state);service.frame(other,otherState);
- const match=service.matches.get('room:m:1'),p=match.players.get('guest'),otherPlayer=service.matches.get('other-room:m:1').players.get('host');
+ const match=service.matches.get('room:m:1'),p=match.players.get('guest'),otherPlayer=service.matches.get('other-room:m:1').players.get('host'),otherActivityAt=otherPlayer.activity.last;
  for(let i=0;i<1000;i++)service.matches.set('finished-'+i,{finished:true,players:{values(){throw Error('Retained result traversed by movement input');}}});
  now=2;service.input(guest,{yaw:0});now=3;service.input(guest,{yaw:1});
- assert.equal(p.inputAt,3);assert.equal(p.activity.last,3);assert.equal(otherPlayer.inputAt,undefined);assert.equal(otherPlayer.activity.last,1);
+ assert.equal(p.inputAt,3);assert.equal(p.activity.last,3);assert.equal(otherPlayer.inputAt,undefined);assert.equal(otherPlayer.activity.last,otherActivityAt);
  now=4;service.frame(host,{...state,phase:'results'});service.input(guest,{yaw:2});assert.equal(p.inputAt,3,'settled matches stop receiving input');
  await service.close();
 });

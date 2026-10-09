@@ -143,7 +143,7 @@ const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(k
 let progressMatch='';
 let crownStatus=read('ravelfront-crown-status',{season:1,wins:0,owned:false,unlocked:false}),crownStatusKey='';
 let menuSection=['locker','shop','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
-let leaderboards=null,leaderboardTab='kills',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0;
+let leaderboards=null,leaderboardTab='kills',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
 const menuShopStates={};
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
 let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
@@ -249,12 +249,13 @@ function titleBar() {
   return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
 function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
-function renderLeaderboard(focus=false){const box=$('#menu .frontier-leaderboard');if(!box)return;const scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup(menuModel());box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus)box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}
+function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}}
 async function refreshLeaderboards(force=false){
- if(screen!=='menu'||menuSection!=='play'||!party?.ready||leaderboardPending||!force&&performance.now()-leaderboardFetchedAt<30000)return;
- leaderboardPending=true;try{let progressToken;try{progressToken=localStorage.getItem('ravelfront-progress-token');}catch{}leaderboards=await party.request('leaderboards',{progressToken});leaderboardError='';}catch(error){leaderboardError=error.message;}finally{leaderboardPending=false;leaderboardFetchedAt=performance.now();renderLeaderboard();}
+ if(screen!=='menu'||menuSection!=='play'&&dialogType!=='leaderboards'||!party?.ready||leaderboardPending||!force&&leaderboards&&performance.now()-leaderboardFetchedAt<15000)return;
+ const offset=dialog.open&&dialogType==='leaderboards'?leaderboardOffset:0;
+ leaderboardPending=true;renderLeaderboard();try{let progressToken;try{progressToken=localStorage.getItem('ravelfront-progress-token');}catch{}const result=await party.request('leaderboards',{progressToken,offset});if(!offset)leaderboards=result;leaderboardPageBoards=result;leaderboardError='';}catch(error){leaderboardError=error.message;}finally{leaderboardPending=false;leaderboardFetchedAt=performance.now();renderLeaderboard();}
 }
-setInterval(()=>{void refreshLeaderboards();},30000);
+setInterval(()=>{void refreshLeaderboards();},15000);
 function refreshPublicMatch(){
  if(screen!=='menu'||menuSection!=='play')return;
  const card=$('#menu .public-royale-card');if(!card)return;
@@ -857,6 +858,7 @@ function leave(confirm = false,notifyParty=true) {
   state = null;
   predicted = null;
   screen = "menu";
+  leaderboardFetchedAt=0;
   paused = true;
   busy = false;
   keys.clear();
@@ -1191,7 +1193,7 @@ async function launchParty(launch){
 }
 function initializeParty(){
  party=new PartyClient(profile,{
-  status:status=>{if(screen==='menu')renderMenu();if(status==='Connected'){void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
+  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   'public-match':publicMatchChanged,
@@ -1214,6 +1216,8 @@ function inventoryAction(action,index,from){
  if(dialogType==='royale-inventory')royaleUI.updateInventory(state.players.find(p=>p.id===localId));
 }
 const actions = {
+ 'leaderboard-open':()=>{leaderboardOffset=0;leaderboardPageBoards=leaderboards;modal('FRONTIER LEADERS',`<section class="frontier-leaderboard frontier-leaderboard-expanded">${leaderboardMarkup({...menuModel(),expanded:true})}</section>`,'leaderboards');void refreshLeaderboards(true);},
+ 'leaderboard-refresh':()=>{void refreshLeaderboards(true);},
  'owner-map-editor':()=>ownerConsole.openMapEditor(),
  'owner-refresh':()=>ownerConsole.refresh(),
  'owner-logout':()=>ownerConsole.logout(),
@@ -1339,6 +1343,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("button,[data-action]");
   if (!b) return;
   if(b.dataset.leaderboardTab){leaderboardTab=b.dataset.leaderboardTab==='wins'?'wins':'kills';renderLeaderboard(true);}
+  if(b.dataset.leaderboardPage!==undefined&&!leaderboardPending&&dialogType==='leaderboards'){leaderboardOffset=Math.max(0,Number(b.dataset.leaderboardPage)||0);$('#dialog .frontier-board-ranks').scrollTop=0;void refreshLeaderboards(true);}
   if(b.dataset.socialTab){socialTab=b.dataset.socialTab;void socialMenu();}
   if(b.dataset.socialPage!==undefined){socialOffset=Number(b.dataset.socialPage);void socialMenu();}
   if(b.dataset.spectateFriend){if(state){toast('Return to the lobby before spectating a friend.');return;}b.disabled=true;void partyRequest('spectate-friend',{id:b.dataset.spectateFriend}).then(()=>{b.disabled=false;});}

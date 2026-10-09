@@ -40,7 +40,7 @@ export class PartyService{
   switch(m.type){
    case 'ping':return {presence:this.presence(u.id)};
    case 'profile':u.profile=safeProfile(m.profile);this.store.identities.get(u.id).profile=u.profile;this.store.save();this.relay.progression.leaderboardCache=null;this.sync(p);return;
-   case 'leaderboards':this.limit(u,'leaderboards',6,60000);this.relay.progression.restoreLeaderboardViewer(m.progressToken,u.id);return this.relay.progression.leaderboards(u.id);
+   case 'leaderboards':this.limit(u,'leaderboards',30,60000);this.relay.progression.restoreLeaderboardViewer(m.progressToken,u.id);return this.relay.progression.leaderboards(u.id,{offset:m.offset});
    case 'social':this.limit(u,'browse',30,60000);return this.social(u,m);
    case 'online':this.limit(u,'browse',30,60000);return this.social(u,m).online;
    case 'lookup':{this.limit(u,'lookup',12,60000);const code=normalizeFriendCode(m.code);if(!/^[A-HJ-NP-Z2-9]{10}$/.test(code))throw Error('Enter a valid Friend Code, for example AB7KQ-4M2QX.');const id=this.store.codes.get(code);if(!id||this.store.blocked(u.id,id))throw Error('Friend Code not found or player unavailable.');if(id===u.id)throw Error('That is your own Friend Code.');return this.card(u.id,id);}

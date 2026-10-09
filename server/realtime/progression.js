@@ -14,10 +14,18 @@ export class ProgressionService{
  identity(token){return typeof token==='string'&&/^[a-f0-9]{32,64}$/.test(token)?createHash('sha256').update(token).digest('hex'):null;}
  async register(peer,token){peer.progressId=this.identity(token)||randomUUID();await this.ready;for(const receipt of this.account(peer.progressId).receipts.slice(-30))this.relay.send(peer,{type:'reward',receipt});}
  account(id){if(!this.accounts.has(id))this.accounts.set(id,{receipts:[],pairs:[],earned:[],encounters:[]});return this.accounts.get(id);}
- bindPublicPlayer(peer,socialId){const identity=this.relay.parties?.store.identities.get(socialId);if(!identity||!peer.progressId)return;const a=this.account(peer.progressId);if(a.socialId===socialId&&a.publicName===identity.profile.name)return;a.socialId=socialId;a.publicName=identity.profile.name;this.dirty=true;this.leaderboardCache=null;}
+ bindPublicPlayer(peer,socialId,{participant=false}={}){const identity=this.relay.parties?.store.identities.get(socialId);if(!identity||!peer.progressId)return;const a=this.account(peer.progressId);if(a.socialId===socialId&&a.publicName===identity.profile.name&&(!participant||a.publicParticipant))return;a.socialId=socialId;a.publicName=identity.profile.name;if(participant)a.publicParticipant=true;this.dirty=true;this.leaderboardCache=null;}
  restoreLeaderboardViewer(token,socialId){const progressId=this.identity(token);if(progressId&&this.accounts.has(progressId))this.bindPublicPlayer({progressId},socialId);}
  recordPublicStat(p,metric){if(p.bot)return;const a=this.account(p.identity),totals=publicTotals(a);totals[metric]++;this.dirty=true;this.leaderboardCache=null;}
- leaderboards(socialId){const now=this.clock();if(!this.leaderboardCache||now-this.leaderboardCache.time>30)this.leaderboardCache={time:now,ranks:rankPublicPlayers(this.accounts,this.relay.parties?.store.identities)};return {updatedAt:this.leaderboardCache.time,...publicLeaderboardView(this.leaderboardCache.ranks,socialId)};}
+ recordPublicRound(p,m,won=false){
+  if(p.bot||!p.identity||p.afkRemoved||p.raw?.lateSpectator||p.raw?.contestant===false)return;
+  const a=this.account(p.identity),totals=publicTotals(a),id=m.key.slice(m.room.length+1);a.publicRounds??=[];
+  let round=a.publicRounds.find(r=>r.id===id);if(!round){round={id,kills:0,wins:0};a.publicRounds.push(round);a.publicRounds=a.publicRounds.slice(-128);}
+  const kills=Math.min(MAX_CONTESTANTS-1,Math.max(p.kills||0,Number.isInteger(p.raw?.kills)?p.raw.kills:0)),wins=Number(won),deltaKills=Math.max(0,kills-round.kills),deltaWins=Math.max(0,wins-round.wins),first=!a.publicParticipant;
+  if(!deltaKills&&!deltaWins&&!first)return;
+  round.kills+=deltaKills;round.wins+=deltaWins;totals.kills+=deltaKills;totals.wins+=deltaWins;a.publicParticipant=true;this.dirty=true;this.leaderboardCache=null;
+ }
+ leaderboards(socialId,options){const now=this.clock();if(!this.leaderboardCache||now-this.leaderboardCache.time>30)this.leaderboardCache={time:now,ranks:rankPublicPlayers(this.accounts,this.relay.parties?.store.identities)};return {updatedAt:this.leaderboardCache.time,...publicLeaderboardView(this.leaderboardCache.ranks,socialId,options)};}
  unbindInput(peer,key){const targets=this.inputTargets.get(peer);if(!targets)return;targets.delete(key);if(!targets.size)this.inputTargets.delete(peer);}
  bindInput(match,p,peer){
   if(p.peer&&p.peer!==peer)this.unbindInput(p.peer,match.key);
@@ -41,12 +49,14 @@ export class ProgressionService{
   const room=peer.id,now=this.clock(),key=room+':'+String(s.matchId).slice(0,64)+':'+s.round;
   if(warmup.has(s.stage))return;
   let m=this.matches.get(key);
-  if(!m){if(s.phase!=='playing')return;m={id:randomUUID(),key,room,started:now,last:now,event:-1,players:new Map(),eliminations:[],hits:new Map(),custom:peer.rewardPublic!==true,mode:s.mode==='royale'?'royale':['ffa','teams'].includes(s.mode)?s.mode:'arena',difficulty:Math.max(1,Math.min(4,s.difficulty||1)),hostIdentity:peer.progressId};this.matches.set(key,m);}
-  if(m.finished||now-m.last<.35)return;
+  if(!m){if(s.phase!=='playing'&&!(peer.rewardPublic===true&&s.mode==='royale'))return;m={id:randomUUID(),key,room,started:now,last:now-.5,event:-1,players:new Map(),eliminations:[],hits:new Map(),custom:peer.rewardPublic!==true,mode:s.mode==='royale'?'royale':['ffa','teams'].includes(s.mode)?s.mode:'arena',difficulty:Math.max(1,Math.min(4,s.difficulty||1)),hostIdentity:peer.progressId};this.matches.set(key,m);}
+  if(m.finished)return;
+  const scoreChanged=!m.custom&&m.mode==='royale'&&s.players.some(p=>!p.bot&&Number.isInteger(p.kills)&&p.kills>(m.players.get(p.id)?.raw?.kills||0));
+  if(s.phase!=='results'&&now-m.last<.35&&!scoreChanged)return;
   const recovered=now-m.last>5,dt=Math.min(1.5,Math.max(0,now-m.last));m.last=now;m.state=s;
   if(recovered)for(const p of m.players.values())p.activity.last=now;
   const seen=new Set(),connected=new Map([...this.relay.peers.values()].filter(p=>p.ws).map(p=>[p.id,p]));
-  for(const raw of s.players){if(typeof raw.id!=='string'||seen.has(raw.id)||raw.lateSpectator)continue;seen.add(raw.id);
+  for(const raw of s.players){if(typeof raw.id!=='string'||seen.has(raw.id)||raw.lateSpectator||raw.friendSpectator||raw.contestant===false)continue;seen.add(raw.id);
    const isHost=raw.id===s.hostId,remote=isHost?peer:connected.get(raw.id),bot=raw.bot===true&&/^bot-(?:\d+|fill-\d+x*)$/.test(raw.id);
    if(!bot&&!remote)continue;
    if(!bot&&!isHost&&![...remote.links.values()].some(p=>p.id===room||p.progressId===peer.progressId))continue;
@@ -62,9 +72,10 @@ export class ProgressionService{
   }
   for(const e of s.events||[]){if(!Number.isInteger(e.id)||e.id<=m.event)continue;m.event=Math.max(m.event,e.id);const p=m.players.get(e.player),target=m.players.get(e.target);if(e.type==='afk-removed'&&p){p.afkRemoved=true;p.controlled=false;continue;}if(!p||p.afkRemoved)continue;
    if(e.type==='hit'&&target&&target!==p){p.activity.damage+=Math.max(0,Math.min(100,e.amount||0));if(p.controlled)meaningfulActivity(p.activity,'damage',target.id,now);const hits=m.hits.get(target.id)||new Map();hits.set(p.id,now);m.hits.set(target.id,hits);}
-   if(e.type==='elimination'&&target&&target!==p&&now-(target.lastEliminated||-999)>2){target.lastEliminated=now;p.kills++;if(!m.custom&&m.mode==='royale')this.recordPublicStat(p,'kills');m.eliminations.push({attacker:p.id,target:target.id,time:now});for(const [id,t]of m.hits.get(target.id)||[])if(id!==p.id&&now-t<12){const helper=m.players.get(id);if(helper)helper.assists++;}m.hits.delete(target.id);}
+   if(e.type==='elimination'&&target&&target!==p&&now-(target.lastEliminated??-999)>2){target.lastEliminated=now;p.kills++;m.eliminations.push({attacker:p.id,target:target.id,time:now});for(const [id,t]of m.hits.get(target.id)||[])if(id!==p.id&&now-t<12){const helper=m.players.get(id);if(helper)helper.assists++;}m.hits.delete(target.id);}
    const activity=activityEvent(e);if(p.controlled&&activity&&meaningfulActivity(p.activity,'action',activity.signature+':'+Math.round(p.raw.x/3)+','+Math.round(p.raw.z/3),now)&&activity.contribution)p.activity.contributions++;
   }
+  if(!m.custom&&m.mode==='royale')for(const p of m.players.values())this.recordPublicRound(p,m);
   if(s.phase==='results')this.settle(m);
  }
  settle(m){
@@ -75,8 +86,8 @@ export class ProgressionService{
    const kills=m.eliminations.filter(e=>e.attacker===p.id).map(e=>{const victim=m.players.get(e.target),repeat=account.pairs.filter(x=>x.target===victim.identity).length;account.pairs.push({target:victim.identity,time:now});return {bot:victim.bot,difficulty:victim.difficulty,repeat,...(!victim.bot&&!participation({...victim.activity,elapsed:victim.activity.elapsed??elapsed,afkRemoved:victim.afkRemoved})?{repeat:9}:{})};});
    const ranked=all.filter(o=>!o.raw?.lateSpectator).sort((a,b)=>b.kills-a.kills||(a.raw?.deaths||0)-(b.raw?.deaths||0));
    const place=m.mode==='royale'?p.raw?.place:ranked.indexOf(p)+1;
-   const won=m.mode==='royale'?place===1:m.mode==='teams'?(m.state.scores?.[p.raw?.team]||0)>(m.state.scores?.[1-p.raw?.team]||0):place===1&&p.kills>0;
-   if(won&&!m.custom&&m.mode==='royale'&&!p.afkRemoved)this.recordPublicStat(p,'wins');
+   const won=m.mode==='royale'?place===1&&(m.state.winnerId===undefined||m.state.winnerId===p.id||m.state.teamSize>1&&m.state.winnerId!=null&&m.state.winnerTeam===p.raw?.team):m.mode==='teams'?(m.state.scores?.[p.raw?.team]||0)>(m.state.scores?.[1-p.raw?.team]||0):place===1&&p.kills>0;
+   if(won&&!m.custom&&m.mode==='royale')this.recordPublicRound(p,m,true);
    const result=calculateReward({player:{...p.activity,afkRemoved:p.afkRemoved},opponents:enemy.map(o=>({...o.activity,bot:o.bot,difficulty:o.difficulty,familiarity:account.encounters.filter(e=>e.target===o.identity).length,afkRemoved:o.afkRemoved})),elapsed,custom:m.custom,mode:m.mode,place,won,eliminations:kills,assists:p.assists,hourEarned:account.earned.reduce((n,e)=>n+e.amount,0)});
    const receipt={id:m.id+':'+p.identity.slice(0,12),amount:result.amount,label:won?'Frontier secured':'Match complete',mode:m.mode,place,won,kills:result.eligible?p.kills:0,assists:result.eligible?p.assists:0,eligible:result.eligible,reason:result.reason,time:now,challenge:result.challenge,population:result.population,custom:m.custom};
    for(const o of enemy)if(!o.bot&&result.eligible)account.encounters.push({target:o.identity,time:now});
@@ -87,6 +98,6 @@ export class ProgressionService{
   if(this.relay.authority?.rooms.has(m.room))continue; // The authoritative simulation owns AFK removal.
   for(const p of m.players.values()){if(!p.controlled||p.bot||p.afkRemoved||!p.peer?.ws)continue;const remaining=Math.ceil(activityRemaining(p.activity,now));if(remaining<=12)this.relay.send(p.peer,{type:'afk',remaining});if(remaining<=0){p.afkRemoved=true;p.controlled=false;const host=this.relay.peers.get(m.room);if(host)this.relay.send(host,{type:'afk-enforce',player:p.id});}}
  }if(this.dirty){this.dirty=false;void this.save();}}
- save(){if(!this.path)return Promise.resolve();const json=JSON.stringify([...this.accounts].slice(-5000));this.saveChain=this.saveChain.then(async()=>{await mkdir(dirname(this.path),{recursive:true});await writeFile(this.path+'.tmp',json);await rename(this.path+'.tmp',this.path);}).catch(()=>{this.dirty=true;});return this.saveChain;}
+ save(){if(!this.path)return Promise.resolve();const json=JSON.stringify([...this.accounts]);this.saveChain=this.saveChain.then(async()=>{await mkdir(dirname(this.path),{recursive:true});await writeFile(this.path+'.tmp',json);await rename(this.path+'.tmp',this.path);}).catch(()=>{this.dirty=true;});return this.saveChain;}
  async close(){await this.ready;await this.save();}
 }

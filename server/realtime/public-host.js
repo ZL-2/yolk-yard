@@ -32,7 +32,7 @@ export class PublicHost {
   const status=this.summary(),spectator=!!admission.spectator||this.state&&!status.joinable;
   if((spectator?status.availableSpectators:status.availableSeats)<1)return null;
   const record={...admission,spectator:!!spectator,publicSpectator:!!spectator,crownRecord:crownRecord(this.relay.progression.account(peer.progressId).crowns)};
-  this.relay.progression.bindPublicPlayer?.(peer,record.memberId);
+  this.relay.progression.bindPublicPlayer?.(peer,record.memberId,{participant:!spectator});
   this.members.set(peer.id,{peer:peer.id,id:peer.id===this.host?.peer?this.host.id:peer.id,order:++this.order,admission:record});
   peer.publicMember=true;this.joinSerial++;return record;
  }

@@ -463,9 +463,12 @@ export class Network {
   broadcast(state) {
     if(this.serverAuthority)return;
     this.snapshot = state;
-    if(this.officialPublic&&performance.now()-(this.lastPublicProgress||0)>=500){this.lastPublicProgress=performance.now();const hostPeer=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;if(hostPeer?.id===PREFIX+this.code)hostPeer.control({type:'public-progress',state:rewardFrame(state,this.id,this.callbacks.getHostInput?.()||{})});}
-    this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     if (!this.lastPublish || performance.now() - this.lastPublish > 2000 || this.lastPublishedStage!==state.royale?.stage || this.lastPublishedPhase!==state.phase) { this.lastPublish = performance.now();this.lastPublishedStage=state.royale?.stage;this.lastPublishedPhase=state.phase;this.publishRoom(); }
+    if(this.officialPublic){
+      const scores=state.royale?.matchId+':'+state.phase+':'+state.players.filter(p=>!p.bot&&!p.lateSpectator).map(p=>p.id+','+(p.kills||0)+','+(p.place||0)).join(';');
+      if(scores!==this.lastPublicScores||performance.now()-(this.lastPublicProgress||0)>=500){this.lastPublicScores=scores;this.lastPublicProgress=performance.now();const hostPeer=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;if(hostPeer?.id===PREFIX+this.code)hostPeer.control({type:'public-progress',state:rewardFrame(state,this.id,this.callbacks.getHostInput?.()||{})});}
+    }
+    this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     state = {...state, visibility:this.visibility,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,network:{hostId:this.id,members:this.members,chatSequence:this.chatRoom.sequence}};
     const worldVersion=state.royale?`${state.royale.matchId}:${state.round}:${state.royale.lootVersion}:${state.royale.buildVersion}`:null;
     // Commit ownership changes with their recovery state: host departure must
