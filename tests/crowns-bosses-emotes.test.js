@@ -45,9 +45,9 @@ test('keyed boss caches reject missing keys and damage interruptions, consume a 
  p.inventory[1]={id:'rookKeycard',count:1};p.lastDamage=s.time;seasonInteract(s,p,{interact:true},1/60);assert.equal(p.cacheProgress,0);p.lastDamage=-100;
  for(let i=0;i<91;i++)seasonInteract(s,p,{interact:true},1/60);assert.equal(cache.opened,true);assert.equal(p.inventory[1],null);assert.ok(s.loot.some(i=>i.weapon&&i.rarity>=3));const n=s.loot.length;seasonInteract(s,p,{interact:true},1/60);assert.equal(s.loot.length,n);
 });
-test('Mythic Grappler has unlimited shots, a surface latch and cooldown; Veil has finite smoke',()=>{
+test('Mythic Grappler has unlimited shots, a protected surface latch and cooldown; Veil has finite smoke',()=>{
  const {s,p}=flat(),winch={id:'anchorWinch',count:1};assert.equal(useSeasonItem(s,p,winch),true);assert.equal(p.grapple.valid,false);assert.equal(useSeasonItem(s,p,winch),false);s.time+=2;
- s.map.boxes=[{x:0,y:0,z:-12,w:4,h:4,d:1}];assert.equal(useSeasonItem(s,p,winch),true);assert.equal(p.grapple.valid,true);for(let i=0;i<40;i++)movePlayer(p,{},s.map,1/60);assert.ok(p.z<-5);assert.equal(winchCharges(winch,s.time),Infinity);assert.equal(p.fall?.immune||false,false);
+ s.map.boxes=[{x:0,y:0,z:-12,w:4,h:4,d:1}];assert.equal(useSeasonItem(s,p,winch),true);assert.equal(p.grapple.valid,true);for(let i=0;i<40;i++)movePlayer(p,{},s.map,1/60);assert.ok(p.z<-5);assert.equal(winchCharges(winch,s.time),Infinity);assert.equal(p.fall?.immune,true);
  assert.equal(useSeasonItem(s,p,{id:'veilProjector'}),true);assert.equal(s.smokes.at(-1).until-s.time,6);
 });
 test('first victory grants next-match crown; crowned victory increments and unlocks the display once',()=>{
