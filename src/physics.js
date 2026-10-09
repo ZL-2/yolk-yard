@@ -215,7 +215,8 @@ function movePlayerStep(p, input, map, dt) {
   {
     const rule=TACTICAL_SPRINT,was=p.sprinting;p.stamina??=100;p.sprintRest??=0;p.sprintRecovery=Math.max(0,(p.sprintRecovery||0)-dt);
     if(p.stamina>=rule.restart)p.exhausted=false;
-    p.sprinting=!!input.sprint&&!p.boss&&!p.downed&&!p.reviving&&!p.crouching&&!p.sliding&&!p.exhausted&&p.stamina>0&&!input.aim&&!input.fire&&!p.use&&!input.buildMode&&!input.editing&&!p.reloadEnd&&(input.forward||0)>.2&&p.grounded;
+    // Carry an existing sprint through its jump; do not start a new sprint in air.
+    p.sprinting=!!input.sprint&&!p.boss&&!p.downed&&!p.reviving&&!p.crouching&&!p.sliding&&!p.exhausted&&p.stamina>0&&!input.aim&&!input.fire&&!p.use&&!input.buildMode&&!input.editing&&!p.reloadEnd&&(input.forward||0)>.2&&(p.grounded||was);
     p.tacticalSprint=p.sprinting;p.sprintBlend=Math.min(1,Math.max(0,(p.sprintBlend||0)+(p.sprinting?1:-2)*rule.acceleration*dt));
     if(p.sprinting){p.stamina=Math.max(0,p.stamina-rule.drain*dt);p.sprintRest=0;if(p.stamina===0)p.exhausted=true;}
     else{p.sprintRest+=dt;if(p.sprintRest>rule.delay)p.stamina=Math.min(100,p.stamina+rule.recharge*dt);}
@@ -232,20 +233,22 @@ function movePlayerStep(p, input, map, dt) {
   // Packet gaps are not a physical stop. Use the most recently executed move,
   // bounded by server freshness, so crouch edges can initiate slides under jitter.
   const momentumX=p.motionFresh?p.motionVX:p.vx,momentumZ=p.motionFresh?p.motionVZ:p.vz;
-  const speedBefore=Math.hypot(momentumX||0,momentumZ||0),crouchEdge=!!input.crouch&&!p.crouchLatch;
+  const speedBefore=Math.hypot(momentumX||0,momentumZ||0);
   const gx=p.grounded&&input.crouch?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=p.grounded&&input.crouch?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0,slope=Math.hypot(gx,gz);
-  if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&slope>=SEASON.slide.slope&&p.slideCooldown===0){p.sliding=true;p.slideAge=0;p.slideVX=-gx/slope*3;p.slideVZ=-gz/slope*3;}
-  if(!p.downed&&!p.reviving&&crouchEdge&&p.grounded&&speedBefore>=5.5&&p.slideCooldown===0){
+  if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&speedBefore<SEASON.slide.startSpeed&&slope>=SEASON.slide.slope&&p.slideCooldown===0){p.sliding=true;p.slideAge=0;p.slideVX=-gx/slope*3;p.slideVZ=-gz/slope*3;}
+  // Holding crouch can queue a slide through a jump or mobility-item landing.
+  // Actual momentum, not the sprint button or terrain slope, admits the slide.
+  if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&speedBefore>=SEASON.slide.startSpeed&&p.slideCooldown===0){
     p.sliding=true;p.slideAge=0;const boost=Math.min(9,speedBefore+.35)/Math.max(.01,speedBefore);p.slideVX=momentumX*boost;p.slideVZ=momentumZ*boost;
   }
   p.crouchLatch=!!input.crouch;
   if(p.sliding){
     p.slideAge=(p.slideAge||0)+dt;
-    if(!input.crouch||input.jump||p.downed||p.reviving||slope<SEASON.slide.slope&&(p.slideAge>=3.4||Math.hypot(p.slideVX,p.slideVZ)<2.6)){p.sliding=false;p.slideCooldown=.65;}
+    if(!input.crouch||input.jump||p.downed||p.reviving||slope<SEASON.slide.slope&&Math.hypot(p.slideVX,p.slideVZ)<SEASON.slide.stopSpeed){p.sliding=false;p.slideCooldown=.65;}
   }
-  p.crouching=!p.downed&&(p.sliding||!!p.reviving||!!input.crouch||!canStand(map,p));
+  p.crouching=!p.downed&&(p.sliding||!!p.reviving||!!input.crouch&&p.grounded||!canStand(map,p));
   p.lowCrouch=!!p.crouching&&!p.sliding&&!canOccupy(map,p,STANCE.crouching.height);
-  if(p.crouching||p.downed||p.reviving)p.sprinting=false;
+  if(p.crouching||p.downed||p.reviving)p.sprinting=p.tacticalSprint=false;
   if(p.downed){input={...input,jump:false,aim:false};p.crouching=false;p.sliding=false;}
   if(p.reviving){f=0;s=0;}
   const speed =

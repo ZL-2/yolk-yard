@@ -27,7 +27,7 @@ export function frontierInteract(sim,p,input,dt){
  if(nearVault&&input.interact){
   const card=p.inventory.findIndex(i=>i?.id===(v.key||'asterKeycard'));
   const eye={x:p.x,y:p.y+1.2,z:p.z},goal={x:v.reader.x,y:v.reader.y+1.2,z:v.reader.z},d=dist(eye,goal)||1;
-  if(card<0||sim.time-p.lastDamage<.25||wallDistance(sim.map,eye,{x:(goal.x-eye.x)/d,y:(goal.y-eye.y)/d,z:(goal.z-eye.z)/d},d)<d-.15){p.vaultProgress=0;return true;}
+  if(card<0||sim.time-(p.lastInterruptDamage??p.lastDamage)<.25||wallDistance(sim.map,eye,{x:(goal.x-eye.x)/d,y:(goal.y-eye.y)/d,z:(goal.z-eye.z)/d},d)<d-.15){p.vaultProgress=0;return true;}
   if(p.vaultId!==v.id){p.vaultId=v.id;p.vaultProgress=0;}p.vaultProgress=(p.vaultProgress||0)+dt;
   if(p.vaultProgress>=WORLD_RULES.vaultUse){const state=vaultState(sim,v.id);state.open=true;state.openedAt=sim.time;p.inventory[card]=null;p.vaultProgress=0;setDoor(sim,sim.map.doors.find(d=>d.id===v.doorId),true,p);sim.syncInventory(p);sim.emit('vault-open',{player:p.id,vaultId:v.id,name:v.name,x:v.x,y:v.y,z:v.z});sim.emit('royale-cue',{cue:'vault-unlock',player:p.id,x:v.x,y:v.y,z:v.z});}
   p.interactLatch=true;return true;

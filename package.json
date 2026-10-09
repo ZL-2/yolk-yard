@@ -1,6 +1,6 @@
 {
   "name": "ravelfront",
-  "version": "5.1.0",
+  "version": "5.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
     "test": "node --test tests/*.test.js",
     "test:bots": "node --test --test-concurrency=1 tests/bot-runtime.test.js tests/bot-tactics.test.js tests/bot-movement-speed.test.js tests/royale-teammate-bots.test.js tests/field-polish.test.js tests/shadowstep-field.test.js tests/streaming-performance.test.js",
     "test:bots-load": "BOT_VALIDATE=1 node scripts/bot-behavior-check.mjs",
+    "test:mobility": "node --test --test-concurrency=1 tests/mobility-storm.test.js tests/vault-grappler.test.js tests/shadowstep-field.test.js tests/bot-movement-speed.test.js tests/remote-input.test.js && node --test --test-name-pattern='ordinary landing|shock and impulse launches' tests/gameplay-overhaul.test.js && node --test --test-name-pattern='traversal routes|tactical sprint|guest presentation' tests/world-overhaul.test.js && node --test --test-name-pattern='crouch changes|slide requires|remote slide' tests/field-systems.test.js && node --test --test-name-pattern='holding crouch' tests/season-one.test.js",
     "test:browser": "node scripts/keybind-browser-check.mjs && node scripts/chat-browser-check.mjs && node scripts/arms-browser-check.mjs && node scripts/open-browser-check.mjs",
     "test:relay": "node scripts/relay-check.mjs",
     "test:quality": "node scripts/quality-check.mjs",

@@ -48,11 +48,11 @@ test('ordinary landing damage uses the fall apex, respects small jumps, higher l
  const platform={...flat,boxes:[{x:0,z:0,y:8,w:10,d:10,h:1}]},q={...fall(0),y:20,grounded:false,vy:0};resetAirborne(q);for(let i=0;i<180&&!q.grounded;i++)movePlayer(q,{},platform,1/60);assert.equal(q.y,9);assert.equal(fallDamage(q.landing),0);
 });
 
-test('shock launches protect one landing and never deploy a glider; ordinary impulses remain vulnerable',()=>{
+test('shock and impulse launches protect one landing and never deploy a glider',()=>{
  const p={...fall(0)};launchPlayer(p,{source:'shockwave',vy:28,vx:6});let high=0;
  for(let i=0;i<400&&!p.grounded;i++){movePlayer(p,{},flat,1/60);high=Math.max(high,p.y);assert.notEqual(p.flight,'glide');}assert.ok(high>12);assert.equal(fallDamage(p.landing),0);assert.equal(p.fall,null);assert.equal(p.redeploy,false);
  p.y=25;p.grounded=false;p.vy=0;for(let i=0;i<300&&!p.grounded;i++)movePlayer(p,{},flat,1/60);assert.ok(fallDamage(p.landing)>=100);
- assert.ok(fallDamage(fall(25,'impulse').landing)>=100);
+ assert.equal(fallDamage(fall(25,'impulse').landing),0);
  const pad={...fall(0)};launchPlayer(pad,{source:'launchpad',vy:38});let glided=false;for(let i=0;i<600&&!pad.grounded;i++){movePlayer(pad,{},flat,1/60);glided ||=pad.flight==='glide';}assert.ok(glided);assert.equal(fallDamage(pad.landing),0);
 });
 

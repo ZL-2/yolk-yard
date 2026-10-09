@@ -38,6 +38,7 @@ import {groundAt} from './terrain.js';
 import {ITEMS,ammoType,AMMO_CAPS,makeStorm,stormAt,makeFlight,transportAt} from './royale-data.js';
 
 const battlePreparation=new WeakMap();
+const movementItemKinds=new Set(['jumpRig','shadowstep','winch','impulse','launchpad']);
 
 export class RoyaleSimulation extends Simulation {
  constructor(options={}){
@@ -318,7 +319,11 @@ export class RoyaleSimulation extends Simulation {
   if(source!=='Storm'&&source!=='Fall'&&victim.shield>0){absorbed=Math.min(victim.shield,amount);victim.shield-=absorbed;amount-=absorbed;
    this.emit('royale-cue',{cue:victim.shield===0?'shield-break':'shield-hit',player:victim.id,x:victim.x,y:victim.y,z:victim.z});
   }
-  cancelEmote(victim);victim.botIntentAt=0;this.cancelUse(victim);victim.chestProgress=0;victim.lastDamage=this.time;
+  // Storm ticks still hurt, but must not restart item/search timers every frame.
+  // Keep direct damage separate so a keycard can also finish unlocking in storm.
+  victim.lastInterruptDamage??=victim.lastDamage??-100;
+  if(source!=='Storm'){victim.lastInterruptDamage=this.time;victim.botIntentAt=0;this.cancelUse(victim);victim.chestProgress=0;}
+  cancelEmote(victim);victim.lastDamage=this.time;
   if(source!=='Storm'&&source!=='Bleed out'){victim.reviveBlockedUntil=this.time+REVIVE_RULES.damageDelay;victim.reviving=null;}
   if(amount>=victim.health&&mayDown(this,victim,source))downPlayer(this,victim,attacker,source,precision,shotId);
   else if(amount>0)super.damage(victim,attacker,amount,source,precision,shotId);
@@ -470,7 +475,7 @@ export class RoyaleSimulation extends Simulation {
    if(slot!==p.slot){p.slot=slot;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);this.cancelUse(p);this.emit('royale-cue',{player:p.id,cue:'weapon-swap'});}
    if(p.slot>0&&input.swapSlot>0&&input.swapSlot<6&&input.swapSlot!==p.slot&&!p.swapLatch){const j=input.swapSlot;[p.inventory[p.slot],p.inventory[j]]=[p.inventory[j],p.inventory[p.slot]];p.reloadEnd=0;this.cancelUse(p);this.syncInventory(p);beginEquip(p,this.time,true);}
    p.swapLatch=input.swapSlot>=0;
-   if(input.sprint)this.cancelUse(p);
+   if(input.sprint&&p.use&&!movementItemKinds.has(ITEMS[p.use.id]?.kind))this.cancelUse(p);
    this.moveWithCommands(p,input,dt,p.emote&&commands?{...commands,steps:commands.steps.map(step=>({...step,yaw:p.emote.yaw,pitch:0,forward:0,strafe:0}))}:commands);p.moving=Math.hypot(p.x-previous.x,p.z-previous.z)>.001;p.aim=!!input.aim&&!reviving&&p.flight==='ground'&&!p.use&&!!p.inventory[p.slot]?.weapon;p.vx=(p.x-previous.x)/dt;p.vz=(p.z-previous.z)/dt;
    if(p.landing){const amount=warmup?0:fallDamage(p.landing);p.landing=null;if(amount)this.damage(p,null,amount,'Fall');if(p.health<=0)continue;}
    if(wasFlight!==p.flight)this.emit('royale-cue',{player:p.id,cue:p.flight==='ground'?'land':p.flight==='dive'?'glider-cut':'glider-deploy',x:p.x,y:p.y,z:p.z});

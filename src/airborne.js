@@ -4,7 +4,7 @@
 export const FALL_RULES=Object.freeze({story:4,safe:12,lethal:24,firstDamage:10});
 export const LAUNCH_RULES=Object.freeze({
  normal:{immune:false,redeploy:false,forceGlider:false},
- impulse:{immune:false,redeploy:false,forceGlider:false},
+ impulse:{immune:true,redeploy:false,forceGlider:false},
  shockwave:{immune:true,redeploy:false,forceGlider:false},
  launchpad:{immune:true,redeploy:true,forceGlider:true},
  bus:{immune:true,redeploy:true,forceGlider:false},

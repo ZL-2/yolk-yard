@@ -30,13 +30,13 @@ test('all three vaults have independent physical gates, keys and four guaranteed
 test('grappler crosshair ray and shot agree; misses animate, cooldown persists and Mythic never runs out',()=>{
  const{s,p}=flat(),item={id:'anchorWinch',count:1};assert.equal(grappleAim(s.map,p,wallDistance).valid,false);assert.equal(useSeasonItem(s,p,item),true);assert.equal(p.grapple.valid,false);assert.equal(useSeasonItem(s,p,item),false);
  for(let i=0;i<150;i++)movePlayer(p,{},s.map,1/60);assert.equal(p.z,0);assert.equal(p.grapple,null);s.time+=GRAPPLER.cooldown;s.map.boxes=[{x:0,y:0,z:-15,w:5,h:5,d:1}];assert.equal(grappleAim(s.map,p,wallDistance).valid,true);assert.equal(useSeasonItem(s,p,item),true);
- for(let i=0;i<60;i++)movePlayer(p,{},s.map,1/60);assert.ok(p.z<-10&&p.z>-14.2,'pulls toward surface and stops outside wall');assert.ok(canStand(s.map,p));assert.equal(p.fall?.immune||false,false);assert.equal(item.charges,undefined);
+ for(let i=0;i<60;i++)movePlayer(p,{},s.map,1/60);assert.ok(p.z<-10&&p.z>-14.2,'pulls toward surface and stops outside wall');assert.ok(canStand(s.map,p));assert.equal(p.fall?.immune??p.landing?.immune,true);assert.equal(item.charges,undefined);
  s.time+=2;p.inventory[1]=item;p.slot=1;p.use=null;p.equipUntil=0;s.beginUse(p);assert.ok(p.use,'normal fire input can start an unlimited Grappler');s.finishUse(p);assert.equal(p.grapple.phase,'hook');
  p.inventory[1]=item;const ready=item.readyAt;s.dropSlot(p,1);assert.equal(s.loot.find(i=>i.id==='anchorWinch').readyAt,ready);
 });
-test('grappler travel sweeps collisions, resets prior fall height only on a real latch and grants no glider immunity',()=>{
+test('grappler travel sweeps collisions and protects a real latch without granting glider redeploy',()=>{
  const{s,p}=flat();Object.assign(p,{y:6,grounded:false,fall:{apex:45,immune:false,source:'normal'}});startGrapple(p,{origin:{x:0,y:7.7,z:0},anchor:{x:0,y:7.7,z:-8},length:8,valid:true},s.time);
- for(let i=0;i<10;i++)movePlayer(p,{},s.map,1/60);assert.equal(p.fall.source,'grapple');assert.ok(p.fall.apex<7);assert.equal(p.redeploy,false);assert.equal(p.forceGlider,false);assert.ok(fallDamage({distance:30,immune:p.fall.immune})>=100);
+ for(let i=0;i<10;i++)movePlayer(p,{},s.map,1/60);assert.equal(p.fall.source,'grapple');assert.ok(p.fall.apex<7);assert.equal(p.redeploy,false);assert.equal(p.forceGlider,false);assert.equal(fallDamage({distance:30,immune:p.fall.immune}),0);
  s.map.boxes=[{x:0,y:0,z:-4,w:3,h:20,d:.15}];for(let i=0;i<120;i++)movePlayer(p,{},s.map,1/60);assert.ok(p.z>-3.61,'thin cover added in flight cannot be tunneled through');
 });
 test('the returning plunger tracks the shooter after moving away from the launch point',()=>{

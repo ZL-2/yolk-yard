@@ -1,6 +1,6 @@
-// Skye-style Mythic: unlimited plunger shots; no glider or fall immunity.
+// Unlimited plunger shots; successful pulls protect the following landing, not gunfire.
 // Range/projectile/cadence references are kept separate from pull-motion tuning.
-export const GRAPPLER=Object.freeze({range:75,minRange:2,projectileSpeed:75,cooldown:1/.65,returnTime:1.26,pullSpeed:26});
+export const GRAPPLER=Object.freeze({range:75,minRange:2,projectileSpeed:75,cooldown:1/.65,returnTime:1.26,pullSpeed:26,latchHop:4.8,releaseHop:4.8});
 export function grappleAim(map,p,ray){
  const cp=Math.cos(p.pitch||0),d={x:-Math.sin(p.yaw||0)*cp,y:Math.sin(p.pitch||0),z:-Math.cos(p.yaw||0)*cp};
  const origin={x:p.x,y:p.y+(p.crouching?1.05:1.7),z:p.z},length=ray(map,origin,d,GRAPPLER.range);
@@ -13,7 +13,7 @@ export function startGrapple(p,aim,time){
 }
 function release(p,g,momentum=true){
  g.phase='return';g.returnAt=g.elapsed;
- if(momentum){p.launchVelocity={x:g.vx||0,z:g.vz||0};p.vy=Math.min(12,g.vy||0);p.grounded=false;}
+ if(momentum){p.launchVelocity={x:g.vx||0,z:g.vz||0};p.vy=Math.max(GRAPPLER.releaseHop,Math.min(12,g.vy||0));p.grounded=false;}
 }
 export function stepGrapple(p,input,map,dt,occupy,ground){
  const g=p.grapple;if(!g)return false;
@@ -23,17 +23,19 @@ export function stepGrapple(p,input,map,dt,occupy,ground){
  if(g.phase==='hook'){
   if(g.elapsed<g.hookTime)return false;
   if(!g.valid){release(p,g,false);return false;}
-  g.phase='pull';p.fall={apex:p.y,immune:false,source:'grapple'};p.landing=null;p.launchVelocity=null;p.redeploy=false;p.forceGlider=false;p.flight='ground';
+  g.phase='pull';g.pullAt=g.elapsed;p.fall={apex:p.y,immune:true,source:'grapple'};p.landing=null;p.launchVelocity=null;p.redeploy=false;p.forceGlider=false;p.flight='ground';
  }
  if(input.jump&&!p.jumpLatch){p.jumpLatch=true;release(p,g);return false;}
  p.jumpLatch=!!input.jump;
  const dx=g.anchor.x-p.x,dy=g.anchor.y-1.3-p.y,dz=g.anchor.z-p.z,length=Math.hypot(dx,dy,dz)||1;
  if(length<1.1||g.elapsed>g.hookTime+GRAPPLER.range/GRAPPLER.pullSpeed+1){release(p,g);return false;}
- const travel=Math.min(length-1,GRAPPLER.pullSpeed*dt),steps=Math.max(1,Math.ceil(travel/.22));
  g.vx=dx/length*GRAPPLER.pullSpeed;g.vy=dy/length*GRAPPLER.pullSpeed;g.vz=dz/length*GRAPPLER.pullSpeed;
+ const lift=Math.max(0,GRAPPLER.latchHop-24*Math.max(0,g.elapsed-(g.pullAt??g.hookTime)));
+ if(lift>0)g.vy=Math.max(g.vy,lift);
+ const travelTime=Math.min(dt,(length-1)/GRAPPLER.pullSpeed),steps=Math.max(1,Math.ceil(Math.hypot(g.vx,g.vy,g.vz)*travelTime/.22));
  for(let i=0;i<steps;i++){
-  const q={x:p.x+dx/length*travel/steps,y:p.y+dy/length*travel/steps,z:p.z+dz/length*travel/steps};q.y=Math.max(q.y,ground(map,q.x,q.z));
-  if(!occupy(map,q)){release(p,g);p.vy=0;p.launchVelocity=null;return false;}
+  const q={x:p.x+g.vx*travelTime/steps,y:p.y+g.vy*travelTime/steps,z:p.z+g.vz*travelTime/steps};q.y=Math.max(q.y,ground(map,q.x,q.z));
+  if(!occupy(map,q)){release(p,g);p.launchVelocity=null;return false;}
   Object.assign(p,q);
  }
  p.vy=g.vy;p.grounded=false;p.sprinting=p.tacticalSprint=false;p.crouching=p.sliding=false;p.sprintBlend=0;
