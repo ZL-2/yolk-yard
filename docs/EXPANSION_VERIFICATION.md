@@ -10,6 +10,7 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 - First fully passing branch CI: `7c87e186d2fd51777284c5882abd40c06bccdb4e`.
 - Traversal/mobile follow-up: `c50ef8da010d1ab4ae3f6a8d5ef8f3c9c1b1ebd9`.
 - Previous verified code checkpoint: `ac2ac7c1cb86340e7585a582279391a8b1cc2b59`.
+- Current verified code checkpoint: `d7493b5e62d172e52f8b4ce2df283ca7891e0dc2`.
 - Branch: `expansion-foundation-142`.
 - Verification date: 2026-10-11.
 
@@ -22,7 +23,8 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 | Local real-socket public-host scenarios | Passed first-player hosting, concurrent joins, brief reconnect, graceful/abrupt/frozen-host migration, checkpoint-world preservation, guest inventory-preference delivery and preservation after migration, joining after migration, late spectator admission and authenticated leaderboards; zero server simulations, protocol 43. |
 | Production asset build | Passed on the branch. Existing large-bundle warning remains; no download-size improvement is claimed. |
 | First complete branch CI | [Run 38105284235](https://github.com/ZL-2/yolk-yard/actions/runs/38105284235) passed 213 focused tests, six HUD/guest-presentation tests, real-socket scenarios, production build, CPU guard and browser checks. |
-| Final complete branch CI | [Run 38105822036](https://github.com/ZL-2/yolk-yard/actions/runs/38105822036) passed **228 focused tests** (216 gameplay, six HUD/guest-presentation, six revive/traversal), real-socket scenarios including guest preferences/migration, production build, baseline CPU guard and every browser assertion. |
+| Previous foundation CI | [Run 38105822036](https://github.com/ZL-2/yolk-yard/actions/runs/38105822036) passed **228 focused tests** (216 gameplay, six HUD/guest-presentation, six revive/traversal), real-socket scenarios including guest preferences/migration, production build, baseline CPU guard and every browser assertion. |
+| Current follow-up CI | [Run 38108261932](https://github.com/ZL-2/yolk-yard/actions/runs/38108261932) passed **281 focused tests**, 72 seeded bot scenarios, real-socket scenarios, production build, baseline CPU comparison, desktop/mobile browser checks and the full owner-editor browser scenario. |
 | Browser acceptance | [Follow-up run 38105551883](https://github.com/ZL-2/yolk-yard/actions/runs/38105551883) passed desktop/390px settings, real aim-toggle and camera response, preferred pickup, loot comparison, combat feedback, and 320px/390px inventory/inspection checks with no page errors. Screenshots were inspected. Mobile button clipping and key/quantity overlap were corrected; stronger assertions now cover them. |
 | Traversal follow-up | 46 focused foundation/Mythic checks and six existing revive/vault/traversal scenarios passed after excluding revive during active traversal. |
 | Final recap follow-up | 28 foundation tests passed after separating actual finishing-hit source/distance from knock credit, correcting splash-healing advice and pickaxe-swap cancellation feedback; included in the successful final CI run. |
@@ -33,10 +35,10 @@ It exercises saved settings, small-screen layouts, real aim-toggle input and
 camera response, preferred-slot pickup, loot comparison, combat feedback and
 inventory layout. Screenshots and JSON reports are uploaded as
 `expansion-verification` artifacts for 14 days.
-Final screenshots, browser results and CPU samples are in
-[artifact 11689237545](https://github.com/ZL-2/yolk-yard/actions/runs/38105822036/artifacts/11689237545),
-retained until 2026-10-25. The final mobile inspection and 320px inventory
-screenshots were visually reviewed, including improved label contrast.
+Current screenshots, browser results and CPU samples are in
+[artifact 11690855631](https://github.com/ZL-2/yolk-yard/actions/runs/38108261932/artifacts/11690855631),
+retained until 2026-10-25. Camera, map validation, GLB import and the 1024px editor
+screenshots were reviewed, alongside the earlier mobile inventory review.
 The CI browser uses software-rendered WebGL. Its on-screen FPS is not a
 hardware-GPU performance measurement.
 
@@ -44,6 +46,11 @@ The full-suite failures remain visible. Several fixtures expect retired server
 arenas, retired modes, former maps/bot counts, or obsolete collision interfaces.
 Others need individual investigation. Their existence is not waived merely
 because the same failures occurred on the baseline.
+The broader [PR workflow 38108355409](https://github.com/ZL-2/yolk-yard/actions/runs/38108355409)
+also reports 605 tests / 565 passes / 40 failures. Its older arena browser script
+waits for `menuPose.time`, and its solo browser script is blocked by the Season 1
+launch dialog. Those scripts still need updating or investigation; the PR is
+**not fully green**. Deployment jobs were skipped.
 
 ## CPU comparison
 
@@ -53,19 +60,20 @@ and distance equivalence, projectile contact distance and normal equivalence,
 and ordinary movement/stance equivalence at varied time steps. New mantle/vault
 paths are covered separately at 20, 30 and 60 Hz.
 
-Latest local median wall-clock CPU workload times, in milliseconds:
+Latest GitHub runner median wall-clock CPU workload times, in milliseconds:
 
-| Workload | Baseline | Foundation | Change |
+| Workload | Baseline | Current branch | Change |
 | --- | ---: | ---: | ---: |
-| 24,000 humanoid-hit queries | 38.975 | 8.691 | 77.7% lower |
-| 8,000 world-visibility queries | 33.792 | 34.175 | 1.1% higher; within noise |
-| 8,000 swept projectile queries | 105.241 | 39.783 | 62.2% lower |
-| 11,520 ordinary movement steps | 25.311 | 23.234 | 8.2% lower |
+| 24,000 humanoid-hit queries | 38.383 | 10.976 | 71.4% lower |
+| 8,000 world-visibility queries | 37.431 | 37.571 | 0.4% higher; within noise |
+| 8,000 swept projectile queries | 121.684 | 44.892 | 63.1% lower |
+| 11,520 ordinary movement steps | 30.304 | 27.331 | 9.8% lower |
 
-The previous independent GitHub runner also passed: hitboxes 71.4% lower,
-projectiles 62.5% lower, movement 9.0% lower and visibility queries 0.3% lower
-(effectively unchanged). Compare each current/baseline pair only within its own
-environment, not raw milliseconds across machines.
+The preceding local comparison also passed: hitboxes 77.7% lower, projectiles
+62.2% lower, movement 8.2% lower and visibility 1.1% higher (within noise).
+Compare each current/baseline pair only within its own environment, not raw
+milliseconds across machines. The final runner includes the authored terrain
+follow-up; both physics versions receive that same current map.
 
 The CI guard permits a 10% median variance ceiling to reduce noise-related
 failures; it is **not** a claim that a 10% real regression is acceptable.
@@ -121,7 +129,9 @@ guarantee zero performance regression on every device.
   western woods cabin. Moving those buildings 7 m east and 5 m west respectively
   separates the conflicting authored footprints. The existing foundation test
   passes unchanged for all 61 buildings, floor overlaps and spawn clearance;
-  scenery counts are unchanged. The full-suite run above includes this fix.
+  the full-suite run above includes this fix. Building/tree/door/loot counts
+  stay unchanged; scatter re-evaluation changes props from 823 to 824 and boxes
+  from 6505 to 6506. That resulting map is included in the passing CPU comparison.
 - The editor validator yields after 4 ms of work, caps its displayed issue list
   at 200, cancels when closed and changes no match geometry. Runtime simulation
   ticks never invoke it. Relay publish validation rejects insufficient clear
@@ -148,8 +158,11 @@ guarantee zero performance regression on every device.
   before Test walk exposed a real capture conflict: the main menu handler
   released the editor's pointer lock. That handler now recognizes editor-owned
   capture; Test walk's click handler is registered once per editor session.
-  Full editor acceptance, repeated Test walk and handler cleanup await the next
-  CI run. Screenshots of the clear/warning reports and camera were inspected.
+  Follow-up run 38108261932 passes full editor acceptance, repeated Test walk
+  and stable handler counts, plus GLB import/export, concurrent-draft rejection,
+  expired authorization recovery and saved-draft reopening. There are no page
+  errors. Screenshots of clear/warning reports, camera, import and editor were
+  inspected.
 
 ## Remaining release gates
 

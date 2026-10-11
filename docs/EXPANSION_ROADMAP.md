@@ -42,7 +42,7 @@ complete merely because a menu, stub, or configuration value exists.
 | 28 Loading | E lobby-first presentation; E incremental map preparation; E actual stage labels; E versioned assets; E reusable safe geometry |
 | 29 Accessibility | I non-color hit labels; I prompt text scale/contrast; I hold/toggle; I audio-visual categories; I reduced-motion setting |
 | 30 Training | E basic tutorial, P survival/loot lessons; P moving range targets/accuracy; P timed building drills; P independent practice tuning; P one-time contextual help |
-| 31 Editor | E undo/redo; E properties, P grouping/visibility/locking acceptance; E snapping; I local map validation; E draft/publish separation |
+| 31 Editor | V undo/redo and multi-selection history; V properties/locking, P named grouping/visibility; E snapping; V local map validation; V draft/publish separation |
 | 32 Safety | E bounded host/input claims, P expanded validation; P recoverable backups; E release agreement; E regression scripts; E opt-in diagnostics |
 
 ## Release gates
@@ -111,7 +111,10 @@ waiver. New or touched behavior requires direct regression coverage.
   fallback spawn to nearby clear ground.
 - Separated the Aster barracks and western woods cabin from their neighboring
   vault approaches. The existing all-61-foundations/overlapping-floors/spawn
-  clearance regression now passes without changing its assertions or object counts.
+  clearance regression now passes without changing its assertions. Building,
+  tree, door and loot counts are unchanged; recomputing the decorative scatter
+  adds one net prop/collider (824/6506 versus 823/6505). CPU comparisons include
+  this resulting map and pass; this is not a promise about every device.
 - Building/door edits and copies now keep functional controls, colliders and
   rendered hinges aligned, including quarter turns and nonuniform scaling.
   Separately edited or deleted leaves take precedence over building transforms.
@@ -129,7 +132,12 @@ waiver. New or touched behavior requires direct regression coverage.
   popper test allows the actual equip plus throw duration. Preview coverage
   includes independently moved/deleted door leaves; foundation coverage passes
   unchanged after separating the two neighboring buildings from vault approaches.
-- Camera browser acceptance passed. The editor checks caught a menu/input
-  conflict cancelling Test walk, now fixed alongside repeated-walk input-handler
-  cleanup; full editor browser acceptance awaits the follow-up branch CI run.
+- [Follow-up CI 38108261932](https://github.com/ZL-2/yolk-yard/actions/runs/38108261932)
+  passed on `d7493b5`: 281 focused tests, 72 seeded bot duels, real-socket host
+  scenarios, build, CPU comparison and both browser suites. The editor checks
+  caught and verified a fix for a menu/input conflict cancelling Test walk;
+  repeated walks keep a stable input-handler count. Screenshots were reviewed.
+- [Draft PR #12](https://github.com/ZL-2/yolk-yard/pull/12) retains the whole
+  expansion ledger. Its broader workflow remains red on the 40 full-suite
+  failures and older browser scripts; focused success does not waive those gates.
   No deployment, protocol, version or progression-schema change.
