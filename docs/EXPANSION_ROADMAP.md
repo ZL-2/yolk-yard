@@ -31,7 +31,7 @@ complete merely because a menu, stub, or configuration value exists.
 | 17 Effects | E muzzle flashes; P material impacts; E Mythic effects; P visibility-safe atmosphere presets; E bounded pools |
 | 18 Audio | E surface steps; P indoor acoustics; E distance detail; P explicit voice priority; P exploration music ducking |
 | 19 HUD | I minimap side/visibility, inventory/map scale; E descriptions; E urgent notifications; E interaction prompts; E results breakdown |
-| 20 Controls | I independent sensitivity contexts; I swept third-person collision; I comfort sliders; P controller; I jump/build buffering, V reload buffering |
+| 20 Controls | I independent sensitivity contexts; V swept third-person collision; I comfort sliders; P controller; I jump/build buffering, V reload buffering |
 | 21 Social | E quick chat/pings; E party readiness; E recovery status; P recent teammates; E party continuity |
 | 22 Progress | E weapon mastery; E weekly, P daily challenges; P discoveries; E career milestones; E reward transparency |
 | 23 Cosmetics | E sets; E interactive previews; P named loadouts; E cosmetic prestige; E ownership/pricing |
@@ -124,9 +124,12 @@ waiver. New or touched behavior requires direct regression coverage.
   input edges and expire rather than firing later after conflicting actions.
 - Expired bot utility plans no longer disable gun aiming indefinitely. Utility
   execution waits for equip completion and releases the previous trigger.
-- Latest full differential run: 604 tests, 563 passed, 41 failed, no new failing
+- Latest full differential run: 605 tests, 565 passed, 40 failed, no new failing
   names. The existing door test now closes the leaf before shooting it; the
-  popper test allows the actual equip plus throw duration. One additional
-  separately run preview test covers independently moved/deleted door leaves.
-- Browser acceptance for the new camera and editor checks is pending the next
-  branch CI run. No deployment, protocol, version or progression-schema change.
+  popper test allows the actual equip plus throw duration. Preview coverage
+  includes independently moved/deleted door leaves; foundation coverage passes
+  unchanged after separating the two neighboring buildings from vault approaches.
+- Camera browser acceptance passed. The editor checks caught a menu/input
+  conflict cancelling Test walk, now fixed alongside repeated-walk input-handler
+  cleanup; full editor browser acceptance awaits the follow-up branch CI run.
+  No deployment, protocol, version or progression-schema change.

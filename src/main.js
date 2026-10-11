@@ -1439,6 +1439,8 @@ dialog.addEventListener("cancel", (e) => {
   else closeDialog();
 });
 document.addEventListener("pointerlockchange", () => {
+  // The owner editor owns capture during Test walk even though the game is paused.
+  if(screen==='editor'&&mapEditor?.walking&&document.pointerLockElement===mapEditor.canvas)return;
   // A capture request can finish after a menu opens. Keep menu buttons usable.
   if(document.pointerLockElement&&(paused||dialog.open||chat.opened||screen!=="game")){document.exitPointerLock();return;}
   if (

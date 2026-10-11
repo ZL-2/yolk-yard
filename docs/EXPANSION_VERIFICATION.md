@@ -17,7 +17,7 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 
 | Check | Result and limits |
 | --- | --- |
-| Full repository suite | Latest local run: 604 tests, 563 passed, 41 failed. Baseline: 549 tests, 505 passed, 44 failed. No new failing test names. The humanoid hitbox/checkpoint check passes; door damage and queued bot utility checks now use the correct closed-leaf state and equip-plus-throw duration. **The whole suite is not green.** |
+| Full repository suite | Latest local run: 605 tests, 565 passed, 40 failed. Baseline: 549 tests, 505 passed, 44 failed. No new failing test names. Humanoid hitbox/checkpoint and authored foundation checks pass; door damage and queued bot utility checks now use the correct closed-leaf state and equip-plus-throw duration. **The whole suite is not green.** |
 | Focused checkpoint suite | 51 passed: foundation, performance HUD, guest presentation, remote input, building, arms and audio. |
 | Local real-socket public-host scenarios | Passed first-player hosting, concurrent joins, brief reconnect, graceful/abrupt/frozen-host migration, checkpoint-world preservation, guest inventory-preference delivery and preservation after migration, joining after migration, late spectator admission and authenticated leaderboards; zero server simulations, protocol 43. |
 | Production asset build | Passed on the branch. Existing large-bundle warning remains; no download-size improvement is claimed. |
@@ -121,8 +121,7 @@ guarantee zero performance regression on every device.
   western woods cabin. Moving those buildings 7 m east and 5 m west respectively
   separates the conflicting authored footprints. The existing foundation test
   passes unchanged for all 61 buildings, floor overlaps and spawn clearance;
-  scenery counts are unchanged. This resolves one more baseline failure after
-  the full-suite run above.
+  scenery counts are unchanged. The full-suite run above includes this fix.
 - The editor validator yields after 4 ms of work, caps its displayed issue list
   at 200, cancels when closed and changes no match geometry. Runtime simulation
   ticks never invoke it. Relay publish validation rejects insufficient clear
@@ -144,8 +143,13 @@ guarantee zero performance regression on every device.
 - New browser scenarios check a wall behind an emoting player, camera recovery
   when it is removed, editor check results, keyboard focus, a floating-object
   warning and location focus, alongside existing owner editing/publishing checks.
-  These new browser scenarios still await branch CI; they are not yet claimed
-  as accepted.
+  Camera/settings/HUD scenarios passed in branch run 38107880124. The editor
+  report, focus, transforms, history, locking and draft publication also passed
+  before Test walk exposed a real capture conflict: the main menu handler
+  released the editor's pointer lock. That handler now recognizes editor-owned
+  capture; Test walk's click handler is registered once per editor session.
+  Full editor acceptance, repeated Test walk and handler cleanup await the next
+  CI run. Screenshots of the clear/warning reports and camera were inspected.
 
 ## Remaining release gates
 
