@@ -41,7 +41,7 @@ export function healingSuggestion(p,time){
  if(!p||p.health<=0||p.downed||p.use||p.flight!=='ground'||p.lastDamage>time-4)return null;
  for(const kind of ['heal','shield','splash'])for(let slot=1;slot<=5;slot++){
   const item=p.inventory?.[slot],def=ITEMS[item?.id];if(!item||item.count<=0||def?.kind!==kind)continue;
-  if(kind==='heal'&&p.health<def.cap||kind==='shield'&&p.shield<def.cap||kind==='splash'&&(p.health<100||p.shield<100))return {slot,label:kind==='heal'?'Health available':'Shield available'};
+  if(kind==='heal'&&p.health<def.cap||kind==='shield'&&p.shield<def.cap||kind==='splash'&&(p.health<100||p.shield<100))return {slot,label:kind==='heal'||kind==='splash'&&p.health<100?'Health available':'Shield available'};
  }return null;
 }
 export const USE_CANCEL_REASONS=Object.freeze({damage:'Incoming damage',sprint:'Sprinting',swap:'Changed equipment',drop:'Dropped item',revive:'Reviving teammate',action:'Another action'});

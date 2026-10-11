@@ -82,14 +82,14 @@ waiver. New or touched behavior requires direct regression coverage.
   migration, snapshot isolation, jump/build buffers and reload presentation.
 - `tests/comfort.test.js`: corrupt-storage clamping, hold/toggle/reset behavior,
   independent context sensitivities and independently disabled visual sounds.
-- Latest full differential run: 580 tests, 537 passed, 43 failed. No new failing
+- Latest full differential run: 582 tests, 539 passed, 43 failed. No new failing
   test names versus the original 549-test baseline; one prior hitbox check now
   passes. Existing failures are **not** hidden or relabeled as passing.
 - `scripts/expansion-performance-check.mjs`: identical deterministic hitbox,
   collision and projectile queries against immutable baseline code, with seven
   alternating warmed samples and numerical-equivalence assertions.
-- Desktop/mobile browser interactions passed, followed by visual-review fixes
-  for cramped small-screen inventory controls. Follow-up acceptance is tracked
+- Desktop/mobile browser interactions and visual-review follow-ups passed,
+  including cramped small-screen inventory controls. Exact acceptance is tracked
   in [EXPANSION_VERIFICATION.md](EXPANSION_VERIFICATION.md), with exact test
   counts, benchmark limits, CI evidence and remaining gates.
 - `.github/workflows/expansion-checks.yml` runs

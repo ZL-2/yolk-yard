@@ -27,6 +27,9 @@ test('combat recap accounts shield and health exactly once across multiple attac
 test('shield-only damage contributes to assists, and old shield damage does not',()=>{
  for(const elapsed of [2,13]){const{s,p,a,b}=room();p.shield=100;s.damage(p,b,20,'SMG');assert.equal(p.health,100);s.time+=elapsed;s.damage(p,a,1000,'Rifle');assert.equal(b.assists||0,elapsed<12?1:0);}
 });
+test('death recap identifies the finishing damage source while preserving original knock credit',()=>{
+ for(const source of ['Pistol','Bleed out']){const{s,p,a,b}=room();p.downed=true;p.knockedBy=b.id;p.health=40;s.damage(p,source==='Pistol'?a:null,50,source);assert.equal(b.kills,1);assert.equal(a.kills,0);assert.equal(p.killerId,b.id);assert.equal(p.recap.name,source==='Pistol'?a.name:'Bleed out');assert.equal(p.recap.distance,source==='Pistol'?10:0);assert.equal(p.recap.weapon,source);assert.equal(p.recap.damage,40);}
+});
 test('history expires, coalesces storm ticks, bounds sources and rejects invalid damage',()=>{
  const p=runner(),a={id:'a',name:'Alpha'};for(let i=0;i<1800;i++)recordCombatDamage(p,null,1/60,'Storm',i/60);assert.ok(p.combatHistory.length<=RECAP_LIMIT);assert.ok(Math.abs(combatRecap(p,30,{}).totalDamage-12)<=1,'continuous storm does not retain damage older than the recap window');
  for(let i=0;i<80;i++)recordCombatDamage(p,{...a,id:'a'+i},2,'Rifle',10+i/10);assert.ok(p.combatHistory.length<=RECAP_LIMIT);
@@ -83,6 +86,10 @@ test('loot comparisons use live rarity balance and healing help respects item ca
  const p=runner();p.health=60;p.shield=50;p.lastDamage=0;p.inventory[2]={id:'bandage',count:2};p.inventory[3]={id:'mini',count:2};
  assert.deepEqual(healingSuggestion(p,10),{slot:2,label:'Health available'});p.health=80;assert.equal(healingSuggestion(p,10),null);p.inventory[4]={id:'flask',count:2};assert.equal(healingSuggestion(p,10).slot,4);p.lastDamage=9;assert.equal(healingSuggestion(p,10),null);
  const compare=weaponComparison({id:'scatter',weapon:true,rarity:4},{id:'scatter',weapon:true,rarity:1});assert.ok(compare.stats.damage>compare.previous.damage);assert.ok(compare.stats.reload<compare.previous.reload);
+});
+test('splash healing advice describes the missing vital and pickaxe selection explains a cancelled use',()=>{
+ const{s,p}=room();p.inventory[1]=null;p.inventory[2]={id:'splash',count:2};p.health=60;p.shield=100;p.lastDamage=-100;assert.deepEqual(healingSuggestion(p,s.time),{slot:2,label:'Health available'});p.health=100;p.shield=60;assert.deepEqual(healingSuggestion(p,s.time),{slot:2,label:'Shield available'});
+ p.use={id:'medkit'};s.playerAction(p.id,'inventory-select-0');assert.equal(p.use,null);assert.equal(p.slot,0);assert.equal(s.events.at(-1).cue,'use-cancel');assert.equal(s.events.at(-1).reason,'swap');
 });
 test('item cancellation explains damage, sprint and swapping without cancelling storm use',()=>{
  const{s,p,a}=room();p.health=50;p.inventory[1]={id:'medkit',count:2};s.beginUse(p);s.damage(p,null,1,'Storm');assert.ok(p.use);s.damage(p,a,1,'Rifle');assert.equal(s.events.at(-2)?.reason||s.events.find(e=>e.cue==='use-cancel')?.reason,'damage');

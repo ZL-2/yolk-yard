@@ -749,8 +749,11 @@ export class Simulation {
     }
     if (victim.health > 0) return;
     victim.mantle=null;
+    // The finisher and the credited knocker can differ. Explain the actual
+    // final damage source without changing the existing elimination award.
+    const finalHit={weapon:source,damage:Math.round(applied),distance:attacker?Math.round(dist(victim,attacker)):0,critical:!!precision,name:attacker?.name||source};
     attacker=this.eliminationCredit?.(victim,attacker)||attacker;
-    victim.recap=combatRecap(victim,this.time,{weapon:source,damage:Math.round(applied),distance:attacker?Math.round(dist(victim,attacker)):0,critical:!!precision,name:attacker?.name||source});
+    victim.recap=combatRecap(victim,this.time,finalHit);
     victim.killerId = attacker && attacker !== victim ? attacker.id : null;
     for(const [id,time] of Object.entries(victim.damageLedger||{})){const helper=this.players.get(id);if(helper&&id!==victim.killerId&&this.time-time<12)helper.assists=(helper.assists||0)+1;}victim.damageLedger={};
     victim.deaths++;

@@ -20,5 +20,6 @@
 :root.hide-minimap .royale-map-stack,:root.hide-compass .royale-compass{display:none!important}
 :root.high-contrast-hud .royale-prompt,:root.high-contrast-hud .royale-compass,:root.high-contrast-hud .royale-storm-warning,:root.high-contrast-hud .build-help{background:#07131ff5;color:white;text-shadow:none;padding:8px 12px}
 :root.high-contrast-hud .royale-slot{background:#102337!important;border-color:#a9c6db!important}
+:root.high-contrast-hud #dialog[data-kind="royale-inventory"] :is(.weapon-stats dt,.inventory-section-title span,.inventory-inspect p){color:#d1e4ea}
 :root.reduced-motion *, :root.reduced-motion *:before, :root.reduced-motion *:after{scroll-behavior:auto!important;animation-duration:0s!important;animation-iteration-count:1!important;transition-duration:0s!important}
 @media(min-width:1000px){:root .royale-hotbar{transform:scale(var(--hud-scale,1));transform-origin:right bottom}}

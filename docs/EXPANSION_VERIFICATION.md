@@ -8,8 +8,7 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 
 - Immutable baseline: `c2866b6edbaaae26c4aac6f0717960e2c5a2bf7e`.
 - First fully passing branch CI: `7c87e186d2fd51777284c5882abd40c06bccdb4e`.
-- Follow-up: traversal/revive exclusion and small-screen inventory corrections;
-  acceptance is recorded in the subsequent branch workflow run.
+- Traversal/mobile follow-up: `c50ef8da010d1ab4ae3f6a8d5ef8f3c9c1b1ebd9`.
 - Branch: `expansion-foundation-142`.
 - Verification date: 2026-10-11.
 
@@ -17,13 +16,14 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 
 | Check | Result and limits |
 | --- | --- |
-| Full repository suite | 580 tests: 537 passed, 43 failed. Baseline: 549 tests, 505 passed, 44 failed. No new failing test names; the fixed humanoid hitbox/checkpoint test now passes. **The whole suite is not green.** |
+| Full repository suite | 582 tests: 539 passed, 43 failed. Baseline: 549 tests, 505 passed, 44 failed. No new failing test names; the fixed humanoid hitbox/checkpoint test now passes. **The whole suite is not green.** |
 | Focused checkpoint suite | 51 passed: foundation, performance HUD, guest presentation, remote input, building, arms and audio. |
 | Local real-socket public-host scenarios | Passed first-player hosting, concurrent joins, brief reconnect, graceful/abrupt/frozen-host migration, checkpoint-world preservation, joining after migration, late spectator admission and authenticated leaderboards; zero server simulations, protocol 43. |
 | Production asset build | Passed on the branch. Existing large-bundle warning remains; no download-size improvement is claimed. |
 | First complete branch CI | [Run 38105284235](https://github.com/ZL-2/yolk-yard/actions/runs/38105284235) passed 213 focused tests, six HUD/guest-presentation tests, real-socket scenarios, production build, CPU guard and browser checks. |
-| Browser acceptance | Desktop and 390px settings, aim toggle, pickup, comparison, feedback and inventory checks passed with no page errors. Visual review found cramped mobile inventory controls despite the original no-overflow assertion; corrected layout and stronger 320px/390px checks are awaiting the follow-up run. |
+| Browser acceptance | [Follow-up run 38105551883](https://github.com/ZL-2/yolk-yard/actions/runs/38105551883) passed desktop/390px settings, real aim-toggle and camera response, preferred pickup, loot comparison, combat feedback, and 320px/390px inventory/inspection checks with no page errors. Screenshots were inspected. Mobile button clipping and key/quantity overlap were corrected; stronger assertions now cover them. |
 | Traversal follow-up | 46 focused foundation/Mythic checks and six existing revive/vault/traversal scenarios passed after excluding revive during active traversal. |
+| Final recap follow-up | 28 foundation tests passed after separating actual finishing-hit source/distance from knock credit, correcting splash-healing advice and pickaxe-swap cancellation feedback. The final branch CI must also pass. |
 
 The branch workflow has read-only repository permission and no deployment job.
 Its browser scenario launches its own local relay, not the production service.
@@ -93,7 +93,7 @@ guarantee zero performance regression on every device.
 
 ## Remaining release gates
 
-Finish the small-screen follow-up browser review; investigate outstanding relevant
+Confirm the final follow-up branch CI; investigate outstanding relevant
 baseline failures; exercise live-device multiplayer and repeat-join cleanup;
 complete the remaining roadmap items or explicitly agree a smaller release
 scope. Vehicles, convoys, voice chat and extensive destruction remain gated.

@@ -406,7 +406,7 @@ export class RoyaleSimulation extends Simulation {
   if(markerAction(this,p,action))return;
   if((p.downed||p.reviving)&&action!=='spectate'&&!action.startsWith('ping-'))return;
   if(this.options.building!==false&&p.health>0&&!p.spectating&&p.flight==='ground'&&action.startsWith('build-')){editBuilding(this,p,action);return;}
-  if(action==='inventory-select-0'&&p.health>0&&!p.spectating){p.slot=0;p.use=null;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);return;}
+  if(action==='inventory-select-0'&&p.health>0&&!p.spectating){this.cancelUse(p,'swap');p.slot=0;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);return;}
   const change=/^inventory-(select|drop|drop-one|split|swap)-([1-5])(?:-([1-5]))?$/.exec(action);
   if(change&&p.health>0&&!p.spectating&&p.flight==='ground'){
    const from=Number(change[2]),to=Number(change[3]),beforeInventory=JSON.stringify(p.inventory);
