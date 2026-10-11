@@ -12,6 +12,7 @@ import {buildingTick} from '../src/building.js';
 import {armPose,ARM_POSES} from '../src/arms.js';
 import {reloadSequence} from '../src/firearm-audio.js';
 import {GuestFire} from '../src/guest-fire.js';
+import {prepareRevive,downPlayer} from '../src/team-survival.js';
 
 const flat=()=>({id:'flat',theme:'royale',size:100,boxes:[],floorLoot:[],landmarks:[],districts:[]});
 function runner(){const p={id:'host',name:'Host',health:100,shield:0,x:0,y:0,z:0,yaw:0,pitch:0,vx:0,vy:0,vz:0,grounded:true,flight:'ground',inventory:inventory(),slot:1,weapon:'sprinter',contestant:true,spectating:false,shieldUntil:0};resetStance(p);p.inventory[1]={id:'sprinter',weapon:true,rarity:0,ammo:30,count:1};return p;}
@@ -126,6 +127,12 @@ test('production guest copies cannot mutate authoritative traversal during recon
 });
 test('guest fire cannot show a shot that the host forbids during a mantle',()=>{
  const{s,p}=room();s.syncInventory(p);p.mantle={kind:'mantle'};const f=new GuestFire(),input={seq:1,slot:1,fire:true,yaw:0,pitch:0};assert.equal(f.step(p,input,100,100,1),null);assert.equal(s.fire(p),false);p.mantle=null;assert.ok(f.step(p,{...input,seq:2},101,101,1));
+});
+test('revive cannot start during traversal, explains cancelled healing, and knock clears a mantle immediately',()=>{
+ const{s,p,a,b}=room();s.options.teamSize=2;p.team=a.team=0;b.team=1;Object.assign(a,{x:1.5,downed:true,health:100,reviveBlockedUntil:0});
+ for(const key of ['mantle','grapple','shadowstep','traversal']){p[key]={};p.use={id:'medkit'};assert.equal(prepareRevive(s,p,{interact:true}),false,key);assert.equal(p.reviving,null);assert.ok(p.use);p[key]=null;}
+ assert.equal(prepareRevive(s,p,{interact:true}),true);assert.equal(p.reviving,a.id);assert.equal(p.use,null);assert.equal(s.events.at(-1).cue,'use-cancel');assert.equal(s.events.at(-1).reason,'revive');
+ p.mantle={kind:'mantle'};downPlayer(s,p,b,'Rifle',false,'knock');assert.equal(p.mantle,null);assert.equal(p.downed,true);
 });
 test('build input buffers briefly through cooldown, never across mode changes or expiry',()=>{
  for(const scenario of ['buffer','expired','changed','released']){const{s,p}=room();p.slot=0;p.materials.wood=100;p.nextBuild=s.time+.1;const input={buildMode:true,buildType:'wall',buildMaterial:'wood',fire:true};buildingTick(s,p,input);assert.equal(s.builds.length,0);s.time+=scenario==='expired'?.3:.12;if(scenario==='released')buildingTick(s,p,{...input,buildMode:false,fire:false});buildingTick(s,p,{...input,fire:false,...(scenario==='changed'?{buildType:'floor'}:{})});assert.equal(s.builds.length,scenario==='buffer'?1:0,scenario);assert.equal(p.materials.wood,scenario==='buffer'?90:100);}

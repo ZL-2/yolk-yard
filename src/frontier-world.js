@@ -42,7 +42,7 @@ export function frontierInteract(sim,p,input,dt){
   const from=line[endpoint],to=line[endpoint==='from'?'to':'from'];
   if(!canStand(sim.map,from))continue;
   const route=[line.from,...line.via||[],line.to].map(q=>({...q}));if(endpoint==='to')route.reverse();
-  p.traversal={id:line.id,type:line.type,from:{...from},to:{...to},route,progress:0,speed:line.speed};p.use=null;p.reloadEnd=0;p.burstLeft=0;p.sprinting=false;p.interactLatch=true;p.grounded=false;p.vy=0;p.fall={apex:p.y,immune:true,source:'traversal'};sim.emit('royale-cue',{cue:'traversal-grab',player:p.id,x:p.x,y:p.y,z:p.z});return true;
+  sim.cancelUse?.(p,'action');p.traversal={id:line.id,type:line.type,from:{...from},to:{...to},route,progress:0,speed:line.speed};p.use=null;p.reloadEnd=0;p.burstLeft=0;p.sprinting=false;p.interactLatch=true;p.grounded=false;p.vy=0;p.fall={apex:p.y,immune:true,source:'traversal'};sim.emit('royale-cue',{cue:'traversal-grab',player:p.id,x:p.x,y:p.y,z:p.z});return true;
  }
  return false;
 }

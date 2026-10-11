@@ -416,7 +416,7 @@ export class RoyaleSimulation extends Simulation {
    else if(change[1]==='split'){const item=p.inventory[from],empty=p.inventory.findIndex(i=>!i);if(item&&!item.weapon&&item.count>1&&empty>=0){const count=Math.floor(item.count/2);item.count-=count;p.inventory[empty]={...item,count};}}
    else if(Number.isInteger(to)&&to>=1&&to<6){[p.inventory[from],p.inventory[to]]=[p.inventory[to],p.inventory[from]];if(p.slot===from)p.slot=to;else if(p.slot===to)p.slot=from;beginEquip(p,this.time,true);}
    if(beforeInventory!==JSON.stringify(p.inventory))this.emit('inventory-change',{player:p.id});
-   this.cancelUse(p);p.reloadEnd=0;p.burstLeft=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'weapon-swap'});return;
+   this.cancelUse(p,'swap');p.reloadEnd=0;p.burstLeft=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'weapon-swap'});return;
   }
   if(action==='spectate'&&p.health>0){this.damage(p,null,p.health+p.shield+1,'Left round');if(p.flight==='transport'){p.health=0;this.eliminate(p);}}
  }
@@ -487,7 +487,7 @@ export class RoyaleSimulation extends Simulation {
    const reviving=prepareRevive(this,p,input);
    const slot=clamp(Math.floor(input.slot??p.slot),0,5);
    if(slot!==p.slot){p.slot=slot;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);this.cancelUse(p,'swap');this.emit('royale-cue',{player:p.id,cue:'weapon-swap'});}
-   if(p.slot>0&&input.swapSlot>0&&input.swapSlot<6&&input.swapSlot!==p.slot&&!p.swapLatch){const j=input.swapSlot;[p.inventory[p.slot],p.inventory[j]]=[p.inventory[j],p.inventory[p.slot]];p.reloadEnd=0;this.cancelUse(p);this.syncInventory(p);beginEquip(p,this.time,true);}
+   if(p.slot>0&&input.swapSlot>0&&input.swapSlot<6&&input.swapSlot!==p.slot&&!p.swapLatch){const j=input.swapSlot;[p.inventory[p.slot],p.inventory[j]]=[p.inventory[j],p.inventory[p.slot]];p.reloadEnd=0;this.cancelUse(p,'swap');this.syncInventory(p);beginEquip(p,this.time,true);}
    p.swapLatch=input.swapSlot>=0;
    if(input.sprint&&p.use&&!movementItemKinds.has(ITEMS[p.use.id]?.kind))this.cancelUse(p,'sprint');
    this.moveWithCommands(p,input,dt,p.emote&&commands?{...commands,steps:commands.steps.map(step=>({...step,yaw:p.emote.yaw,pitch:0,forward:0,strafe:0}))}:commands);p.moving=Math.hypot(p.x-previous.x,p.z-previous.z)>.001;p.aim=!!input.aim&&!reviving&&p.flight==='ground'&&!p.use&&!!p.inventory[p.slot]?.weapon;p.vx=(p.x-previous.x)/dt;p.vz=(p.z-previous.z)/dt;

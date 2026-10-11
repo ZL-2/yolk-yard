@@ -2,6 +2,7 @@ name: Expansion branch verification (no deployment)
 on:
   push:
     branches: [expansion-foundation-142]
+    paths-ignore: ['docs/**']
 permissions:
   contents: read
 concurrency:
@@ -24,6 +25,8 @@ jobs:
         run: node --test tests/expansion-foundation.test.js tests/comfort.test.js tests/building.test.js tests/building-overhaul.test.js tests/arms.test.js tests/audio.test.js tests/mobility-storm.test.js tests/remote-input.test.js tests/leaderboards.test.js tests/public-host.test.js tests/shadowstep-field.test.js tests/boss-awareness-audio.test.js tests/field-polish.test.js tests/vault-grappler.test.js tests/snapshot-codec.test.js tests/season-one.test.js tests/crowns-bosses-emotes.test.js tests/authority-performance.test.js tests/bot-runtime.test.js tests/field-refinement.test.js tests/bot-movement-speed.test.js tests/recurring-royale.test.js
       - run: node scripts/public-host-network-check.mjs
       - run: node --test tests/performance-hud.test.js tests/guest-presentation.test.js
+      - name: Revive and authored traversal acceptance
+        run: node --test --test-name-pattern='Duo knock|revive stops|final active|finishing|all seven traversal|vault stairs' tests/field-systems.test.js tests/world-overhaul.test.js
       - name: Compile production assets
         run: npm run build
       - name: Reproducible baseline CPU comparison

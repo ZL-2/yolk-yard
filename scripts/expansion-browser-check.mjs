@@ -46,7 +46,14 @@ try{
  await page.waitForFunction(()=>document.querySelector('#hit-marker')?.dataset.kind==='break');
  assert.equal(await page.locator('#damage-directions .damage-direction').count(),5);await page.screenshot({path:out+'/combat-feedback.png'});checks.feedback=true;
  await page.keyboard.press('KeyI');await page.locator('#dialog[data-kind=royale-inventory]').waitFor({state:'visible'});await page.screenshot({path:out+'/inventory-desktop.png'});
- await page.setViewportSize({width:390,height:844});assert.equal(await page.locator('#dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);await page.screenshot({path:out+'/inventory-mobile.png'});checks.inventoryLayout=true;
+ for(const width of [320,390]){
+  await page.setViewportSize({width,height:844});assert.equal(await page.locator('#dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+  assert.equal(await page.locator('#dialog .inventory-actions button').evaluateAll(nodes=>nodes.every(el=>el.scrollWidth<=el.clientWidth+1)),true,'mobile inventory button labels must fit');
+  assert.equal(await page.locator('#dialog .royale-slot').evaluateAll(nodes=>nodes.every(el=>{const k=el.querySelector('kbd')?.getBoundingClientRect(),b=el.querySelector('b')?.getBoundingClientRect();return !b||k.right+2<=b.left;})),true,'slot key and quantity must not overlap');
+  await page.screenshot({path:out+`/inventory-mobile-${width}.png`});
+ }
+ await page.locator('#dialog [data-action=royale-inspect]').click();await page.locator('#inventory-inspect').waitFor({state:'visible'});await page.locator('#inventory-inspect').scrollIntoViewIfNeeded();
+ assert.equal(await page.locator('#dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);await page.screenshot({path:out+'/inventory-inspect-mobile.png'});checks.inventoryLayout=true;
  assert.deepEqual(errors,[]);await writeFile(out+'/result.json',JSON.stringify({checks,errors},null,2));console.log('PASS expansion browser',checks);
 }catch(error){await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/result.json',JSON.stringify({checks,errors,error:String(error)},null,2));throw error;}
 finally{await browser?.close();await vite.close();await relay.close();}

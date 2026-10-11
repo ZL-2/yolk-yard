@@ -12,11 +12,11 @@ complete merely because a menu, stub, or configuration value exists.
 
 | Category | Individually tracked requirements |
 | --- | --- |
-| 1 Combat | I pooled directional damage; I differentiated confirmations; I multi-attacker recap; E authority/prediction consistency |
+| 1 Combat | V pooled directional damage; V differentiated confirmations; I multi-attacker recap; E authority/prediction consistency |
 | 2 Weapons | E distinct balance profiles; P tradeoff attachments; P inspection; I tactical/empty reload distinction |
 | 3 Movement | I swept mantle; I low vault; E blended transitions; P corner/door collision acceptance |
 | 4 Building | E placement reasons; I placement buffering; E edit highlights/reset; E cracks, P collapse warning effects |
-| 5 Inventory | I preferred slots; I compare before swap; I crosshair loot targeting; I multi-stack merging/capacity |
+| 5 Inventory | V preferred slots; V compare before swap; V crosshair loot targeting; V multi-stack merging/capacity |
 | 6 Survival | I clear movement rules; I healing suggestions; P limited recovery stations; I cancellation reasons |
 | 7 Bots | E bounded skill; E combat roles; E last-known information; E stuck recovery; E bounded natural mistakes |
 | 8 Teammates | P tactical commands; P item sharing; E safe revive planning; E formation spacing |
@@ -36,7 +36,7 @@ complete merely because a menu, stub, or configuration value exists.
 | 22 Progress | E weapon mastery; E weekly, P daily challenges; P discoveries; E career milestones; E reward transparency |
 | 23 Cosmetics | E sets; E interactive previews; P named loadouts; E cosmetic prestige; E ownership/pricing |
 | 24 Rankings | E kills/wins, P qualified win rate; P friends filter; P seasonal rankings; E verified receipts, P match-history UI; E ranking transparency |
-| 25 CPU | E think budgets; E spatial indices; E route cache; I hitbox/projectile allocation reduction; E developer subsystem timing |
+| 25 CPU | E think budgets; E spatial indices; E route cache; V hitbox/projectile allocation reduction; E developer subsystem timing |
 | 26 Graphics | E scenery batches; E distance detail; E visibility updates; E shared materials/assets; P repeated-join cleanup verification |
 | 27 Network | E interest tiers; E interpolation; P important-event replay reliability; P measured host ranking; E bandwidth/backpressure |
 | 28 Loading | E lobby-first presentation; E incremental map preparation; E actual stage labels; E versioned assets; E reusable safe geometry |
@@ -82,13 +82,17 @@ waiver. New or touched behavior requires direct regression coverage.
   migration, snapshot isolation, jump/build buffers and reload presentation.
 - `tests/comfort.test.js`: corrupt-storage clamping, hold/toggle/reset behavior,
   independent context sensitivities and independently disabled visual sounds.
-- First full differential run: 565 tests, 522 passed, 43 failed. No new failing
+- Latest full differential run: 580 tests, 537 passed, 43 failed. No new failing
   test names versus the original 549-test baseline; one prior hitbox check now
   passes. Existing failures are **not** hidden or relabeled as passing.
 - `scripts/expansion-performance-check.mjs`: identical deterministic hitbox,
   collision and projectile queries against immutable baseline code, with seven
   alternating warmed samples and numerical-equivalence assertions.
-- Browser acceptance is required. `.github/workflows/expansion-checks.yml` runs
+- Desktop/mobile browser interactions passed, followed by visual-review fixes
+  for cramped small-screen inventory controls. Follow-up acceptance is tracked
+  in [EXPANSION_VERIFICATION.md](EXPANSION_VERIFICATION.md), with exact test
+  counts, benchmark limits, CI evidence and remaining gates.
+- `.github/workflows/expansion-checks.yml` runs
   only on this feature branch, has read-only repository permission and has **no
   deployment job**. The local environment currently lacks Chromium.
 - No production version, protocol, relay configuration or progression schema

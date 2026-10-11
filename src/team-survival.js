@@ -14,7 +14,7 @@ export function downPlayer(sim,p,attacker,source,precision,shotId){
  recordCombatDamage(p,attacker,applied,source,sim.time,precision);
  // `health` is vitality while DOWNED, not normal combat health. All normal
  // weapon/build/loot/use paths are gated by the explicit state.
- Object.assign(p,{downed:true,lifeState:'DOWNED',health:REVIVE_RULES.vitality,shield:0,downedAt:sim.time,downCount:(p.downCount||0)+1,knockedBy:attacker?.id||null,knockSource:source,reviveProgress:0,reviverId:null,reviving:null,reviveBlockedUntil:sim.time+.5,sliding:false,crouching:false,sprinting:false,flight:'ground',reloadEnd:0,burstLeft:0,building:false,editing:false,use:null,chestProgress:0,fireLatch:true});
+ Object.assign(p,{downed:true,lifeState:'DOWNED',health:REVIVE_RULES.vitality,shield:0,downedAt:sim.time,downCount:(p.downCount||0)+1,knockedBy:attacker?.id||null,knockSource:source,reviveProgress:0,reviverId:null,reviving:null,reviveBlockedUntil:sim.time+.5,sliding:false,crouching:false,sprinting:false,flight:'ground',mantle:null,reloadEnd:0,burstLeft:0,building:false,editing:false,use:null,chestProgress:0,fireLatch:true});
  sim.emit('hit',{player:attacker?.id,target:p.id,amount:applied,shotId,weapon:source,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z,x:p.x,y:p.y+1,z:p.z,precision});
  sim.emit('knocked',{player:attacker?.id,target:p.id,name:attacker?.name||source,targetName:p.name,weapon:source});
  sim.emit('royale-cue',{cue:'teammate-down',player:p.id,x:p.x,y:p.y,z:p.z});
@@ -27,9 +27,9 @@ export function reviveAccessible(map,reviver,target){
 export function reviveTarget(sim,p){return [...sim.players.values()].filter(o=>o.downed&&o.health>0&&!o.spectating&&(!o.reviverId||o.reviverId===p.id)&&teammates(sim.options,p,o)&&reviveAccessible(sim.map,p,o)).sort((a,b)=>dist(p,a)-dist(p,b))[0];}
 export function prepareRevive(sim,p,input){
  p.reviving=null;
- if(!activeMember(p)||p.flight!=='ground'||!input.interact||input.fire||input.jump||input.sprint||Math.hypot(input.forward||0,input.strafe||0)>.1||sim.time<(p.reviveBlockedUntil||0))return false;
+ if(!activeMember(p)||p.flight!=='ground'||p.mantle||p.grapple||p.shadowstep||p.traversal||!input.interact||input.fire||input.jump||input.sprint||Math.hypot(input.forward||0,input.strafe||0)>.1||sim.time<(p.reviveBlockedUntil||0))return false;
  const target=reviveTarget(sim,p);if(!target||sim.time<(target.reviveBlockedUntil||0))return false;
- p.reviving=target.id;p.reloadEnd=0;p.burstLeft=0;p.use=null;p.building=false;p.editing=false;p.aim=false;
+ sim.cancelUse?.(p,'revive');p.reviving=target.id;p.reloadEnd=0;p.burstLeft=0;p.use=null;p.building=false;p.editing=false;p.aim=false;
  return true;
 }
 export function tickRevives(sim,dt){
