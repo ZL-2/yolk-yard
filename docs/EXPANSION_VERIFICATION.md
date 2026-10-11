@@ -18,7 +18,7 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 | --- | --- |
 | Full repository suite | 582 tests: 539 passed, 43 failed. Baseline: 549 tests, 505 passed, 44 failed. No new failing test names; the fixed humanoid hitbox/checkpoint test now passes. **The whole suite is not green.** |
 | Focused checkpoint suite | 51 passed: foundation, performance HUD, guest presentation, remote input, building, arms and audio. |
-| Local real-socket public-host scenarios | Passed first-player hosting, concurrent joins, brief reconnect, graceful/abrupt/frozen-host migration, checkpoint-world preservation, joining after migration, late spectator admission and authenticated leaderboards; zero server simulations, protocol 43. |
+| Local real-socket public-host scenarios | Passed first-player hosting, concurrent joins, brief reconnect, graceful/abrupt/frozen-host migration, checkpoint-world preservation, guest inventory-preference delivery and preservation after migration, joining after migration, late spectator admission and authenticated leaderboards; zero server simulations, protocol 43. |
 | Production asset build | Passed on the branch. Existing large-bundle warning remains; no download-size improvement is claimed. |
 | First complete branch CI | [Run 38105284235](https://github.com/ZL-2/yolk-yard/actions/runs/38105284235) passed 213 focused tests, six HUD/guest-presentation tests, real-socket scenarios, production build, CPU guard and browser checks. |
 | Browser acceptance | [Follow-up run 38105551883](https://github.com/ZL-2/yolk-yard/actions/runs/38105551883) passed desktop/390px settings, real aim-toggle and camera response, preferred pickup, loot comparison, combat feedback, and 320px/390px inventory/inspection checks with no page errors. Screenshots were inspected. Mobile button clipping and key/quantity overlap were corrected; stronger assertions now cover them. |
@@ -61,6 +61,10 @@ failures; it is **not** a claim that a 10% real regression is acceptable.
 Hitbox/projectile work avoids temporary objects and arrays, inventory sync
 reuses simulation-owned arrays, and movement reuses exact broadphase results.
 Snapshots and prediction own their mutable copies.
+Changing HUD, comfort, inventory preferences or input settings no longer calls
+the graphics-quality reset: it preserves adaptive render resolution instead of
+resizing the canvas and restoring full resolution. The browser check instruments
+the real quality-reset method and verifies it is not called by those controls.
 
 A supplementary 150-second simulation with one human, 47 ordinary bots and
 three bosses measured active-tick mean/p95/p99 of 0.949/1.584/4.333 ms, versus

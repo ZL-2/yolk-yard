@@ -1424,7 +1424,9 @@ document.addEventListener("input", (e) => {
   if(name.startsWith('slot_'))syncInventoryPreferences();
   actionToggles.reset();applyComfort(document.documentElement,settings);
   sound.setVolumes(settings);
-  view.setQuality();
+  // Comfort/HUD/input edits must not reset adaptive render resolution or
+  // reallocate the canvas. FOV is already applied by the camera update.
+  if(name==='quality')view.setQuality();
 });
 dialog.addEventListener("cancel", (e) => {
   e.preventDefault();
@@ -1502,7 +1504,7 @@ dialog.addEventListener('click', e => {
   if (reset) {
     resetSliders(settings, reset.dataset.resetSlider);
     for (const [id] of SLIDERS) { $('#'+id).value=settings[id]; $('#out-'+id).value=settings[id]; }
-    save('yolk-settings', settings); applyComfort(document.documentElement,settings); sound.setVolumes(settings); view.setQuality();
+    save('yolk-settings', settings); applyComfort(document.documentElement,settings); sound.setVolumes(settings);
   }
   if(dialogType==='settings')bindingEditor?.click(e.target);
 });

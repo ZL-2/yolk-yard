@@ -19,13 +19,15 @@ try{
  page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Expansion QA'}));});
  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest);await page.locator('#loading-screen').waitFor({state:'hidden'});
+ await page.evaluate(async()=>{const {View}=await import('/src/view.js'),original=View.prototype.setQuality;window.__qualityResetCount=0;View.prototype.setQuality=function(...args){window.__qualityResetCount++;return original.apply(this,args);};});
  await page.locator('#menu [data-action=settings]:visible').first().click();
  await page.locator('[data-settings-tab=gameplay]').click();await page.locator('#slot_shotgun').selectOption('4');
- await page.locator('[data-settings-tab=mouse]').click();await page.locator('#adsSensitivity').fill('0.5');await page.locator('#adsSensitivity').dispatchEvent('input');await page.locator('#adsSensitivity').dispatchEvent('change');
+ await page.locator('[data-settings-tab=mouse]').click();await page.locator('[data-reset-slider=adsSensitivity]').click();await page.locator('#adsSensitivity').fill('0.5');await page.locator('#adsSensitivity').dispatchEvent('input');await page.locator('#adsSensitivity').dispatchEvent('change');
  await page.locator('[data-settings-tab=comfort]').click();await page.locator('#aimMode').selectOption('toggle');await page.locator('#reducedMotion').check();
  await page.locator('[data-settings-tab=hud]').click();await page.locator('#highContrast').check();await page.locator('#mapSide').selectOption('left');
  assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('reduced-motion')),true);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('yolk-settings')).slot_shotgun),'4');
+ assert.equal(await page.evaluate(()=>window.__qualityResetCount),0,'HUD/comfort/input settings must preserve adaptive rendering');checks.settingsPreserveRenderBudget=true;
  await page.screenshot({path:out+'/settings-desktop.png'});await page.setViewportSize({width:390,height:844});
  assert.equal(await page.locator('#dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);await page.screenshot({path:out+'/settings-mobile.png'});checks.settings=true;
  await page.setViewportSize({width:1440,height:900});await page.getByRole('button',{name:'Back',exact:true}).click();
