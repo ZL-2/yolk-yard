@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {createServer} from 'vite';
-import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
+import {mkdtemp,rm,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {startRealtimeServer} from '../server/realtime/index.js';
 const temp=await mkdtemp(tmpdir()+'/ravel-editor-browser-'),out=process.env.EDITOR_CHECK_OUTPUT||'test-results/map-editor',origin='http://127.0.0.1:5199',code='89271406539284756012';
 process.env.YOLK_OWNER_CODE=code;process.env.YOLK_OWNER_DATA_PATH=temp+'/owner.json';process.env.RAVEL_SOCIAL_DATA_PATH=temp+'/social.json';process.env.RAVEL_REWARD_DATA_PATH=temp+'/progress.json';
+const retired={id:'box-999999',source:'box-999999',name:'Old wall',position:[0,0,0],rotation:0,scale:[1,1,1],collision:true},oldLayout={format:1,mapId:'sunnybreak',objects:[retired]};
+await writeFile(temp+'/maps.json',JSON.stringify({format:1,maps:{sunnybreak:{draftVersion:0,revision:0,updated:0,draft:oldLayout,published:oldLayout}},assets:[]}));
 const app=await startRealtimeServer({host:'127.0.0.1',port:9002,origins:[origin],mapPath:temp+'/maps.json'});
 const vite=await createServer({server:{host:'127.0.0.1',port:5199,strictPort:true,watch:null}});await vite.listen();await mkdir(out,{recursive:true});
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']}),context=await browser.newContext({viewport:{width:1440,height:900}}),page=await context.newPage(),errors=[],metrics={};
@@ -18,7 +20,9 @@ async function open(p,name='Workshop Check'){await p.goto(origin+'/?qa&workshopN
 async function property(name,value,axis){const selector=`[data-map-property="${name}"]${axis===undefined?'':`[data-axis="${axis}"]`}`,field=page.locator(selector);await field.fill(String(value));await field.press('Tab');await page.waitForTimeout(180);await ready(page);}
 function fixtureGlb(){const bin=Buffer.from(new Float32Array([-1,0,0,1,0,0,0,2,0]).buffer),doc={asset:{version:'2.0'},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],materials:[{doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[.9,.55,.2,1],metallicFactor:0,roughnessFactor:1}}],meshes:[{primitives:[{attributes:{POSITION:0},material:0}]}],buffers:[{byteLength:bin.length}],bufferViews:[{buffer:0,byteOffset:0,byteLength:bin.length}],accessors:[{bufferView:0,componentType:5126,count:3,type:'VEC3',min:[-1,0,0],max:[1,2,0]}]},text=JSON.stringify(doc),json=Buffer.from(text+' '.repeat((4-text.length%4)%4)),bytes=Buffer.alloc(28+json.length+bin.length);bytes.writeUInt32LE(0x46546c67,0);bytes.writeUInt32LE(2,4);bytes.writeUInt32LE(bytes.length,8);bytes.writeUInt32LE(json.length,12);bytes.writeUInt32LE(0x4e4f534a,16);json.copy(bytes,20);bytes.writeUInt32LE(bin.length,20+json.length);bytes.writeUInt32LE(0x004e4942,24+json.length);bin.copy(bytes,28+json.length);return bytes;}
 try{
- await open(page);assert.equal(await page.locator('#map-picker').inputValue(),'sunnybreak');await page.screenshot({path:out+'/owner-coast-editor.png'});
+ await open(page);assert.equal(await page.locator('#map-picker').inputValue(),'sunnybreak');
+ assert.match(await page.locator('#map-server-recovery').innerText(),/2 edits/);const download=page.waitForEvent('download');await action(page,'export-recovery').click();const archived=JSON.parse(await readFile(await (await download).path(),'utf8'));assert.deepEqual(archived.recoveries[0].objects.draft,[retired]);assert.deepEqual(archived.recoveries[0].objects.published,[retired]);metrics.mapRecovery=true;
+ await page.screenshot({path:out+'/owner-coast-editor.png'});
  await action(page,'validate').click();await page.locator('#map-validation-title').waitFor();assert.equal(await page.locator('.map-validation-list li').count(),0);await page.screenshot({path:out+'/map-check-clear.png'});await page.locator('[data-validation-close]').click();
  await page.evaluate(async()=>{const e=window.__yolkTest.editor();e.doc.set({id:'qa-floating',kind:'block',name:'Floating check block',position:[0,80,0],scale:[1,1,1],rotation:0,collision:true});e.changed();await e.rebuild();});await ready(page);
  await action(page,'validate').click();await page.locator('.map-validation-list li').filter({hasText:'Floating check block'}).waitFor();

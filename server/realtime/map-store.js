@@ -1,8 +1,8 @@
 import {readFile,writeFile,rename,mkdir} from 'node:fs/promises';
-import {dirname,join} from 'node:path';
+import {basename,dirname,join} from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {BASE_MAPS,baseMap,installPublishedLayouts,validateLayoutBundle} from '../../src/maps.js';
-import {validateLayout,compileLayout,emptyLayout} from '../../src/map-layout.js';
+import {validateLayout,compileLayout,emptyLayout,baseObjects} from '../../src/map-layout.js';
 import {validateMapGeometry} from '../../src/map-validation.js';
 import {canStand} from '../../src/physics.js';
 import {groundAt} from '../../src/terrain.js';
@@ -23,10 +23,48 @@ export function validateGlb(bytes){
  return {triangles:Math.ceil(triangles)};
 }
 export class MapStore{
- constructor({path=mapDataPath()}={}){this.path=path;this.assetDir=join(dirname(path),'map-assets');this.state={format:1,maps:{},assets:[]};this.available=true;this.queue=Promise.resolve();this.ready=this.restore();}
- async restore(){try{const data=JSON.parse(await readFile(this.path,'utf8'));if(data.format!==1||!data.maps||!Array.isArray(data.assets))throw Error('Unsupported map store');for(const [id,m]of Object.entries(data.maps)){if(!BASE_MAPS.some(b=>b.id===id))throw Error('Unknown map');m.draft=validateLayout(m.draft,id);m.published=validateLayout(m.published,id);compileLayout(baseMap(id),m.published);}this.state=data;}catch(e){if(e.code!=='ENOENT'){this.available=false;console.error('Map store could not be restored. Existing file preserved.',e.code||'INVALID_MAP',e.message);}}if(this.available)installPublishedLayouts(this.layouts());}
+ constructor({path=mapDataPath()}={}){this.path=path;this.assetDir=join(dirname(path),'map-assets');this.state={format:1,maps:{},assets:[]};this.available=true;this.archivedReferences=0;this.queue=Promise.resolve();this.ready=this.restore();}
+ async restore(){
+  let loaded=false;
+  try{
+   const original=await readFile(this.path,'utf8');loaded=true;const data=JSON.parse(original);
+   if(data.format!==1||!data.maps||!Array.isArray(data.assets))throw Error('Unsupported map store');
+   const backup=this.path+'.before-recovery-'+createHash('sha256').update(original).digest('hex')+'.bak';
+   let recovered=0;
+   for(const [id,m]of Object.entries(data.maps)){
+    if(!BASE_MAPS.some(b=>b.id===id))throw Error('Unknown map');
+    if(!m||!['draftVersion','revision'].every(k=>Number.isSafeInteger(m[k])&&m[k]>=0)||m.recoveries!=null&&!Array.isArray(m.recoveries))throw Error('Invalid map revision history');
+    const base=baseMap(id),sources=new Set(baseObjects(base).map(o=>o.id)),archived={};
+    for(const kind of ['draft','published']){
+     // Validate every record before recovery. Only a missing base-map source is
+     // recoverable here; malformed data must still fail closed.
+     const checked=validateLayout(m[kind],id),missing=new Set(checked.objects.filter(o=>o.source&&!sources.has(o.source)).map(o=>o.id));
+     if(missing.size){
+      archived[kind]=m[kind].objects.filter(o=>missing.has(o.id));
+      checked.objects=checked.objects.filter(o=>!missing.has(o.id));
+      m[kind==='draft'?'draftVersion':'revision']++;
+      recovered+=missing.size;
+     }
+     compileLayout(base,checked);m[kind]=checked;
+    }
+    if(Object.keys(archived).length){
+     m.updated=Date.now();m.recoveries=[...(m.recoveries||[]),{at:m.updated,reason:'missing-base-object',backup:basename(backup),objects:archived}];
+    }
+   }
+   validateLayoutBundle(Object.fromEntries(Object.entries(data.maps).filter(([,m])=>m.published.objects.length).map(([id,m])=>[id,m.published])));
+   if(recovered){
+    // Preserve the exact original, including archived records and asset metadata,
+    // before atomically replacing it. A failed backup never enables writes.
+    try{await writeFile(backup,original,{mode:0o600,flag:'wx'});}catch(e){if(e.code!=='EEXIST'||await readFile(backup,'utf8')!==original)throw e;}
+    await this.persist(data);
+    console.info('Map store recovered:',recovered,'obsolete source references archived; original backup preserved.');
+   }else this.state=data;
+   this.archivedReferences=Object.values(this.state.maps).reduce((sum,m)=>sum+(m.recoveries||[]).reduce((n,r)=>n+['draft','published'].reduce((count,k)=>count+(r.objects?.[k]?.length||0),0),0),0);
+  }catch(e){if(loaded||e.code!=='ENOENT'){this.available=false;console.error('Map store could not be restored. Existing file preserved.',e.code||'INVALID_MAP',e.message);}}
+  if(this.available)installPublishedLayouts(this.layouts());
+ }
  layouts(){return Object.fromEntries(Object.entries(this.state.maps).filter(([,m])=>m.published?.objects?.length).map(([id,m])=>[id,m.published]));}
- storage(){return {available:this.available,persistent:persistentMount(this.path)};}
+ storage(){return {available:this.available,persistent:persistentMount(this.path),archivedReferences:this.archivedReferences};}
  record(id){if(!BASE_MAPS.some(m=>m.id===id))throw failure('Unknown map.');return this.state.maps[id]||{draftVersion:0,revision:0,draft:emptyLayout(id),published:emptyLayout(id),updated:0};}
  overview(){return {maps:BASE_MAPS.map(m=>{const r=this.record(m.id);return {id:m.id,name:m.name,revision:r.revision,draftVersion:r.draftVersion,objects:r.draft.objects.length,updated:r.updated};}),assets:this.state.assets.map(a=>({...a})),storage:this.storage()};}
  get(id){return {...this.record(id),assets:this.state.assets,storage:this.storage()};}
