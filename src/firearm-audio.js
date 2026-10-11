@@ -33,8 +33,8 @@ export function synthesizeShot(id,sampleRate=44100,variation=0){
  }
  return out;
 }
-export function reloadSequence(id,duration){
+export function reloadSequence(id,duration,empty=true){
  const shell=['scatter','doubleyolk'].includes(id),bolt=['needle','peeper'].includes(id),launcher=id==='thumper',pistol=id==='pip';
- if(shell)return [{cue:'reload-out',at:.02,scale:.8},{cue:'reload-in',at:duration*.3,scale:.75},{cue:'reload-in',at:duration*.56,scale:.8},{cue:'pump-action',at:duration*.86,scale:1}];
- return [{cue:launcher?'launcher-open':'reload-out',at:.01,scale:pistol?.7:1},{cue:id==='comet'?'cell-seat':'reload-in',at:duration*.64,scale:pistol?.8:1},{cue:bolt?'bolt-action':'reload-bolt',at:duration*.87,scale:launcher?.7:.85}];
+ if(shell)return [{cue:'reload-out',at:.02,scale:.8},{cue:'reload-in',at:duration*.3,scale:.75},{cue:'reload-in',at:duration*.56,scale:.8},...(empty?[{cue:'pump-action',at:duration*.86,scale:1}]:[])];
+ return [{cue:launcher?'launcher-open':'reload-out',at:.01,scale:pistol?.7:1},{cue:id==='comet'?'cell-seat':'reload-in',at:duration*.64,scale:pistol?.8:1},...(empty?[{cue:bolt?'bolt-action':'reload-bolt',at:duration*.87,scale:launcher?.7:.85}]:[])];
 }

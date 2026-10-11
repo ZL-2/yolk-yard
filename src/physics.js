@@ -144,18 +144,19 @@ export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS) {
 function pushAxis(p,map,axis,delta) {
  if(Math.abs(delta)<1e-10)return;
  const start=p[axis],base=p.y,other=axis==='x'?'z':'x',size=axis==='x'?'w':'d';
- let target=start+delta;
- const height=bodyHeight(p),point={x:p.x,y:p.y,z:p.z};point[axis]=target;
- const hits=[];let top=base;
- for(const b of candidates(map,point))if(p.y<b.y+b.h-.015&&p.y+height>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(target-b[axis])<b[size]/2+RADIUS){hits.push(b);top=Math.max(top,b.y+b.h);}
- // One stair rise per axis. Never stack multiple step corrections in one move.
- if(hits.length&&p.grounded&&top-base>0&&top-base<=.43&&canOccupy(map,{...point,y:top},height)) {
-  p[axis]=target;p.y=top;return;
- }
- for(const b of hits){
+ const proposal=start+delta;let target=proposal;
+ const height=bodyHeight(p),point={x:p.x,y:p.y,z:p.z};point[axis]=proposal;
+ let hit=false,top=base;
+ // All overlaps are tested against the proposed endpoint, not the clamped
+ // endpoint. Accumulate the same entry-face clamps without a temporary array.
+ for(const b of candidates(map,point))if(p.y<b.y+b.h-.015&&p.y+height>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(proposal-b[axis])<b[size]/2+RADIUS){
+  hit=true;top=Math.max(top,b.y+b.h);
   const edge=b[axis]-Math.sign(delta)*(b[size]/2+RADIUS+.001);
-  // Clamp against the entry face; an unrelated box cannot teleport the player.
   target=delta>0?Math.min(target,Math.max(start,edge)):Math.max(target,Math.min(start,edge));
+ }
+ // One stair rise per axis. Never stack multiple step corrections in one move.
+ if(hit&&p.grounded&&top-base>0&&top-base<=.43&&canOccupy(map,{...point,y:top},height)) {
+  p[axis]=proposal;p.y=top;return;
  }
  p[axis]=target;
 }
@@ -165,14 +166,16 @@ export function movePlayer(p, input, map, dt) {
   for(let i=0;i<steps;i++){
     const before=beginFallStep(p);movePlayerStep(p,input,map,Math.min(dt,.1)/steps);
     let normalY=1;
-    if(p.fall&&p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.hypot(1,gx,gz);}
+    if(p.fall&&p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.sqrt(1+gx*gx+gz*gz);}
     if(p.flight!=='transport')finishFallStep(p,before,normalY);
   }
 }
 function movePlayerStep(p, input, map, dt) {
   if (p.health <= 0) return;
   const freshJump=(input.jumpPress||0)>(p.lastJumpPress||0)||input.jump&&!p.jumpHeld;
-  p.jumpHeld=!!input.jump;p.jumpBuffer=freshJump?.14:Math.max(0,(p.jumpBuffer||0)-dt);p.mantleCooldown=Math.max(0,(p.mantleCooldown||0)-dt);
+  if(p.jumpHeld!==!!input.jump)p.jumpHeld=!!input.jump;
+  if(freshJump)p.jumpBuffer=.14;else if(p.jumpBuffer>0)p.jumpBuffer=Math.max(0,p.jumpBuffer-dt);
+  if(p.mantleCooldown>0)p.mantleCooldown=Math.max(0,p.mantleCooldown-dt);
   if ((input.jumpPress || 0) > (p.lastJumpPress || 0)) {
     p.lastJumpPress = input.jumpPress;
     p.jumpLatch = p.flightLatch = false;
@@ -184,7 +187,7 @@ function movePlayerStep(p, input, map, dt) {
     1.48,
   );
   if (p.flight === 'transport') return;
-  if(stepMantle(p,map,dt,canStand))return;
+  if(p.mantle&&stepMantle(p,map,dt,canStand))return;
   if(p.jumpBuffer>0&&beginMantle(p,input,map,{candidates,rayBox,canStand,radius:RADIUS})){stepMantle(p,map,dt,canStand);return;}
   if(stepGrapple(p,input,map,dt,canStand,groundAt))return;
   stepShadowstep(p,map,dt,canOccupy,groundAt,bodyHeight(p),RADIUS);
@@ -201,7 +204,7 @@ function movePlayerStep(p, input, map, dt) {
   if (p.flight === 'dive' || p.flight === 'glide' || p.flight === 'launch') {
     p.crouching=false;p.lowCrouch=false;p.sliding=false;p.crouchLatch=!!input.crouch;
     const toggle=input.jump&&!p.flightLatch;p.flightLatch=!!input.jump;
-    const f=clamp(input.forward || 0,-1,1),s=clamp(input.strafe || 0,-1,1),length=Math.max(1,Math.hypot(f,s));
+    const f=clamp(input.forward || 0,-1,1),s=clamp(input.strafe || 0,-1,1),length=Math.max(1,Math.sqrt(f*f+s*s));
     const speed=SEASON.flight[p.flight];
     pushAxis(p,map,'x',(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)/length*speed*dt);
     pushAxis(p,map,'z',(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)/length*speed*dt);
@@ -230,7 +233,7 @@ function movePlayerStep(p, input, map, dt) {
   }
   let f = clamp(input.forward || 0, -1, 1),
     s = clamp(input.strafe || 0, -1, 1),
-    len = Math.hypot(f, s);
+    len = Math.sqrt(f*f+s*s);
   if (len > 1) {
     f /= len;
     s /= len;
@@ -239,8 +242,8 @@ function movePlayerStep(p, input, map, dt) {
   // Packet gaps are not a physical stop. Use the most recently executed move,
   // bounded by server freshness, so crouch edges can initiate slides under jitter.
   const momentumX=p.motionFresh?p.motionVX:p.vx,momentumZ=p.motionFresh?p.motionVZ:p.vz;
-  const speedBefore=Math.hypot(momentumX||0,momentumZ||0);
-  const gx=p.grounded&&input.crouch?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=p.grounded&&input.crouch?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0,slope=Math.hypot(gx,gz);
+  const speedBefore=Math.sqrt((momentumX||0)**2+(momentumZ||0)**2);
+  const gx=p.grounded&&input.crouch?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=p.grounded&&input.crouch?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0,slope=Math.sqrt(gx*gx+gz*gz);
   if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&speedBefore<SEASON.slide.startSpeed&&slope>=SEASON.slide.slope&&p.slideCooldown===0){p.sliding=true;p.slideAge=0;p.slideVX=-gx/slope*3;p.slideVZ=-gz/slope*3;}
   // Holding crouch can queue a slide through a jump or mobility-item landing.
   // Actual momentum, not the sprint button or terrain slope, admits the slide.
@@ -263,15 +266,15 @@ function movePlayerStep(p, input, map, dt) {
     (p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
   let mx=(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)*speed,mz=(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)*speed;
   if(p.sliding){
-    let vx=p.slideVX||0,vz=p.slideVZ||0,v=Math.hypot(vx,vz);
+    let vx=p.slideVX||0,vz=p.slideVZ||0,v=Math.sqrt(vx*vx+vz*vz);
     if(p.grounded){
       const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;
       vx-=gx*SEASON.slide.gravity*dt;vz-=gz*SEASON.slide.gravity*dt;
       const loss=Math.max(0,1-(slope>=SEASON.slide.slope?2.4:3.8)*dt/Math.max(v,.01));vx*=loss;vz*=loss;
     }
-    v=Math.hypot(vx,vz);const wanted=Math.hypot(mx,mz);
-    if(wanted>.1){const blend=Math.min(.055,dt*.85);vx=vx*(1-blend)+mx/wanted*v*blend;vz=vz*(1-blend)+mz/wanted*v*blend;const n=Math.hypot(vx,vz)||1;vx*=v/n;vz*=v/n;}
-    const cap=Math.min(1,SEASON.slide.cap/(Math.hypot(vx,vz)||1));p.slideVX=mx=vx*cap;p.slideVZ=mz=vz*cap;
+    v=Math.sqrt(vx*vx+vz*vz);const wanted=Math.sqrt(mx*mx+mz*mz);
+    if(wanted>.1){const blend=Math.min(.055,dt*.85);vx=vx*(1-blend)+mx/wanted*v*blend;vz=vz*(1-blend)+mz/wanted*v*blend;const n=Math.sqrt(vx*vx+vz*vz)||1;vx*=v/n;vz*=v/n;}
+    const cap=Math.min(1,SEASON.slide.cap/(Math.sqrt(vx*vx+vz*vz)||1));p.slideVX=mx=vx*cap;p.slideVZ=mz=vz*cap;
   }else if(!p.grounded&&p.slideAge>0&&!p.downed){mx=mx*.2+(p.slideVX||0)*.8;mz=mz*.2+(p.slideVZ||0)*.8;}
   else if(p.grounded&&!p.sliding)p.slideAge=0;
   const dx=mx*dt,dz=mz*dt;
@@ -288,18 +291,21 @@ function movePlayerStep(p, input, map, dt) {
   pushAxis(p, map, "z", dz);
   if(p.launchVelocity&&!p.grounded){pushAxis(p,map,'x',p.launchVelocity.x*dt);pushAxis(p,map,'z',p.launchVelocity.z*dt);p.launchVelocity.x*=Math.exp(-.4*dt);p.launchVelocity.z*=Math.exp(-.4*dt);}
   const ground=groundAt(map,p.x,p.z);
+  // Vertical resolution never changes X/Z or geometry. Reuse this exact
+  // broadphase result for support and landing rather than querying twice.
+  const verticalBoxes=candidates(map,p);
   if(followedGround&&Math.abs(p.y-oldSurfaceY)<.05&&Math.abs(ground-oldSurfaceY)<=.43)p.y=ground;
   // Follow short descents without falling and landing on every individual tread.
   if(wasGrounded){
     let support=ground;
-    for(const b of candidates(map,p))if(b.y+b.h<=p.y+.001&&Math.abs(p.x-b.x)<b.w/2+RADIUS&&Math.abs(p.z-b.z)<b.d/2+RADIUS)support=Math.max(support,b.y+b.h);
-    if(p.y-support<=.43&&canOccupy(map,{x:p.x,y:support,z:p.z},bodyHeight(p))){p.y=support;p.vy=0;}
+    for(const b of verticalBoxes)if(b.y+b.h<=p.y+.001&&Math.abs(p.x-b.x)<b.w/2+RADIUS&&Math.abs(p.z-b.z)<b.d/2+RADIUS)support=Math.max(support,b.y+b.h);
+    if(p.y-support<=.43&&(support===p.y&&p.vy===0||canOccupy(map,{x:p.x,y:support,z:p.z},bodyHeight(p)))){p.y=support;p.vy=0;}
   }
   const oldY = p.y;
   p.vy -= 24 * dt;
   p.y += p.vy * dt;
   p.grounded = false;
-  for (const b of candidates(map,p)) {
+  for (const b of verticalBoxes) {
     if (
       Math.abs(p.x - b.x) >= b.w / 2 + RADIUS ||
       Math.abs(p.z - b.z) >= b.d / 2 + RADIUS

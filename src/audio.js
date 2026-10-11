@@ -146,7 +146,7 @@ export class Sound {
  }
  pop(distance=0,position=null){if(distance>190)return;const source=position?{...position,radius:190}:null,scale=source?1:1/(1+distance/18);this.layer(noise(160,.38,.25),source,'effects',scale);this.layer(note(70,.4,.17,'triangle',25),source,'effects',scale);}
  pickup(){this.cue('pickup-1');}eliminate(){this.cue('elimination');}
- reload(duration=1.2,id='sprinter'){this.cancelReload();this.reloadVoices=[];for(const e of reloadSequence(id,duration))for(const p of SOUND_CUES[e.cue]||[]){const voice=this.layer({...p,at:e.at+(p.at||0)},null,'effects',e.scale);if(voice)this.reloadVoices.push(voice);}}
+ reload(duration=1.2,id='sprinter',empty=true){this.cancelReload();this.reloadVoices=[];for(const e of reloadSequence(id,duration,empty))for(const p of SOUND_CUES[e.cue]||[]){const voice=this.layer({...p,at:e.at+(p.at||0)},null,'effects',e.scale);if(voice)this.reloadVoices.push(voice);}}
  cancelReload(){for(const source of this.reloadVoices||[])try{source.stop();}catch{}this.reloadVoices=[];}
  loop(id,target,{freq=300,volume=.06,noise:useNoise=true}={}){
   if(!this.ctx)return;

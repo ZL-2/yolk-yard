@@ -10,6 +10,7 @@ import {sanitizeSlotPreferences,vacantSlot,targetLoot,stackCapacity,healingSugge
 import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
 import {buildingTick} from '../src/building.js';
 import {armPose,ARM_POSES} from '../src/arms.js';
+import {reloadSequence} from '../src/firearm-audio.js';
 
 const flat=()=>({id:'flat',theme:'royale',size:100,boxes:[],floorLoot:[],landmarks:[],districts:[]});
 function runner(){const p={id:'host',name:'Host',health:100,shield:0,x:0,y:0,z:0,yaw:0,pitch:0,vx:0,vy:0,vz:0,grounded:true,flight:'ground',inventory:inventory(),slot:1,weapon:'sprinter',contestant:true,spectating:false,shieldUntil:0};resetStance(p);p.inventory[1]={id:'sprinter',weapon:true,rarity:0,ammo:30,count:1};return p;}
@@ -68,6 +69,9 @@ test('new guns use empty preferred slots and full inventories still swap exactly
 test('oversized loot stacks fill multiple empty slots without deleting excess',()=>{
  const{s,p}=room();p.pickupPreferences={healing:4};const item=s.dropLoot(p,{id:'mini',count:30,rarity:1});s.takeLoot(p,item);for(let i=2;i<=5;i++)assert.equal(p.inventory[i].count,6);assert.equal(item.count,6);assert.ok(s.loot.includes(item));
 });
+test('inventory synchronization reuses simulation arrays without aliasing snapshots',()=>{
+ const{s,p}=room();s.syncInventory(p);const ammo=p.ammo,reserve=p.reserve,snapshot=s.snapshot().players.find(q=>q.id===p.id);p.inventory[1].ammo=4;p.bank.medium=90;s.syncInventory(p);assert.equal(p.ammo,ammo);assert.equal(p.reserve,reserve);assert.equal(p.ammo[1],4);assert.equal(p.reserve[1],90);assert.equal(snapshot.ammo[1],30);assert.equal(snapshot.reserve[1],100);
+});
 test('crosshair targeting is deterministic, honors visibility and prefers aimed loot over side clutter',()=>{
  const p=runner(),front={uid:'front',x:0,y:0,z:-2},side={uid:'side',x:1,y:0,z:0},back={uid:'back',x:0,y:0,z:1};
  assert.equal(targetLoot([side,back,front],p),front);assert.equal(targetLoot([front,side,back],p,i=>i!==front),side);
@@ -118,6 +122,7 @@ test('build input buffers briefly through cooldown, never across mode changes or
 test('empty reload action differs visibly, retains authoritative duration, and resets hands',()=>{
  const{s,p}=room();for(const ammo of [0,5]){p.inventory[1].ammo=ammo;s.syncInventory(p);p.reloadEnd=0;assert.equal(s.reload(p),true);assert.equal(p.reloadEmpty,ammo===0);assert.equal(s.snapshot().players.find(q=>q.id===p.id).reloadEmpty,ammo===0);assert.equal(s.events.at(-1).duration,p.reloadDuration);}
  for(const id of ['sprinter','zipper','pip','scatter','needle']){assert.notDeepEqual(armPose(id,.86,true).right,armPose(id,.86,false).right);assert.deepEqual(armPose(id,1,true).right,ARM_POSES[id].right);assert.deepEqual(armPose(id,-1,true),armPose(id,-1,false));}
+ for(const id of ['sprinter','peeper','scatter']){const empty=reloadSequence(id,2,true),tactical=reloadSequence(id,2,false);assert.equal(empty.length,tactical.length+1);assert.ok(empty.at(-1).at<2);assert.ok(!tactical.some(e=>/bolt|pump/.test(e.cue)));}
 });
 test('radius-expanded slab tests and scalar face normals preserve exact contact geometry',()=>{
  const b={x:0,y:0,z:0,w:2,h:3,d:2},map={...flat(),theme:'arena',boxes:[b]};

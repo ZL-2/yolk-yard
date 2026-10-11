@@ -28,7 +28,7 @@ try{
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('yolk-settings')).slot_shotgun),'4');
  await page.screenshot({path:out+'/settings-desktop.png'});await page.setViewportSize({width:390,height:844});
  assert.equal(await page.locator('#dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);await page.screenshot({path:out+'/settings-mobile.png'});checks.settings=true;
- await page.setViewportSize({width:1440,height:900});await page.locator('#dialog [data-action=close]').click();
+ await page.setViewportSize({width:1440,height:900});await page.getByRole('button',{name:'Back',exact:true}).click();
  await page.locator('[data-action=training]:visible').click();await page.locator('[data-action=start-training]').click();await page.locator('#loading-screen').waitFor({state:'hidden'});
  const resume=page.locator('#dialog [data-action=resume]');if(await resume.isVisible())await resume.click();else await page.mouse.click(720,450);
  await page.waitForFunction(()=>!window.__yolkTest.read().paused&&document.pointerLockElement);

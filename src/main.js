@@ -988,7 +988,7 @@ function processEvents() {
         damageDirections.hit(e,performance.now());
       }
     }
-    if (e.type === "reload" && e.player === localId) sound.reload(Math.max(.3,(me?.reloadEnd||state.time+1.2)-state.time),e.weapon||gun(me).id);
+    if (e.type === "reload" && e.player === localId) sound.reload(Math.max(.3,(me?.reloadEnd||state.time+1.2)-state.time),e.weapon||gun(me).id,e.empty!==false);
     if (e.type === "pickup" && e.player === localId) {
       sound.pickup();
       notice(

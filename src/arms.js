@@ -46,7 +46,6 @@ export function armPose(id, progress=-1, empty=false) {
   if(active) {
     left=path([[0,c.left],[.16,c.socket],[.38,c.drop],[.5,c.drop],[.72,c.socket],[1,c.left]],t);
     if(id==='scatter'||id==='doubleyolk') left=path([[0,c.left],[.15,c.drop],[.32,c.socket],[.45,c.drop],[.62,c.socket],[.78,[-.13,-.15,-.23]],[1,c.left]],t);
-    if(id==='needle'||id==='peeper') right=path([[0,c.right],[.12,c.right],[.26,[.22,.01,.2]],[.44,[.24,.01,.33]],[.72,[.22,.01,.18]],[1,c.right]],t);
     if(id==='thumper') left=path([[0,c.left],[.25,c.drop],[.45,[-.25,-.25,-.57]],[.75,c.socket],[1,c.left]],t);
     // Tactical reload retains the chambered round. An empty reload visibly
     // operates the action after seating ammunition, on the same host clock.
