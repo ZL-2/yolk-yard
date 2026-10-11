@@ -12,6 +12,7 @@ import {buildIsland,buildIslandSteps,RoyaleView} from './royale-view.js';
 import {shopItem} from './shop-catalog.js';
 import {makeShopBack,makeShopPickaxe,makeShopGlider,makeShopTrail} from './shop-models.js';
 import {stairCamera} from './stair-camera.js';
+import {cameraDistance,cameraNearPlane,smoothCameraDistance} from './camera-collision.js';
 import {LobbyMotion} from './lobby-motion.js';
 import {eyeHeight,bodyHeight,canFight} from './stance.js';
 import * as THREE from "three";
@@ -366,6 +367,13 @@ export class View {
       this.pickupMeshes.set(id, group);
     }
 
+  }
+  placeCameraBehind(state,p,origin,back,length,dt,mode){
+    if(this.cameraBoom&&Math.hypot(p.x-this.cameraBoom.x,p.y-this.cameraBoom.y,p.z-this.cameraBoom.z)>8)this.cameraBoom=null;
+    const distance=cameraDistance(getMap(state.options.map),origin,back,length);
+    this.cameraBoom=smoothCameraDistance(this.cameraBoom,distance,dt,`${state.round}:${state.options.map}:${p.id}:${mode}`);
+    Object.assign(this.cameraBoom,{x:p.x,y:p.y,z:p.z});
+    this.camera.position.copy(origin).addScaledVector(back,this.cameraBoom.distance);
   }
   setParty(profiles){
     const key=JSON.stringify(profiles);if(key===this.partyPreviewKey)return;this.partyPreviewKey=key;
@@ -770,12 +778,12 @@ export class View {
         p.z,
       );
       this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
+      let cameraBoom=false;
       if (killer || local.downed || local.emote) {
         const cameraYaw=local.emote?(this.emoteLook?.yaw??p.yaw):p.yaw;
-        const back = new THREE.Vector3(Math.sin(cameraYaw), local.emote?.2:.35, Math.cos(cameraYaw)).normalize();
-        const origin = {x:p.x, y:p.y+(p.downed?.8:1.6), z:p.z};
-        const distance = Math.max(0.1, wallDistance(getMap(state.options.map), origin, back, local.emote?4.2:3.5)-0.2);
-        this.camera.position.set(origin.x+back.x*distance, origin.y+back.y*distance, origin.z+back.z*distance);
+        const back = this.cameraBack??=new THREE.Vector3();back.set(Math.sin(cameraYaw),local.emote?.2:.35,Math.cos(cameraYaw)).normalize();
+        const origin = this.cameraOrigin??=new THREE.Vector3();origin.set(p.x,p.y+Math.min(1.6,eyeHeight(p)),p.z);
+        this.placeCameraBehind(state,p,origin,back,local.emote?4.2:3.5,dt,local.emote?'emote':'spectator');cameraBoom=true;
         this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
       }
       const draw=equipPose(local,state.time);
@@ -851,9 +859,14 @@ export class View {
         if(p.flight==='transport'){
           this.camera.position.set(p.x+Math.sin(p.yaw)*Math.cos(p.pitch||0)*24,p.y+8-Math.sin(p.pitch||0)*20,p.z+Math.cos(p.yaw)*Math.cos(p.pitch||0)*24);this.camera.lookAt(p.x,p.y+3,p.z);this.camera.fov=80;this.camera.updateProjectionMatrix();
         }else if(p.health>0&&p.flight!=='ground'){
-          this.camera.position.set(p.x+Math.sin(p.yaw)*6,p.y+3.5,p.z+Math.cos(p.yaw)*6);this.camera.rotation.set(Math.min(p.pitch,-.18),p.yaw,0,'YXZ');
+          const back=this.cameraBack??=new THREE.Vector3();back.set(Math.sin(p.yaw)*6,1.9,Math.cos(p.yaw)*6);const length=back.length();back.normalize();
+          const origin=this.cameraOrigin??=new THREE.Vector3();origin.set(p.x,p.y+1.6,p.z);
+          this.placeCameraBehind(state,p,origin,back,length,dt,'flight');cameraBoom=true;this.camera.rotation.set(Math.min(p.pitch,-.18),p.yaw,0,'YXZ');
         }
       }
+      const near=cameraBoom?cameraNearPlane(this.camera.fov,this.camera.aspect):(getMap(state.options.map).theme==='royale'?.15:.025);
+      if(this.camera.near!==near){this.camera.near=near;this.camera.updateProjectionMatrix();}
+      if(!cameraBoom)this.cameraBoom=null;
     }
     if (state) {
       const seen = new Set();

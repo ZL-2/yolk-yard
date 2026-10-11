@@ -47,6 +47,12 @@ try{
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{const id=window.__yolkTest.read().localId,p=s.players.get(id);s.emit('hit',{player:id,target:'qa-enemy',amount:20,shotId:'qa-shield',shield:true,shieldBreak:true});s.emit('hit',{player:'qa-enemy',target:id,amount:10,sourceX:p.x+6,sourceZ:p.z,shield:true});}));
  await page.waitForFunction(()=>document.querySelector('#hit-marker')?.dataset.kind==='break');
  assert.equal(await page.locator('#damage-directions .damage-direction').count(),5);await page.screenshot({path:out+'/combat-feedback.png'});checks.feedback=true;
+ await page.evaluate(async()=>{const {rebuildMap}=await import('/src/building.js'),{startEmote}=await import('/src/emotes.js');window.__yolkTest.fixture(s=>{const p=s.players.get(window.__yolkTest.read().localId);window.__yolkTest.look(0,0);p.yaw=0;p.lastDamage=-100;p.emoteReadyAt=0;s.builds.push({id:888888,owner:p.id,type:'wall',material:'wood',rotation:0,mask:0,x:p.x,y:p.y,z:p.z+1.4,health:150,maxHealth:150,builtAt:s.time});s.buildVersion++;rebuildMap(s);if(!startEmote(s,p,'shuffle'))throw Error('Emote camera fixture unavailable');});});
+ await page.waitForFunction(()=>{const q=window.__yolkTest.read(),p=q.state.players.find(p=>p.id===q.localId),camera=window.__yolkTest.celebrations().cameraPosition;return !!p.emote&&camera[2]>p.z+.1&&camera[2]<p.z+1.15;});
+ await page.screenshot({path:out+'/emote-camera-wall.png'});
+ await page.evaluate(async()=>{const {rebuildMap}=await import('/src/building.js');window.__yolkTest.fixture(s=>{s.builds=s.builds.filter(b=>b.id!==888888);s.buildVersion++;rebuildMap(s);});});
+ await page.waitForFunction(()=>{const q=window.__yolkTest.read(),p=q.state.players.find(p=>p.id===q.localId),camera=window.__yolkTest.celebrations().cameraPosition;return camera[2]-p.z>3.5;});
+ await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.players.get(window.__yolkTest.read().localId).emote=null;}));checks.cameraCollision=true;
  await page.keyboard.press('KeyI');await page.locator('#dialog[data-kind=royale-inventory]').waitFor({state:'visible'});await page.screenshot({path:out+'/inventory-desktop.png'});
  for(const width of [320,390]){
   await page.setViewportSize({width,height:844});assert.equal(await page.locator('#dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);

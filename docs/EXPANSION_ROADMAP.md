@@ -14,15 +14,15 @@ complete merely because a menu, stub, or configuration value exists.
 | --- | --- |
 | 1 Combat | V pooled directional damage; V differentiated confirmations; I multi-attacker recap; E authority/prediction consistency |
 | 2 Weapons | E distinct balance profiles; P tradeoff attachments; P inspection; I tactical/empty reload distinction |
-| 3 Movement | I swept mantle; I low vault; E blended transitions; P corner/door collision acceptance |
+| 3 Movement | I swept mantle; I low vault; E blended transitions; V ordinary door/corner collision acceptance |
 | 4 Building | E placement reasons; I placement buffering; E edit highlights/reset; E cracks, P collapse warning effects |
 | 5 Inventory | V preferred slots; V compare before swap; V crosshair loot targeting; V multi-stack merging/capacity |
 | 6 Survival | I clear movement rules; I healing suggestions; P limited recovery stations; I cancellation reasons |
-| 7 Bots | E bounded skill; E combat roles; E last-known information; E stuck recovery; E bounded natural mistakes |
+| 7 Bots | E bounded skill, V seeded duel limits; E combat roles; E last-known information; E stuck recovery, V expired utility recovery; E bounded natural mistakes |
 | 8 Teammates | P tactical commands; P item sharing; E safe revive planning; E formation spacing |
 | 9 Bosses | E distinct encounters; E warnings; E Mythic counterplay; E patrol variation; E vault identities |
 | 10 Map | E unique layouts; E sightline reduction; P route validation; E landmarks; P location-weighted loot |
-| 11 Environment | P warning/detonation props; E breakable cover; E functional doors; P power systems |
+| 11 Environment | P warning/detonation props; E breakable cover; V door geometry/occupancy/interaction checks; P power systems |
 | 12 Storm | E phase timing; P late-circle reachability; E traversal rotations; E early equipment window |
 | 13 Objectives | P approximate bounties; G moving convoy; E capture relays; P one optional rotating event |
 | 14 Vehicles | G buggy/occupants/fuel/damage; G counterplay; E authored traversal; E collision-safe traversal exits, G vehicle exits |
@@ -31,7 +31,7 @@ complete merely because a menu, stub, or configuration value exists.
 | 17 Effects | E muzzle flashes; P material impacts; E Mythic effects; P visibility-safe atmosphere presets; E bounded pools |
 | 18 Audio | E surface steps; P indoor acoustics; E distance detail; P explicit voice priority; P exploration music ducking |
 | 19 HUD | I minimap side/visibility, inventory/map scale; E descriptions; E urgent notifications; E interaction prompts; E results breakdown |
-| 20 Controls | I independent sensitivity contexts; P third-person collision acceptance; I comfort sliders; P controller; I jump/build buffering, P reload buffering |
+| 20 Controls | I independent sensitivity contexts; I swept third-person collision; I comfort sliders; P controller; I jump/build buffering, V reload buffering |
 | 21 Social | E quick chat/pings; E party readiness; E recovery status; P recent teammates; E party continuity |
 | 22 Progress | E weapon mastery; E weekly, P daily challenges; P discoveries; E career milestones; E reward transparency |
 | 23 Cosmetics | E sets; E interactive previews; P named loadouts; E cosmetic prestige; E ownership/pricing |
@@ -42,7 +42,7 @@ complete merely because a menu, stub, or configuration value exists.
 | 28 Loading | E lobby-first presentation; E incremental map preparation; E actual stage labels; E versioned assets; E reusable safe geometry |
 | 29 Accessibility | I non-color hit labels; I prompt text scale/contrast; I hold/toggle; I audio-visual categories; I reduced-motion setting |
 | 30 Training | E basic tutorial, P survival/loot lessons; P moving range targets/accuracy; P timed building drills; P independent practice tuning; P one-time contextual help |
-| 31 Editor | E undo/redo; E properties, P grouping/visibility/locking acceptance; E snapping; P map validation; E draft/publish separation |
+| 31 Editor | E undo/redo; E properties, P grouping/visibility/locking acceptance; E snapping; I local map validation; E draft/publish separation |
 | 32 Safety | E bounded host/input claims, P expanded validation; P recoverable backups; E release agreement; E regression scripts; E opt-in diagnostics |
 
 ## Release gates
@@ -102,3 +102,28 @@ waiver. New or touched behavior requires direct regression coverage.
   production build, CPU comparison, saved settings without render-budget resets,
   and desktop/320px/390px browser acceptance. This does not complete the P/E/I/G
   entries above or waive the 43 full-suite failures.
+
+## Door, camera and bot recovery checkpoint
+
+- All 122 ordinary authored doorways pass from both sides, at three lateral
+  offsets, at 20 and 60 Hz. Raised the dock drainage and refuge tunnel roofs to
+  clear their sampled terrain, preserving scenery counts. Moved one obstructed
+  fallback spawn to nearby clear ground.
+- Building/door edits and copies now keep functional controls, colliders and
+  rendered hinges aligned, including quarter turns and nonuniform scaling.
+  Separately edited or deleted leaves take precedence over building transforms.
+- Editor Check map examines spawns, door clearance, local loot access and solid
+  object support; its report links to the affected location. Publish validation
+  also runs on the relay. These are local checks, not full-map route proofs.
+- Third-person camera volume sweeps protect near-plane corners, retract
+  immediately at cover and extend smoothly after cover clears.
+- Reload taps survive short equip/mantle transitions for 220 ms, preserve guest
+  input edges and expire rather than firing later after conflicting actions.
+- Expired bot utility plans no longer disable gun aiming indefinitely. Utility
+  execution waits for equip completion and releases the previous trigger.
+- Latest full differential run: 604 tests, 563 passed, 41 failed, no new failing
+  names. The existing door test now closes the leaf before shooting it; the
+  popper test allows the actual equip plus throw duration. One additional
+  separately run preview test covers independently moved/deleted door leaves.
+- Browser acceptance for the new camera and editor checks is pending the next
+  branch CI run. No deployment, protocol, version or progression-schema change.

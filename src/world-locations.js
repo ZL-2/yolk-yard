@@ -95,7 +95,11 @@ export function authorFrontierWorld(c){
  const vault={id:'aster-vault',bossId:'warden-aster',key:'asterKeycard',name:'Voss Strategic Reserve',doorId:gate.id,x:vx,y:vy,z:vz,entrance,reader,stairs:[{x:vx,y:house.baseY,z:vz+27},{x:vx,y:vy+3,z:vz+18},{x:vx,y:vy,z:vz+10.5}],house:buildings.indexOf(house)};
  // A covered forest refuge and a dry drainage tunnel are physically traversable.
  for(const [name,x,z,w,d,h]of [['HUSH REFUGE',-38,67,14,18,4],['PORT DRAIN',126,188,5,18,3]]){
-  const y=yAt(x,z),rock=name==='HUSH REFUGE';for(const side of [-1,1])put(x+side*w/2,y,z,rock?2:.55,h,d,rock?0x68746a:0x677b80,{material:'brick'});put(x,y+h,z,w+2,rock?2:.6,d,rock?0x6a7765:0x62767b,{material:'brick'});sign(name,x,y+h-.7,z+d/2+.2);floorLoot.push({x,y,z,poi:rock?'landmark-12':'landmark-13',role:'weapon',chance:1,source:'ground'});
+  const y=yAt(x,z),rock=name==='HUSH REFUGE';
+  // The port approach climbs above the tunnel midpoint. A midpoint-height
+  // roof clipped the neighboring hangar doorway at head height.
+  let ceiling=y+h;for(let dz=-d/2;dz<=d/2;dz+=2)ceiling=Math.max(ceiling,yAt(x,z+dz)+h);
+  for(const side of [-1,1])put(x+side*w/2,y,z,rock?2:.55,ceiling-y,d,rock?0x68746a:0x677b80,{material:'brick'});put(x,ceiling,z,w+2,rock?2:.6,d,rock?0x6a7765:0x62767b,{material:'brick'});sign(name,x,ceiling-.7,z+d/2+.2);floorLoot.push({x,y,z,poi:rock?'landmark-12':'landmark-13',role:'weapon',chance:1,source:'ground'});
  }
  // Exactly three roof-to-roof lines, each backed by an industrial purpose.
  for(const [poi,label]of [['observatory','ASTER SERVICE LINE'],['works','QUARRY HAUL LINE'],['docks','CARGO TRANSFER LINE']]){

@@ -33,7 +33,7 @@ test('a Royale bot finishes a queued popper throw after firing a weapon',()=>{
  const bot=[...s.players.values()].find(p=>p.bot);
  Object.assign(bot,{x:70,y:0,z:0,flight:'ground',grounded:true,slot:1,useLatch:true,brain:{utility:{slot:2,yaw:0,pitch:.35,until:s.time+1}}});
  bot.inventory[1]={id:'pip',weapon:true,ammo:7,count:1,rarity:0};bot.inventory[2]={id:'popper',count:2,rarity:1};s.syncInventory(bot);
- for(let i=0;i<30;i++)s.tick(1/60);
+ for(let i=0;i<54;i++)s.tick(1/60); // Includes the .3 s equip and .35 s throw; no action is instantaneous.
  assert.equal(bot.inventory[2].count,1);assert.equal(bot.use,null);
  assert.ok(s.projectiles.some(p=>p.owner===bot.id&&p.popper));
 });

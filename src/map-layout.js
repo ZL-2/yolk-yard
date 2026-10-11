@@ -63,6 +63,9 @@ export function transformBox(box,origin,record){
  const p=transformPoint(box,origin,record),a=record.rotation*Math.PI/180,c=Math.abs(Math.cos(a)),s=Math.abs(Math.sin(a));
  return {...box,...p,w:Math.max(.02,box.w*record.scale[0]*c+box.d*record.scale[2]*s),d:Math.max(.02,box.w*record.scale[0]*s+box.d*record.scale[2]*c),h:Math.max(.02,box.h*record.scale[1])};
 }
+export function transformDoor(door,origin,record){
+ return {...transformBox(door,origin,record),yaw:(door.yaw||0)+record.rotation*Math.PI/180,editorObject:record.id};
+}
 export function prefabBoxes(kind){
  const p=prefab(kind);if(!p||['spawn','chest'].includes(kind))return [];
  const [w,h,d]=p.size,b=(x,y,z,w,h,d)=>({x,y,z,w,h,d,kind:'editor',material:p.material,color:p.color?Number.parseInt(p.color.slice(1),16):0x647983});
@@ -96,7 +99,20 @@ export function compileLayout(base,input){
  const map={...base,boxes:(base.authored||base.boxes).map((b,i)=>({...b,objectId:b.objectId||'world-'+i})),editorObjects:[],editorBase:base,layoutKey:layoutKey(layout)};
  for(const key of ['buildings','props','trees','chests','floorLoot','navLinks','signs','doors'])map[key]=(base[key]||[]).map(p=>({...p}));
  map.spawns=base.spawns.map(p=>[...p]);
- const removed=new Set(),replacements=new Map(),explicit=new Set(layout.objects.filter(o=>o.source).map(o=>o.source));
+ const removed=new Set(),replacements=new Map(),explicit=new Set(layout.objects.filter(o=>o.source&&o.id===o.source).map(o=>o.source));
+ // Door leaves are separate authored objects. Keep those stable source IDs,
+ // while moving their interaction, rendering and collision with the building.
+ const doorSources=new Map();for(const source of sources.values())for(const b of source.boxes)if(b.doorId)doorSources.set(b.doorId,source.id);
+ const moveDoors=(doors,r,origin,copy=false)=>{
+  for(const d of doors){
+   if(!copy&&explicit.has(doorSources.get(d.id))&&doorSources.get(d.id)!==r.source)continue;
+   const solid=(base.authored||base.boxes).find(b=>b.doorId===d.id),id=copy?'editor-'+r.id+'-'+d.id:d.id;
+   if(!copy){map.doors=map.doors.filter(o=>o.id!==id);if(solid){removed.add(solid.objectId);replacements.delete(solid.objectId);}}
+   if(r.removed||!r.collision)continue;
+   const door={...transformDoor(d,origin,r),id,...(copy?{building:undefined}:{})};map.doors.push(door);
+   if(solid){const box={...transformBox(solid,origin,r),objectId:'world-door-'+id,doorId:id,editorObject:r.id,...(copy?{building:undefined}:{})};if(copy){if(++addedSolids>4000)throw Error('Reduce duplicated structures: at most 4,000 added structural pieces per map.');map.boxes.push(box);}else replacements.set(solid.objectId,box);}
+  }
+ };
  let addedSolids=0;const records=[...layout.objects].sort((a,b)=>(a.source?.startsWith('building-')?-1:0)-(b.source?.startsWith('building-')?-1:0));
  for(const r of records){
   const src=r.source?sources.get(r.source):null;if(r.source&&!src)throw Error('The map contains an object that no longer exists.');
@@ -108,21 +124,24 @@ export function compileLayout(base,input){
     for(const p of map.props)if(p.building===i&&!explicit.has('prop-'+map.props.indexOf(p))){p.editorHidden=true;}
     for(const key of ['chests','floorLoot','signs'])map[key]=map[key].filter(p=>p.building!==i||!r.removed).map(p=>p.building===i?{...p,...transformPoint(p,origin,r)}:p);
     map.navLinks=map.navLinks.filter(p=>p.building!==i||!r.removed).map(p=>p.building===i?{...p,building:undefined,from:transformPoint(p.from,origin,r),to:transformPoint(p.to,origin,r)}:p);
-    map.doors=map.doors.filter(p=>p.building!==i||!r.removed).map(p=>p.building===i?{...p,...transformPoint(p,origin,r)}:p);
+    moveDoors((base.doors||[]).filter(p=>p.building===i),r,origin);
    }else if(['prop','tree'].includes(src.type)){
     const key=src.type==='tree'?'trees':'props',i=Number(src.id.split('-')[1]);map[key][i]={...map[key][i],...transformPoint(src.spec,origin,r),editorHidden:true};
    }else if(src.type==='chest'){
     const p=base.chests[Number(src.id.split('-')[1])];map.chests=map.chests.filter(c=>c.id!==p.id);if(!r.removed)map.chests.push({...p,...transformPoint(p,origin,r)});
    }else if(src.type==='spawn'){map.spawns[Number(src.id.split('-')[1])]=r.removed?null:[r.position[0],r.position[2]];}
+   if(src.type==='box'&&src.spec.doorId)moveDoors((base.doors||[]).filter(d=>d.id===src.spec.doorId),r,origin);
   }else if(!r.removed){
    const solids=src?src.boxes:r.kind==='model'?[{x:0,y:0,z:0,w:r.dimensions[0],h:r.dimensions[1],d:r.dimensions[2],kind:'editor',material:'metal'}]:prefabBoxes(r.kind);
-   addedSolids+=solids.length;if(addedSolids>4000)throw Error('Reduce duplicated structures: at most 4,000 added structural pieces per map.');
-   if(r.collision)for(const [i,b]of solids.entries())map.boxes.push({...transformBox(b,origin,r),objectId:'editor-'+r.id+'-'+i,editorObject:r.id,building:undefined,tree:undefined,prop:undefined,...(b.doorId?{doorId:'editor-'+r.id+'-'+b.doorId}:{}),...(r.kind==='shield-barrel'?{health:150,harvestType:'shieldBarrel'}:{})});
+   addedSolids+=solids.filter(b=>!b.doorId).length;if(addedSolids>4000)throw Error('Reduce duplicated structures: at most 4,000 added structural pieces per map.');
+   if(r.collision)for(const [i,b]of solids.entries())if(!b.doorId)map.boxes.push({...transformBox(b,origin,r),objectId:'editor-'+r.id+'-'+i,editorObject:r.id,building:undefined,tree:undefined,prop:undefined,...(r.kind==='shield-barrel'?{health:150,harvestType:'shieldBarrel'}:{})});
    if(src?.type==='building'){
     const building=Number(src.id.split('-')[1]);
-    for(const key of ['chests','floorLoot','doors'])for(const [i,p]of (base[key]||[]).entries())if(p.building===building)map[key].push({...p,...transformPoint(p,origin,r),building:undefined,id:key==='doors'?'editor-'+r.id+'-'+p.id:'editor-'+r.id+'-'+key+'-'+i});
+    for(const key of ['chests','floorLoot'])for(const [i,p]of (base[key]||[]).entries())if(p.building===building)map[key].push({...p,...transformPoint(p,origin,r),building:undefined,id:'editor-'+r.id+'-'+key+'-'+i});
+    moveDoors((base.doors||[]).filter(p=>p.building===building),r,origin,true);
     for(const p of base.navLinks||[])if(p.building===building)map.navLinks.push({...p,building:undefined,from:transformPoint(p.from,origin,r),to:transformPoint(p.to,origin,r)});
    }
+   if(src?.type==='box'&&src.spec.doorId)moveDoors((base.doors||[]).filter(d=>d.id===src.spec.doorId),r,origin,true);
    if(r.kind==='spawn'||src?.type==='spawn')map.spawns.push([r.position[0],r.position[2]]);
    if(r.kind==='chest'||src?.type==='chest')map.chests.push({id:'editor-chest-'+r.id,x:r.position[0],y:r.position[1],z:r.position[2],poi:base.districts?.[0]?.id||'editor',chance:1,source:'chest',floor:0,room:'editor'});
   }

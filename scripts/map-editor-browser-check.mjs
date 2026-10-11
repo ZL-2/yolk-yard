@@ -4,7 +4,7 @@ import {createServer} from 'vite';
 import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {startRealtimeServer} from '../server/realtime/index.js';
-const temp=await mkdtemp(tmpdir()+'/ravel-editor-browser-'),out='test-results/map-editor',origin='http://127.0.0.1:5199',code='89271406539284756012';
+const temp=await mkdtemp(tmpdir()+'/ravel-editor-browser-'),out=process.env.EDITOR_CHECK_OUTPUT||'test-results/map-editor',origin='http://127.0.0.1:5199',code='89271406539284756012';
 process.env.YOLK_OWNER_CODE=code;process.env.YOLK_OWNER_DATA_PATH=temp+'/owner.json';process.env.RAVEL_SOCIAL_DATA_PATH=temp+'/social.json';process.env.RAVEL_REWARD_DATA_PATH=temp+'/progress.json';
 const app=await startRealtimeServer({host:'127.0.0.1',port:9002,origins:[origin],mapPath:temp+'/maps.json'});
 const vite=await createServer({server:{host:'127.0.0.1',port:5199,strictPort:true,watch:null}});await vite.listen();await mkdir(out,{recursive:true});
@@ -19,6 +19,12 @@ async function property(name,value,axis){const selector=`[data-map-property="${n
 function fixtureGlb(){const bin=Buffer.from(new Float32Array([-1,0,0,1,0,0,0,2,0]).buffer),doc={asset:{version:'2.0'},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],materials:[{doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[.9,.55,.2,1],metallicFactor:0,roughnessFactor:1}}],meshes:[{primitives:[{attributes:{POSITION:0},material:0}]}],buffers:[{byteLength:bin.length}],bufferViews:[{buffer:0,byteOffset:0,byteLength:bin.length}],accessors:[{bufferView:0,componentType:5126,count:3,type:'VEC3',min:[-1,0,0],max:[1,2,0]}]},text=JSON.stringify(doc),json=Buffer.from(text+' '.repeat((4-text.length%4)%4)),bytes=Buffer.alloc(28+json.length+bin.length);bytes.writeUInt32LE(0x46546c67,0);bytes.writeUInt32LE(2,4);bytes.writeUInt32LE(bytes.length,8);bytes.writeUInt32LE(json.length,12);bytes.writeUInt32LE(0x4e4f534a,16);json.copy(bytes,20);bytes.writeUInt32LE(bin.length,20+json.length);bytes.writeUInt32LE(0x004e4942,24+json.length);bin.copy(bytes,28+json.length);return bytes;}
 try{
  await open(page);assert.equal(await page.locator('#map-picker').inputValue(),'sunnybreak');await page.screenshot({path:out+'/owner-coast-editor.png'});
+ await action(page,'validate').click();await page.locator('#map-validation-title').waitFor();assert.equal(await page.locator('.map-validation-list li').count(),0);await page.screenshot({path:out+'/map-check-clear.png'});await page.locator('[data-validation-close]').click();
+ await page.evaluate(async()=>{const e=window.__yolkTest.editor();e.doc.set({id:'qa-floating',kind:'block',name:'Floating check block',position:[0,80,0],scale:[1,1,1],rotation:0,collision:true});e.changed();await e.rebuild();});await ready(page);
+ await action(page,'validate').click();await page.locator('.map-validation-list li').filter({hasText:'Floating check block'}).waitFor();
+ await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>!!document.activeElement.closest('.map-confirm')),true);await page.keyboard.press('Shift+Tab');
+ await page.screenshot({path:out+'/map-check-warning.png'});await page.locator('.map-validation-list li').filter({hasText:'Floating check block'}).getByRole('button',{name:'Show location'}).click();
+ assert.equal(await page.evaluate(()=>window.__yolkTest.editor().controls.target.y),81);await action(page,'undo').click();await ready(page);await page.evaluate(()=>window.__yolkTest.editor().resetCamera());metrics.mapValidation=true;
  await page.locator('#map-editor canvas').focus();await page.waitForTimeout(300);
  const cameraBefore=await page.evaluate(()=>{const e=window.__yolkTest.editor();return {position:e.camera.position.toArray(),target:e.controls.target.toArray()};});
  await page.keyboard.down('KeyW');assert.equal(await page.evaluate(()=>window.__yolkTest.editor().keys.has('KeyW')),true);await page.waitForTimeout(1000);await page.keyboard.up('KeyW');await page.keyboard.down('KeyD');await page.waitForTimeout(1000);await page.keyboard.up('KeyD');

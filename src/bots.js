@@ -14,6 +14,7 @@ import {ROYALE_TEAM_BOT as teamPolicy} from './bot-config.js';
 import {tacticalGoal,keepCommittedTask,commitTask} from './bot-tactics.js';
 import {botAim,steadyBotFire} from './bot-aim.js';
 import {botWorld} from './bot-work.js';
+import {activeBotUtility} from './bot-utility.js';
 export {BOT_SKILL};
 // Atoll behavior has its own schedule and never enters match combat objectives.
 export function warmupInput(sim,p){
@@ -37,6 +38,7 @@ export function warmupInput(sim,p){
 export function botInput(sim,p){
  if(isWarmup(sim.stage))return warmupInput(sim,p);
  const skill=skillFor(sim),now=sim.time,r=sim.random,brain=p.brain?.memory?p.brain:(p.brain={...newBrain(sim,p),...p.brain});
+ activeBotUtility(p,now);
  observe(sim,p,brain,skill);const target=selectThreat(sim,p,brain,skill);
  const evacuation=p.inventory?stormPriority(sim,p,skill):null;
  if(evacuation?.urgent){brain.decision=0;brain.utility=null;sim.cancelUse?.(p);}
@@ -112,7 +114,7 @@ export function botInput(sim,p){
  const movement=smoothArenaCombatMovement(brain,move,yaw,now,arenaCombat);
  const moving=Math.hypot(move.mx,move.mz)>.1;
  const topUp=!visible&&now-(brain.attackedAt??-100)>2.5&&p.ammo[slot]<w.magazine*.65;
- return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,moveTarget:move.mx||move.mz?move.moveTarget:null,combatAim:visible&&!brain.utility&&task.kind!=='melee'}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:(p.ammo[slot]===0||topUp)&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
+ return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,moveTarget:move.mx||move.mz?move.moveTarget:null,utilityItem:!!brain.utility,combatAim:visible&&!brain.utility&&task.kind!=='melee'}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:(p.ammo[slot]===0||topUp)&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
 }
 import {teammates} from './teams.js';
 import {ammoType,ITEMS} from './royale-data.js';

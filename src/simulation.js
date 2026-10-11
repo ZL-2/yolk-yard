@@ -1,4 +1,5 @@
 import {recordCombatDamage,combatRecap} from './combat-feedback.js';
+import {reloadRequested} from './reload-buffer.js';
 import {startEmote,cancelEmote,emoteInput} from './emotes.js';
 import {watcherAction} from './spectator-status.js';
 import {COMBAT_LIMITS,UTILITY_WEAPONS} from './weapon-balance.js';
@@ -162,6 +163,7 @@ export class Simulation {
     safe.fireHeld=safe.fire;safe.firePress=safe.fire&&!previous?.fireHeld?safe.seq:previous?.firePress||0;
     safe.jumpHeld = safe.jump;
     safe.jumpPress = safe.jump && !previous?.jumpHeld ? safe.seq : previous?.jumpPress || 0;
+    safe.reloadHeld=safe.reload;safe.reloadPress=safe.reload&&!previous?.reloadHeld?safe.seq:previous?.reloadPress||0;
     if(remote) {
       if(p.health<=0||p.spectating)return;
       let buffer=this.remoteInputs.get(id);
@@ -181,9 +183,10 @@ export class Simulation {
     if(!buffer)return null;
     const steps=buffer.take(dt,!!this.recoveringTick);
     let input={...(steps.at(-1)||buffer.last||{yaw:p.yaw,pitch:p.pitch,slot:p.slot})};
-    input.firePress=Math.max(input.firePress||0,...steps.map(step=>step.firePress||0));
-    for(const key of ['fire','reload','popper','interact','drop'])
-      if(steps.some(step=>step[key]))input[key]=true;
+    for(const step of steps){
+      input.firePress=Math.max(input.firePress||0,step.firePress||0);input.reloadPress=Math.max(input.reloadPress||0,step.reloadPress||0);
+      input.fire||=step.fire;input.reload||=step.reload;input.popper||=step.popper;input.interact||=step.interact;input.drop||=step.drop;
+    }
     if(this.time-p.lastInput>.4)input={yaw:p.yaw,pitch:p.pitch,slot:p.slot};
     return {steps,input};
   }
@@ -435,7 +438,7 @@ export class Simulation {
   }
   combatInput(p,input){
     const w=gun(p),requested=triggerRequested(p,w,input,this.time);
-    if(input.reload||input.fire&&p.ammo[p.slot]===0)this.reload(p);
+    if(reloadRequested(p,w,input,this.time)||input.fire&&p.ammo[p.slot]===0){if(this.reload(p))p.pendingReload=null;}
     if(p.burstLeft&&this.time+1e-9>=p.burstTime){
       if(this.fire(p,true)){p.burstLeft--;p.burstTime=this.time+w.burstInterval;}
       else if(p.reloadEnd||p.ammo[p.slot]<=0)p.burstLeft=0;

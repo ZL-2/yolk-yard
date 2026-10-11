@@ -1,4 +1,4 @@
-# Expansion foundation verification
+# Expansion verification
 
 This is a work-branch checkpoint, not a release or a completion claim for the
 32-category expansion. Production remains Quality Update 141, protocol 43.
@@ -9,7 +9,7 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 - Immutable baseline: `c2866b6edbaaae26c4aac6f0717960e2c5a2bf7e`.
 - First fully passing branch CI: `7c87e186d2fd51777284c5882abd40c06bccdb4e`.
 - Traversal/mobile follow-up: `c50ef8da010d1ab4ae3f6a8d5ef8f3c9c1b1ebd9`.
-- Final verified code checkpoint: `ac2ac7c1cb86340e7585a582279391a8b1cc2b59`.
+- Previous verified code checkpoint: `ac2ac7c1cb86340e7585a582279391a8b1cc2b59`.
 - Branch: `expansion-foundation-142`.
 - Verification date: 2026-10-11.
 
@@ -17,7 +17,7 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 
 | Check | Result and limits |
 | --- | --- |
-| Full repository suite | 582 tests: 539 passed, 43 failed. Baseline: 549 tests, 505 passed, 44 failed. No new failing test names; the fixed humanoid hitbox/checkpoint test now passes. **The whole suite is not green.** |
+| Full repository suite | Latest local run: 604 tests, 563 passed, 41 failed. Baseline: 549 tests, 505 passed, 44 failed. No new failing test names. The humanoid hitbox/checkpoint check passes; door damage and queued bot utility checks now use the correct closed-leaf state and equip-plus-throw duration. **The whole suite is not green.** |
 | Focused checkpoint suite | 51 passed: foundation, performance HUD, guest presentation, remote input, building, arms and audio. |
 | Local real-socket public-host scenarios | Passed first-player hosting, concurrent joins, brief reconnect, graceful/abrupt/frozen-host migration, checkpoint-world preservation, guest inventory-preference delivery and preservation after migration, joining after migration, late spectator admission and authenticated leaderboards; zero server simulations, protocol 43. |
 | Production asset build | Passed on the branch. Existing large-bundle warning remains; no download-size improvement is claimed. |
@@ -57,12 +57,12 @@ Latest local median wall-clock CPU workload times, in milliseconds:
 
 | Workload | Baseline | Foundation | Change |
 | --- | ---: | ---: | ---: |
-| 24,000 humanoid-hit queries | 30.341 | 8.867 | 70.8% lower |
-| 8,000 world-visibility queries | 32.554 | 32.646 | 0.3% higher; within noise |
-| 8,000 swept projectile queries | 102.681 | 38.159 | 62.8% lower |
-| 11,520 ordinary movement steps | 23.119 | 21.642 | 6.4% lower |
+| 24,000 humanoid-hit queries | 38.975 | 8.691 | 77.7% lower |
+| 8,000 world-visibility queries | 33.792 | 34.175 | 1.1% higher; within noise |
+| 8,000 swept projectile queries | 105.241 | 39.783 | 62.2% lower |
+| 11,520 ordinary movement steps | 25.311 | 23.234 | 8.2% lower |
 
-The independent final GitHub runner also passed: hitboxes 71.4% lower,
+The previous independent GitHub runner also passed: hitboxes 71.4% lower,
 projectiles 62.5% lower, movement 9.0% lower and visibility queries 0.3% lower
 (effectively unchanged). Compare each current/baseline pair only within its own
 environment, not raw milliseconds across machines.
@@ -105,6 +105,41 @@ guarantee zero performance regression on every device.
 - Comfort changes do not disable actual weapon recoil or change hitboxes.
 - No new central diagnostics overlay, database schema, production version,
   protocol revision or relay configuration is introduced.
+
+## Door, camera, editor and bot follow-up
+
+- `tests/expansion-collision.test.js` covers all 122 ordinary doorway passages
+  (both directions, three offsets, 20/60 Hz), diagonal frames, moved/copied and
+  rotated/scaled door controls, guest door collision, occupied closing and wall
+  occlusion. It also checks edited-leaf render ownership and separately edited
+  or removed leaves in building previews.
+- The authored coast passes 937 local map checks with five clear spawns and no
+  warnings or errors. The dock drainage roof had intersected the hangar entrance
+  at head height; roof clearance now follows the highest terrain under each
+  tunnel. The last fallback spawn was moved out of a foundation.
+- The editor validator yields after 4 ms of work, caps its displayed issue list
+  at 200, cancels when closed and changes no match geometry. Runtime simulation
+  ticks never invoke it. Relay publish validation rejects insufficient clear
+  spawns or mismatched door controls; local route/support findings are warnings.
+- Camera tests cover near-plane edge contacts, ceiling/floor contacts, new build
+  geometry, immediate retraction, smooth release and target changes. One short
+  spatial sweep applies only to the local third-person camera.
+- Five reload tests exercise a 220 ms tap window, input-edge coalescing, guest
+  delivery, held reload, mantle/equip completion, expiry, swaps and resets.
+- Three bot utility tests prove expired/missing/consumed plans cannot suppress
+  ordinary gun aiming, activation respects equip/latch state, and an expired
+  cached intent cannot keep throwing. Expensive bot decisions remain scheduled.
+- All 72 seeded stationary/moving-target duel scenarios pass again. Across these
+  uncommon-weapon fixtures, a full 200-health/shield target survives 4.667 to
+  10.517 seconds; longest stationary bot interval is 0.633 seconds. This bounds
+  these fixtures, not every multiplayer encounter or weapon rarity.
+- Real-socket public hosting, reconnect and all three host-transfer scenarios
+  pass again with zero relay simulations and unchanged protocol 43.
+- New browser scenarios check a wall behind an emoting player, camera recovery
+  when it is removed, editor check results, keyboard focus, a floating-object
+  warning and location focus, alongside existing owner editing/publishing checks.
+  These new browser scenarios still await branch CI; they are not yet claimed
+  as accepted.
 
 ## Remaining release gates
 

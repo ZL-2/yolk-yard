@@ -1,0 +1,6 @@
+#map-editor .map-validation-card { max-width: 680px; }
+#map-editor .map-validation-list { display: grid; gap: 12px; padding: 0; margin: 0; list-style: none; }
+#map-editor .map-validation-list li { border: 1px solid #8d7960; border-left: 4px solid #e4bb74; border-radius: 4px; padding: 12px; display: grid; gap: 7px; }
+#map-editor .map-validation-list li.error { border-color: #ba7670; border-left-color: #ffaaa7; }
+#map-editor .map-validation-list p { color: #d1dae5; }
+#map-editor .map-validation-list button { justify-self: start; }
