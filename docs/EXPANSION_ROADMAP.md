@@ -97,3 +97,8 @@ waiver. New or touched behavior requires direct regression coverage.
   deployment job**. The local environment currently lacks Chromium.
 - No production version, protocol, relay configuration or progression schema
   has been changed. Remaining P/E/G requirements are still outstanding.
+- Final code checkpoint `ac2ac7c` passed [branch CI 38105822036](https://github.com/ZL-2/yolk-yard/actions/runs/38105822036):
+  228 focused tests, guest preferences through the real relay and host migration,
+  production build, CPU comparison, saved settings without render-budget resets,
+  and desktop/320px/390px browser acceptance. This does not complete the P/E/I/G
+  entries above or waive the 43 full-suite failures.

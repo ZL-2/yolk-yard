@@ -9,6 +9,7 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 - Immutable baseline: `c2866b6edbaaae26c4aac6f0717960e2c5a2bf7e`.
 - First fully passing branch CI: `7c87e186d2fd51777284c5882abd40c06bccdb4e`.
 - Traversal/mobile follow-up: `c50ef8da010d1ab4ae3f6a8d5ef8f3c9c1b1ebd9`.
+- Final verified code checkpoint: `ac2ac7c1cb86340e7585a582279391a8b1cc2b59`.
 - Branch: `expansion-foundation-142`.
 - Verification date: 2026-10-11.
 
@@ -21,9 +22,10 @@ The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
 | Local real-socket public-host scenarios | Passed first-player hosting, concurrent joins, brief reconnect, graceful/abrupt/frozen-host migration, checkpoint-world preservation, guest inventory-preference delivery and preservation after migration, joining after migration, late spectator admission and authenticated leaderboards; zero server simulations, protocol 43. |
 | Production asset build | Passed on the branch. Existing large-bundle warning remains; no download-size improvement is claimed. |
 | First complete branch CI | [Run 38105284235](https://github.com/ZL-2/yolk-yard/actions/runs/38105284235) passed 213 focused tests, six HUD/guest-presentation tests, real-socket scenarios, production build, CPU guard and browser checks. |
+| Final complete branch CI | [Run 38105822036](https://github.com/ZL-2/yolk-yard/actions/runs/38105822036) passed **228 focused tests** (216 gameplay, six HUD/guest-presentation, six revive/traversal), real-socket scenarios including guest preferences/migration, production build, baseline CPU guard and every browser assertion. |
 | Browser acceptance | [Follow-up run 38105551883](https://github.com/ZL-2/yolk-yard/actions/runs/38105551883) passed desktop/390px settings, real aim-toggle and camera response, preferred pickup, loot comparison, combat feedback, and 320px/390px inventory/inspection checks with no page errors. Screenshots were inspected. Mobile button clipping and key/quantity overlap were corrected; stronger assertions now cover them. |
 | Traversal follow-up | 46 focused foundation/Mythic checks and six existing revive/vault/traversal scenarios passed after excluding revive during active traversal. |
-| Final recap follow-up | 28 foundation tests passed after separating actual finishing-hit source/distance from knock credit, correcting splash-healing advice and pickaxe-swap cancellation feedback. The final branch CI must also pass. |
+| Final recap follow-up | 28 foundation tests passed after separating actual finishing-hit source/distance from knock credit, correcting splash-healing advice and pickaxe-swap cancellation feedback; included in the successful final CI run. |
 
 The branch workflow has read-only repository permission and no deployment job.
 Its browser scenario launches its own local relay, not the production service.
@@ -31,6 +33,10 @@ It exercises saved settings, small-screen layouts, real aim-toggle input and
 camera response, preferred-slot pickup, loot comparison, combat feedback and
 inventory layout. Screenshots and JSON reports are uploaded as
 `expansion-verification` artifacts for 14 days.
+Final screenshots, browser results and CPU samples are in
+[artifact 11689237545](https://github.com/ZL-2/yolk-yard/actions/runs/38105822036/artifacts/11689237545),
+retained until 2026-10-25. The final mobile inspection and 320px inventory
+screenshots were visually reviewed, including improved label contrast.
 The CI browser uses software-rendered WebGL. Its on-screen FPS is not a
 hardware-GPU performance measurement.
 
@@ -55,6 +61,11 @@ Latest local median wall-clock CPU workload times, in milliseconds:
 | 8,000 world-visibility queries | 32.554 | 32.646 | 0.3% higher; within noise |
 | 8,000 swept projectile queries | 102.681 | 38.159 | 62.8% lower |
 | 11,520 ordinary movement steps | 23.119 | 21.642 | 6.4% lower |
+
+The independent final GitHub runner also passed: hitboxes 71.4% lower,
+projectiles 62.5% lower, movement 9.0% lower and visibility queries 0.3% lower
+(effectively unchanged). Compare each current/baseline pair only within its own
+environment, not raw milliseconds across machines.
 
 The CI guard permits a 10% median variance ceiling to reduce noise-related
 failures; it is **not** a claim that a 10% real regression is acceptable.
@@ -97,8 +108,8 @@ guarantee zero performance regression on every device.
 
 ## Remaining release gates
 
-Confirm the final follow-up branch CI; investigate outstanding relevant
-baseline failures; exercise live-device multiplayer and repeat-join cleanup;
+Investigate outstanding relevant baseline failures; exercise live-device
+multiplayer and repeat-join cleanup;
 complete the remaining roadmap items or explicitly agree a smaller release
 scope. Vehicles, convoys, voice chat and extensive destruction remain gated.
 Do not merge or deploy this checkpoint as if the entire expansion were done.
