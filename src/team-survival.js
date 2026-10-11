@@ -60,7 +60,7 @@ export function rescueBotInput(sim,p){
  }
  if(!activeMember(p)||!isTeamRoyale(sim.options)||p.flight!=='ground')return null;
  const mate=[...sim.players.values()].filter(o=>o.downed&&o.health>0&&!o.spectating&&(!o.reviverId||o.reviverId===p.id)&&teammates(sim.options,p,o)).sort((a,b)=>Number(a.bot)-Number(b.bot)||dist(p,a)-dist(p,b))[0];if(!mate)return null;
- sim.cancelUse?.(p);
+ sim.cancelUse?.(p,'revive');
  const dx=mate.x-p.x,dz=mate.z-p.z,near=reviveAccessible(sim.map,p,mate);
  const yaw=Math.atan2(-dx,-dz),brain=p.brain??=newBrain(sim,p);
  const path=near?{mx:0,mz:0,jump:false}:navigate(sim,p,brain,mate,skillFor(sim,p));

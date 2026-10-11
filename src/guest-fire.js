@@ -2,6 +2,7 @@ import {gun} from './data.js';
 import {updateCombatAccuracy,firedAccuracy,weaponReadyAt,triggerWindow} from './combat.js';
 import {COMBAT_LIMITS} from './weapon-balance.js';
 import {muzzleOrigin} from './physics.js';
+import {canFight} from './stance.js';
 // Immediate presentation only. Accepted server trajectories own tracers/damage.
 export class GuestFire{
  constructor(){this.reset();}
@@ -11,7 +12,7 @@ export class GuestFire{
   if(this.session!==session){this.reset();this.session=session;}if(this.key!==key){this.key=key;this.burst=0;this.pending=0;this.held=false;this.accuracy=null;}
   this.sent=this.sent.filter(s=>s.seq>player.ack&&now-s.at<1);this.echoes=this.echoes.filter(s=>now-s.at<1).slice(-64);
   const pressed=input.fire&&!this.held;this.held=!!input.fire&&time>=(player.equipUntil||0);if(pressed)this.pending=time+triggerWindow(player);
-  const eligible=!player.sprinting&&!(player.sprintRecovery>0)&&!player.traversal&&player.health>0&&!player.downed&&!player.reviving&&!player.spectating&&(!player.inventory||player.flight==='ground'&&player.inventory?.[player.slot]?.weapon)&&input.slot===player.slot&&!input.buildMode&&!input.reload&&!player.reloadEnd&&!player.use;
+  const eligible=canFight(player)&&!player.sprinting&&!(player.sprintRecovery>0)&&!player.traversal&&(!player.inventory||player.flight==='ground'&&player.inventory?.[player.slot]?.weapon)&&input.slot===player.slot&&!input.buildMode&&!input.reload&&!player.reloadEnd&&!player.use;
   if(!this.accuracy||player.ack!==this.lastAck&&!this.sent.length){this.accuracy={...player.combatState};this.lastAck=player.ack;}
   player.aim=!!input.aim;updateCombatAccuracy(player,w,this.accuracy,1/60,time,Math.hypot(player.vx||0,player.vz||0));
   player.shotSpread=this.accuracy.spread;player.firstShot=this.accuracy.firstShot;player.recoilPitch=this.accuracy.recoilPitch;player.recoilYaw=this.accuracy.recoilYaw;

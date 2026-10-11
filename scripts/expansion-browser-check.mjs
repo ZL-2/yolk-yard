@@ -32,11 +32,13 @@ try{
  await page.locator('[data-action=training]:visible').click();await page.locator('[data-action=start-training]').click();await page.locator('#loading-screen').waitFor({state:'hidden'});
  const resume=page.locator('#dialog [data-action=resume]');if(await resume.isVisible())await resume.click();else await page.mouse.click(720,450);
  await page.waitForFunction(()=>!window.__yolkTest.read().paused&&document.pointerLockElement);
- await page.evaluate(()=>window.__yolkTest.fixture(s=>{const p=s.players.get(window.__yolkTest.read().localId);p.inventory[1]={id:'sprinter',weapon:true,count:1,ammo:20,rarity:2};p.inventory[4]=null;s.syncInventory(p);window.__yolkTest.pose({x:18,y:0,z:30,yaw:0,pitch:0,slot:1,grounded:true,flight:'ground',vy:0});}));
+ await page.waitForFunction(()=>document.querySelector('.connection-signal')?.hidden);
+ const mapBox=await page.locator('.royale-map-stack').boundingBox(),netBox=await page.locator('.performance-network').boundingBox();assert.ok(mapBox.x+mapBox.width<netBox.x,'left minimap must not cover connection statistics');
+ await page.evaluate(()=>window.__yolkTest.fixture(s=>{const p=s.players.get(window.__yolkTest.read().localId);s.trainingResupply=s.time+3600;p.inventory[1]={id:'sprinter',weapon:true,count:1,ammo:20,rarity:2};p.inventory[4]=null;s.syncInventory(p);window.__yolkTest.pose({x:18,y:0,z:30,yaw:0,pitch:0,slot:1,grounded:true,flight:'ground',vy:0});}));
  await page.mouse.click(720,450,{button:'right'});await page.waitForFunction(()=>{const q=window.__yolkTest.read();return q.state.players.find(p=>p.id===q.localId).aim&&q.scope.aimBlend>.8;});
  await page.mouse.click(720,450,{button:'right'});await page.waitForFunction(()=>{const q=window.__yolkTest.read();return !q.state.players.find(p=>p.id===q.localId).aim&&q.scope.aimBlend<.1;});checks.toggleAimAndCamera=true;
  await page.waitForFunction(()=>window.__yolkTest.fixture(s=>s.players.get(window.__yolkTest.read().localId).pickupPreferences?.shotgun===4));
- await page.evaluate(()=>window.__yolkTest.fixture(s=>{const p=s.players.get(window.__yolkTest.read().localId),item=s.dropLoot({...p,z:p.z-1.8},{id:'scatter',weapon:true,count:1,ammo:5,rarity:4});if(!item)throw Error('loot fixture unreachable');}));
+ await page.evaluate(()=>window.__yolkTest.fixture(s=>{window.__yolkTest.look(0,-.2);const p=s.players.get(window.__yolkTest.read().localId),item=s.dropLoot({...p,z:p.z-1.8},{id:'scatter',weapon:true,count:1,ammo:5,rarity:4});if(!item)throw Error('loot fixture unreachable');}));
  await page.waitForFunction(()=>document.querySelector('#royale-prompt .loot-comparison'));
  await page.screenshot({path:out+'/loot-comparison.png'});await page.keyboard.press('KeyF');
  await page.waitForFunction(()=>{const q=window.__yolkTest.read();return q.state.players.find(p=>p.id===q.localId).inventory[4]?.id==='scatter';});checks.preferredPickup=true;

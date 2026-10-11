@@ -748,6 +748,7 @@ export class Simulation {
     });
     }
     if (victim.health > 0) return;
+    victim.mantle=null;
     attacker=this.eliminationCredit?.(victim,attacker)||attacker;
     victim.recap=combatRecap(victim,this.time,{weapon:source,damage:Math.round(applied),distance:attacker?Math.round(dist(victim,attacker)):0,critical:!!precision,name:attacker?.name||source});
     victim.killerId = attacker && attacker !== victim ? attacker.id : null;

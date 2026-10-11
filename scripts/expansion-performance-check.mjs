@@ -28,7 +28,8 @@ function movement(api){
  }return players;
 }
 if(baseline)for(const q of rays){const a=current.humanHit(q.o,q.d,q.p,q.radius),b=baseline.humanHit(q.o,q.d,q.p,q.radius);assert.equal(a.region,b.region);assert.ok(a.distance===b.distance||Math.abs(a.distance-b.distance)<1e-10);}
-if(baseline){const a=movement(current),b=movement(baseline);for(let i=0;i<a.length;i++)for(const key of ['x','y','z','vx','vy','vz','stamina'])assert.ok(Math.abs(a[i][key]-b[i][key])<1e-9,`movement contact mismatch: ${i} ${key}`);}
+if(baseline)for(const q of world){const a=current.worldHit(ROYALE_MAP,q.o,q.d,q.max,.04),b=baseline.worldHit(ROYALE_MAP,q.o,q.d,q.max,.04);assert.equal(!!a,!!b);if(a){assert.ok(Math.abs(a.distance-b.distance)<1e-9);for(const axis of ['x','y','z'])assert.ok(Math.abs(a.normal[axis]-b.normal[axis])<1e-9);}}
+if(baseline){const a=movement(current),b=movement(baseline);for(let i=0;i<a.length;i++){for(const key of ['x','y','z','vx','vy','vz','stamina'])assert.ok(Math.abs(a[i][key]-b[i][key])<1e-9,`movement contact mismatch: ${i} ${key}`);for(const key of ['grounded','crouching','lowCrouch','sliding'])assert.equal(a[i][key],b[i][key]);}}
 let checksum=0;
 const workloads={hitboxes:api=>{for(let repeat=0;repeat<3;repeat++)for(const q of rays){const hit=api.humanHit(q.o,q.d,q.p,q.radius);if(Number.isFinite(hit.distance))checksum+=hit.distance;}},collision:api=>{for(const q of world)checksum+=api.wallDistance(ROYALE_MAP,q.o,q.d,q.max);},projectiles:api=>{for(const q of world){const hit=api.worldHit(ROYALE_MAP,q.o,q.d,q.max,.04);if(hit)checksum+=hit.distance;}}};
 workloads.movement=api=>{for(const p of movement(api))checksum+=p.x+p.y+p.z;};

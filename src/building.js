@@ -164,9 +164,9 @@ export function buildingTick(sim,p,input){
  const requested=MATERIALS[input.buildMaterial]?input.buildMaterial:'wood';
  if(requested!==p.buildRequested||!p.buildMaterial){p.buildMaterial=requested;p.buildRequested=requested;}
  p.buildMaterial=selectMaterial(p.materials,p.buildMaterial)||p.buildMaterial;p.buildRotation=Number.isInteger(input.buildRotation)?((input.buildRotation%4)+4)%4:0;
- if(p.editing){p.buildBufferedUntil=0;p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;return true;}
+ if(p.editing){p.buildBufferedUntil=0;if(p.use)sim.cancelUse?.(p,'action');p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;return true;}
  if(p.building){
-  p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;
+  if(p.use)sim.cancelUse?.(p,'action');p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;
   const intent=p.buildType+':'+p.buildRotation+':'+p.buildMaterial;
   if(p.buildBufferedIntent!==intent)p.buildBufferedUntil=0;
   if(input.fire){p.buildBufferedUntil=sim.time+.22;p.buildBufferedIntent=intent;}

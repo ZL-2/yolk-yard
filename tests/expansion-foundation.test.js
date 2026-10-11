@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {RoyaleSimulation} from '../src/royale.js';
 import {inventory} from '../src/building.js';
 import {movePlayer,canStand,invalidateCollision,humanHit,rayBox,worldHit} from '../src/physics.js';
-import {predictMovement} from '../src/guest-movement.js';
+import {predictMovement,predictionCopy} from '../src/guest-movement.js';
 import {resetStance,canFight,regionPose} from '../src/stance.js';
 import {recordCombatDamage,combatRecap,CombatConfirmation,DamageDirections,RECAP_LIMIT} from '../src/combat-feedback.js';
 import {sanitizeSlotPreferences,vacantSlot,targetLoot,stackCapacity,healingSuggestion,weaponComparison} from '../src/inventory-policy.js';
@@ -11,6 +11,7 @@ import {SnapshotEncoder,SnapshotDecoder} from '../src/snapshot-codec.js';
 import {buildingTick} from '../src/building.js';
 import {armPose,ARM_POSES} from '../src/arms.js';
 import {reloadSequence} from '../src/firearm-audio.js';
+import {GuestFire} from '../src/guest-fire.js';
 
 const flat=()=>({id:'flat',theme:'royale',size:100,boxes:[],floorLoot:[],landmarks:[],districts:[]});
 function runner(){const p={id:'host',name:'Host',health:100,shield:0,x:0,y:0,z:0,yaw:0,pitch:0,vx:0,vy:0,vz:0,grounded:true,flight:'ground',inventory:inventory(),slot:1,weapon:'sprinter',contestant:true,spectating:false,shieldUntil:0};resetStance(p);p.inventory[1]={id:'sprinter',weapon:true,rarity:0,ammo:30,count:1};return p;}
@@ -86,6 +87,10 @@ test('item cancellation explains damage, sprint and swapping without cancelling 
  const{s,p,a}=room();p.health=50;p.inventory[1]={id:'medkit',count:2};s.beginUse(p);s.damage(p,null,1,'Storm');assert.ok(p.use);s.damage(p,a,1,'Rifle');assert.equal(s.events.at(-2)?.reason||s.events.find(e=>e.cue==='use-cancel')?.reason,'damage');
  s.beginUse(p);s.cancelUse(p,'sprint');assert.equal(s.events.at(-1).reason,'sprint');s.beginUse(p);s.cancelUse(p,'arbitrary');assert.equal(s.events.at(-1).reason,'action');
 });
+test('search keeps its reachable chest while aim changes and completes once',()=>{
+ const{s,p}=room();const a={id:'a',x:0,y:0,z:-2,opened:false,contents:[]},b={id:'b',x:2,y:0,z:0,opened:false,contents:[]};s.chests=[a,b];
+ for(let i=0;i<3;i++)s.interact(p,{interact:true},.1);assert.equal(p.chestId,'a');p.yaw=-Math.PI/2;for(let i=0;i<6;i++)s.interact(p,{interact:true},.1);assert.equal(a.opened,true);assert.equal(b.opened,false);assert.equal(s.events.filter(e=>e.cue==='chest-open').length,1);
+});
 
 test('mantling and low vaulting complete through shared host/guest collision at several frame rates',()=>{
  for(const height of [.8,1.5])for(const dt of [1/60,1/30,1/20]){
@@ -115,6 +120,12 @@ test('mantle snapshot and checkpoint resume without changing the path',()=>{
 });
 test('snapshots own mantle progress independently from later simulation steps',()=>{
  const{s,p}=room();s.map.boxes=[{x:0,y:0,z:-1.4,w:3,h:1.5,d:2}];step(p,{jump:true,forward:1},s.map);const snapshot=s.snapshot().players.find(q=>q.id===p.id),elapsed=snapshot.mantle.elapsed;step(p,{},s.map);assert.equal(snapshot.mantle.elapsed,elapsed);assert.notEqual(snapshot.mantle,p.mantle);assert.notEqual(snapshot.mantle.to,p.mantle.to);
+});
+test('production guest copies cannot mutate authoritative traversal during reconciliation',()=>{
+ const{s,p}=room();s.map.boxes=[{x:0,y:0,z:-1.4,w:3,h:1.5,d:2}];step(p,{jump:true,forward:1},s.map);const authoritative=s.snapshot().players.find(q=>q.id===p.id),before=structuredClone(authoritative),guest=predictionCopy(authoritative);for(let i=0;i<20;i++)step(guest,{},s.map,1/60,true);assert.deepEqual(authoritative,before);assert.notEqual(guest.y,authoritative.y);assert.notEqual(guest.ammo,authoritative.ammo);
+});
+test('guest fire cannot show a shot that the host forbids during a mantle',()=>{
+ const{s,p}=room();s.syncInventory(p);p.mantle={kind:'mantle'};const f=new GuestFire(),input={seq:1,slot:1,fire:true,yaw:0,pitch:0};assert.equal(f.step(p,input,100,100,1),null);assert.equal(s.fire(p),false);p.mantle=null;assert.ok(f.step(p,{...input,seq:2},101,101,1));
 });
 test('build input buffers briefly through cooldown, never across mode changes or expiry',()=>{
  for(const scenario of ['buffer','expired','changed','released']){const{s,p}=room();p.slot=0;p.materials.wood=100;p.nextBuild=s.time+.1;const input={buildMode:true,buildType:'wall',buildMaterial:'wood',fire:true};buildingTick(s,p,input);assert.equal(s.builds.length,0);s.time+=scenario==='expired'?.3:.12;if(scenario==='released')buildingTick(s,p,{...input,buildMode:false,fire:false});buildingTick(s,p,{...input,fire:false,...(scenario==='changed'?{buildType:'floor'}:{})});assert.equal(s.builds.length,scenario==='buffer'?1:0,scenario);assert.equal(p.materials.wood,scenario==='buffer'?90:100);}

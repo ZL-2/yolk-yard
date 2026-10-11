@@ -35,7 +35,7 @@ import {teammates,wonRoyale,isTeamRoyale} from './teams.js';
 import {arrangeSettings} from './settings-layout.js';
 import {eggsMarkup,formatEggs} from './currency-ui.js';
 import {GuestPresentation} from './guest-presentation.js';
-import {predictMovement} from './guest-movement.js';
+import {predictMovement,predictionCopy} from './guest-movement.js';
 import {GuestFire} from './guest-fire.js';
 const guestFire=new GuestFire();
 const guestPresentation=new GuestPresentation();
@@ -582,7 +582,7 @@ function callbacks() {
       const me = s.players.find((p) => p.id === localId);
       if (!me) return;
       pendingInputs = pendingInputs.filter((i) => i.seq > me.ack);
-      predicted = { ...me, ammo: [...me.ammo], reserve: [...me.reserve], grapple:me.grapple?structuredClone(me.grapple):null,shadowstep:me.shadowstep?{...me.shadowstep}:null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null, launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+      predicted = predictionCopy(me);
       for (const i of pendingInputs)
         predictMovement(predicted, i, getMap(s.options.map), 1 / 60, s.royale);
       if (me.health > 0 && lastHealth <= 0) {
@@ -1775,7 +1775,7 @@ function pumpNetworkInput(now=performance.now()) {
       connectionReport.network.sent(i.seq,now);
       const me = state.players.find((p) => p.id === localId);
       if (me?.health > 0 && state.phase==='playing') {
-        if (!predicted) predicted = { ...me,grapple:me.grapple?structuredClone(me.grapple):null,shadowstep:me.shadowstep?{...me.shadowstep}:null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null,launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+        if (!predicted) predicted = predictionCopy(me);
         predicted.emote=me.emote?{...me.emote}:null;
         const beforeMove={x:predicted.x,z:predicted.z};
         predictMovement(predicted, i, getMap(state.options.map), 1 / 60, state.royale, state.time);
