@@ -35,11 +35,11 @@ test('human footsteps track distance, hover is silent and activation cue remains
  const me={id:'a',x:0,y:0,z:0,yaw:0,health:100,grounded:true,moving:true,vx:5,vz:0};
  for(let i=0;i<120;i++){me.sprinting=i>60;s.update({players:[me]},me,1/60,true);}assert.ok(cues.length>=8&&cues.length<=14);assert.ok(cues.every(c=>c==='step-soil'));
 });
-test('Royale sprint equals arena movement and walk is slower without diagonal advantage',()=>{
+test('tactical sprint accelerates beyond arena walking without diagonal advantage',()=>{
  const flat={size:100,boxes:[]};
  function travel(royale,sprint,diagonal=false){const p={x:0,y:0,z:0,yaw:0,pitch:0,health:100,weapon:'sprinter',crown:null,grounded:true,vy:0,...(royale?{inventory:[],stamina:100}:{})};for(let i=0;i<60;i++)movePlayer(p,{forward:1,strafe:diagonal?1:0,sprint},flat,1/60);return Math.hypot(p.x,p.z);}
- assert.ok(Math.abs(travel(true,true)-travel(false,false))<1e-8);assert.ok(Math.abs(travel(true,false)-ROYALE_MOVEMENT.walk)<1e-8);assert.ok(Math.abs(travel(true,true,true)-ROYALE_MOVEMENT.sprint)<1e-8);
- assert.ok(travel(true,false)<travel(true,true));for(const w of WEAPONS)assert.equal(w.speed,ROYALE_MOVEMENT.sprint);
+ assert.ok(travel(true,true)>travel(false,false));assert.ok(Math.abs(travel(true,false)-ROYALE_MOVEMENT.walk)<1e-8);assert.ok(Math.abs(travel(true,true,true)-travel(true,true))<1e-8);assert.ok(travel(true,true)<ROYALE_MOVEMENT.sprint);
+ assert.ok(travel(true,false)<travel(true,true));for(const w of WEAPONS)assert.ok(w.speed<ROYALE_MOVEMENT.sprint);
 });
 test('dense world has distinct biomes, open loot anchors and real terrain relief',()=>{
  assert.ok(map.buildings.length>=60);assert.ok(map.buildings.reduce((n,b)=>n+b.floors,0)>=100);assert.equal(map.trees.length,640);assert.ok(map.props.length>150);assert.ok(map.chests.length>120);assert.ok(map.floorLoot.length>300);

@@ -56,7 +56,7 @@ test('published additions share visible dimensions and exact quarter-turn collis
 });
 test('moving a complete building moves solids, interior props and loot; deleting/restoring is reversible',()=>{
  const base=baseMap('sunnybreak'),src=baseObjects(base).find(o=>o.type==='building'),r=sourceRecord(src);r.position[0]+=20;r.rotation=90;
- const map=compileLayout(base,layout(base.id,[r]));assert.equal(map.buildings[0].editorHidden,true);assert.equal(map.boxes.filter(b=>b.editorObject===r.id).length,src.boxes.length);assert.ok(map.props.filter(p=>p.building===0).every(p=>p.editorHidden));const old=base.chests.find(c=>c.building===0),moved=map.chests.find(c=>c.id===old.id);assert.notEqual(moved.x,old.x);assert.notEqual(moved.z,old.z);
+ const map=compileLayout(base,layout(base.id,[r]));assert.equal(map.buildings[0].editorHidden,true);assert.equal(map.boxes.filter(b=>b.editorObject===r.id).length,src.boxes.length+base.doors.filter(d=>d.building===0).length);assert.ok(map.props.filter(p=>p.building===0).every(p=>p.editorHidden));const old=base.chests.find(c=>c.building===0),moved=map.chests.find(c=>c.id===old.id);assert.notEqual(moved.x,old.x);assert.notEqual(moved.z,old.z);
  const removed=compileLayout(base,layout(base.id,[{...r,removed:true}]));assert.ok(!removed.chests.some(c=>c.building===0));assert.ok(!removed.boxes.some(b=>b.building===0));
  const doc=new MapDocument(base);doc.set(r);doc.remove(r.id);assert.ok(doc.record(r.id).removed);doc.undo();assert.ok(!doc.record(r.id).removed);doc.undo();assert.equal(doc.layout.objects.length,0);doc.redo();assert.equal(doc.layout.objects.length,1);doc.restore(r.id);assert.equal(doc.dirty,false);
 });
@@ -82,7 +82,7 @@ test('owner map APIs reject wrong origin, missing/expired tokens and stale draft
 
 test('copies have independent solids, doors and loot, and explicit furniture edits do not duplicate visuals',()=>{
  const base=baseMap('sunnybreak'),src=baseObjects(base).find(o=>o.type==='building'),copy={...sourceRecord(src),id:'building-copy',position:[src.position[0]+20,src.position[1],src.position[2]]},map=compileLayout(base,layout(base.id,[copy]));
- assert.ok(map.boxes.filter(b=>b.editorObject===copy.id).every(b=>b.objectId.startsWith('editor-building-copy-')));const chest=map.chests.find(c=>c.id.startsWith('editor-building-copy-'));assert.ok(chest);assert.equal(chest.building,undefined);
+ assert.ok(map.boxes.filter(b=>b.editorObject===copy.id).every(b=>b.objectId.startsWith('editor-building-copy-')||b.objectId.startsWith('world-door-editor-building-copy-')));const chest=map.chests.find(c=>c.id.startsWith('editor-building-copy-'));assert.ok(chest);assert.equal(chest.building,undefined);
  const prop=baseObjects(base).find(o=>o.type==='prop'&&o.spec.building===0),edited=compileLayout(base,layout(base.id,[sourceRecord(src),{...sourceRecord(prop),position:[0,30,0]}]));assert.ok(edited.editorObjects.find(o=>o.id===src.id).omitProps.includes(prop.id));
  const sources=Array.from({length:251},(_,i)=>({...copy,id:'copy-'+i}));assert.throws(()=>validateLayout(layout(base.id,sources)),/limit/);
 });

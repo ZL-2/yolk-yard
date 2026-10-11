@@ -1,3 +1,7 @@
+import {CombatConfirmation,CONFIRM_LABEL,DamageDirections} from './combat-feedback.js';
+import {preferencesFromSettings,inventoryPreferencesHTML,USE_CANCEL_REASONS} from './inventory-policy.js';
+import {COMFORT_DEFAULTS,ActionToggles,comfortHTML,applyComfort,sensitivityFor} from './comfort-settings.js';
+import './expansion.css';
 import {bindCrownStore,attachCrown} from './crowns.js';
 import {grappleAim} from './grappler.js';
 import {bossDefeatMessage} from './bosses.js';
@@ -31,7 +35,7 @@ import {teammates,wonRoyale,isTeamRoyale} from './teams.js';
 import {arrangeSettings} from './settings-layout.js';
 import {eggsMarkup,formatEggs} from './currency-ui.js';
 import {GuestPresentation} from './guest-presentation.js';
-import {predictMovement} from './guest-movement.js';
+import {predictMovement,predictionCopy} from './guest-movement.js';
 import {GuestFire} from './guest-fire.js';
 const guestFire=new GuestFire();
 const guestPresentation=new GuestPresentation();
@@ -116,6 +120,7 @@ let profile = safeProfile(
   read("yolk-profile", { name: "Player", weapon: "sprinter", hat: 0, eyewear: NO_EYEWEAR }),
 );
 const settings = {
+  ...COMFORT_DEFAULTS,
   ...SLIDER_DEFAULTS,
   ...PERFORMANCE_DEFAULTS,
   quality: "high",
@@ -126,6 +131,7 @@ const settings = {
   chatMode: "all",
   ...read("yolk-settings", {}),
 };
+applyComfort(document.documentElement,settings);
 // Migrate the former alternate aim key to dedicated sprint exactly once.
 if(!settings.royaleBindings){if(settings.keybinds?.aim)settings.keybinds.aim=settings.keybinds.aim.map(k=>k==='ShiftLeft'?null:k);settings.royaleBindings=true;}
 settings.keybinds = normalizeBindings(settings.keybinds);
@@ -166,11 +172,11 @@ let view,
   scoreHeld = false,
   noticeUntil = 0,
   toastUntil = 0,
-  hitUntil = 0,
   damageFlash = 0;
 const sound = new Sound();
 sound.setVolumes(settings);
 const keys = new Set();
+const actionToggles=new ActionToggles();
 const actionDown = action => bindingDown(settings.keybinds, keys, action);
 const controlLabel = action => settings.keybinds[action].filter(Boolean).map(bindingLabel).join(' / ') || 'Unbound';
 let bindingEditor = null;
@@ -217,7 +223,8 @@ const royaleUI = new RoyaleUI(item=>view.itemPreview(item));
 const buildControls={buildMode:false,buildType:'wall',buildMaterial:'wood',buildRotation:0,editing:false};
 document.addEventListener('build-edit-close',()=>{if(screen==='game'&&!paused&&!matchMedia('(pointer:coarse)').matches)view.renderer.domElement.requestPointerLock?.();});
 const buildUI=new BuildingUI(royaleUI.root,buildControls,action=>{if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});});
-let resultAt=0;const damageSources=[];
+let resultAt=0;const combatConfirmation=new CombatConfirmation(),damageDirections=new DamageDirections($('#damage-directions'));
+$('#hit-marker').insertAdjacentHTML('afterend','<span id="hit-confirm-label" hidden></span>');
 let matchRequest=0, autoQueue=false, swapSlot=-1;
 const chat = new ChatPanel($("#app"), {
   context: () => ({state, localId, preference:settings.chatMode, connected:!!net?.ready && !net.closed && screen!=="menu", host:!!net?.isHost, enabled:net?.chatEnabled, roomMuted:net?.chatMuted||[]}),
@@ -348,7 +355,7 @@ function settingsMenu() {
       )
       .join(
         "",
-      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["visualSoundEffects", "Visualize Sound Effects"], ["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
+      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["visualSoundEffects", "Visualize Sound Effects"], ["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}${inventoryPreferencesHTML(settings)}${comfortHTML(settings)}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
     "settings",
   );
   bindingEditor=new KeybindEditor(dialog.querySelector(".keybind-list"),settings.keybinds,bindings=>{settings.keybinds=bindings;keys.clear();queuedActions.clear();input.fire=input.aim=false;save("yolk-settings",settings);});
@@ -575,7 +582,7 @@ function callbacks() {
       const me = s.players.find((p) => p.id === localId);
       if (!me) return;
       pendingInputs = pendingInputs.filter((i) => i.seq > me.ack);
-      predicted = { ...me, ammo: [...me.ammo], reserve: [...me.reserve], grapple:me.grapple?structuredClone(me.grapple):null,shadowstep:me.shadowstep?{...me.shadowstep}:null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null, launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+      predicted = predictionCopy(me);
       for (const i of pendingInputs)
         predictMovement(predicted, i, getMap(s.options.map), 1 / 60, s.royale);
       if (me.health > 0 && lastHealth <= 0) {
@@ -844,12 +851,13 @@ function pauseMenu() {
   );
 }
 function leave(confirm = false,notifyParty=true) {
+  lastPreferenceSync='';actionToggles.reset();
   const returningFromMatch=screen==='game';
   if(returningFromMatch)showLoading('RETURNING TO LOBBY','Closing the match connection and preparing your operator in the lobby.',{kind:'exit'});else hideLoading(true);
   if(notifyParty){activeLaunch=null;void partyRequest("returned");}
   earnMatch++;
   buildControls.buildMode=false;buildUI.cancel();
-  resultAt=0;$("#round-banner").hidden=true;damageSources.length=0;
+  resultAt=0;$("#round-banner").hidden=true;damageDirections.reset();combatConfirmation.reset();
   matchRequest++;autoQueue=false;sound.stopWorld();royaleUI.waypoint=null;royaleUI.root.hidden=true;document.body.classList.remove('in-royale','in-spawn-island','in-duos');
   net?.destroy();
   net = null;
@@ -914,9 +922,17 @@ function resultsMenu() {
     "results",
   );
 }
-let lastWorldKey="";
+let lastWorldKey="",lastPreferenceSync='';
+function syncInventoryPreferences(){
+ if(!state?.royale||state.phase!=='playing'||!state.players.some(p=>p.id===localId))return;
+ const value=JSON.stringify(preferencesFromSettings(settings)),key=state.royale.matchId+':'+state.round+':'+localId+':'+value;
+ if(key===lastPreferenceSync||!sim&&!net?.ready)return;
+ lastPreferenceSync=key;const action='inventory-preferences:'+value;
+ if(sim&&!sim.remote)sim.playerAction(localId,action);else net?.send({type:'player-action',action});
+}
 function handleState() {
   if (!state) return;
+  syncInventoryPreferences();
   try{useMatchLayouts(state.mapLayouts||{},state.mapLayoutKey);}catch(error){toast('Invalid map layout: '+error.message);return;}
   const worldKey=(state.royale?.matchId||'')+':'+state.round+':'+state.options.map;
   if(state.royale&&lastWorldKey!==worldKey){lastWorldKey=worldKey;pendingInputs=[];predicted=null;keys.clear();queuedActions.clear();guestFire.reset();const me=state.players.find(p=>p.id===localId);if(me){input.slot=me.slot;input.yaw=me.yaw;input.pitch=me.pitch;}buildControls.buildMode=false;buildUI.cancel();}
@@ -949,7 +965,9 @@ function processEvents() {
     if(e.type==='boss-interrupted'&&e.player===localId)notice('ROOK’S WINCH INTERRUPTED');
     if(e.type==='vault-open')notice((e.name||'Vault').toUpperCase()+' UNLOCKED · Epic requisitions secured',3500);if(e.type==='boss-defeated'&&e.player===localId)notice(bossDefeatMessage(e),4500);if(e.type==='relay-captured'&&e.player===localId)notice('SIGNAL LIVE · Contacts revealed. Your location is exposed.',3500);
     const me = state.players.find((p) => p.id === localId);
+    combatConfirmation.accept(e,localId,performance.now());
     sound.event(e,me,state);
+    if(e.type==='royale-cue'&&e.player===localId&&e.cue==='use-cancel'&&e.reason)notice('Item use stopped · '+(USE_CANCEL_REASONS[e.reason]||'Another action'),1700);
     if(e.type==='duo-marker')sound.cue(e.kind==='danger'?'danger-ping':'world-ping',null,.75);
     if(e.type==='knocked'&&teammates(state.options,me,state.players.find(p=>p.id===e.target)))notice(`Teammate downed · ${e.targetName}`,1800);
     if(e.type==='revived'&&(e.player===localId||e.target===localId))notice(e.target===localId?'Back in the fight · 30 health':'Teammate revived',2200);
@@ -965,16 +983,12 @@ function processEvents() {
     if (e.type === "explosion")
       sound.pop(me ? Math.hypot(me.x - e.x, me.z - e.z) : 0,e);
     if (e.type === "hit") {
-      if (e.player === localId) {
-        sound.hit();
-        hitUntil = performance.now() + 150;
-      }
       if (e.target === localId) {
         damageFlash=Math.max(damageFlash,.5+Math.min(.35,e.amount/100));
-        if(Number.isFinite(e.sourceX)&&Number.isFinite(e.sourceZ)){damageSources.push({x:e.sourceX,z:e.sourceZ,until:performance.now()+1400});if(damageSources.length>5)damageSources.shift();}
+        damageDirections.hit(e,performance.now());
       }
     }
-    if (e.type === "reload" && e.player === localId) sound.reload(Math.max(.3,(me?.reloadEnd||state.time+1.2)-state.time),e.weapon||gun(me).id);
+    if (e.type === "reload" && e.player === localId) sound.reload(Math.max(.3,(me?.reloadEnd||state.time+1.2)-state.time),e.weapon||gun(me).id,e.empty!==false);
     if (e.type === "pickup" && e.player === localId) {
       sound.pickup();
       notice(
@@ -1021,6 +1035,7 @@ function processEvents() {
       predicted = null;
     }
   }
+  const confirmation=combatConfirmation.takeSound();if(confirmation&&confirmation!=='elimination')sound.hit(confirmation);
 }
 function hud() {
   if (screen !== "game" || !state) return;
@@ -1118,7 +1133,10 @@ function hud() {
   $('#scope-spread').style.width=$('#scope-spread').style.height=`${2*radius}px`;$('#scope-spread').hidden=radius<2;
   $('#crosshair').classList.toggle('pellet-reticle',gun(p).pellets>1);
   $("#center-dot").hidden = !settings.centerDot || aiming;
-  $("#hit-marker").hidden = !settings.hitMarkers || p.health <= 0 || paused || performance.now() >= hitUntil;
+  const marker=$('#hit-marker'),hitLabel=$('#hit-confirm-label');
+  marker.hidden = !settings.hitMarkers || p.health <= 0 || paused || performance.now() >= combatConfirmation.until;
+  marker.dataset.kind=combatConfirmation.kind;marker.setAttribute('aria-label',CONFIRM_LABEL[combatConfirmation.kind]);
+  hitLabel.hidden=marker.hidden;hitLabel.textContent=CONFIRM_LABEL[combatConfirmation.kind];hitLabel.dataset.kind=combatConfirmation.kind;
   const scoped =
     aiming && (gun(p).optic === "scope" || gun(p).optic === "prism");
   $("#scope").style.display = scoped && view.aimBlend>.8 ? "block" : "none";
@@ -1403,8 +1421,12 @@ document.addEventListener("input", (e) => {
   const out = $("#out-" + name);
   if (out) out.textContent = settings[name];
   save("yolk-settings", settings);
+  if(name.startsWith('slot_'))syncInventoryPreferences();
+  actionToggles.reset();applyComfort(document.documentElement,settings);
   sound.setVolumes(settings);
-  view.setQuality();
+  // Comfort/HUD/input edits must not reset adaptive render resolution or
+  // reallocate the canvas. FOV is already applied by the camera update.
+  if(name==='quality')view.setQuality();
 });
 dialog.addEventListener("cancel", (e) => {
   e.preventDefault();
@@ -1417,6 +1439,8 @@ dialog.addEventListener("cancel", (e) => {
   else closeDialog();
 });
 document.addEventListener("pointerlockchange", () => {
+  // The owner editor owns capture during Test walk even though the game is paused.
+  if(screen==='editor'&&mapEditor?.walking&&document.pointerLockElement===mapEditor.canvas)return;
   // A capture request can finish after a menu opens. Keep menu buttons usable.
   if(document.pointerLockElement&&(paused||dialog.open||chat.opened||screen!=="game")){document.exitPointerLock();return;}
   if (
@@ -1452,6 +1476,7 @@ function pressControl(code) {
 
   if(settings.keybinds.chat.includes(code)&&net?.ready&&screen!=="menu"){chat.open();return;}
   keys.add(code);
+  for(const action of ['sprint','crouch','aim','interact'])if(settings.keybinds[action].includes(code))actionToggles.press(action,settings);
   if(settings.keybinds.marker.includes(code))sendMarker('normal');
   if(settings.keybinds.danger.includes(code))sendMarker('danger');
   for (const action of ['jump', 'fire', 'reload', 'popper', 'interact']) {
@@ -1481,7 +1506,7 @@ dialog.addEventListener('click', e => {
   if (reset) {
     resetSliders(settings, reset.dataset.resetSlider);
     for (const [id] of SLIDERS) { $('#'+id).value=settings[id]; $('#out-'+id).value=settings[id]; }
-    save('yolk-settings', settings); sound.setVolumes(settings); view.setQuality();
+    save('yolk-settings', settings); applyComfort(document.documentElement,settings); sound.setVolumes(settings);
   }
   if(dialogType==='settings')bindingEditor?.click(e.target);
 });
@@ -1543,6 +1568,7 @@ document.addEventListener("keyup", (e) => {
 });
 window.addEventListener("blur", () => {
   keys.clear();
+  actionToggles.reset();
   scoreHeld = false;
   queuedActions.clear();
   input.fire = false;
@@ -1552,6 +1578,7 @@ window.addEventListener("blur", () => {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     keys.clear();
+    actionToggles.reset();
     scoreHeld = false;
     queuedActions.clear();
     input.fire = false;
@@ -1569,8 +1596,8 @@ document.addEventListener("mouseup", (e) => {
 });
 function aimSensitivity() {
   const p=state?.players.find(p=>p.id===localId);
-  const aiming = !buildControls.editing && (actionDown("aim") || touch.aim)&&(!p?.inventory||!!p.inventory[p.slot]?.weapon);
-  return aiming ? settings.scopeSensitivity*(gun(p).ads?.sensitivity||1) : 1;
+  const aiming = !buildControls.editing && (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim)&&(!p?.inventory||!!p.inventory[p.slot]?.weapon);
+  return sensitivityFor(settings,{editing:buildControls.editing,building:buildControls.buildMode,thirdPerson:!!p?.emote||p?.spectating||!!p?.flight&&p.flight!=='ground',aiming,scoped:!!p&&!!gun(p).ads,scopeScale:p?gun(p).ads?.sensitivity||1:1});
 }
 document.addEventListener("mousemove", (e) => {
   if (
@@ -1689,6 +1716,7 @@ document.addEventListener("graphics-lost", () => {
 });
 function frameInput() {
   const active = !document.hidden && !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && state?.players.find(p => p.id === localId)?.health > 0;
+  if(!active)actionToggles.reset();
   const combat=active&&state?.phase==='playing'&&canFight(state?.players.find(p=>p.id===localId));
   if(active&&!combat){buildControls.buildMode=false;buildUI.cancel();}
   buildControls.yaw=input.yaw;buildControls.pitch=input.pitch;
@@ -1715,7 +1743,7 @@ function frameInput() {
     jump:
       active && (actionDown("jump") || touch.jump || queuedActions.has("jump")),
     fire: combat && !buildControls.editing && !buildControls.suppressBuildFire && (actionDown("fire") || touch.fire || queuedActions.has("fire")),
-    aim: combat && !buildControls.editing && (actionDown("aim") || touch.aim),
+    aim: combat && !buildControls.editing && (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim),
     reload:
       active &&
       (actionDown("reload") || touch.reload || queuedActions.has("reload")),
@@ -1726,9 +1754,9 @@ function frameInput() {
         queuedActions.has("popper")),
     buildMode:combat&&buildControls.buildMode,buildType:buildControls.buildType,buildMaterial:buildControls.buildMaterial,buildRotation:buildControls.buildRotation,buildAnchor:buildControls.buildAnchor,editing:buildControls.editing,
     slot: input.slot,
-    crouch:active&&(actionDown('crouch')||touch.crouch),
-    sprint:active&&(actionDown('sprint')||touch.sprint),
-    interact:active&&(actionDown('interact')||touch.interact||queuedActions.has('interact')),
+    crouch:active&&(actionToggles.value('crouch',actionDown('crouch'),settings)||touch.crouch),
+    sprint:active&&(actionToggles.value('sprint',actionDown('sprint'),settings)||touch.sprint),
+    interact:active&&(actionToggles.value('interact',actionDown('interact'),settings)||touch.interact||queuedActions.has('interact')),
     drop:active&&queuedActions.has('drop'),swapSlot:active?swapSlot:-1,
   };
   swapSlot=-1;
@@ -1751,7 +1779,7 @@ function pumpNetworkInput(now=performance.now()) {
       connectionReport.network.sent(i.seq,now);
       const me = state.players.find((p) => p.id === localId);
       if (me?.health > 0 && state.phase==='playing') {
-        if (!predicted) predicted = { ...me,grapple:me.grapple?structuredClone(me.grapple):null,shadowstep:me.shadowstep?{...me.shadowstep}:null,traversal:me.traversal?{...me.traversal}:null,fall:me.fall?{...me.fall}:null,launchVelocity:me.launchVelocity?{...me.launchVelocity}:null };
+        if (!predicted) predicted = predictionCopy(me);
         predicted.emote=me.emote?{...me.emote}:null;
         const beforeMove={x:predicted.x,z:predicted.z};
         predictMovement(predicted, i, getMap(state.options.map), 1 / 60, state.royale, state.time);
@@ -1833,7 +1861,7 @@ function loop(now) {
     switchSpectator(1);
   view.spectateTarget = me?.spectating ? spectateTarget : null;
   updateSpectatorStatus(me,now);
-  soundVisuals.update(state,me?.spectating?state?.players.find(p=>p.id===spectateTarget):me,{enabled:settings.visualSoundEffects,playing:screen==='game'&&!paused&&!document.hidden},now);
+  soundVisuals.update(state,me?.spectating?state?.players.find(p=>p.id===spectateTarget):me,{enabled:settings.visualSoundEffects,categories:settings,playing:screen==='game'&&!paused&&!document.hidden},now);
   sound.updateLobby(screen!=='game',dt,document.hidden);
   sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!(!net&&paused));
   let renderPlayer = predicted;
@@ -1856,7 +1884,7 @@ function loop(now) {
     presentation.player,
     dt,
     screen === "game",
-    !paused && !chat.opened && !buildControls.editing && (actionDown("aim") || touch.aim),
+    !paused && !chat.opened && !buildControls.editing && (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim),
     profile,
   );
   // Keep the screen through map construction and asynchronous shader preparation.
@@ -1868,15 +1896,10 @@ function loop(now) {
   }
   if(resultAt&&now>=resultAt){resultAt=0;$('#round-banner').hidden=true;if(state?.phase==='results')resultsMenu();}
   const current=state?.players.find(p=>p.id===localId);
-  while(damageSources[0]?.until<now)damageSources.shift();
-  $('#damage-directions').innerHTML=current?damageSources.map(source=>{
-    const dx=source.x-current.x,dz=source.z-current.z,yaw=input.yaw;
-    const angle=Math.atan2(dx*Math.cos(yaw)-dz*Math.sin(yaw),-dx*Math.sin(yaw)-dz*Math.cos(yaw))*180/Math.PI;
-    return `<i class="damage-direction" style="transform:rotate(${angle}deg);opacity:${Math.min(1,(source.until-now)/500)}"></i>`;
-  }).join(''):'';
+  damageDirections.update(current,input.yaw,now,screen==='game'&&!paused&&current?.health>0);
   $('#hud').classList.toggle('low-health',!!current&&current.health>0&&current.health<25);
   damageFlash = Math.max(0, damageFlash - dt * 1.5);
-  $("#damage").style.opacity = damageFlash;
+  $("#damage").style.opacity = damageFlash*(settings.reducedMotion?.25:1);
   updateFrontMessage($("#notice"),now < noticeUntil);
   updateFrontMessage($("#toast"),now < toastUntil);
   for (const row of $("#feed").children)

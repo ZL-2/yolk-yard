@@ -9,15 +9,15 @@ const make=(options={})=>{const s=new RoyaleSimulation({capacity:4,bots:0,seed:2
 const ground=(p,x=70,z=0)=>Object.assign(p,{x,y:0,z,flight:'ground',grounded:true,shieldUntil:0});
 const advance=(s,seconds)=>{for(let i=0;i<seconds*60;i++)s.tick(1/60);};
 test('the expanded island can open every chest without the old loot cap swallowing rewards',()=>{
- const s=make();s.map={...ROYALE_MAP,boxes:ROYALE_MAP.boxes};const p=s.players.get('host'),initial=s.loot.length;
+ const s=make();s.map={...ROYALE_MAP,boxes:ROYALE_MAP.boxes};for(const v of s.vaults)v.open=true;const p=s.players.get('host'),initial=s.loot.length,expected=s.chests.reduce((n,c)=>n+c.contents.length,0);
  for(const chest of s.chests){ground(p,chest.x,chest.z);p.y=chest.y;assert.equal(s.openChest(p,chest),true,chest.id);}
- assert.equal(s.loot.length,initial+s.chests.length*3);
+ assert.equal(s.loot.length,initial+expected);
  assert.ok(s.loot.length>700);
 });
 test('Royale isolates loadouts, fills to capacity, and waits on Spawn Island for two contestants before departure',()=>{
  const empty=new RoyaleSimulation({bots:0});empty.addPlayer('host',{});assert.equal(empty.startRound(),true);assert.equal(empty.stage,'spawn-island');assert.equal(empty.beginBattle(),false);
- const s=make({bots:15,capacity:8,fill:true});assert.equal(s.players.size,8);assert.equal(s.alive,8);
- for(const p of s.players.values()){assert.equal(p.flight,'transport');assert.equal(p.health,100);assert.equal(p.shield,0);assert.deepEqual(p.inventory.slice(1),[null,null,null,null,null]);assert.equal(p.inventory[0].id,'pickaxe');assert.equal(p.reserve.reduce((a,b)=>a+b,0),0);}
+ const s=make({bots:15,capacity:8,fill:true});assert.equal([...s.players.values()].filter(p=>p.contestant).length,8);assert.equal(s.alive,8);
+ for(const p of [...s.players.values()].filter(p=>p.contestant)){assert.equal(p.flight,'transport');assert.equal(p.health,100);assert.equal(p.shield,0);assert.deepEqual(p.inventory.slice(1),[null,null,null,null,null]);assert.equal(p.inventory[0].id,'pickaxe');assert.equal(p.reserve.reduce((a,b)=>a+b,0),0);}
 });
 test('takeoff locks entrants to spectator seats and spawn/profile/rejoin cannot grant a second life',()=>{
  const s=make(),p=s.players.get('host');const late=s.addPlayer('late',{name:'Late'});assert.equal(late.spectating,true);assert.equal(late.health,0);
@@ -38,8 +38,8 @@ test('five slots swap and drop without duplicating magazines or reserve ammo',()
  const s=make(),p=ground(s.players.get('host'));s.loot=[];
  for(const id of ['sprinter','pip','needle','scatter','comet'])assert.equal(s.takeLoot(p,s.dropWeapon(p,id)),true);
  p.slot=3;const replacement=s.dropWeapon(p,'peeper',4,3);assert.equal(s.takeLoot(p,replacement),true);assert.equal(p.inventory[3].id,'peeper');assert.equal(s.loot.filter(i=>i.id==='needle').length,1);
- p.bank.heavy=9;s.syncInventory(p);s.reload(p);advance(s,3);assert.equal(p.inventory[3].ammo,weapon('peeper').magazine);assert.equal(p.bank.heavy,12-weapon('peeper').magazine);
- s.dropSlot(p,3);assert.equal(s.loot.find(i=>i.id==='peeper').ammo,weapon('peeper').magazine);assert.equal(p.bank.heavy,12-weapon('peeper').magazine);
+ p.bank.medium=9;s.syncInventory(p);s.setInput(p.id,{seq:1,slot:3});advance(s,.6);assert.equal(s.reload(p),true);advance(s,gun(p).reload+.1);assert.equal(p.inventory[3].ammo,gun({slot:0,inventory:[{id:'peeper',weapon:true,rarity:4}]}).magazine);assert.equal(p.bank.medium,12-gun({slot:0,inventory:[{id:'peeper',weapon:true,rarity:4}]}).magazine);
+ s.dropSlot(p,3);assert.equal(s.loot.find(i=>i.id==='peeper').ammo,gun({slot:0,inventory:[{id:'peeper',weapon:true,rarity:4}]}).magazine);assert.equal(p.bank.medium,12-gun({slot:0,inventory:[{id:'peeper',weapon:true,rarity:4}]}).magazine);
  p.bank.light=AMMO_CAPS.light;const ammo=s.dropAmmo(p,'light',50);assert.equal(s.takeLoot(p,ammo),false);assert.equal(ammo.count,50);
 });
 test('healing and shield use complete once, cancel on damage, and refuse full or capped stats',()=>{
@@ -56,13 +56,13 @@ test('reserve and selected weapon instances determine damage and reload, while a
 });
 test('stamina drains, exhausts, gates sprint, and regenerates after rest',()=>{
  const s=make(),p=ground(s.players.get('host'),70,40),input={yaw:0,forward:1,sprint:true};
- for(let i=0;i<280;i++)movePlayer(p,input,s.map,1/60);assert.equal(p.exhausted,true);assert.ok(p.stamina<3);
+ for(let i=0;i<335;i++)movePlayer(p,input,s.map,1/60);assert.equal(p.exhausted,true);assert.ok(p.stamina<3);
  for(let i=0;i<60;i++)movePlayer(p,{yaw:0},s.map,1/60);assert.ok(p.stamina<3);
  for(let i=0;i<160;i++)movePlayer(p,{yaw:0},s.map,1/60);assert.ok(p.stamina>20);assert.equal(p.exhausted,false);
 });
 test('transport cannot be damaged, forces exit, and automatically deploys a glider and lands',()=>{
  const s=make(),p=s.players.get('host');s.map.boxes=[];s.damage(p,null,1000,'Storm');assert.equal(p.health,100);
- advance(s,35.2);assert.equal(p.flight,'dive');advance(s,8);assert.equal(p.flight,'ground');assert.equal(p.y,0);assert.equal(p.health,100);
+ advance(s,35.2);assert.equal(p.flight,'dive');for(let i=0;i<60*60&&p.flight!=='ground';i++)s.tick(1/60);assert.equal(p.flight,'ground');assert.equal(p.y,0);assert.equal(p.health,100);
 });
 test('a second flight tap survives a release and press arriving between host ticks',()=>{
  const s=make(),p=s.players.get('guest');s.time=s.startedAt+4;

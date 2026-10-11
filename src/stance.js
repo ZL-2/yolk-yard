@@ -9,11 +9,10 @@ export const STANCE = Object.freeze({
 export const stanceOf=p=>p?.downed?'downed':p?.sliding?'sliding':p?.lowCrouch?'compact':p?.crouching?'crouching':'standing';
 export const bodyHeight=p=>STANCE[stanceOf(p)].height;
 export const eyeHeight=p=>STANCE[stanceOf(p)].eye;
-export const canFight=p=>!!p&&p.health>0&&!p.downed&&!p.spectating&&!p.reviving;
-export function resetStance(p){Object.assign(p,{stamina:100,sprintRest:0,sprintBlend:0,sprintRecovery:0,tacticalSprint:false,sprinting:false,exhausted:false,traversal:null,traversalLock:0,vaultProgress:0,crouching:false,lowCrouch:false,sliding:false,crouchLatch:false,slideVX:0,slideVZ:0,slideAge:0,slideCooldown:0,downed:false,lifeState:'ALIVE',downCount:0,reviving:null,reviverId:null,reviveProgress:0,knockedBy:null,knockSource:null,reviveBlockedUntil:0,lastInterruptDamage:undefined});}
+export const canFight=p=>!!p&&p.health>0&&!p.downed&&!p.spectating&&!p.reviving&&!p.mantle;
+export function resetStance(p){Object.assign(p,{pendingReload:null,reloadHeld:false,mantle:null,mantleCooldown:0,jumpBuffer:0,jumpHeld:false,combatHistory:[],recap:null,stamina:100,sprintRest:0,sprintBlend:0,sprintRecovery:0,tacticalSprint:false,sprinting:false,exhausted:false,traversal:null,traversalLock:0,vaultProgress:0,crouching:false,lowCrouch:false,sliding:false,crouchLatch:false,slideVX:0,slideVZ:0,slideAge:0,slideCooldown:0,downed:false,lifeState:'ALIVE',downCount:0,reviving:null,reviverId:null,reviveProgress:0,knockedBy:null,knockSource:null,reviveBlockedUntil:0,lastInterruptDamage:undefined});}
 // Standardized anatomical pose. Decorative clothing/hair/backpacks never enter this path.
-export function regionPose(h,p){
- const mode=stanceOf(p),speed=Math.hypot(p.vx||0,p.vz||0);
+export function regionPose(h,p,out,mode=stanceOf(p),speed=Math.hypot(p.vx||0,p.vz||0)){
  let x=h.x,y=h.y,z=h.z,rx=h.rx,ry=h.ry,rz=h.rz;
  if(mode==='downed'){
   if(h.region==='head'){y=.60;z=-.65;}
@@ -28,5 +27,7 @@ export function regionPose(h,p){
   else if(h.y>.5){y=.37;z=-.17;ry*=.7;}
   else{y=.21;z=.03;ry*=.8;}
  }else{const lower=(.09+(p.sprinting?.025:0))*Math.min(1,speed/2);y-=h.y>=.9?lower:h.y>=.5?lower*.5:0;}
- return {...h,x,y,z,rx,ry,rz};
+ // Hit tests reuse one output object and one stance/speed calculation per ray.
+ // Other callers keep the original independent-object contract.
+ out??={...h};out.region=h.region;out.x=x;out.y=y;out.z=z;out.rx=rx;out.ry=ry;out.rz=rz;return out;
 }

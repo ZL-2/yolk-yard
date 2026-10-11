@@ -1,21 +1,14 @@
 name: Test and publish Ravelfront
 on:
   push:
-    branches: [main, match-setup, better-together, ravelfront, field-update, spectator-ready-120, loading-ready-122, field-refinement-124, crowns-coast-127, owner-map-editor-ready, boss-voices-ready]
-    paths-ignore:
-      - public/room-test.html
-      - public/room-test.js
-      - public/server-check.html
-      - public/server-check.js
-      - .github/workflows/publish-room-test.yml
+    branches: [main]
+    paths-ignore: [public/room-test.html, public/room-test.js, public/server-check.html, public/server-check.js, .github/workflows/publish-room-test.yml]
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency:
-  group: yolk-game-${{ github.ref }}
+  group: ravelfront-release-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
@@ -28,381 +21,21 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm test
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[service-notices]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]') && !contains(github.event.head_commit.message, '[map-editor]') && !contains(github.event.head_commit.message, '[field-polish]') && !contains(github.event.head_commit.message, '[boss-awareness]')"
-      - name: Verify boss perception, spatial voices, multiplayer synchronization and markers
-        if: contains(github.event.head_commit.message, '[boss-awareness]')
-        run: |
-          node --test tests/boss-awareness-audio.test.js tests/crowns-bosses-emotes.test.js tests/season-one.test.js tests/vault-grappler.test.js tests/audio.test.js tests/snapshot-codec.test.js tests/field-polish.test.js tests/royale-countdown.test.js tests/updates.test.js
-          node scripts/boss-awareness-network-check.mjs
-          npx playwright install --with-deps chromium
-          node scripts/boss-awareness-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[boss-awareness]')
-        with:
-          name: boss-awareness-checks
-          path: test-results/boss-awareness
-          retention-days: 7
-      - name: Verify field gameplay, collision performance, multiplayer and browser visuals
-        if: contains(github.event.head_commit.message, '[field-polish]')
-        run: |
-          node --test tests/vault-grappler.test.js tests/weapon-balance.test.js tests/weapon-stats.test.js tests/audio.test.js tests/field-polish.test.js tests/field-refinement.test.js tests/streaming-performance.test.js tests/bot-runtime.test.js tests/render-performance.test.js tests/snapshot-codec.test.js tests/royale-teammate-bots.test.js tests/world-overhaul.test.js tests/crowns-bosses-emotes.test.js tests/season-one.test.js tests/recurring-royale.test.js tests/royale-countdown.test.js tests/owner.test.js tests/updates.test.js tests/map-editor.test.js tests/authority-performance.test.js tests/remote-input.test.js tests/hitbox.test.js tests/bot-movement-speed.test.js tests/service-status.test.js
-          node scripts/field-refinement-network-check.mjs
-          node scripts/map-editor-network-check.mjs
-          PROFILE_OUT=test-results/field-polish/full-match.json node scripts/kestrel-performance-check.mjs
-          node scripts/field-performance-check.mjs
-          npx playwright install --with-deps chromium
-          node scripts/vault-grappler-browser-check.mjs
-          node scripts/field-polish-browser-check.mjs
-          node scripts/field-refinement-browser-check.mjs
-          node scripts/crowns-coast-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[field-polish]')
-        with:
-          name: field-polish-checks
-          path: |
-            test-results/vault-grappler
-            test-results/field-polish
-            test-results/field-refinement
-            test-results/crowns-coast
-          retention-days: 7
-      - name: Verify owner map workshop, multiplayer layouts and browser controls
-        if: contains(github.event.head_commit.message, '[map-editor]')
-        run: |
-          node --test tests/map-editor.test.js tests/owner.test.js tests/snapshot-codec.test.js tests/recurring-royale.test.js tests/royale-countdown.test.js tests/updates.test.js tests/crowns-bosses-emotes.test.js
-          node scripts/map-editor-network-check.mjs
-          npx playwright install --with-deps chromium
-          node scripts/map-editor-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[map-editor]')
-        with:
-          name: map-editor-checks
-          path: test-results/map-editor
-          retention-days: 7
-      - name: Verify field resupply, deliberate input, countdown and UI
-        if: contains(github.event.head_commit.message, '[field-refinement]')
-        run: |
-          node --test tests/crowns-bosses-emotes.test.js tests/season-one.test.js tests/keybinds.test.js tests/rewards-afk.test.js tests/snapshot-codec.test.js tests/field-refinement.test.js tests/recurring-royale.test.js tests/royale-countdown.test.js tests/world-overhaul.test.js tests/chat.test.js tests/spectator-status.test.js tests/royale-teammate-bots.test.js tests/loading-screen.test.js tests/updates.test.js
-          node scripts/field-refinement-network-check.mjs
-          npx playwright install --with-deps chromium
-          node scripts/field-refinement-browser-check.mjs
-          node scripts/crowns-coast-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[field-refinement]')
-        with:
-          name: field-refinement-checks
-          path: |
-            test-results/field-refinement
-            test-results/crowns-coast
-          retention-days: 7
-      - name: Verify cinematic loading transitions
-        if: contains(github.event.head_commit.message, '[loading-art]')
-        run: |
-          node --test tests/loading-screen.test.js tests/updates.test.js
-          npx playwright install --with-deps chromium
-          node scripts/loading-art-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[loading-art]')
-        with:
-          name: loading-art-checks
-          path: test-results/loading-art
-          retention-days: 7
-      - name: Verify streaming, bot execution and render performance
-        if: contains(github.event.head_commit.message, '[streaming-fix]')
-        run: |
-          node --test tests/streaming-performance.test.js tests/bot-runtime.test.js tests/royale-teammate-bots.test.js tests/snapshot-codec.test.js tests/guest-presentation.test.js tests/recurring-royale.test.js tests/spectator-status.test.js
-          node scripts/streaming-world-check.mjs
-          node scripts/streaming-network-check.mjs
-          PROFILE_OUT=test-results/streaming/simulation.json node scripts/kestrel-performance-check.mjs
-          npx playwright install --with-deps chromium
-          node scripts/streaming-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[streaming-fix]')
-        with:
-          name: streaming-checks
-          path: test-results/streaming
-          retention-days: 7
-      - name: Verify named spectators and Social contrast
-        if: contains(github.event.head_commit.message, '[spectator-fix]')
-        run: |
-          node --test tests/spectator-status.test.js tests/snapshot-codec.test.js tests/recurring-royale.test.js
-          npx playwright install --with-deps chromium
-          node scripts/social-contrast-check.mjs
-          node scripts/spectator-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[spectator-fix]')
-        with:
-          name: spectator-checks
-          path: test-results/spectators
-          retention-days: 7
-      - name: Verify Kestrel camera, recharge and simulation changes
-        if: contains(github.event.head_commit.message, '[kestrel-fix]')
-        run: |
-          node --test tests/kestrel-fix.test.js tests/bot-runtime.test.js tests/guest-presentation.test.js tests/season-one.test.js tests/world-overhaul.test.js tests/hitbox.test.js tests/remote-input.test.js tests/snapshot-codec.test.js tests/recurring-royale.test.js tests/authority-performance.test.js
-          npx playwright install --with-deps chromium
-          node scripts/kestrel-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[kestrel-fix]')
-        with:
-          name: kestrel-checks
-          path: test-results/kestrel-fix
-          retention-days: 7
-      - name: Verify lobby character clearance and empty public resets
-        if: contains(github.event.head_commit.message, '[lobby-clearance]')
-        run: |
-          node --test tests/recurring-royale.test.js
-          npx playwright install --with-deps chromium
-          node scripts/lobby-clearance-check.mjs
-      - name: Verify nonblocking publishing
-        if: contains(github.event.head_commit.message, '[remove-update-screen]')
-        run: |
-          node --test tests/updates.test.js
-          npx playwright install --with-deps chromium
-          node scripts/no-update-screen-browser-check.mjs
-      - name: Verify publishing recovery
-        if: contains(github.event.head_commit.message, '[deployment-recovery]')
-        run: node --test tests/deployment.test.js tests/updates.test.js
-      - name: Verify procedural audio
-        if: contains(github.event.head_commit.message, '[operator-audio]')
-        run: node --test tests/audio.test.js
-      - name: Verify shared service notices and two-player detection
-        if: contains(github.event.head_commit.message, '[service-notices]')
-        run: node --test tests/service-status.test.js
-      - name: Verify Fieldcraft movement, combat, authority, audio and owner access
-        if: contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[capacity-update]') && !contains(github.event.head_commit.message, '[private-social]')
-        run: |
-          if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" == "true" ]]; then
-            node --test tests/leaderboards.test.js tests/rewards-afk.test.js tests/public-host.test.js tests/shadowstep-field.test.js tests/boss-awareness-audio.test.js tests/updates.test.js tests/field-polish.test.js tests/vault-grappler.test.js tests/snapshot-codec.test.js tests/season-one.test.js tests/crowns-bosses-emotes.test.js tests/audio.test.js tests/authority-performance.test.js tests/remote-input.test.js tests/bot-runtime.test.js tests/field-refinement.test.js tests/bot-movement-speed.test.js tests/recurring-royale.test.js tests/performance-hud.test.js tests/network-stats.test.js
-            node scripts/public-host-network-check.mjs
-            npx playwright install --with-deps chromium
-            node scripts/shadowstep-browser-check.mjs
-            node scripts/kestrel-performance-check.mjs
-          else
-            npm run test:field
-          fi
-          if [[ "${{ contains(github.event.head_commit.message, '[lag-hotfix]') }}" != "true" ]]; then
-            npx playwright install --with-deps chromium
-            npm run test:field-browser
-          fi
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[lag-hotfix]')
-        with:
-          name: shadowstep-verification
-          path: test-results/shadowstep
-          retention-days: 7
-      - name: Verify workload admission, batched state, bots and multiplayer continuity
-        if: contains(github.event.head_commit.message, '[capacity-update]')
-        run: npm run test:capacity
-      - name: Verify private party hosts, friend spectators, teammate fill and coordinated publishing
-        if: contains(github.event.head_commit.message, '[private-social]')
-        run: |
-          npm run test:private-social
-          node --test tests/capacity.test.js tests/authority-performance.test.js tests/public-access.test.js tests/performance-hud.test.js tests/network-stats.test.js
-          npx playwright install --with-deps chromium
-          node scripts/private-social-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[private-social]')
-        with:
-          name: private-social-verification
-          path: test-results/private-social
-          retention-days: 7
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[field-update]')
-        with:
-          name: field-verification
-          path: test-results/field
-      - name: Verify Ravelfront operators, cosmetics and populated island
-        if: (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]'))
-        run: |
-          npx playwright install --with-deps chromium
-          node scripts/rebrand-browser-check.mjs
-          node scripts/party-duos-check.mjs
-          node scripts/lobby-duos-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]'))
-        with:
-          name: ravelfront-verification
-          path: test-results
-
-      - name: Verify party service, Duo rules and responsive lobby
-        if: contains(github.event.head_commit.message, '[lobby-duos]')
-        run: |
-          node scripts/party-duos-check.mjs
-          npx playwright install --with-deps chromium
-          node scripts/lobby-duos-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && (contains(github.event.head_commit.message, '[lobby-duos]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))
-        with:
-          name: lobby-duos
-          path: test-results/lobby-duos
-      - name: Verify settings categories, controls and responsive layout
-        if: contains(github.event.head_commit.message, '[settings-layout]')
-        run: |
-          npx playwright install --with-deps chromium
-          node scripts/settings-layout-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[settings-layout]')
-        with:
-          name: settings-layout
-          path: test-results/settings
-      - name: Verify Battle Royale inventory slot layout
-        if: contains(github.event.head_commit.message, '[inventory-layout]')
-        run: |
-          npx playwright install --with-deps chromium
-          node scripts/inventory-layout-check.mjs
-      - name: Verify Outfitter purchases, previews and mobile layout
-        if: contains(github.event.head_commit.message, '[egg-shop]')
-        run: |
-          npx playwright install --with-deps chromium
-          node scripts/egg-shop-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[egg-shop]')
-        with:
-          name: egg-shop-previews
-          path: test-results/egg-shop
-          retention-days: 7
-      - run: npm run test:relay
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]') && !contains(github.event.head_commit.message, '[map-editor]') && !contains(github.event.head_commit.message, '[field-polish]') && !contains(github.event.head_commit.message, '[boss-awareness]')"
-      - run: npm run test:realtime
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]') && !contains(github.event.head_commit.message, '[map-editor]') && !contains(github.event.head_commit.message, '[field-polish]') && !contains(github.event.head_commit.message, '[boss-awareness]')"
-      - name: Verify authoritative countdown, human-only early departure and shared Bus transition
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]') && !contains(github.event.head_commit.message, '[map-editor]') && !contains(github.event.head_commit.message, '[field-polish]') && !contains(github.event.head_commit.message, '[boss-awareness]')"
-        run: node scripts/countdown-network-check.mjs
-      - name: Verify Royale phases, spectator cutoff, falling loot and host migration
-        if: "!contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[remove-update-screen]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]') && !contains(github.event.head_commit.message, '[map-editor]') && !contains(github.event.head_commit.message, '[field-polish]') && !contains(github.event.head_commit.message, '[boss-awareness]')"
-        run: node scripts/royale-flow-check.mjs
-      - name: Verify deployed game relay
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[operator-audio]') && !contains(github.event.head_commit.message, '[field-update]') && !contains(github.event.head_commit.message, '[lobby-motion]') && !contains(github.event.head_commit.message, '[social-squads]') && !contains(github.event.head_commit.message, '[weapon-balance]') && !contains(github.event.head_commit.message, '[bot-pace]') && !contains(github.event.head_commit.message, '[menu-hub]') && !contains(github.event.head_commit.message, '[host-royale]') && !contains(github.event.head_commit.message, '[recurring-royale]') && !contains(github.event.head_commit.message, '[lobby-clearance]') && !contains(github.event.head_commit.message, '[season-one]') && !contains(github.event.head_commit.message, '[world-overhaul]') && !contains(github.event.head_commit.message, '[kestrel-fix]') && !contains(github.event.head_commit.message, '[spectator-fix]') && !contains(github.event.head_commit.message, '[streaming-fix]') && !contains(github.event.head_commit.message, '[loading-art]') && !contains(github.event.head_commit.message, '[field-refinement]') && !contains(github.event.head_commit.message, '[field-polish]') && !contains(github.event.head_commit.message, '[boss-awareness]')
-        env:
-          YOLK_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
-        run: node scripts/relay-live-check.mjs
-      - name: Verify cinematic lobby motion
-        if: contains(github.event.head_commit.message, '[lobby-motion]')
-        run: |
-          node --test tests/lobby-motion.test.js tests/lobby-music.test.js tests/audio.test.js tests/loading-screen.test.js
-          npx playwright install --with-deps chromium
-          node scripts/lobby-motion-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[lobby-motion]')
-        with:
-          name: lobby-motion
-          path: test-results/lobby-motion
-      - name: Verify Social, four-player parties and authoritative Squads
-        if: contains(github.event.head_commit.message, '[social-squads]')
-        run: |
-          node scripts/social-squads-check.mjs
-          node --test --test-name-pattern='authority delivers|populated authority|scheduling stall|catch-up|rate budget' tests/authority-performance.test.js
-          npx playwright install --with-deps chromium
-          node scripts/social-squads-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[social-squads]')
-        with:
-          name: social-squads-verification
-          path: test-results/social-squads
-      - name: Verify every weapon, authority, stances, crosshairs and scopes
-        if: contains(github.event.head_commit.message, '[weapon-balance]')
-        run: |
-          npm run test:weapons
-          node scripts/generate-weapon-matrix.mjs
-          git diff --exit-code -- docs/WEAPON_BALANCE.csv docs/WEAPON_BALANCE.json docs/WEAPON_BALANCE.md
-          npx playwright install --with-deps chromium
-          node scripts/weapon-balance-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[weapon-balance]')
-        with:
-          name: weapon-balance-verification
-          path: test-results/weapon-balance
-      - name: Verify arena bot movement and unchanged player/Royale speeds
-        if: contains(github.event.head_commit.message, '[bot-pace]')
-        run: |
-          node --test tests/bot-movement-speed.test.js
-          node --test --test-name-pattern='crouch changes|slide requires' tests/field-systems.test.js
-      - name: Verify built-in navigation, purchases, presets and Career
-        if: contains(github.event.head_commit.message, '[menu-hub]')
-        run: |
-          node --test tests/career.test.js tests/egg-shop.test.js
-          npx playwright install --with-deps chromium
-          node scripts/menu-hub-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[menu-hub]')
-        with:
-          name: menu-hub-verification
-          path: test-results/menu-hub
-          retention-days: 7
-      - name: Verify hosted Royale, squad bots and private arena loading
-        if: contains(github.event.head_commit.message, '[host-royale]')
-        run: |
-          npx playwright install --with-deps chromium
-          npm run test:host-royale
-          node scripts/weapon-balance-network-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[host-royale]')
-        with:
-          name: host-royale-verification
-          path: test-results/host-royale
-          retention-days: 7
-      - name: Verify recurring public Royale, retired mode and manual private starts
-        if: contains(github.event.head_commit.message, '[recurring-royale]')
-        run: |
-          node --test tests/recurring-royale.test.js tests/royale-teammate-bots.test.js tests/snapshot-codec.test.js tests/career.test.js
-          npx playwright install --with-deps chromium
-          node scripts/recurring-royale-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[recurring-royale]')
-        with:
-          name: recurring-royale-verification
-          path: test-results/recurring-royale
-          retention-days: 7
-      - name: Verify Season 1 combat, boss, inventory, schedule, movement and rendering
-        if: contains(github.event.head_commit.message, '[season-one]')
-        run: |
-          node --test tests/season-one.test.js tests/recurring-royale.test.js tests/royale-teammate-bots.test.js tests/bot-movement-speed.test.js tests/snapshot-codec.test.js tests/weapon-balance.test.js tests/hitbox.test.js tests/egg-shop.test.js
-          node scripts/weapon-balance-network-check.mjs
-          npx playwright install --with-deps chromium
-          node scripts/season-one-browser-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[season-one]')
-        with:
-          name: season-one-checks
-          path: test-results/season-one
-          retention-days: 7
-      - name: Verify The Fortified Coast gameplay, maps, UI and multiplayer
-        if: contains(github.event.head_commit.message, '[world-overhaul]')
-        run: |
-          node --test tests/world-overhaul.test.js tests/island-overhaul.test.js tests/season-one.test.js tests/royale-teammate-bots.test.js tests/snapshot-codec.test.js tests/weapon-balance.test.js tests/hitbox.test.js tests/recurring-royale.test.js tests/private-transport.test.js tests/relay-compact.test.js tests/relay-liveness.test.js tests/remote-input.test.js
-          node --test --test-name-pattern='every Ravelfront arena|detailed lobby' tests/ravel-arenas.test.js
-          node scripts/weapon-balance-network-check.mjs
-          npx playwright install --with-deps chromium
-          node scripts/world-overhaul-browser-check.mjs
-          node scripts/world-art-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && contains(github.event.head_commit.message, '[world-overhaul]')
-        with:
-          name: fortified-coast-checks
-          path: |
-            test-results/world-overhaul
-            test-results/world-art
-          retention-days: 7
+      - name: All unit and real socket regression tests
+        run: node --test --test-concurrency=2 tests/*.test.js
+      - name: Public host election, reconnection, migration, scoring and inventory
+        run: node scripts/public-host-network-check.mjs
+      - name: Map publishing and pinned multiplayer layouts
+        run: node scripts/map-editor-network-check.mjs
       - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
-          name: yolk-build
+          name: ravelfront-build
           path: dist
           retention-days: 7
   browser:
-    # Relay-only releases use the real WebSocket/simulation checks in the build job.
-    # Other verified releases retain the existing local-browser opt-in.
-    if: "!(contains(github.event.head_commit.message, '[field-update]') || contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - suite: arena
-            command: npm run test:browser
-          - suite: visual
-            command: node scripts/royale-solo-check.mjs && node scripts/royale-art-check.mjs
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -411,48 +44,50 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: ${{ matrix.command }}
+      - name: Desktop/mobile controls, inventory, combat HUD and camera
+        run: node scripts/expansion-browser-check.mjs
+      - name: Owner editor, transformations, Test walk, draft conflicts and publishing
+        run: EDITOR_CHECK_OUTPUT=test-results/expansion/map-editor node scripts/map-editor-browser-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: yolk-game-checks-${{ matrix.suite }}
-          path: test-results
-          retention-days: 7
-  # Require the build and release browser checks before publishing.
-  # The longer multiplayer Royale suite remains available as npm run test:royale.
-  test:
-    if: always()
-    needs: [build, browser]
+          name: release-browser-evidence
+          path: test-results/expansion
+          retention-days: 14
+  performance:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
-      - name: Require every test suite
-        env:
-          BUILD_RESULT: ${{ needs.build.result }}
-          BROWSER_RESULT: ${{ needs.browser.result }}
-          VERIFIED_RELEASE: ${{ (contains(github.event.head_commit.message, '[field-update]') || contains(github.event.head_commit.message, '[publish-verified]') || contains(github.event.head_commit.message, '[relay-release]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]'))) }}
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Bounded bot fairness scenarios
+        run: BOT_VALIDATE=1 BOT_DUELS_ONLY=1 node scripts/bot-behavior-check.mjs
+      - name: Compare warmed CPU work with the previous production release
         run: |
-          test "$BUILD_RESULT" = success
-          if [ "$VERIFIED_RELEASE" = true ]; then
-            test "$BROWSER_RESULT" = skipped
-          else
-            test "$BROWSER_RESULT" = success
-          fi
-      - uses: actions/download-artifact@v4
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+          git worktree add --detach ../expansion-baseline c2866b6edbaaae26c4aac6f0717960e2c5a2bf7e
+          ln -s "$GITHUB_WORKSPACE/node_modules" ../expansion-baseline/node_modules
+          PERFORMANCE_BASELINE=../expansion-baseline node scripts/expansion-performance-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: yolk-build
-          path: dist
-      - uses: actions/configure-pages@v5
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-      - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        with:
-          path: dist
+          name: release-performance-evidence
+          path: test-results/expansion/performance.json
+          retention-days: 14
   deploy:
-    if: always() && needs.test.result == 'success' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: test
+    # Every release uses the same gates. Commit titles cannot skip tests.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [build, browser, performance]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     concurrency:
       group: pages-publish
       cancel-in-progress: false
@@ -460,75 +95,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ravelfront-build
+          path: dist
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
       - uses: actions/deploy-pages@v4
         id: deployment
   verify-live:
-    if: always() && needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[lag-hotfix]') && (contains(github.event.head_commit.message, '[field-update]') || contains(github.event.head_commit.message, '[lobby-duos]') || (contains(github.event.head_commit.message, '[rebrand]') || contains(github.event.pull_request.title, '[rebrand]')))
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/lobby-live-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: live-lobby
-          path: test-results/live-lobby
-
-# Verified menu release: includes completed keybind capture verification.
-
-  verify-motion-live:
-    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[lobby-motion]')
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/lobby-motion-check.mjs
-        env:
-          LOBBY_MOTION_LIVE: https://zl-2.github.io/yolk-yard
-
-  verify-social-live:
-    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[social-squads]')
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 9
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: node scripts/social-squads-live-check.mjs
-
-  verify-private-live:
-    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[private-social]')
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/private-social-live-check.mjs
-
-  verify-weapons-live:
-    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[weapon-balance]')
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -540,343 +117,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: node scripts/weapon-balance-live-check.mjs
+      - name: Matching website/relay build, private host/guest match and live lobby
+        run: node scripts/release-live-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: weapon-balance-live
-          path: test-results/weapon-balance-live
-
-  verify-bot-pace-live:
-    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[bot-pace]')
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: npm ci
-      - run: node scripts/bot-pace-live-check.mjs
-
-  verify-menu-hub-live:
-    if: always() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[menu-hub]')
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/menu-hub-live-check.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: menu-hub-live
-          path: test-results/menu-hub-live
-
-  verify-host-royale-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[host-royale]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/private-social-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/host-royale-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
-          RAVEL_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: host-royale-live
-          path: test-results/host-royale-live
-          retention-days: 7
-
-  verify-recurring-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[recurring-royale]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/recurring-royale-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
-          RAVEL_RELAY_URL: wss://yolk-yard-relay.onrender.com/game
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: recurring-royale-live
-          path: test-results/recurring-royale-live
-          retention-days: 7
-
-  verify-no-update-screen-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[remove-update-screen]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/no-update-screen-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
-
-  verify-lobby-clearance-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[lobby-clearance]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/lobby-clearance-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: lobby-clearance-live
-          path: test-results/lobby-clearance
-          retention-days: 7
-
-  verify-season-one-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[season-one]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/season-one-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: season-one-live
-          path: test-results/season-one
-          retention-days: 7
-
-  verify-world-overhaul-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[world-overhaul]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/world-overhaul-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: fortified-coast-live
-          path: test-results/world-overhaul
-          retention-days: 7
-
-  verify-kestrel-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[kestrel-fix]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/kestrel-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
-
-  check-release-safety:
-    if: github.ref == 'refs/heads/spectator-ready-120' || github.ref == 'refs/heads/loading-ready-122' || github.ref == 'refs/heads/field-refinement-124'
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/release-safety-check.mjs
-  verify-loading-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[loading-art]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/loading-art-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: loading-art-live
-          path: test-results/loading-art
-          retention-days: 7
-  verify-spectators-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[spectator-fix]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: node scripts/release-safety-check.mjs
-
-  verify-streaming-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[streaming-fix]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/kestrel-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
-
-  verify-field-refinement-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[field-refinement]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/field-refinement-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
-      - run: node scripts/crowns-coast-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: field-refinement-live
-          path: |
-            test-results/field-refinement
-            test-results/crowns-coast
-          retention-days: 7
-
-  verify-field-polish-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[field-polish]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/field-polish-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: field-polish-live
-          path: test-results/field-polish
-          retention-days: 7
-
-  verify-boss-awareness-live:
-    if: ${{ !cancelled() && needs.deploy.result == 'success' && contains(github.event.head_commit.message, '[boss-awareness]') }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: node scripts/recurring-royale-live-check.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/boss-awareness-browser-check.mjs
-        env:
-          RAVEL_FRONTEND_URL: https://zl-2.github.io/yolk-yard/
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: boss-awareness-live
-          path: test-results/boss-awareness
-          retention-days: 7
+          name: release-live-evidence
+          path: test-results/release-live
+          retention-days: 14

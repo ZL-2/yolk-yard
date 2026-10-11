@@ -1,3 +1,5 @@
+import {recordCombatDamage,combatRecap} from './combat-feedback.js';
+import {reloadRequested} from './reload-buffer.js';
 import {startEmote,cancelEmote,emoteInput} from './emotes.js';
 import {watcherAction} from './spectator-status.js';
 import {COMBAT_LIMITS,UTILITY_WEAPONS} from './weapon-balance.js';
@@ -161,6 +163,7 @@ export class Simulation {
     safe.fireHeld=safe.fire;safe.firePress=safe.fire&&!previous?.fireHeld?safe.seq:previous?.firePress||0;
     safe.jumpHeld = safe.jump;
     safe.jumpPress = safe.jump && !previous?.jumpHeld ? safe.seq : previous?.jumpPress || 0;
+    safe.reloadHeld=safe.reload;safe.reloadPress=safe.reload&&!previous?.reloadHeld?safe.seq:previous?.reloadPress||0;
     if(remote) {
       if(p.health<=0||p.spectating)return;
       let buffer=this.remoteInputs.get(id);
@@ -180,9 +183,10 @@ export class Simulation {
     if(!buffer)return null;
     const steps=buffer.take(dt,!!this.recoveringTick);
     let input={...(steps.at(-1)||buffer.last||{yaw:p.yaw,pitch:p.pitch,slot:p.slot})};
-    input.firePress=Math.max(input.firePress||0,...steps.map(step=>step.firePress||0));
-    for(const key of ['fire','reload','popper','interact','drop'])
-      if(steps.some(step=>step[key]))input[key]=true;
+    for(const step of steps){
+      input.firePress=Math.max(input.firePress||0,step.firePress||0);input.reloadPress=Math.max(input.reloadPress||0,step.reloadPress||0);
+      input.fire||=step.fire;input.reload||=step.reload;input.popper||=step.popper;input.interact||=step.interact;input.drop||=step.drop;
+    }
     if(this.time-p.lastInput>.4)input={yaw:p.yaw,pitch:p.pitch,slot:p.slot};
     return {steps,input};
   }
@@ -434,7 +438,7 @@ export class Simulation {
   }
   combatInput(p,input){
     const w=gun(p),requested=triggerRequested(p,w,input,this.time);
-    if(input.reload||input.fire&&p.ammo[p.slot]===0)this.reload(p);
+    if(reloadRequested(p,w,input,this.time)||input.fire&&p.ammo[p.slot]===0){if(this.reload(p))p.pendingReload=null;}
     if(p.burstLeft&&this.time+1e-9>=p.burstTime){
       if(this.fire(p,true)){p.burstLeft--;p.burstTime=this.time+w.burstInterval;}
       else if(p.reloadEnd||p.ammo[p.slot]<=0)p.burstLeft=0;
@@ -444,9 +448,9 @@ export class Simulation {
   reload(p){
     const w=gun(p);
     if(!canFight(p)||this.time<(p.equipUntil||0)||p.reloadEnd||p.reserve[p.slot]<=0||p.ammo[p.slot]>=w.magazine)return false;
-    p.reloadStarted=this.time;p.reloadDuration=p.ammo[p.slot]===0?w.reloadEmpty:w.reload;
+    p.reloadStarted=this.time;p.reloadEmpty=p.ammo[p.slot]===0;p.reloadDuration=p.reloadEmpty?w.reloadEmpty:w.reload;
     p.reloadEnd=this.time+p.reloadDuration;p.burstLeft=0;p.burstWeapon=null;
-    this.emit('reload',{player:p.id,weapon:w.id,duration:p.reloadDuration});return true;
+    this.emit('reload',{player:p.id,weapon:w.id,duration:p.reloadDuration,empty:p.reloadEmpty});return true;
   }
   recordPoses(){
     this.poseHistory??=new Map();
@@ -722,6 +726,7 @@ export class Simulation {
     }
   }
   damage(victim, attacker, amount, source, precision = false, shotId = null) {
+    if(!Number.isFinite(amount)||amount<=0)return;
     if (victim.health <= 0 || this.time < victim.shieldUntil) return;
     if(teammates(this.options,attacker,victim))return;
     let absorbed=0;
@@ -730,6 +735,7 @@ export class Simulation {
       if(victim.health<=100){absorbed=Math.min(victim.streakArmor||0,amount);victim.streakArmor-=absorbed;amount-=absorbed;}
     }
     const applied = absorbed + Math.min(victim.health, amount);
+    recordCombatDamage(victim,attacker,applied,source,this.time,precision);
     if(attacker&&attacker!==victim){victim.damageLedger??={};victim.damageLedger[attacker.id]=this.time;}
     victim.health = Math.max(0, victim.health - amount);
     victim.lastDamage = this.time;
@@ -745,8 +751,12 @@ export class Simulation {
     });
     }
     if (victim.health > 0) return;
+    victim.mantle=null;
+    // The finisher and the credited knocker can differ. Explain the actual
+    // final damage source without changing the existing elimination award.
+    const finalHit={weapon:source,damage:Math.round(applied),distance:attacker?Math.round(dist(victim,attacker)):0,critical:!!precision,name:attacker?.name||source};
     attacker=this.eliminationCredit?.(victim,attacker)||attacker;
-    victim.recap={weapon:source,damage:Math.round(applied),distance:attacker?Math.round(dist(victim,attacker)):0,critical:!!precision,name:attacker?.name||source};
+    victim.recap=combatRecap(victim,this.time,finalHit);
     victim.killerId = attacker && attacker !== victim ? attacker.id : null;
     for(const [id,time] of Object.entries(victim.damageLedger||{})){const helper=this.players.get(id);if(helper&&id!==victim.killerId&&this.time-time<12)helper.assists=(helper.assists||0)+1;}victim.damageLedger={};
     victim.deaths++;
@@ -889,6 +899,7 @@ export class Simulation {
       "pitch",
       "grounded",
       "jumpLatch",
+      "jumpHeld", "jumpBuffer", "mantle", "mantleCooldown",
       "lastJumpPress", "nextShot", "fireLatch", "weaponCooldowns", "shotgunReadyAt", "pendingFireUntil", "lastFirePress", "burstWeapon", "burstLeft", "burstTime",
       "health",
       "kills",
@@ -898,7 +909,7 @@ export class Simulation {
       "slot",
       "ammo",
       "reserve",
-      "reloadEnd", "reloadStarted", "reloadDuration",
+      "reloadEnd", "reloadStarted", "reloadDuration", "reloadEmpty",
       "equipStarted",
       "equipHolster",
       "equipUntil",
@@ -926,7 +937,7 @@ export class Simulation {
       winner: this.winner,
       players: [...this.players.values()].map((p) => {
         const row={inputQueue:this.remoteInputs.get(p.id)?.queue.length||0};
-        for(const key of keys){const value=p[key];row[key]=Array.isArray(value)?value.slice():key==='weaponCooldowns'?{...value}:value;}
+        for(const key of keys){const value=p[key];row[key]=Array.isArray(value)?value.slice():key==='weaponCooldowns'?{...value}:key==='mantle'&&value?{...value,from:{...value.from},lift:{...value.lift},across:{...value.across},to:{...value.to}}:value;}
         return Object.assign(row,{
         shotSpread: p.accuracyState[p.slot]?.spread ?? gun(p).spread * (p.aim ? gun(p).aimSpread : 1),
         recoilPitch:p.recoilPitch||0,recoilYaw:p.recoilYaw||0,firstShot:!!p.accuracyState[p.slot]?.firstShot,shotSerial:p.shotSerial||0,combatState:{...p.accuracyState[p.slot]},

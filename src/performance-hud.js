@@ -17,7 +17,7 @@ export class PerformanceHUD{
  }
  update(now,frameMs,net,settings,active){
   this.root.hidden=!active;
-  if(!active){this.frames=[];this.lastRender=-Infinity;this.net=null;return;}
+  if(!active){this.frames=[];this.lastRender=-Infinity;this.net=null;this.warning='healthy';this.warningUntil=0;return;}
   if(frameMs>0&&Number.isFinite(frameMs)){this.frames.push(frameMs);if(this.frames.length>120)this.frames.shift();}
   if(net!==this.net){this.net=net;this.history=[];this.rateAt=now;this.previous=null;this.rates=null;this.warning='healthy';this.warningUntil=0;}
   if(now-this.lastRender<200)return;this.lastRender=now;
@@ -33,7 +33,7 @@ export class PerformanceHUD{
   for(const [selector,arrow,bytes,packets]of [['.net-down','↓','down','in'],['.net-up','↑','up','out']])this.root.querySelector(selector).textContent=this.rates?`${arrow} ${(this.rates[bytes]/1024).toFixed(2)} KB/s · ${Math.round(this.rates[packets])} msg/s`:`${arrow} — KB/s · — msg/s`;
   const health=connectionHealth(net,now);
   if(health!=='healthy'){this.warning=health;this.warningUntil=now+(health==='critical'?2000:1000);}
-  else if(now>=this.warningUntil)this.warning='healthy';
+  else if(!this.warning||now>=this.warningUntil)this.warning='healthy';
   this.signal.hidden=!settings.connectionWarnings||this.warning==='healthy';
   this.signal.dataset.health=this.warning;this.signal.setAttribute('aria-label',this.warning==='critical'?'Connection interrupted or severely delayed':'Connection delayed');
   this.network.hidden=this.details.hidden&&this.signal.hidden;

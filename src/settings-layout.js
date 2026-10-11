@@ -1,12 +1,15 @@
 const categories=[
  ['video','▣','Video',['quality','fov','showFps']],
- ['audio','♫','Audio',['volume','effectsVolume','ambienceVolume','musicVolume','visualSoundEffects']],
- ['mouse','↗','Mouse',['sensitivity','scopeSensitivity','invert']],
- ['hud','⊕','HUD',['centerDot','hitMarkers','netDebugStats','connectionWarnings']],
- ['gameplay','⚙','Gameplay',['confirmEditOnRelease','chatMode']],
+ ['audio','♫','Audio',['volume','effectsVolume','ambienceVolume','musicVolume','visualSoundEffects','visualFootsteps','visualGunfire','visualBosses','visualOther']],
+ ['mouse','↗','Mouse',['sensitivity','adsSensitivity','scopeSensitivity','buildSensitivity','editSensitivity','thirdPersonSensitivity','invert']],
+ ['hud','⊕','HUD',['centerDot','hitMarkers','netDebugStats','connectionWarnings','hudScale','textScale','highContrast','showMinimap','showCompass','mapSide']],
+ ['comfort','◌','Comfort',['reducedMotion','headBob','weaponMotion','sprintMode','crouchMode','aimMode','interactMode']],
+ ['gameplay','⚙','Gameplay',['confirmEditOnRelease','chatMode','slot_shotgun','slot_rifle','slot_healing','slot_mobility']],
  ['bindings','⌨','Keybinds',[]]
 ];
 const descriptions={
+ headBob:'Adjust walking bob of your held weapon. This never changes movement or accuracy.',weaponMotion:'Reduce decorative weapon kick and motion. Actual weapon recoil and aiming remain unchanged.',reducedMotion:'Reduce damage flashes, weapon bob and decorative interface animation without changing combat rules.',hudScale:'Resize the inventory and minimap, within screen-safe limits.',textScale:'Increase interaction, recap and HUD help text size.',highContrast:'Use darker HUD panels and stronger text contrast.',mapSide:'Move the minimap to the opposite side of the screen.',showMinimap:'Hide only the small map. Your full island map remains available.',showCompass:'Show or hide the compass.',buildSensitivity:'Mouse sensitivity multiplier while placing builds.',editSensitivity:'Mouse sensitivity multiplier while editing tiles.',thirdPersonSensitivity:'Mouse sensitivity multiplier during third-person gameplay.',sprintMode:'Hold the binding or press once to toggle. Menus, focus loss and death clear toggles.',crouchMode:'Hold or toggle crouching and sliding. Collision and speed requirements are unchanged.',aimMode:'Hold or toggle aiming. Actual aiming and recoil rules are unchanged.',interactMode:'Hold or toggle searching and reviving. Press again to stop; normal range and damage restrictions still apply.',visualFootsteps:'Show enemy footstep indicators. Teammate footsteps remain hidden.',visualGunfire:'Show gunfire and explosion indicators.',visualBosses:'Show nearby boss sound indicators.',visualOther:'Show chests, traversal and other environmental sound indicators.',
+ slot_shotgun:'Places newly collected shotguns into this slot when empty. Existing equipment is never rearranged.',slot_rifle:'Preferred empty slot for rifles and precision weapons. Your manual arrangements are preserved.',slot_healing:'Partial stacks merge first, then use the preferred empty healing slot.',slot_mobility:'Preferred empty slot for Grappler, Shadowstep, Jump Rig, Impulse Charges and Launch Pads.',
  visualSoundEffects:'Show directional footsteps, gunfire, explosives, gliders and nearby chest sounds around the crosshair. Quiet crouching is excluded. Saved on this browser.',
  showFps:'Show your measured frames per second during gameplay.',
  netDebugStats:'Show ping, incoming and outgoing traffic, message rates and a latency graph. Packet loss is unavailable in this browser transport.',
@@ -15,7 +18,7 @@ const descriptions={
  fov:'Adjust how much of the world is visible. A wider field of view shows more of your surroundings.',
  volume:'Controls the overall game volume. Individual sound channels are multiplied by this level.',
  effectsVolume:'Weapon effects, impacts and gameplay cues.',ambienceVolume:'Environmental sound and wind.',musicVolume:'Menu music and match fanfares.',
- sensitivity:'How quickly the camera turns when you move the mouse.',scopeSensitivity:'Adjust aiming sensitivity while looking through a scope.',invert:'Reverse the direction of vertical mouse movement.',
+ sensitivity:'How quickly the camera turns when you move the mouse.',adsSensitivity:'Adjust unscoped aiming independently from magnified optics.',scopeSensitivity:'Adjust aiming sensitivity while looking through a scope.',invert:'Reverse the direction of vertical mouse movement.',
  centerDot:'Show a dot in the center of your crosshair.',hitMarkers:'Show visual feedback when your shots hit.',
  confirmEditOnRelease:'Confirm a valid manual build edit when you release the selection input. Turn off to confirm with your Edit binding.',
  chatMode:'Choose filtered messages, quick messages only, or no chat. The safety filter always remains enabled. Mute or report players through Pause → Player controls.'

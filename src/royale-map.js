@@ -18,9 +18,11 @@ const box=(x,z,w,d,h,color='stone',y=0,kind='building',extra={})=>{const b={x,z,
 const buildingPlans={
  borough:[[-26,-23,20,16,3,'apartment'],[0,-22,18,16,2,'shop'],[28,-20,16,22,2,'apartment'],[-25,14,18,16,2,'shop'],[2,19,16,18,2,'bakery'],[27,17,18,16,2,'shop'],[-7,43,16,14,1,'garage']],
  farm:[[-23,-22,28,20,2,'barn'],[15,-20,16,16,2,'house'],[-26,20,16,14,1,'stable'],[10,23,26,16,1,'greenhouse'],[35,13,12,14,1,'garage']],
- observatory:[[0,-12,28,24,2,'command'],[35,-18,16,16,4,'tower'],[-27,17,18,18,1,'lab'],[10,24,18,14,1,'barracks'],[40,19,12,14,1,'garage']],
+ // Keep the barracks clear of the raised Aster vault approach and its terrain pad.
+ observatory:[[0,-12,28,24,2,'command'],[35,-18,16,16,4,'tower'],[-27,17,18,18,1,'lab'],[17,24,18,14,1,'barracks'],[40,19,12,14,1,'garage']],
  docks:[[-23,-24,26,20,2,'warehouse'],[16,-26,16,18,3,'office'],[-26,13,20,18,1,'hangar'],[9,14,18,16,2,'warehouse'],[35,-11,12,14,1,'garage']],
- woods:[[-22,-21,18,18,2,'lodge'],[13,-19,12,14,1,'cabin'],[-27,17,12,14,1,'cabin'],[9,20,14,16,2,'lodge'],[34,10,10,14,1,'shed']],
+ // The western cabin leaves a walkable gap beside Nyx's bunker entrance.
+ woods:[[-22,-21,18,18,2,'lodge'],[13,-19,12,14,1,'cabin'],[-32,17,12,14,1,'cabin'],[9,20,14,16,2,'lodge'],[34,10,10,14,1,'shed']],
  works:[[-29,-24,26,20,3,'warehouse'],[15,-26,18,20,3,'office'],[-33,17,16,16,1,'garage'],[6,15,24,18,2,'refinery'],[34,10,12,14,1,'shed']],
  terraces:[[-26,-23,16,18,2,'villa'],[6,-22,18,18,2,'villa'],[33,-19,12,14,1,'garage'],[-22,17,18,16,2,'house'],[13,21,24,18,3,'hotel'],[37,17,12,14,1,'shop']],
  heights:[[-24,-12,18,18,2,'lab'],[10,-18,22,18,3,'hatchery'],[-25,24,18,18,2,'greenhouse'],[12,20,18,16,2,'office']],
@@ -164,4 +166,4 @@ for(const [x,z,kind] of [[116,-173,'crate'],[122,-172,'barrels'],[145,-127,'crat
 // Material assignments and stable IDs are shared by harvesting, destruction and rendering.
 for(const [i,b]of boxes.entries())b.objectId=b.doorId?'world-door-'+b.doorId:'world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
-export const ROYALE_MAP={id:'sunnybreak',revision:9,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[75,75]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,material:'brick'};
+export const ROYALE_MAP={id:'sunnybreak',revision:9,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[80,80]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,material:'brick'};

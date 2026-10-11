@@ -1,0 +1,55 @@
+name: Expansion branch verification (no deployment)
+on:
+  # The normal PR/release pipeline now includes this acceptance coverage.
+  # Keep this focused checkpoint workflow available without duplicating it.
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: expansion-verification-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Combat, movement, inventory, UI rules and multiplayer regressions
+        run: node --test tests/expansion-foundation.test.js tests/comfort.test.js tests/building.test.js tests/building-overhaul.test.js tests/arms.test.js tests/audio.test.js tests/mobility-storm.test.js tests/remote-input.test.js tests/leaderboards.test.js tests/public-host.test.js tests/shadowstep-field.test.js tests/boss-awareness-audio.test.js tests/field-polish.test.js tests/vault-grappler.test.js tests/snapshot-codec.test.js tests/season-one.test.js tests/crowns-bosses-emotes.test.js tests/authority-performance.test.js tests/bot-runtime.test.js tests/field-refinement.test.js tests/bot-movement-speed.test.js tests/recurring-royale.test.js
+      - run: node scripts/public-host-network-check.mjs
+      - name: Door, camera, reload buffer and map editor acceptance
+        run: node --test tests/expansion-collision.test.js tests/reload-buffer.test.js tests/map-editor.test.js tests/bot-tactics.test.js tests/bot-utility.test.js
+      - name: Queued bot utility completion
+        run: node --test --test-name-pattern='queued popper' tests/continuity.test.js
+      - name: Authored foundations and spawn clearance
+        run: node --test --test-name-pattern='all 61 foundations' tests/royale-systems.test.js
+      - name: Bounded bot fairness scenarios
+        run: BOT_VALIDATE=1 BOT_DUELS_ONLY=1 node scripts/bot-behavior-check.mjs
+      - run: node --test tests/performance-hud.test.js tests/guest-presentation.test.js
+      - name: Revive and authored traversal acceptance
+        run: node --test --test-name-pattern='Duo knock|revive stops|final active|finishing|all seven traversal|vault stairs' tests/field-systems.test.js tests/world-overhaul.test.js
+      - name: Compile production assets
+        run: npm run build
+      - name: Reproducible baseline CPU comparison
+        run: |
+          git worktree add --detach ../expansion-baseline c2866b6edbaaae26c4aac6f0717960e2c5a2bf7e
+          ln -s "$GITHUB_WORKSPACE/node_modules" ../expansion-baseline/node_modules
+          PERFORMANCE_BASELINE=../expansion-baseline node scripts/expansion-performance-check.mjs
+      - run: npx playwright install --with-deps chromium
+      - name: Desktop, mobile, input and HUD browser checks
+        run: node scripts/expansion-browser-check.mjs
+      - name: Owner editor controls, map validation and safe draft publishing
+        run: EDITOR_CHECK_OUTPUT=test-results/expansion/map-editor node scripts/map-editor-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: expansion-verification
+          path: test-results/expansion
+          retention-days: 14

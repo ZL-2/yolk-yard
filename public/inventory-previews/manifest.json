@@ -3,48 +3,48 @@
   "source": "817681cdbb416578c372befa41202d97ee0e6a88056086f05b94dba4e125318a",
   "weapons": {
     "sprinter": {
-      "name": "Sprinter",
-      "sha256": "369a302ad659bfd24ecf5cf7cf4ae43efcd5861b4e06a53bcb156092ebc74919"
+      "name": "R-41 Service Rifle",
+      "sha256": "0dd049f7e077f16b9ac7dc514b5aede45456c58a00bdac10e2415931b9f08f20"
     },
     "scatter": {
-      "name": "Scatter",
-      "sha256": "2acfb17984b3bc9561baf32425bb32ada1fad625d42367efc3691572ced26be1"
+      "name": "M12 Combat Shotgun",
+      "sha256": "c64af796b6c4b5ace68462e043d9478258526efff5168a4924c2748a729d31a2"
     },
     "needle": {
-      "name": "Needle",
-      "sha256": "ef9174628dc9623af6360002cc9997c0bfc1bc5cf241a290a99d7d15f4e8bcfd"
+      "name": "LR-9 Longshot",
+      "sha256": "fe8bb4fb4423249b903465e69638b226f9c59e66856ffa3dbbc9cbdde6c28283"
     },
     "zipper": {
-      "name": "Zipper",
-      "sha256": "7d807a75f971900d22f44bc54d503b4faf862809e09b0515df229a55d5a29682"
+      "name": "VX-7 SMG",
+      "sha256": "5d6e7fcb45b08a13317b6496f228db64b1e26317fb9b70fd4501b19e95445ae7"
     },
     "thumper": {
-      "name": "Thumper",
-      "sha256": "0adb9cebeea376e6295f14b14d4054419bb1148685f96096f288367e5314ddc8"
+      "name": "AT-6 Rocket Launcher",
+      "sha256": "e89ea7c89cd0b8674304c4577c379a5374334136999c11c522d0c076ba024e54"
     },
     "anchor": {
-      "name": "Anchor",
-      "sha256": "2e440f92deefe30b4252243dd4974554aefbe9e49f123025d6bba4968d368595"
+      "name": "DMR-18 Sentinel",
+      "sha256": "321622ec560cccd8cbc3ba71fedb1b6ab6f86781afd5a6c958f4919971235ec4"
     },
     "duet": {
-      "name": "Duet",
-      "sha256": "6f8434301fc1b513d08f530e8d370f9954b1bcfe3c26bd33d9137fbba21603bb"
+      "name": "BR-3 Burst Rifle",
+      "sha256": "f8639789e4ec6517a27eab1680de0a7c940e19909975a53b24fd547bd3c0cf40"
     },
     "pip": {
-      "name": "Pip",
-      "sha256": "9ed9497dedc745972078f067fa2fb690036fb3faf0b7ce147c2a879e0cefaf1c"
+      "name": "P-9 Sidearm",
+      "sha256": "5a66a327e50911d95e4f9879d131f1f4e6e2210feff50134c9fb3c4ab2d07d50"
     },
     "peeper": {
-      "name": "Sentry",
-      "sha256": "6c6935cdd298e496a5cd0b9cbd3fd9b669cefb8b5f78025373b737bb54f631a5"
+      "name": "SR-25 Scout",
+      "sha256": "9774f887a71d0cdc79edf6305868e32067161ce5c8d1f269695d692ef23f3610"
     },
     "doubleyolk": {
-      "name": "Breach",
-      "sha256": "9d3050d98322542cd2df23ad954c4499633ee33340e04fbe6c37bb3b3cbfd644"
+      "name": "SG-2 Breacher",
+      "sha256": "4119ea5f69793aa3623075717138f1fcd0367dbd8c215ba64cd4dc9c98c28b86"
     },
     "comet": {
-      "name": "Comet",
-      "sha256": "bac2b0bc3283224345edd483a78ebd864f10a6527cb851a05302e76068e2b16b"
+      "name": "ARC-5 Pulse Rifle",
+      "sha256": "71b39297465279f7b0e3b97e1cc64452322ef584604911f30bf2ec1b18716604"
     }
   }
 }

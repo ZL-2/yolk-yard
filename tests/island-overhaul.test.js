@@ -19,7 +19,7 @@ test('all POIs and landmarks have supported, unobstructed loot across their floo
  assert.ok(groundAt(map,147,218)<.5,'the pier must extend into the inlet');
 });
 test('navigation reaches every roof and physics can walk interior stairs without jumps',()=>{
- const nav=navigation(map),doors=Object.fromEntries(map.doors.filter(d=>!d.vault).map(d=>[d.id,{open:true}])),walkMap={...map,boxes:map.boxes.map(b=>worldDoorBox(b,doors))};
+ const nav=navigation(map),doors=Object.fromEntries(map.doors.filter(d=>!d.vault).map(d=>[d.id,{open:true}])),walkMap={...map,boxes:map.boxes.map(b=>worldDoorBox(b,doors)).filter(Boolean)};
  for(const [index,b]of map.buildings.entries()){
   const start={x:b.x,y:b.baseY,z:b.z-b.d/2-1.8},end={x:b.x,y:b.baseY+b.h,z:b.z-b.d*.25},path=nav.path(start,end);
   assert.ok(path.length&&Math.hypot(path.at(-1).x-end.x,path.at(-1).z-end.z)<3&&Math.abs(path.at(-1).y-end.y)<.45,`${index} ${b.type} roof path`);
@@ -38,7 +38,7 @@ test('match loot varies, restores exactly, pairs ammunition and survives support
  assert.equal(restored.random(),a.random());
  const high=a.loot.find(i=>i.y>groundAt(a.map,i.x,i.z)+3),support=a.map.boxes.find(b=>Math.abs(b.y+b.h-high.y)<.01&&Math.abs(b.x-high.x)<b.w/2&&Math.abs(b.z-high.z)<b.d/2);
  const uid=high.uid,before=a.loot.length;assert.ok(support);damageObject(a,support,10000);assert.equal(a.loot.length,before);assert.equal(a.loot.filter(i=>i.uid===uid).length,1);tickLootMotion(a);a.time+=3;tickLootMotion(a);assert.ok(validLootPoint(a.map,high));
- a.phase='results';a.startRound();a.beginBattle();assert.notDeepEqual(a.loot,same.loot);assert.ok(a.chests.every(c=>!c.opened&&c.contents.length===(['bandage','medkit','mini','flask','splash'].includes(c.contents[2].id)?3:4)&&c.contents[0].weapon&&c.contents[1].ammoType));assert.ok(a.loot.every(i=>validLootPoint(a.map,i)));
+ a.phase='results';a.startRound();a.beginBattle();assert.notDeepEqual(a.loot,same.loot);assert.ok(a.chests.every(c=>!c.opened&&c.contents.length===(['bandage','medkit','mini','flask','splash'].includes(c.contents[2].id)?4:5)&&c.contents[0].weapon&&c.contents[1].ammoType));assert.ok(a.loot.every(i=>validLootPoint(a.map,i)));
 });
 test('pickup deltas stay small after intervening movement frames and preserve removals',()=>{
  const items=Array.from({length:700},(_,uid)=>({uid,id:'sprinter',x:uid,y:0,z:4,weapon:true}));

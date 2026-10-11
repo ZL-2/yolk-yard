@@ -48,10 +48,10 @@ test('marker intent is bounded, rate-limited, expiring and visible only to its D
 
 test('cached collision buckets cover cell boundaries and invalidate after geometry edits',()=>{
  const a={x:15.8,y:0,z:0,w:.2,h:2,d:1},b={x:17,y:0,z:0,w:1,h:2,d:1},map={theme:'royale',boxes:[a,b]};
- assert.ok(candidates(map,{x:16,y:0,z:0}).has(a));assert.ok(candidates(map,{x:16,y:0,z:0}).has(b));
+ assert.ok(candidates(map,{x:16,y:0,z:0}).includes(a));assert.ok(candidates(map,{x:16,y:0,z:0}).includes(b));
  const before=candidates(map,{x:16,y:0,z:0});map.boxes=[b];invalidateCollision(map);
- const after=candidates(map,{x:16,y:0,z:0});assert.notEqual(before,after);assert.ok(!after.has(a));assert.ok(after.has(b));
- assert.ok(!candidates(map,{x:80,y:0,z:80}).has(b));
+ const after=candidates(map,{x:16,y:0,z:0});assert.notEqual(before,after);assert.ok(!after.includes(a));assert.ok(after.includes(b));
+ assert.ok(!candidates(map,{x:80,y:0,z:80}).includes(b));
 });
 
  test('nearby loot lookup matches brute force and refreshes after movement and pickup',async()=>{

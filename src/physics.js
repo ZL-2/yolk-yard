@@ -1,11 +1,12 @@
 import {TACTICAL_SPRINT} from './world-rules.js';
+import {beginMantle,stepMantle} from './mantle.js';
 import {stepGrapple} from './grappler.js';
 import {stepShadowstep} from './shadowstep.js';
 import {SEASON} from './season-one.js';
 import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon, gun } from "./data.js";
 import {groundAt,terrainHit} from './terrain.js';
-import {STANCE,bodyHeight,eyeHeight,regionPose} from './stance.js';
+import {STANCE,stanceOf,bodyHeight,eyeHeight,regionPose} from './stance.js';
 export const RADIUS = 0.32,
   HEIGHT = 1.85,
   EYE = 1.70;
@@ -19,16 +20,16 @@ export function direction(yaw, pitch = 0) {
     z: -Math.cos(yaw) * Math.cos(pitch),
   };
 }
-export function rayBox(o, d, b, max = Infinity) {
+export function rayBox(o, d, b, max = Infinity, radius = 0) {
   // Slab intersection without per-box arrays, iterators or dynamic property lookups.
   // This runs for every sight line, navigation probe and projectile collision.
-  let lo=0,hi=max,a,c,min=b.x-b.w/2,upper=b.x+b.w/2;
+  let lo=0,hi=max,a,c,min=b.x-b.w/2-radius,upper=b.x+b.w/2+radius;
   if(Math.abs(d.x)<1e-8){if(o.x<min||o.x>upper)return Infinity;}
   else{a=(min-o.x)/d.x;c=(upper-o.x)/d.x;if(a>c){const swap=a;a=c;c=swap;}lo=Math.max(lo,a);hi=Math.min(hi,c);if(lo>hi)return Infinity;}
-  min=b.y;upper=b.y+b.h;
+  min=b.y-radius;upper=b.y+b.h+radius;
   if(Math.abs(d.y)<1e-8){if(o.y<min||o.y>upper)return Infinity;}
   else{a=(min-o.y)/d.y;c=(upper-o.y)/d.y;if(a>c){const swap=a;a=c;c=swap;}lo=Math.max(lo,a);hi=Math.min(hi,c);if(lo>hi)return Infinity;}
-  min=b.z-b.d/2;upper=b.z+b.d/2;
+  min=b.z-b.d/2-radius;upper=b.z+b.d/2+radius;
   if(Math.abs(d.z)<1e-8){if(o.z<min||o.z>upper)return Infinity;}
   else{a=(min-o.z)/d.z;c=(upper-o.z)/d.z;if(a>c){const swap=a;a=c;c=swap;}lo=Math.max(lo,a);hi=Math.min(hi,c);if(lo>hi)return Infinity;}
   return lo;
@@ -110,14 +111,15 @@ export const HUMAN_HIT=[
 export const humanFlightPitch=p=>p.flight==='dive'?.78:p.flight==='glide'?.09+Math.max(-.06,Math.min(.11,(-(p.vx||0)*Math.sin(p.yaw||0)-(p.vz||0)*Math.cos(p.yaw||0))*.005)):0;
 export function humanHit(o,d,p,radius=0){
  const yaw=p.yaw||0,c=Math.cos(yaw),s=Math.sin(yaw),dx=o.x-p.x,dz=o.z-p.z;
- const origin={x:dx*c-dz*s,y:o.y-p.y,z:dx*s+dz*c},v={x:d.x*c-d.z*s,y:d.y,z:d.x*s+d.z*c};
- const pitch=humanFlightPitch(p),cp=Math.cos(pitch),sp=Math.sin(pitch);for(const vector of [origin,v]){const y=vector.y,z=vector.z;vector.y=y*cp+z*sp;vector.z=-y*sp+z*cp;}
- let result={distance:Infinity,region:null};
+ const ox=dx*c-dz*s,oy=o.y-p.y,oz=dx*s+dz*c,vx=d.x*c-d.z*s,vz=d.x*s+d.z*c;
+ const pitch=humanFlightPitch(p),cp=Math.cos(pitch),sp=Math.sin(pitch),py=oy*cp+oz*sp,pz=-oy*sp+oz*cp,vy=d.y*cp+vz*sp,pvz=-d.y*sp+vz*cp;
+ const result={distance:Infinity,region:null},posed={},mode=stanceOf(p),speed=Math.hypot(p.vx||0,p.vz||0);
  for(const base of HUMAN_HIT){
-  const posed=regionPose(base,p),h={...posed,rx:posed.rx+radius,ry:posed.ry+radius,rz:posed.rz+radius},a=[(origin.x-h.x)/h.rx,(origin.y-h.y)/h.ry,(origin.z-h.z)/h.rz],b=[v.x/h.rx,v.y/h.ry,v.z/h.rz];
-  const A=b.reduce((n,x)=>n+x*x,0),B=2*a.reduce((n,x,i)=>n+x*b[i],0),C=a.reduce((n,x)=>n+x*x,0)-1,D=B*B-4*A*C;
+  const h=regionPose(base,p,posed,mode,speed),rx=h.rx+radius,ry=h.ry+radius,rz=h.rz+radius;
+  const ax=(ox-h.x)/rx,ay=(py-h.y)/ry,az=(pz-h.z)/rz,bx=vx/rx,by=vy/ry,bz=pvz/rz;
+  const A=bx*bx+by*by+bz*bz,B=2*(ax*bx+ay*by+az*bz),C=ax*ax+ay*ay+az*az-1,D=B*B-4*A*C;
   if(A<1e-12||D<0)continue;const t=C<=0?0:(-B-Math.sqrt(D))/(2*A);
-  if(t>=0&&t<result.distance)result={distance:t,region:h.region};
+  if(t>=0&&t<result.distance){result.distance=t;result.region=h.region;}
  }return result;
 }
 // Stable internal API retained for saved simulations and existing callers.
@@ -142,18 +144,19 @@ export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS) {
 function pushAxis(p,map,axis,delta) {
  if(Math.abs(delta)<1e-10)return;
  const start=p[axis],base=p.y,other=axis==='x'?'z':'x',size=axis==='x'?'w':'d';
- let target=start+delta;
- const height=bodyHeight(p),point={x:p.x,y:p.y,z:p.z};point[axis]=target;
- const hits=[];let top=base;
- for(const b of candidates(map,point))if(p.y<b.y+b.h-.015&&p.y+height>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(target-b[axis])<b[size]/2+RADIUS){hits.push(b);top=Math.max(top,b.y+b.h);}
- // One stair rise per axis. Never stack multiple step corrections in one move.
- if(hits.length&&p.grounded&&top-base>0&&top-base<=.43&&canOccupy(map,{...point,y:top},height)) {
-  p[axis]=target;p.y=top;return;
- }
- for(const b of hits){
+ const proposal=start+delta;let target=proposal;
+ const height=bodyHeight(p),point={x:p.x,y:p.y,z:p.z};point[axis]=proposal;
+ let hit=false,top=base;
+ // All overlaps are tested against the proposed endpoint, not the clamped
+ // endpoint. Accumulate the same entry-face clamps without a temporary array.
+ for(const b of candidates(map,point))if(p.y<b.y+b.h-.015&&p.y+height>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(proposal-b[axis])<b[size]/2+RADIUS){
+  hit=true;top=Math.max(top,b.y+b.h);
   const edge=b[axis]-Math.sign(delta)*(b[size]/2+RADIUS+.001);
-  // Clamp against the entry face; an unrelated box cannot teleport the player.
   target=delta>0?Math.min(target,Math.max(start,edge)):Math.max(target,Math.min(start,edge));
+ }
+ // One stair rise per axis. Never stack multiple step corrections in one move.
+ if(hit&&p.grounded&&top-base>0&&top-base<=.43&&canOccupy(map,{...point,y:top},height)) {
+  p[axis]=proposal;p.y=top;return;
  }
  p[axis]=target;
 }
@@ -163,12 +166,16 @@ export function movePlayer(p, input, map, dt) {
   for(let i=0;i<steps;i++){
     const before=beginFallStep(p);movePlayerStep(p,input,map,Math.min(dt,.1)/steps);
     let normalY=1;
-    if(p.fall&&p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.hypot(1,gx,gz);}
+    if(p.fall&&p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.sqrt(1+gx*gx+gz*gz);}
     if(p.flight!=='transport')finishFallStep(p,before,normalY);
   }
 }
 function movePlayerStep(p, input, map, dt) {
   if (p.health <= 0) return;
+  const freshJump=(input.jumpPress||0)>(p.lastJumpPress||0)||input.jump&&!p.jumpHeld;
+  if(p.jumpHeld!==!!input.jump)p.jumpHeld=!!input.jump;
+  if(freshJump)p.jumpBuffer=.14;else if(p.jumpBuffer>0)p.jumpBuffer=Math.max(0,p.jumpBuffer-dt);
+  if(p.mantleCooldown>0)p.mantleCooldown=Math.max(0,p.mantleCooldown-dt);
   if ((input.jumpPress || 0) > (p.lastJumpPress || 0)) {
     p.lastJumpPress = input.jumpPress;
     p.jumpLatch = p.flightLatch = false;
@@ -180,6 +187,8 @@ function movePlayerStep(p, input, map, dt) {
     1.48,
   );
   if (p.flight === 'transport') return;
+  if(p.mantle&&stepMantle(p,map,dt,canStand))return;
+  if(p.jumpBuffer>0&&beginMantle(p,input,map,{candidates,rayBox,canStand,radius:RADIUS})){stepMantle(p,map,dt,canStand);return;}
   if(stepGrapple(p,input,map,dt,canStand,groundAt))return;
   stepShadowstep(p,map,dt,canOccupy,groundAt,bodyHeight(p),RADIUS);
   p.traversalLock=Math.max(0,(p.traversalLock||0)-dt);
@@ -195,7 +204,7 @@ function movePlayerStep(p, input, map, dt) {
   if (p.flight === 'dive' || p.flight === 'glide' || p.flight === 'launch') {
     p.crouching=false;p.lowCrouch=false;p.sliding=false;p.crouchLatch=!!input.crouch;
     const toggle=input.jump&&!p.flightLatch;p.flightLatch=!!input.jump;
-    const f=clamp(input.forward || 0,-1,1),s=clamp(input.strafe || 0,-1,1),length=Math.max(1,Math.hypot(f,s));
+    const f=clamp(input.forward || 0,-1,1),s=clamp(input.strafe || 0,-1,1),length=Math.max(1,Math.sqrt(f*f+s*s));
     const speed=SEASON.flight[p.flight];
     pushAxis(p,map,'x',(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)/length*speed*dt);
     pushAxis(p,map,'z',(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)/length*speed*dt);
@@ -224,7 +233,7 @@ function movePlayerStep(p, input, map, dt) {
   }
   let f = clamp(input.forward || 0, -1, 1),
     s = clamp(input.strafe || 0, -1, 1),
-    len = Math.hypot(f, s);
+    len = Math.sqrt(f*f+s*s);
   if (len > 1) {
     f /= len;
     s /= len;
@@ -233,8 +242,8 @@ function movePlayerStep(p, input, map, dt) {
   // Packet gaps are not a physical stop. Use the most recently executed move,
   // bounded by server freshness, so crouch edges can initiate slides under jitter.
   const momentumX=p.motionFresh?p.motionVX:p.vx,momentumZ=p.motionFresh?p.motionVZ:p.vz;
-  const speedBefore=Math.hypot(momentumX||0,momentumZ||0);
-  const gx=p.grounded&&input.crouch?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=p.grounded&&input.crouch?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0,slope=Math.hypot(gx,gz);
+  const speedBefore=Math.sqrt((momentumX||0)**2+(momentumZ||0)**2);
+  const gx=p.grounded&&input.crouch?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=p.grounded&&input.crouch?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0,slope=Math.sqrt(gx*gx+gz*gz);
   if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&speedBefore<SEASON.slide.startSpeed&&slope>=SEASON.slide.slope&&p.slideCooldown===0){p.sliding=true;p.slideAge=0;p.slideVX=-gx/slope*3;p.slideVZ=-gz/slope*3;}
   // Holding crouch can queue a slide through a jump or mobility-item landing.
   // Actual momentum, not the sprint button or terrain slope, admits the slide.
@@ -257,20 +266,21 @@ function movePlayerStep(p, input, map, dt) {
     (p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
   let mx=(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)*speed,mz=(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)*speed;
   if(p.sliding){
-    let vx=p.slideVX||0,vz=p.slideVZ||0,v=Math.hypot(vx,vz);
+    let vx=p.slideVX||0,vz=p.slideVZ||0,v=Math.sqrt(vx*vx+vz*vz);
     if(p.grounded){
       const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;
       vx-=gx*SEASON.slide.gravity*dt;vz-=gz*SEASON.slide.gravity*dt;
       const loss=Math.max(0,1-(slope>=SEASON.slide.slope?2.4:3.8)*dt/Math.max(v,.01));vx*=loss;vz*=loss;
     }
-    v=Math.hypot(vx,vz);const wanted=Math.hypot(mx,mz);
-    if(wanted>.1){const blend=Math.min(.055,dt*.85);vx=vx*(1-blend)+mx/wanted*v*blend;vz=vz*(1-blend)+mz/wanted*v*blend;const n=Math.hypot(vx,vz)||1;vx*=v/n;vz*=v/n;}
-    const cap=Math.min(1,SEASON.slide.cap/(Math.hypot(vx,vz)||1));p.slideVX=mx=vx*cap;p.slideVZ=mz=vz*cap;
+    v=Math.sqrt(vx*vx+vz*vz);const wanted=Math.sqrt(mx*mx+mz*mz);
+    if(wanted>.1){const blend=Math.min(.055,dt*.85);vx=vx*(1-blend)+mx/wanted*v*blend;vz=vz*(1-blend)+mz/wanted*v*blend;const n=Math.sqrt(vx*vx+vz*vz)||1;vx*=v/n;vz*=v/n;}
+    const cap=Math.min(1,SEASON.slide.cap/(Math.sqrt(vx*vx+vz*vz)||1));p.slideVX=mx=vx*cap;p.slideVZ=mz=vz*cap;
   }else if(!p.grounded&&p.slideAge>0&&!p.downed){mx=mx*.2+(p.slideVX||0)*.8;mz=mz*.2+(p.slideVZ||0)*.8;}
   else if(p.grounded&&!p.sliding)p.slideAge=0;
   const dx=mx*dt,dz=mz*dt;
-  if (input.jump && p.grounded && !p.jumpLatch && !p.reviving && !p.downed && canStand(map,p)) {
+  if ((input.jump&&!p.jumpLatch||p.jumpBuffer>0) && p.grounded && !p.reviving && !p.downed && canStand(map,p)) {
     p.crouching=false;p.sliding=false;
+    p.jumpBuffer=0;
     p.vy = 8.6;
     p.grounded = false;
   }
@@ -281,18 +291,21 @@ function movePlayerStep(p, input, map, dt) {
   pushAxis(p, map, "z", dz);
   if(p.launchVelocity&&!p.grounded){pushAxis(p,map,'x',p.launchVelocity.x*dt);pushAxis(p,map,'z',p.launchVelocity.z*dt);p.launchVelocity.x*=Math.exp(-.4*dt);p.launchVelocity.z*=Math.exp(-.4*dt);}
   const ground=groundAt(map,p.x,p.z);
+  // Vertical resolution never changes X/Z or geometry. Reuse this exact
+  // broadphase result for support and landing rather than querying twice.
+  const verticalBoxes=candidates(map,p);
   if(followedGround&&Math.abs(p.y-oldSurfaceY)<.05&&Math.abs(ground-oldSurfaceY)<=.43)p.y=ground;
   // Follow short descents without falling and landing on every individual tread.
   if(wasGrounded){
     let support=ground;
-    for(const b of candidates(map,p))if(b.y+b.h<=p.y+.001&&Math.abs(p.x-b.x)<b.w/2+RADIUS&&Math.abs(p.z-b.z)<b.d/2+RADIUS)support=Math.max(support,b.y+b.h);
-    if(p.y-support<=.43&&canOccupy(map,{x:p.x,y:support,z:p.z},bodyHeight(p))){p.y=support;p.vy=0;}
+    for(const b of verticalBoxes)if(b.y+b.h<=p.y+.001&&Math.abs(p.x-b.x)<b.w/2+RADIUS&&Math.abs(p.z-b.z)<b.d/2+RADIUS)support=Math.max(support,b.y+b.h);
+    if(p.y-support<=.43&&(support===p.y&&p.vy===0||canOccupy(map,{x:p.x,y:support,z:p.z},bodyHeight(p)))){p.y=support;p.vy=0;}
   }
   const oldY = p.y;
   p.vy -= 24 * dt;
   p.y += p.vy * dt;
   p.grounded = false;
-  for (const b of candidates(map,p)) {
+  for (const b of verticalBoxes) {
     if (
       Math.abs(p.x - b.x) >= b.w / 2 + RADIUS ||
       Math.abs(p.z - b.z) >= b.d / 2 + RADIUS
@@ -359,31 +372,18 @@ export function worldHit(map, o, d, max = 200, radius = 0) {
   let result = null,
     best = max;
   for (const source of candidates(map,o,d,max,radius)) {
-    const b = radius
-      ? {
-          ...source,
-          w: source.w + radius * 2,
-          d: source.d + radius * 2,
-          y: source.y - radius,
-          h: source.h + radius * 2,
-        }
-      : source;
-    const t = rayBox(o, d, b, best);
+    const b=source,t = rayBox(o, d, b, best, radius);
     if (!Number.isFinite(t) || t > best) continue;
     const hit = { x: o.x + d.x * t, y: o.y + d.y * t, z: o.z + d.z * t };
-    const faces = [
-      ["x", b.x - b.w / 2, -1],
-      ["x", b.x + b.w / 2, 1],
-      ["y", b.y, -1],
-      ["y", b.y + b.h, 1],
-      ["z", b.z - b.d / 2, -1],
-      ["z", b.z + b.d / 2, 1],
-    ];
-    faces.sort(
-      (a, b) => Math.abs(hit[a[0]] - a[1]) - Math.abs(hit[b[0]] - b[1]),
-    );
-    const normal = { x: 0, y: 0, z: 0 };
-    normal[faces[0][0]] = faces[0][2];
+    // Stable face priority matches the former sort, without six arrays and a
+    // comparator per projectile contact (including ties at corners).
+    let face=Math.abs(hit.x-(b.x-b.w/2-radius)),axis='x',sign=-1,delta;
+    delta=Math.abs(hit.x-(b.x+b.w/2+radius));if(delta<face){face=delta;axis='x';sign=1;}
+    delta=Math.abs(hit.y-(b.y-radius));if(delta<face){face=delta;axis='y';sign=-1;}
+    delta=Math.abs(hit.y-(b.y+b.h+radius));if(delta<face){face=delta;axis='y';sign=1;}
+    delta=Math.abs(hit.z-(b.z-b.d/2-radius));if(delta<face){face=delta;axis='z';sign=-1;}
+    delta=Math.abs(hit.z-(b.z+b.d/2+radius));if(delta<face){axis='z';sign=1;}
+    const normal = { x: 0, y: 0, z: 0 };normal[axis]=sign;
     best = t;
     result = { distance: t, point: hit, normal, box: source };
   }

@@ -1,4 +1,6 @@
+import {COMFORT_SLIDERS} from './comfort-settings.js';
 export const SLIDERS = [
+  ...COMFORT_SLIDERS,
   ['sensitivity', 'Mouse sensitivity', .2, 3, .1, 1],
   ['scopeSensitivity', 'Scope sensitivity', .1, 2, .05, .65],
   ['fov', 'Field of view', 65, 110, 1, 85],

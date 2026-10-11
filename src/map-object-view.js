@@ -27,12 +27,13 @@ export function bakeObject(group){
  }
  for(const b of batches.values()){const geometry=mergeGeometries(b.parts);for(const p of b.parts)p.dispose();geometry.computeBoundingSphere();const material=new THREE.MeshLambertMaterial({vertexColors:true}),mesh=new THREE.Mesh(geometry,material);mesh.userData.ownedMaterial=true;mesh.userData.objectRanges=b.ranges;mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);}
 }
-export function makeMapObject(record,kit,{base,markers=false,loadModels=true}={}){
+export function makeMapObject(record,kit,{base,markers=false,loadModels=true,editorPreview=false,previewDoorIds=null}={}){
  const root=new THREE.Group(),content=new THREE.Group();root.add(content);root.name=record.name||record.kind||record.source;root.userData.editorId=record.id;
  const src=record.sourceObject,origin=record.origin||src?.position||[0,0,0],color=record.color?Number.parseInt(record.color.slice(1),16):null;
  if(src?.type==='building'){
   const s=buildingStyle(src.spec);for(const b of src.boxes){if(['tree','prop','roof-collider','door'].includes(b.kind))continue;const c=typeof b.color==='number'?b.color:b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:s.wall;const m=kit.block(content,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color??c);m.userData.objectId=b.objectId;}
   dressBuilding(content,src.spec,kit);
+  if(editorPreview&&record.collision)for(const d of base?.doors||[])if(d.building===Number(src.id.split('-')[1])&&(!previewDoorIds||previewDoorIds.has(record.id===record.source?d.id:'editor-'+record.id+'-'+d.id))){const m=kit.block(content,d.x,d.y+d.h/2,d.z,d.w,d.h,d.d||.18,0x796547);m.userData.objectId='world-door-'+d.id;}
   for(const [index,p]of (base?.props||[]).entries())if(p.building===Number(src.id.split('-')[1])&&!record.omitProps?.includes('prop-'+index)){const start=content.children.length;propModel(content,p,kit);const box=src.boxes.find(b=>b.prop===index);for(const m of content.children.slice(start))m.userData.objectId=box?.objectId;}
  }else if(src?.type==='tree')treeModel(content,src.spec,kit);
  else if(src?.type==='prop')propModel(content,src.spec,kit);
@@ -55,4 +56,16 @@ export function makeMapObject(record,kit,{base,markers=false,loadModels=true}={}
  if(record.kind!=='model')bakeObject(content);
  root.position.fromArray(record.position);root.rotation.y=record.rotation*Math.PI/180;root.scale.fromArray(record.scale);return root;
 }
-export function buildMapObjects(world,map,kit){for(const record of map.editorObjects||[]){const group=makeMapObject(record,kit,{base:map.editorBase});world.add(group);}}
+export function buildMapObjects(world,map,kit){
+ const drawnDoors=new Set();
+ for(const record of map.editorObjects||[]){
+  const door=record.sourceObject?.spec?.doorId;
+  // Functional leaves are drawn by FrontierView during matches. Baking a
+  // second closed leaf here used to leave a visible door after it was opened.
+  if(door&&record.collision&&!map.editorPreview)continue;
+  const previewDoorIds=map.editorPreview?new Set():null;
+  if(map.editorPreview)for(const d of map.doors||[])if(d.editorObject===record.id){drawnDoors.add(d.id);previewDoorIds.add(d.id);}
+  world.add(makeMapObject(record,kit,{base:map.editorBase,editorPreview:!!map.editorPreview,previewDoorIds}));
+ }
+ if(map.editorPreview){const leaves=new THREE.Group();for(const d of map.doors||[])if(!drawnDoors.has(d.id)){const m=kit.block(leaves,d.x,d.y+d.h/2,d.z,d.w,d.h,d.d||.18,0x796547);m.userData.objectId='world-door-'+d.id;}bakeObject(leaves);world.add(leaves);}
+}

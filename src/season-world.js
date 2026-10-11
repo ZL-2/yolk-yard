@@ -67,7 +67,7 @@ export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
  const def=bossDefinition(p.bossId||p.id);if(p.bossWindup){p.bossWindup=null;p.abilityAt=sim.time+8;sim.emit('boss-interrupted',{player:attacker?.id,target:p.id});}
  const shield=source==='Storm'?0:Math.min(p.shield,amount);p.shield-=shield;const dealt=Math.min(p.health,amount-shield);p.health-=dealt;p.lastDamage=sim.time;if(attacker?.contestant){p.attackerId=attacker.id;p.attackerAt=sim.time;p.scanAt=0;}
  if(p.health>0)alertBossToDamage(sim,p,attacker);
- sim.emit('hit',{player:attacker?.id,target:p.id,amount:shield+dealt,precision,shield:shield>0,shotId,weapon:source,x:p.x,y:p.y+1.4,z:p.z,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z});
+ sim.emit('hit',{player:attacker?.id,target:p.id,amount:shield+dealt,precision,shield:shield>0,shieldBreak:shield>0&&p.shield===0,shotId,weapon:source,x:p.x,y:p.y+1.4,z:p.z,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z});
  if(shield&&p.shield===0)sim.emit('royale-cue',{cue:'shield-break',player:p.id,x:p.x,y:p.y,z:p.z});
  if(p.health===0&&!p.bossDefeated){p.bossDefeated=true;p.spectating=true;p.flight='out';p.reloadEnd=0;p.bossWindup=null;p.bossVeil=null;p.bossAlert='unaware';p.bossSuspicion=0;p.targetId=null;
   sim.dropLoot(p,{id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:gun(p).magazine});

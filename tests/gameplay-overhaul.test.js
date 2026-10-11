@@ -25,7 +25,7 @@ test('Spawn Island admits separated contestants, ignores damage and rewards, and
  assert.equal(calculateReward({player:{active:0},opponents:[],elapsed:30}).amount,0);
  s.dropWeapon(p,'needle',4);s.pads.push({x:0,y:0,z:0});s.projectiles.push({id:1});p.shield=100;p.streak=5;
  s.queueEnds=s.time+.01;s.tick(1/60);assert.equal(s.stage,'battle-bus');assert.equal(s.map.id,'sunnybreak');assert.equal(s.projectiles.length,0);assert.equal(s.pads.length,0);
- for(const egg of s.players.values()){assert.equal(egg.health,100);assert.equal(egg.shield,0);assert.equal(egg.slot,0);assert.deepEqual(egg.inventory.slice(1),Array(5).fill(null));assert.deepEqual(egg.materials,{wood:0,brick:0,metal:0});assert.equal(egg.streak,0);assert.equal(egg.flight,'transport');}
+ for(const egg of [...s.players.values()].filter(p=>p.contestant)){assert.equal(egg.health,100);assert.equal(egg.shield,0);assert.equal(egg.slot,0);assert.deepEqual(egg.inventory.slice(1),Array(5).fill(null));assert.deepEqual(egg.materials,{wood:0,brick:0,metal:0});assert.equal(egg.streak,0);assert.equal(egg.flight,'transport');}
  const copy=new RoyaleSimulation(s.options).restore(s.checkpoint());assert.deepEqual(copy.snapshot(),s.snapshot());
 });
 
@@ -34,11 +34,11 @@ test('late join is spectator-only at capacity; forged entry/input/build/pickup r
  const guest=s.admitPlayer('late',{name:'Late'});assert.ok(guest);assert.equal(s.players.get(bot.id),bot);assert.equal(s.alive,2);assert.equal(guest.health,0);assert.equal(guest.contestant,false);
  for(const action of ['respawn','rejoin','team-entry-0','inventory-select-1','inventory-drop-1','build-repair'])s.playerAction(guest.id,action);
  s.spawn(guest);s.setInput(guest.id,{seq:4,fire:true,buildMode:true,jump:true},true);s.tick(1/60);assert.equal(guest.health,0);assert.equal(s.builds.length,0);assert.equal(s.takeLoot(guest,s.loot[0]),false);assert.equal(s.loot.length,loot);
- s.leavePlayer(guest.id);assert.equal(s.alive,2);assert.equal(s.players.size,2);
- for(let i=0;i<4;i++)assert.ok(s.admitPlayer('observer-'+i,{name:'Observer '+i})?.lateSpectator);
+ s.leavePlayer(guest.id);assert.equal(s.alive,2);assert.equal([...s.players.values()].filter(p=>p.contestant).length,2);
+ for(let i=0;i<16;i++)assert.ok(s.admitPlayer('observer-'+i,{name:'Observer '+i})?.lateSpectator);
  assert.equal(s.admitPlayer('overflow',{name:'Overflow'}),null);assert.equal(s.alive,2);
  // The old bot's seat becomes available to the first observer in the next match.
- s.phase='results';s.stage='finished';s.startRound();assert.equal([...s.players.values()].filter(p=>p.contestant).length,2);assert.equal([...s.players.values()].filter(p=>p.lateSpectator).length,3);assert.equal(s.players.get('observer-0').contestant,true);
+ s.phase='results';s.stage='finished';s.startRound();assert.equal([...s.players.values()].filter(p=>p.contestant).length,2);assert.equal([...s.players.values()].filter(p=>p.lateSpectator).length,15);assert.equal(s.players.get('observer-0').contestant,true);
 });
 
 test('ordinary landing damage uses the fall apex, respects small jumps, higher landing floors and shields',()=>{
@@ -74,8 +74,8 @@ test('bots cannot see through cover, react to incoming damage, and forget hidden
 
 test('bot priorities distinguish survival, useful loot, storm timing and team information',()=>{
  const s=round();s.beginBattle();s.map={...flat,boxes:[]};s.loot=[];s.chests=[];const p=s.players.get('host');Object.assign(p,{x:0,y:0,z:0,flight:'ground'});const b=newBrain(s,p),skill=BOT_SKILL[2];
- s.dropWeapon({x:2,y:0,z:0},'pip');const task=chooseObjective(s,p,b,skill,null);assert.equal(task.kind,'loot');const enemy={x:0,y:0,z:-5,id:'threat',visible:true,confidence:1};b.attackedAt=s.time;assert.notEqual(chooseObjective(s,p,b,skill,enemy).kind,'loot');
- s.storm={active:true,x:0,z:0,radius:100,nextX:60,nextZ:0,nextRadius:15,seconds:20};assert.equal(stormPriority(s,p,skill).kind,'rotate');assert.equal(stormPriority(s,p,skill).urgent,false);s.storm.radius=1;p.x=-5;assert.equal(stormPriority(s,p,skill).urgent,true);
+ s.dropWeapon({x:2,y:0,z:0},'pip');const task=chooseObjective(s,p,b,skill,null);assert.equal(task.kind,'loot');const enemy={x:0,y:0,z:-5,id:'threat',visible:true,confidence:1};assert.equal(chooseObjective(s,p,b,skill,enemy).kind,'loot','an unarmed bot secures a nearby weapon first');s.takeLoot(p,s.loot[0]);b.attackedAt=s.time;assert.notEqual(chooseObjective(s,p,b,skill,enemy).kind,'loot');
+ s.storm={active:true,x:0,z:0,radius:100,nextX:60,nextZ:0,nextRadius:15,seconds:20,closing:false};assert.equal(stormPriority(s,p,skill).kind,'rotate');assert.equal(stormPriority(s,p,skill).urgent,false);s.storm.radius=1;p.x=-5;assert.equal(stormPriority(s,p,skill).urgent,true);
  assert.ok(BOT_SKILL[0].reaction>BOT_SKILL[3].reaction);assert.ok(BOT_SKILL[3].reaction>=.15);assert.ok(BOT_SKILL[3].hit<1);assert.ok(BOT_SKILL[3].decision<BOT_SKILL[0].decision);
 });
 

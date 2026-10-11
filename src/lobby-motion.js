@@ -2,8 +2,8 @@
 // The upper-body patrol is a continuous, looping sequence of sector checks.
 export const PATROL_SPEED=1.12;
 export const PATROL_CYCLE=1.35;
-export const PATROL_SCAN_CYCLE=31;
-const sectors=[.28,.66,.58,-.34,-.72,-.63,.08,.55,.26,-.18,-.61,.1];
+export const PATROL_SCAN_CYCLE=24;
+const sectors=[.05,.70,.05,-.70,.10,.66,.03,-.72,.12,.64,-.10,-.65];
 const aiming=[.85,.75,.35,.95,.30,.90,.75,.95,.30,.65,.80,.95];
 const lowReady=[0,.04,.30,0,.34,0,.04,0,.32,.10,.04,0];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));

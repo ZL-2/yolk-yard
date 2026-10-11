@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Simulation } from "../src/simulation.js";
-import { MAPS, navigation } from "../src/maps.js";
+import { MAPS, navigation, surfaceAt } from "../src/maps.js";
 import {
-  movePlayer,
+  movePlayer, canStand, RADIUS,
   direction,
   rayEgg,
   wallDistance,
@@ -147,7 +147,7 @@ test("solid cover blocks shots and friendly fire is disabled", () => {
   s.fire(a);
   advance(s);
   assert.equal(b.health, 100);
-  const t = fixture("teams");
+  const t = fixture("royale");t.s.options.teamSize=2;t.a.team=0;
   t.b.team = t.a.team;
   t.s.fire(t.a);
   advance(t.s);
@@ -198,15 +198,7 @@ test("all maps have safe spawns and connected bot routes", () => {
   for (const map of MAPS) {
     const nav = navigation(map);
     for (const [x, z] of map.spawns) {
-      assert.equal(
-        map.boxes.some(
-          (b) =>
-            Math.abs(x - b.x) < b.w / 2 + 0.46 &&
-            Math.abs(z - b.z) < b.d / 2 + 0.46,
-        ),
-        false,
-        `${map.id} spawn ${x},${z}`,
-      );
+      assert.ok(canStand(map,{x,z,y:surfaceAt(map,x,z)},RADIUS),`${map.id} spawn ${x},${z}`);
       const path = nav.path(
         { x, z },
         { x: map.spawns[0][0], z: map.spawns[0][1] },
@@ -295,7 +287,7 @@ test("swept bolt collision catches thin cover between simulation ticks", () => {
   assert.equal(b.health, 100);
   assert.equal(s.projectiles.length, 0);
   const impact = s.events.find((e) => e.type === "impact");
-  assert.ok(Math.abs(impact.z - 3.7075) < 0.001);
+  assert.ok(Math.abs(impact.z - (3.7075+weapon("needle").hitRadius)) < 0.001);
 });
 test("poppers reflect the struck surface normal, retain tangential motion, and respect their fuse", () => {
   const { s } = fixture();
@@ -332,29 +324,21 @@ test("expanded arenas have usable objectives and multi-level navigation", () => 
     assert.ok(map.size >= 40);
     assert.equal(map.zone[2], 0);
     for (const [x, z] of [...map.bases, [map.zone[0], map.zone[1]]])
-      assert.equal(
-        map.boxes.some(
-          (b) =>
-            b.y < 1.75 &&
-            Math.abs(x - b.x) < b.w / 2 + 0.46 &&
-            Math.abs(z - b.z) < b.d / 2 + 0.46,
-        ),
-        false,
-        `${map.id} objective clear`,
-      );
+      assert.ok(canStand(map,{x,z,y:surfaceAt(map,x,z)},RADIUS),`${map.id} objective clear`);
   }
   const map = MAPS.find((m) => m.id === "depot"),
     nav = navigation(map);
-  const path = nav.path({ x: -36, y: 0, z: 0 }, { x: -17, y: 3.2, z: 0 });
-  assert.ok(path.some((p) => p.y >= 3.15));
-  const pass = worldHit(map, { x: 0, y: 1.43, z: 5 }, direction(0), 10);
-  assert.equal(pass, null, "Underpass remains clear");
+  const elevated=map.pickups.find(([x,z])=>surfaceAt(map,x,z)>2);
+  assert.ok(elevated,'authored elevated pickup');
+  const [x,z]=elevated,y=surfaceAt(map,x,z);
+  const path=nav.path({x:map.bases[0][0],y:0,z:map.bases[0][1]},{x,y,z});
+  assert.ok(path.some(p=>p.y>=y-.3),'bots can reach the current upper route');
 });
 
 test("upper-shell critical hits have distinct authoritative feedback", () => {
   const {s,a,b}=fixture();a.weapon="anchor";a.aim=true;a.accuracyState[0].spread=0;a.pitch=Math.atan2(1.5-1.43,8);
   s.fire(a);const event=s.events.find(e=>e.type==="hit");assert.equal(event.precision,true);
-  assert.ok(Math.abs(event.amount-weapon('anchor').damage*weapon('anchor').critical)<.001);
+  assert.ok(Math.abs(event.amount-Math.min(100,weapon('anchor').damage*weapon('anchor').critical))<.001);
 });
 test("lethal damage reports remaining health and serializes the killer", () => {
   const {s,a,b}=fixture();

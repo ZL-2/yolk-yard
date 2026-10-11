@@ -20,6 +20,7 @@ DRAW_POSES.comet = DRAW_POSES.sprinter;
 const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 export function beginEquip(player,time,holster=false){
  player.equipStarted=time;
+ player.pendingReload=null;
  player.equipHolster=holster?COMBAT_LIMITS.holsterTime:0;
  player.equipUntil=time+player.equipHolster+gun(player).equipTime;
  player.nextShot=Math.max(weaponReadyAt(player,gun(player)),player.equipUntil);

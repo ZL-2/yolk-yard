@@ -3,11 +3,15 @@ import {gun,clamp} from './data.js';
 import {skillFor,wrapAngle} from './bot-config.js';
 import {eyeHeight,bodyHeight} from './stance.js';
 import {botAim,steadyBotFire} from './bot-aim.js';
+import {activeBotUtility} from './bot-utility.js';
 export {royaleAimError} from './bot-aim.js';
 // Cheap execution every physics tick, expensive sensing/objectives stay scheduled.
 // Uses observed positions only. Never snap to hidden/live enemy positions.
 export function executeRoyaleIntent(sim,p,input){
- if(!p.inventory||p.flight!=='ground'||!p.brain||input.buildMode||p.use||p.reviving)return input;
+ if(!p.inventory||p.flight!=='ground'||!p.brain||input.buildMode||p.reviving)return input;
+ const utility=activeBotUtility(p,sim.time);
+ if(utility||input.utilityItem)input={...input,slot:utility?.slot??input.slot,desiredYaw:utility?.yaw??input.desiredYaw,desiredPitch:utility?.pitch??input.desiredPitch,combatAim:false,fire:!!utility&&p.slot===utility.slot&&sim.time>=(p.equipUntil||0)&&!p.useLatch,sprint:false,interact:false};
+ if(p.use)return input;
  const brain=p.brain,now=sim.time,dt=clamp(now-(brain.executionAt??now-1/60),0,.05);brain.executionAt=now;
  const skill=skillFor(sim),target=brain.memory?.[brain.target],w=gun(p,input.slot??p.slot);
  let yaw=input.desiredYaw??input.yaw,pitch=input.desiredPitch??input.pitch,fire=input.fire;

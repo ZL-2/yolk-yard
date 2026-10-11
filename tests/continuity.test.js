@@ -23,9 +23,9 @@ test('spawns are separated, clear of cover, and face an open route',()=>{
 test('Royale checkpoints retain spectator admission and the original bot life',()=>{
  const s=new RoyaleSimulation({capacity:4,bots:3,fill:true,seed:17});s.addPlayer('host',{name:'Host Egg'});s.startRound();s.beginBattle();
  const bot=[...s.players.values()].find(p=>p.bot);Object.assign(bot,{health:42,shield:23,flight:'ground',slot:2});bot.inventory[2]={id:'pip',weapon:true,ammo:7,count:1,rarity:2};s.syncInventory(bot);
- const p=s.admitPlayer('guest',{name:'Guest Egg'});assert.equal(p.health,0);assert.equal(p.spectating,true);assert.equal(p.contestant,false);assert.equal(bot.inventory[2].ammo,7);assert.equal(s.players.size,5);
+ const p=s.admitPlayer('guest',{name:'Guest Egg'});assert.equal(p.health,0);assert.equal(p.spectating,true);assert.equal(p.contestant,false);assert.equal(bot.inventory[2].ammo,7);assert.equal([...s.players.values()].filter(p=>!p.boss).length,5);
  const copy=new RoyaleSimulation(s.options).restore(s.checkpoint());assert.deepEqual(copy.snapshot(),s.snapshot());
- copy.leavePlayer('guest');assert.equal(copy.players.size,4);assert.equal(copy.alive,s.alive);copy.leavePlayer('host');assert.equal(copy.players.size,4);assert.equal(copy.players.has('host'),false);
+ copy.leavePlayer('guest');assert.equal([...copy.players.values()].filter(p=>!p.boss).length,4);assert.equal(copy.alive,s.alive);copy.leavePlayer('host');assert.equal([...copy.players.values()].filter(p=>!p.boss).length,4);assert.equal(copy.players.has('host'),false);
 });
 
 test('a Royale bot finishes a queued popper throw after firing a weapon',()=>{
@@ -33,7 +33,7 @@ test('a Royale bot finishes a queued popper throw after firing a weapon',()=>{
  const bot=[...s.players.values()].find(p=>p.bot);
  Object.assign(bot,{x:70,y:0,z:0,flight:'ground',grounded:true,slot:1,useLatch:true,brain:{utility:{slot:2,yaw:0,pitch:.35,until:s.time+1}}});
  bot.inventory[1]={id:'pip',weapon:true,ammo:7,count:1,rarity:0};bot.inventory[2]={id:'popper',count:2,rarity:1};s.syncInventory(bot);
- for(let i=0;i<30;i++)s.tick(1/60);
+ for(let i=0;i<54;i++)s.tick(1/60); // Includes the .3 s equip and .35 s throw; no action is instantaneous.
  assert.equal(bot.inventory[2].count,1);assert.equal(bot.use,null);
  assert.ok(s.projectiles.some(p=>p.owner===bot.id&&p.popper));
 });
