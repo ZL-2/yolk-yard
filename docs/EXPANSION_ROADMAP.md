@@ -109,6 +109,9 @@ waiver. New or touched behavior requires direct regression coverage.
   offsets, at 20 and 60 Hz. Raised the dock drainage and refuge tunnel roofs to
   clear their sampled terrain, preserving scenery counts. Moved one obstructed
   fallback spawn to nearby clear ground.
+- Separated the Aster barracks and western woods cabin from their neighboring
+  vault approaches. The existing all-61-foundations/overlapping-floors/spawn
+  clearance regression now passes without changing its assertions or object counts.
 - Building/door edits and copies now keep functional controls, colliders and
   rendered hinges aligned, including quarter turns and nonuniform scaling.
   Separately edited or deleted leaves take precedence over building transforms.

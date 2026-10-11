@@ -28,6 +28,8 @@ jobs:
         run: node --test tests/expansion-collision.test.js tests/reload-buffer.test.js tests/map-editor.test.js tests/bot-tactics.test.js tests/bot-utility.test.js
       - name: Queued bot utility completion
         run: node --test --test-name-pattern='queued popper' tests/continuity.test.js
+      - name: Authored foundations and spawn clearance
+        run: node --test --test-name-pattern='all 61 foundations' tests/royale-systems.test.js
       - name: Bounded bot fairness scenarios
         run: BOT_VALIDATE=1 BOT_DUELS_ONLY=1 node scripts/bot-behavior-check.mjs
       - run: node --test tests/performance-hud.test.js tests/guest-presentation.test.js

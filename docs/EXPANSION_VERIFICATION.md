@@ -117,6 +117,12 @@ guarantee zero performance regression on every device.
   warnings or errors. The dock drainage roof had intersected the hangar entrance
   at head height; roof clearance now follows the highest terrain under each
   tunnel. The last fallback spawn was moved out of a foundation.
+- Two later vault additions had raised terrain through the Aster barracks and
+  western woods cabin. Moving those buildings 7 m east and 5 m west respectively
+  separates the conflicting authored footprints. The existing foundation test
+  passes unchanged for all 61 buildings, floor overlaps and spawn clearance;
+  scenery counts are unchanged. This resolves one more baseline failure after
+  the full-suite run above.
 - The editor validator yields after 4 ms of work, caps its displayed issue list
   at 200, cancels when closed and changes no match geometry. Runtime simulation
   ticks never invoke it. Relay publish validation rejects insufficient clear
