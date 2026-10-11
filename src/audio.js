@@ -139,7 +139,11 @@ export class Sound {
   if(id==='doubleyolk'&&distance<30)for(const p of SOUND_CUES['pump-action'])this.layer({...p,at:(p.at||0)+.35},position,'effects',.55);
  }
  death(distance=0,position=null){if(distance>38)return;this.cue('operator-down',position,1/(1+distance/12));}
- hit(){this.layer(note(950,.065,.11,'sine',1400));}
+ hit(kind='body'){
+  const tones={body:[950,1400],shield:[620,960],head:[1400,1850],break:[1850,550],knock:[440,880]},[from,to]=tones[kind]||tones.body;
+  this.layer(note(from,kind==='break'?.12:.065,.09,'sine',to));
+  if(kind==='knock')this.layer(note(1108,.10,.06,'triangle',0,.09));
+ }
  pop(distance=0,position=null){if(distance>190)return;const source=position?{...position,radius:190}:null,scale=source?1:1/(1+distance/18);this.layer(noise(160,.38,.25),source,'effects',scale);this.layer(note(70,.4,.17,'triangle',25),source,'effects',scale);}
  pickup(){this.cue('pickup-1');}eliminate(){this.cue('elimination');}
  reload(duration=1.2,id='sprinter'){this.cancelReload();this.reloadVoices=[];for(const e of reloadSequence(id,duration))for(const p of SOUND_CUES[e.cue]||[]){const voice=this.layer({...p,at:e.at+(p.at||0)},null,'effects',e.scale);if(voice)this.reloadVoices.push(voice);}}

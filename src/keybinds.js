@@ -4,7 +4,7 @@ export const CONTROLS = [
   ['left', 'Move left', 'KeyA', 'ArrowLeft'],
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
   ['jump', 'Jump', 'Space', null],
-  ['crouch', 'Crouch / slide (hold)', 'ControlLeft', null],
+  ['crouch', 'Crouch / slide', 'ControlLeft', null],
   ['marker', 'Duo world marker', 'Mouse1', null],
   ['danger', 'Duo danger marker', 'KeyY', null],
   ['fire', 'Fire', 'Mouse0', null],

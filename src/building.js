@@ -156,7 +156,7 @@ export function swingPickaxe(sim,p){
  if(target)sim.damage(target,p,PICKAXE.player,'Pickaxe');else if(hit){const entry=sim.worldDamage[hit.box.objectId],weak=entry?.weakpoint,bonus=weak&&Math.hypot(hit.point.x-weak.x,hit.point.y-weak.y,hit.point.z-weak.z)<.4;damageObject(sim,hit.box,(hit.box.buildId?PICKAXE.structure:PICKAXE.environment)*(bonus?PICKAXE.weakMultiplier:1),p);const object=sim.worldDamage[hit.box.objectId];if(object&&!object.destroyed){const offset=Math.sin(sim.time*7)*.35;object.weakpoint={x:Math.max(hit.box.x-hit.box.w/2+.03,Math.min(hit.box.x+hit.box.w/2-.03,hit.point.x+(Math.abs(d.z)>.7?offset:0))),y:Math.max(hit.box.y+.3,Math.min(hit.box.y+hit.box.h-.2,hit.point.y+.25)),z:Math.max(hit.box.z-hit.box.d/2+.03,Math.min(hit.box.z+hit.box.d/2-.03,hit.point.z+(Math.abs(d.x)>.7?offset:0)))};}sim.emit('royale-cue',{cue:'harvest-hit',player:p.id,x:hit.point.x,y:hit.point.y,z:hit.point.z});}
 }
 export function buildingTick(sim,p,input){
- if(!canFight(p)){p.building=false;p.editing=false;return false;}
+ if(!canFight(p)){p.building=false;p.editing=false;p.buildBufferedUntil=0;return false;}
  const wasBuilding=p.building;
  p.buildFacing=snappedFacing(p.yaw,wasBuilding?p.buildFacing:undefined);
  const enabled=sim.options?.building!==false;
@@ -164,18 +164,22 @@ export function buildingTick(sim,p,input){
  const requested=MATERIALS[input.buildMaterial]?input.buildMaterial:'wood';
  if(requested!==p.buildRequested||!p.buildMaterial){p.buildMaterial=requested;p.buildRequested=requested;}
  p.buildMaterial=selectMaterial(p.materials,p.buildMaterial)||p.buildMaterial;p.buildRotation=Number.isInteger(input.buildRotation)?((input.buildRotation%4)+4)%4:0;
- if(p.editing){p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;return true;}
+ if(p.editing){p.buildBufferedUntil=0;p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;return true;}
  if(p.building){
   p.use=null;p.reloadEnd=0;p.burstLeft=0;p.aim=false;
-  if(input.fire&&sim.time>=(p.nextBuild||0)){
+  const intent=p.buildType+':'+p.buildRotation+':'+p.buildMaterial;
+  if(p.buildBufferedIntent!==intent)p.buildBufferedUntil=0;
+  if(input.fire){p.buildBufferedUntil=sim.time+.22;p.buildBufferedIntent=intent;}
+  if((input.fire||p.buildBufferedUntil>sim.time)&&sim.time>=(p.nextBuild||0)){
    p.nextBuild=sim.time+.15;
    const mat=p.buildMaterial;
    const {piece:build,reason}=solvePlacement(p,p.buildType,p.buildRotation,mat,sim.map,sim.builds,[...sim.players.values()],input.buildAnchor);
-   p.buildReason=reason;
-   if(!reason&&p.materials[mat]>=COST){const def=MATERIALS[mat];p.materials[mat]-=COST;sim.builds.push({...build,id:'build-'+(++sim.buildId),owner:p.id,team:p.team,teamMode:sim.options.mode==='teams',health:def.start,maxHealth:def.health,constructionRemaining:def.health-def.start,constructionTick:sim.time+.5,revision:0,created:sim.time,lastDamage:-100});p.buildMaterial=selectMaterial(p.materials,mat)||mat;sim.buildVersion++;rebuildMap(sim);sim.emit('royale-cue',{cue:'build-place',player:p.id,x:build.x,y:build.y,z:build.z});}
+   p.buildReason=reason||(p.materials[mat]<COST?'Not enough '+mat:'');
+   if(!reason&&p.materials[mat]>=COST){p.buildBufferedUntil=0;const def=MATERIALS[mat];p.materials[mat]-=COST;sim.builds.push({...build,id:'build-'+(++sim.buildId),owner:p.id,team:p.team,teamMode:sim.options.mode==='teams',health:def.start,maxHealth:def.health,constructionRemaining:def.health-def.start,constructionTick:sim.time+.5,revision:0,created:sim.time,lastDamage:-100});p.buildMaterial=selectMaterial(p.materials,mat)||mat;sim.buildVersion++;rebuildMap(sim);sim.emit('royale-cue',{cue:'build-place',player:p.id,x:build.x,y:build.y,z:build.z});}
   }
   return true;
  }
+ p.buildBufferedUntil=0;
  if(p.slot===0){if(input.fire)swingPickaxe(sim,p);return true;}
  return false;
 }

@@ -1,3 +1,4 @@
+import {recordCombatDamage} from './combat-feedback.js';
 import {isTeamRoyale,teammates} from './teams.js';
 import {dist,wallDistance} from './physics.js';
 import {eyeHeight} from './stance.js';
@@ -10,10 +11,11 @@ export const activeMember=p=>!!p&&p.contestant&&p.health>0&&!p.downed&&!p.specta
 export function mayDown(sim,p,source){return isTeamRoyale(sim.options)&&!p.downed&&!['Left round','Team eliminated','Disconnected'].includes(source)&&[...sim.players.values()].some(o=>teammates(sim.options,p,o)&&activeMember(o));}
 export function downPlayer(sim,p,attacker,source,precision,shotId){
  const applied=p.health;if(attacker&&attacker!==p){p.damageLedger??={};p.damageLedger[attacker.id]=sim.time;}
+ recordCombatDamage(p,attacker,applied,source,sim.time,precision);
  // `health` is vitality while DOWNED, not normal combat health. All normal
  // weapon/build/loot/use paths are gated by the explicit state.
  Object.assign(p,{downed:true,lifeState:'DOWNED',health:REVIVE_RULES.vitality,shield:0,downedAt:sim.time,downCount:(p.downCount||0)+1,knockedBy:attacker?.id||null,knockSource:source,reviveProgress:0,reviverId:null,reviving:null,reviveBlockedUntil:sim.time+.5,sliding:false,crouching:false,sprinting:false,flight:'ground',reloadEnd:0,burstLeft:0,building:false,editing:false,use:null,chestProgress:0,fireLatch:true});
- sim.emit('hit',{player:attacker?.id,target:p.id,amount:applied,shotId,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z,x:p.x,y:p.y+1,z:p.z,precision});
+ sim.emit('hit',{player:attacker?.id,target:p.id,amount:applied,shotId,weapon:source,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z,x:p.x,y:p.y+1,z:p.z,precision});
  sim.emit('knocked',{player:attacker?.id,target:p.id,name:attacker?.name||source,targetName:p.name,weapon:source});
  sim.emit('royale-cue',{cue:'teammate-down',player:p.id,x:p.x,y:p.y,z:p.z});
 }
@@ -39,6 +41,7 @@ export function tickRevives(sim,dt){
   if(target.reviveProgress+1e-7<REVIVE_RULES.seconds||!reviver)continue;
   Object.assign(target,{downed:false,lifeState:'REVIVED',health:REVIVE_RULES.health,shield:0,revivedAt:sim.time,reviveProgress:0,reviverId:null,knockedBy:null,knockSource:null,crouching:true,sliding:false,fireLatch:true,nextShot:sim.time+.3,lastDamage:sim.time,damageLedger:{}});
   reviver.reviving=null;reviver.revives=(reviver.revives||0)+1;
+  target.combatHistory=[];target.recap=null;
   sim.emit('revived',{player:reviver.id,target:target.id});sim.emit('royale-cue',{cue:'revive-complete',player:target.id,x:target.x,y:target.y,z:target.z});
  }
 }

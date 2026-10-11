@@ -1,3 +1,5 @@
+import {recordCombatDamage} from './combat-feedback.js';
+import {sanitizeSlotPreferences,vacantSlot,targetLoot,USE_CANCEL_REASONS} from './inventory-policy.js';
 import {vaultOpen} from './vaults.js';
 import {crownsEnabled,attachCrown,resetMatchCrown,dropCrown,takeCrown,awardCrowns,pulseCrowns} from './crowns.js';
 import {startEmote,cancelEmote,emoteInput} from './emotes.js';
@@ -222,7 +224,7 @@ export class RoyaleSimulation extends Simulation {
   if(p.downed)return false;
   const item=p.inventory[index];if(!item||index===0)return;
   // Drop at the feet: this always remains on the same reachable collision surface.
-  if(!this.dropLoot(p,{...item,droppedBy:p.id,pickupAfter:this.time+1.5}))return false;p.inventory[index]=null;p.reloadEnd=0;p.burstLeft=0;p.use=null;this.syncInventory(p);
+  if(!this.dropLoot(p,{...item,droppedBy:p.id,pickupAfter:this.time+1.5}))return false;this.cancelUse(p,'drop');p.inventory[index]=null;p.reloadEnd=0;p.burstLeft=0;p.use=null;this.syncInventory(p);
   this.emit('royale-cue',{player:p.id,cue:'item-drop',x:p.x,y:p.y,z:p.z});
  }
  takeLoot(p,item){
@@ -231,15 +233,19 @@ export class RoyaleSimulation extends Simulation {
   if(item.resource){const add=Math.min(item.count,999-p.materials[item.resource]);if(add<=0)return false;p.materials[item.resource]+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;return true;}
   if(item.crown)return takeCrown(this,p,item);
   if(item.ammoType){const add=Math.min(item.count,AMMO_CAPS[item.ammoType]-p.bank[item.ammoType]);if(add<=0)return false;p.bank[item.ammoType]+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'ammo-pickup'});return true;}
-  let slot=!item.weapon?p.inventory.findIndex(i=>i?.id===item.id&&i.count<(ITEMS[i.id]?.stack||1)):-1;
-  if(slot>=0){const add=Math.min(item.count,ITEMS[item.id].stack-p.inventory[slot].count);p.inventory[slot].count+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;}
-  else {
-   slot=p.inventory.findIndex(i=>!i);if(slot<0){slot=p.slot===0?1:p.slot;if(this.dropSlot(p,slot)===false)return false;}
-   const {uid,x,y,z,motion,spawnFrom,spawnAt,vaultId,...entry}=item;p.inventory[slot]={...entry};this.removeLoot(item);
+  let merged=0,slot=-1;const maximum=item.weapon?1:ITEMS[item.id]?.stack||1;
+  if(!item.weapon)for(let i=1;i<=5&&item.count>0;i++){const entry=p.inventory[i];if(entry?.id!==item.id)continue;const add=Math.min(item.count,Math.max(0,maximum-entry.count));entry.count+=add;item.count-=add;merged+=add;}
+  while(item.count>0){
+   slot=vacantSlot(p,item);if(slot<0&&!merged){slot=p.slot===0?1:p.slot;if(this.dropSlot(p,slot)===false)return false;}
+   if(slot>=0){
+   const {uid,x,y,z,motion,spawnFrom,spawnAt,vaultId,droppedBy,pickupAfter,landAt,...entry}=item;
+   const count=Math.min(maximum,item.count);p.inventory[slot]={...entry,count};item.count-=count;merged+=count;
    if(!p.inventory[p.slot] || p.inventory.filter(i=>i&&!i.pickaxe).length===1)p.slot=slot;
    beginEquip(p,this.time,true);
+   }else break;
   }
-  p.use=null;p.reloadEnd=0;if(p.bot&&p.brain)p.brain.decision=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'pickup-'+(item.rarity||0),item:item.id});return true;
+  if(!merged)return false;if(!item.count)this.removeLoot(item);else this.lootVersion++;
+  this.cancelUse(p,'swap');p.reloadEnd=0;if(p.bot&&p.brain)p.brain.decision=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'pickup-'+(item.rarity||0),item:item.id});return true;
  }
  openChest(p,chest){
   if(!this.chests.includes(chest)||!canFight(p)||p.flight!=='ground'||chest.opened||!vaultOpen(this,chest.vaultId)||!this.accessible(p,chest,3.3))return false;
@@ -255,13 +261,14 @@ export class RoyaleSimulation extends Simulation {
   if(input.editing)return;if(frontierInteract(this,p,input,dt))return;if(seasonInteract(this,p,input,dt))return;
   if(input.interact&&!p.interactLatch&&toggleDoor(this,p)){p.interactLatch=true;return;}
   for(const item of nearbyItems(this,'loot',p,1.6))if((item.ammoType||item.resource||item.crown)&&this.accessible(p,item,1.6))this.takeLoot(p,item);
-  const chest=input.interact?nearbyItems(this,'chests',p,3.3).filter(c=>!c.opened&&vaultOpen(this,c.vaultId)&&this.accessible(p,c,3.3)).sort((a,b)=>dist(p,a)-dist(p,b))[0]:null;
+  let chest=null;
+  if(input.interact){const nearbyChests=nearbyItems(this,'chests',p,3.3),available=c=>!c.opened&&vaultOpen(this,c.vaultId)&&this.accessible(p,c,3.3);chest=nearbyChests.find(c=>c.id===p.chestId&&available(c))||targetLoot(nearbyChests,p,available);}
   if(input.interact&&chest){
    if(p.chestId!==chest.id){p.chestId=chest.id;p.chestProgress=0;this.emit('royale-cue',{player:p.id,cue:'chest-search'});}
    p.chestProgress+=dt;
    if(p.chestProgress>=.8){this.openChest(p,chest);p.chestProgress=0;p.chestId=null;}
   }else{p.chestProgress=0;p.chestId=null;}
-  const item=input.interact&&!p.swapDoneHeld&&!chest?nearbyItems(this,'loot',p,3).filter(i=>!i.ammoType&&!i.resource&&!i.crown&&!(i.droppedBy===p.id&&i.pickupAfter>this.time)&&this.accessible(p,i,3)).sort((a,b)=>dist(p,a)-dist(p,b))[0]:null;
+  const item=input.interact&&!p.swapDoneHeld&&!chest?targetLoot(nearbyItems(this,'loot',p,3),p,i=>!i.ammoType&&!i.resource&&!i.crown&&!(i.droppedBy===p.id&&i.pickupAfter>this.time)&&vaultOpen(this,i.vaultId)&&this.accessible(p,i,3)):null;
   // One press takes/swaps once. Holding still searches chests, but cannot
   // cycle a full inventory back onto the gun just dropped at the player's feet.
   p.swapUid=null;p.swapProgress=0;
@@ -303,7 +310,7 @@ export class RoyaleSimulation extends Simulation {
   if(!['jumpRig','shadowstep','winch'].includes(def.kind))item.count--;if(item.count<=0)p.inventory[use.slot]=null;p.use=null;this.syncInventory(p);
   this.emit('royale-cue',{player:p.id,cue:'complete-'+use.id,x:p.x,y:p.y,z:p.z});
  }
- cancelUse(p){if(p.use)this.emit('royale-cue',{player:p.id,cue:'use-cancel'});p.use=null;}
+ cancelUse(p,reason='action'){if(p.use)this.emit('royale-cue',{player:p.id,cue:'use-cancel',reason:Object.hasOwn(USE_CANCEL_REASONS,reason)?reason:'action'});p.use=null;}
  reload(p){if(!canFight(p)||!p.inventory[p.slot]?.weapon)return false;this.syncInventory(p);const accepted=super.reload(p);if(accepted&&p.boss)requestBossVoice(this,p,'reload');return accepted;}
  fire(p,burst=false){
   const item=p.inventory[p.slot];if(!canFight(p)||!item?.weapon||p.flight!=='ground'||p.use)return false;
@@ -315,19 +322,22 @@ export class RoyaleSimulation extends Simulation {
   if(teammates(this.options,victim,attacker))return;
   if(source==='Disconnected')victim.shieldUntil=0;
   if(victim.health<=0||victim.spectating||source!=='Disconnected'&&(this.time<(victim.shieldUntil||0)||isWarmup(this.stage)||victim.flight==='transport'))return;
+  if(!Number.isFinite(amount)||amount<=0)return;
   amount=Math.max(0,amount);const old=victim.health;let absorbed=0;
   if(source!=='Storm'&&source!=='Fall'&&victim.shield>0){absorbed=Math.min(victim.shield,amount);victim.shield-=absorbed;amount-=absorbed;
+   recordCombatDamage(victim,attacker,absorbed,source,this.time,precision);
+   if(attacker&&attacker!==victim){victim.damageLedger??={};victim.damageLedger[attacker.id]=this.time;}
    this.emit('royale-cue',{cue:victim.shield===0?'shield-break':'shield-hit',player:victim.id,x:victim.x,y:victim.y,z:victim.z});
   }
   // Storm ticks still hurt, but must not restart item/search timers every frame.
   // Keep direct damage separate so a keycard can also finish unlocking in storm.
   victim.lastInterruptDamage??=victim.lastDamage??-100;
-  if(source!=='Storm'){victim.lastInterruptDamage=this.time;victim.botIntentAt=0;this.cancelUse(victim);victim.chestProgress=0;}
+  if(source!=='Storm'){victim.lastInterruptDamage=this.time;victim.botIntentAt=0;this.cancelUse(victim,'damage');victim.chestProgress=0;}
   cancelEmote(victim);victim.lastDamage=this.time;
   if(source!=='Storm'&&source!=='Bleed out'){victim.reviveBlockedUntil=this.time+REVIVE_RULES.damageDelay;victim.reviving=null;}
   if(amount>=victim.health&&mayDown(this,victim,source))downPlayer(this,victim,attacker,source,precision,shotId);
   else if(amount>0)super.damage(victim,attacker,amount,source,precision,shotId);
-  if(absorbed>0)this.emit('hit',{player:attacker?.id,target:victim.id,amount:absorbed,shotId,weapon:source,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z,x:victim.x,y:victim.y+1.45,z:victim.z,precision,shield:true});
+  if(absorbed>0)this.emit('hit',{player:attacker?.id,target:victim.id,amount:absorbed,shotId,weapon:source,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z,x:victim.x,y:victim.y+1.45,z:victim.z,precision,shield:true,shieldBreak:victim.shield===0});
   if(old>0&&victim.health<=0){if(victim.recap)victim.recap.damage+=Math.round(absorbed);this.eliminate(victim);}
  }
  eliminate(p){
@@ -380,6 +390,8 @@ export class RoyaleSimulation extends Simulation {
  removePlayer(id){const p=this.players.get(id);if(p&&this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant&&p.health>0){p.connected=false;this.damage(p,null,p.health+p.shield+1,'Disconnected');}super.removePlayer(id);if(this.matchTeams?.[p?.team]){const team=this.matchTeams[p.team];team.members=team.members.filter(member=>member!==id);if(!team.members.length)delete this.matchTeams[p.team];}if(!isWarmup(this.stage))resolveDownedTeams(this);}
  playerAction(id,action){
   const p=this.players.get(id);if(!p)return;
+  if(typeof action!=='string')return;
+  if(action.startsWith('inventory-preferences:')){if(action.length>180)return;try{p.pickupPreferences=sanitizeSlotPreferences(JSON.parse(action.slice(22)));}catch{}return;}
   if(action==='emote-cancel'){cancelEmote(p);return;}
   if(action.startsWith('emote-')&&['playing','results'].includes(this.phase)){startEmote(this,p,action.slice(6));return;}
   if(this.phase!=='playing')return;
@@ -472,10 +484,10 @@ export class RoyaleSimulation extends Simulation {
    const wasFlight=p.flight,oldGrounded=p.grounded,previous={x:p.x,y:p.y,z:p.z};
    const reviving=prepareRevive(this,p,input);
    const slot=clamp(Math.floor(input.slot??p.slot),0,5);
-   if(slot!==p.slot){p.slot=slot;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);this.cancelUse(p);this.emit('royale-cue',{player:p.id,cue:'weapon-swap'});}
+   if(slot!==p.slot){p.slot=slot;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);this.cancelUse(p,'swap');this.emit('royale-cue',{player:p.id,cue:'weapon-swap'});}
    if(p.slot>0&&input.swapSlot>0&&input.swapSlot<6&&input.swapSlot!==p.slot&&!p.swapLatch){const j=input.swapSlot;[p.inventory[p.slot],p.inventory[j]]=[p.inventory[j],p.inventory[p.slot]];p.reloadEnd=0;this.cancelUse(p);this.syncInventory(p);beginEquip(p,this.time,true);}
    p.swapLatch=input.swapSlot>=0;
-   if(input.sprint&&p.use&&!movementItemKinds.has(ITEMS[p.use.id]?.kind))this.cancelUse(p);
+   if(input.sprint&&p.use&&!movementItemKinds.has(ITEMS[p.use.id]?.kind))this.cancelUse(p,'sprint');
    this.moveWithCommands(p,input,dt,p.emote&&commands?{...commands,steps:commands.steps.map(step=>({...step,yaw:p.emote.yaw,pitch:0,forward:0,strafe:0}))}:commands);p.moving=Math.hypot(p.x-previous.x,p.z-previous.z)>.001;p.aim=!!input.aim&&!reviving&&p.flight==='ground'&&!p.use&&!!p.inventory[p.slot]?.weapon;p.vx=(p.x-previous.x)/dt;p.vz=(p.z-previous.z)/dt;
    if(p.landing){const amount=warmup?0:fallDamage(p.landing);p.landing=null;if(amount)this.damage(p,null,amount,'Fall');if(p.health<=0)continue;}
    if(wasFlight!==p.flight)this.emit('royale-cue',{player:p.id,cue:p.flight==='ground'?'land':p.flight==='dive'?'glider-cut':'glider-deploy',x:p.x,y:p.y,z:p.z});

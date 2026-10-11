@@ -1,0 +1,23 @@
+/* Event-driven feedback; no animated filters, lights or full-screen effects. */
+#hit-marker{--hit-color:#fff}
+#hit-marker[data-kind="shield"]{--hit-color:#74dbff}
+#hit-marker[data-kind="head"]{--hit-color:#ffd775}
+#hit-marker[data-kind="break"]{--hit-color:#74dbff;outline:2px dashed #74dbff;outline-offset:5px}
+#hit-marker[data-kind="knock"]{--hit-color:#ffd775;outline:2px solid #ffd775;outline-offset:5px}
+#hit-marker[data-kind="elimination"]{--hit-color:#ff8c88;outline:3px double #ff8c88;outline-offset:5px}
+#hit-marker:before{background:linear-gradient(var(--hit-color) 0 9px,transparent 9px 21px,var(--hit-color) 21px)}
+#hit-marker:after{background:linear-gradient(90deg,var(--hit-color) 0 9px,transparent 9px 21px,var(--hit-color) 21px)}
+#hit-confirm-label{position:absolute;z-index:6;top:calc(50% + 29px);left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;letter-spacing:.08em;color:#fff;text-shadow:0 1px 3px #08111b;pointer-events:none;white-space:nowrap}
+#damage-directions .damage-direction[hidden]{display:none}
+#damage-directions .damage-direction[data-kind="shield"]:before{border-color:#65d9ff;filter:none}
+#damage-directions .damage-direction[data-kind="break"]:before{border-color:#65d9ff;border-top-style:double;border-top-width:10px;filter:none}
+.combat-recap-sources{display:block;margin-top:5px;font-size:.85em;line-height:1.4;color:#d5e6ed}
+.loot-comparison{max-width:min(680px,80vw);white-space:normal;line-height:1.5}
+:root #royale-prompt{font-size:calc(14px * var(--prompt-scale,1));max-width:min(700px,85vw)}
+:root .royale-map-stack{transform:scale(var(--hud-scale,1));transform-origin:right top}
+:root.left-minimap .royale-map-stack{right:auto;left:20px;transform-origin:left top}
+:root.hide-minimap .royale-map-stack,:root.hide-compass .royale-compass{display:none!important}
+:root.high-contrast-hud .royale-prompt,:root.high-contrast-hud .royale-compass,:root.high-contrast-hud .royale-storm-warning,:root.high-contrast-hud .build-help{background:#07131ff5;color:white;text-shadow:none;padding:8px 12px}
+:root.high-contrast-hud .royale-slot{background:#102337!important;border-color:#a9c6db!important}
+:root.reduced-motion *, :root.reduced-motion *:before, :root.reduced-motion *:after{scroll-behavior:auto!important;animation-duration:0s!important;animation-iteration-count:1!important;transition-duration:0s!important}
+@media(min-width:1000px){:root .royale-hotbar{transform:scale(var(--hud-scale,1));transform-origin:right bottom}}

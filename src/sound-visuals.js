@@ -1,4 +1,5 @@
 import {teammates} from './teams.js';
+import {visualSoundCategoryEnabled} from './comfort-settings.js';
 import {BOSSES} from './bosses.js';
 import {nearbyItems} from './nearby-items.js';
 const bossIds=new Set(BOSSES.map(b=>b.id));
@@ -28,13 +29,14 @@ export function audibleVisualEvent(e){
 }
 export class SoundVisuals{
  constructor(root){this.node=document.createElement('div');this.node.id='visual-sounds';this.node.className='visual-sounds';this.node.setAttribute('aria-label','Directional sound indicators');this.node.hidden=true;root.append(this.node);this.signals=new Map();this.lastEvent=0;this.nextAt=0;this.icons=[];}
- update(state,listener,{enabled=true,playing=true}={},now=performance.now()){
+ update(state,listener,{enabled=true,playing=true,categories={}}={},now=performance.now()){
   this.node.hidden=!enabled||!playing||!listener||listener.health<=0||!visualSoundsAllowed(state,listener);
   if(this.node.hidden){this.signals.clear();this.lastEvent=state?.events?.at(-1)?.id||0;return;}
   if(now<this.nextAt)return;this.nextAt=now+100;
   const round=(state.royale?.matchId||'')+':'+state.round;
   if(round!==this.round){this.round=round;this.signals.clear();this.lastEvent=0;}
   const add=(key,kind,point,range,ttl)=>{
+   if(!visualSoundCategoryEnabled(kind,categories))return;
    if(!Number.isFinite(point?.x)||!Number.isFinite(point?.z))return;
    const distance=Math.hypot(listener.x-point.x,(listener.y||0)-(point.y||0),listener.z-point.z);
    if(distance>=range)return;
@@ -46,7 +48,7 @@ export class SoundVisuals{
    else if(!teammates(state.options,listener,p)&&(p.flight==='ground'||!state.royale)&&p.grounded!==false&&p.moving&&!p.crouching&&!p.sliding&&!p.downed&&Math.hypot(p.vx||0,p.vz||0)>.8)add('footsteps:'+p.id,p.boss?'boss':'footsteps',p,p.sprinting?26:20,.28);
   }
   if(state.royale)for(const c of nearbyItems(state.royale,'chests',listener,12))if(!c.opened&&!(c.landAt>state.time))add('chest:'+c.id,c.epic?'rareChest':'chest',c,12,.25);
-  for(const [id,c]of this.signals)if(c.until<=now)this.signals.delete(id);
+  for(const [id,c]of this.signals)if(c.until<=now||!visualSoundCategoryEnabled(c.kind,categories))this.signals.delete(id);
   // At most eight sectors/icons during the active match.
   const sectors=new Map();for(const c of this.signals.values()){
    const angle=soundBearing(listener,c.point),sector=Math.round(angle/(Math.PI/6)),key=c.kind+':'+((sector%12+12)%12),old=sectors.get(key);

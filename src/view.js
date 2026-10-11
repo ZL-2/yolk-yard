@@ -794,10 +794,10 @@ export class View {
       const bob =
         Math.sin(this.clock * 11) *
         0.012 *
-        (p.moving ? 1 : 0) *
+        (p.moving ? 1 : 0) * (this.settings.reducedMotion?0:(this.settings.headBob??1)) *
         (1 - this.aimBlend);
       const reload = reloadProgress(local, state.time);
-      const hands = updateArms(this.localArms, draw.active?-1:reload, this.localModel, this.recoil,draw.progress);
+      const hands = updateArms(this.localArms, draw.active?-1:reload, this.localModel, this.recoil,draw.progress,null,!!local.reloadEmpty);
       const throwT=(this.clock-this.localThrowStart)/.78;
       if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1)throwArms(this.localArms,throwT);
       const vm=viewmodelProfile(w.id,this.camera.aspect);this.gunGroup.scale.setScalar(vm.scale);
@@ -818,10 +818,10 @@ export class View {
         ) +
           bob -
           hands.dip + draw.position[1],
-        vm.z + this.recoil * 0.025 + draw.position[2],
+        vm.z + this.recoil * 0.025 * (this.settings.reducedMotion?0:(this.settings.weaponMotion??1)) + draw.position[2],
       );
       this.gunGroup.rotation.set(
-        this.recoil * 0.045 * (1 - this.aimBlend * 0.65) + hands.rotation[0] + draw.rotation[0],
+        this.recoil * 0.045 * (this.settings.reducedMotion?0:(this.settings.weaponMotion??1)) * (1 - this.aimBlend * 0.65) + hands.rotation[0] + draw.rotation[0],
         hands.rotation[1] + draw.rotation[1],
         hands.rotation[2] + draw.rotation[2],
       );
@@ -831,7 +831,7 @@ export class View {
         this.gunGroup.rotation.x+=.2*gesture;
       }
       const sprint=local.sprintBlend||0;this.gunGroup.position.y-=sprint*.28;this.gunGroup.position.x+=sprint*.12;this.gunGroup.rotation.x+=sprint*.55;this.gunGroup.rotation.z+=sprint*.28;
-      if(local.traversal)this.gunGroup.position.y-=.8;
+      if(local.traversal||local.mantle)this.gunGroup.position.y-=.8;
       this.scopeActive = !!aiming && scoped && this.aimBlend > 0.1 && (!local.inventory||!!local.inventory[local.slot]?.weapon);
       if(local.inventory){
         const heldItem=local.building?{id:'blueprint'}:local.inventory[local.slot];
@@ -928,7 +928,7 @@ export class View {
         model.visible=p.health>0||deathAge<1.3;
         if (model.userData.arms&&poseDue) {
           const recoil = model.userData.armRecoil = Math.max(0, (model.userData.armRecoil || 0) - dt * 7);
-          const hands = updateArms(model.userData.arms, draw.active?-1:reloadProgress(p, state.time), model.userData.blaster, recoil,draw.progress);
+          const hands = updateArms(model.userData.arms, draw.active?-1:reloadProgress(p, state.time), model.userData.blaster, recoil,draw.progress,null,!!p.reloadEmpty);
           if(harvesting&&model.userData.shopTool)animatePickaxe(model.userData.shopTool,model.userData.arms,p.pickaxe,state.time-(p.swingAt??-100));
           const throwT=(this.clock-(model.userData.throwStart??-Infinity))/.78;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1)throwArms(model.userData.arms,throwT);
