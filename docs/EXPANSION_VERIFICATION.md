@@ -1,8 +1,35 @@
 # Expansion verification
 
-This is a work-branch checkpoint, not a release or a completion claim for the
-32-category expansion. Production remains Quality Update 141, protocol 43.
-The item-by-item scope is in [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md).
+Release candidate: Quality Update 142, version 5.2.0, protocol 44.
+The full 32-category expansion remains tracked individually in
+[EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md). This release completes the combat,
+movement, inventory, controls, performance and editor foundation described below.
+
+## Release preparation (supersedes the historical failures below)
+
+- Corrected outdated tests for retired Team Scramble/server arenas, 48-seat
+  private matches, three boss NPCs, vault locks, chest materials, current weapon
+  rarity/ammunition rules, sprint acceleration and glider descent. Current
+  player-hosted admission, movement, reconnect and spectator behavior retain
+  real-socket coverage; no failing tests are skipped.
+- Fixed an obstructed Breakwater spawn and extended stationary lobby scans.
+  Regenerated weapon art metadata from the unchanged actual model geometry.
+- Release-history validation preserves sparse historical source numbers,
+  rejects duplicates/out-of-order records and increments the latest published
+  number. Failed attempts and retries do not consume release numbers.
+- The release workflow now requires every unit test, current public-host and
+  map-publishing network checks, desktop/mobile/editor browser checks, 72 bot
+  duels and the baseline CPU guard. It replaces obsolete egg-model/Team Scramble
+  browser gates. Commit-message tags cannot bypass required suites.
+- Render already auto-deploys `main`. Live verification checks the exact Pages
+  and relay build, protocol and cleared updating state, then an isolated private
+  host/guest match and the live desktop/mobile lobby without joining the public
+  match or recording public scores.
+- Pre-release production health exposed an existing unavailable map store.
+  The original file remains preserved. Added failure-code/reason logging so
+  recovery can target the actual stored-data problem after the relay restart.
+
+The historical evidence below describes earlier checkpoints, not current CI.
 
 ## Compared revisions
 

@@ -8,7 +8,10 @@ export function nextReleaseHistory(build, notes, previous) {
   if (previous.schema !== 1 || !Array.isArray(previous.releases) || !previous.releases.length)
     throw new Error("Invalid published release history");
   previous.releases.forEach((r, i, list) => {
-    if (Number(r.number) !== list.length - i) throw new Error("Release numbers must be consecutive");
+    const number=Number(r.number);
+    if (!Number.isSafeInteger(number)||number<1||(i&&number>=Number(list[i-1].number)))
+      throw new Error("Release numbers must be positive and strictly descending");
+    if(typeof r.title!=='string'||!Array.isArray(r.changes))throw new Error("Invalid published release entry");
   });
   if (previous.build === build) return previous;
   const latest = notes[0];
@@ -16,5 +19,5 @@ export function nextReleaseHistory(build, notes, previous) {
   const entry = alreadyPublished
     ? { title: "Game improvements", changes: ["The latest game fixes and improvements."] }
     : { title: latest.title, changes: latest.changes };
-  return { schema: 1, build, releases: [{ ...entry, number: String(previous.releases.length + 1).padStart(2, "0") }, ...previous.releases] };
+  return { schema: 1, build, releases: [{ ...entry, number: String(Number(previous.releases[0].number) + 1).padStart(2, "0") }, ...previous.releases] };
 }

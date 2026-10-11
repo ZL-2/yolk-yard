@@ -18,8 +18,8 @@ test('round rules bound invalid values and use mode-specific defaults',()=>{
  const o=matchOptions({minutes:900,scoreLimit:-2,bots:3.7,difficulty:99});
  assert.deepEqual([o.minutes,o.scoreLimit,o.bots,o.difficulty],[60,1,4,4]);
 });
-test('configured score targets end both arena modes, not the old hardcoded target',()=>{
- for(const mode of ['ffa','teams']){
+test('configured score targets end Free For All, not the old hardcoded target',()=>{
+ for(const mode of ['ffa']){
   const s=new Simulation({mode,scoreLimit:7,minutes:2,bots:0});s.addPlayer('host',{name:'Host'});s.startRound();
   if(mode==='ffa')s.players.get('host').kills=6;else s.scores[0]=6;
   s.tick(.01);assert.equal(s.phase,'playing');

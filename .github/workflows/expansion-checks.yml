@@ -1,8 +1,8 @@
 name: Expansion branch verification (no deployment)
 on:
-  push:
-    branches: [expansion-foundation-142]
-    paths-ignore: ['docs/**']
+  # The normal PR/release pipeline now includes this acceptance coverage.
+  # Keep this focused checkpoint workflow available without duplicating it.
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

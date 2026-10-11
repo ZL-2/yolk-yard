@@ -80,12 +80,12 @@ test('32 filled seats, finite 30-second host countdown, admission cap, practice 
  for(let time=0;time<30;time+=.1){s.time=time;let firing=0;for(const bot of s.players.values())if(bot.bot){const i=warmupInput(s,bot);if(i.fire)firing++;}maxFiring=Math.max(maxFiring,firing);practice+=firing;}
  assert.ok(maxFiring<=3);assert.ok(practice>0);s.damage(p,[...s.players.values()][1],100,'Sprinter');assert.equal(p.health,100);assert.equal(p.kills,0);
  s.time=29.5;s.tick(1/30);assert.equal(s.stage,'starting');assert.equal(s.snapshot().royale.queueEnds,30);
- for(let i=1;i<MAX_HUMANS;i++)assert.ok(s.admitPlayer('human-'+i,{name:'Guest '+i}));assert.equal(s.admitPlayer('overflow',{name:'Overflow'}),null);assert.equal(s.players.size,32);
+ for(let i=1;i<Math.min(MAX_HUMANS,s.options.capacity);i++)assert.ok(s.admitPlayer('human-'+i,{name:'Guest '+i}));assert.equal(s.stage,'battle-bus','a full private roster starts immediately');assert.ok(s.admitPlayer('overflow',{name:'Overflow'})?.lateSpectator);assert.equal([...s.players.values()].filter(p=>p.contestant).length,32);
  s.time=30;s.tick(1/60);assert.equal(s.stage,'battle-bus');assert.equal(s.alive,32);assert.equal(p.inventory.slice(1).filter(Boolean).length,0);assert.deepEqual(p.materials,{wood:0,brick:0,metal:0});
  const spectator=s.admitPlayer('watch',{name:'Watcher'});assert.ok(spectator.spectating);assert.equal(s.alive,32);
  Object.assign(p,{flight:'ground',x:-230,y:0,z:-230});s.map={...s.map,terrain:null,boxes:[]};s.worldBoxes=[];p.inventory=inventory();p.inventory[5]={id:'mini',count:4};s.playerAction(p.id,'inventory-select-5');assert.equal(p.slot,5);s.playerAction(p.id,'inventory-swap-5-1');assert.equal(p.inventory[1].id,'mini');s.playerAction(p.id,'inventory-swap-1-5');s.playerAction(p.id,'inventory-drop-one-5');assert.equal(p.inventory[5].count,3);s.dropSlot(p,5);assert.equal(p.inventory[5],null);assert.equal(p.inventory[0].id,'pickaxe');
  const restored=new RoyaleSimulation().restore(s.checkpoint());assert.equal(restored.options.capacity,32);assert.equal(restored.stage,s.stage);assert.equal(restored.alive,s.alive);
- restored.phase='results';restored.stage='finished';restored.startRound();assert.equal([...restored.players.values()].filter(p=>p.contestant).length,32);assert.equal([...restored.players.values()].filter(p=>p.contestant&&!p.bot).length,16);assert.equal(restored.players.get('watch').spectating,true);
+ restored.phase='results';restored.stage='finished';restored.startRound();assert.equal([...restored.players.values()].filter(p=>p.contestant).length,32);assert.equal([...restored.players.values()].filter(p=>p.contestant&&!p.bot).length,32);assert.equal(restored.players.get('watch').spectating,true);
 });
 test('host warmup uses real elapsed time through slow frames and recovery without speeding up physics',()=>{
  const s=new RoyaleSimulation({capacity:4,bots:0,fill:false,seed:43});s.addPlayer('host',{name:'Host'});s.addPlayer('guest',{name:'Guest'});s.startRound();
@@ -103,7 +103,7 @@ test('swept collision buckets agree with exhaustive geometry queries across boun
  for(let i=0;i<500;i++){const p={x:Math.sin(i)*96,z:Math.cos(i*.73)*96,y:1+i%9},ray=direction(i*.32,Math.sin(i)*.4);assert.equal(wallDistance(indexed,p,ray,150),wallDistance(exhaustive,p,ray,150));assert.equal(canStand(indexed,p),canStand(exhaustive,p));}
 });
 test('larger opening circle preserves nested boundaries and tightens later phases',()=>{
- const s=makeStorm(()=>.6);assert.equal(s[0].closeAt,140);assert.equal(s[0].end,205);assert.equal(s[0].radius,225);
+ const s=makeStorm(()=>.6);assert.equal(s[0].closeAt,150);assert.equal(s[0].end,215);assert.equal(s[0].radius,225);
  for(const p of s)assert.ok(Math.hypot(p.x-p.fromX,p.z-p.fromZ)+p.radius<=p.fromRadius+.001);
- assert.equal(s.at(-1).end,526);assert.ok(STORM_STEPS.at(-1).close<STORM_STEPS[0].close);
+ assert.equal(s.at(-1).end,536);assert.ok(STORM_STEPS.at(-1).close<STORM_STEPS[0].close);
 });

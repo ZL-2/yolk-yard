@@ -54,15 +54,15 @@ test('ready parties launch private host customs without server capacity; friends
   await f.invite(a,b);await b.ask('ready',{value:true});f.app.relay.authority.capacity.overloaded=true;
   await a.ask('queue',{custom:true,visibility:'public',options:{mode:'royale',teamSize:2,teamFill:false,capacity:8,bots:6,fill:true}});
   await wait(()=>a.launches.length);assert.equal(a.launches[0].hostRun,true);assert.equal(a.launches[0].visibility,'private');assert.equal(f.app.relay.authority.capacity.reservations.size,0);
-  const host=await f.launch(a);await wait(()=>b.launches.length);const guest=await f.launch(b);await wait(()=>a.party.state==='playing'&&guest.state.players.length===8);
+  const host=await f.launch(a);await wait(()=>b.launches.length);const guest=await f.launch(b);await wait(()=>a.party.state==='playing'&&guest.state.players.filter(p=>p.contestant).length===48);
   assert.equal(host.net.serverAuthority,undefined);assert.equal(f.app.relay.authority.rooms.size,0);assert.equal(host.sim.players.get('host').team,host.sim.players.get(guest.net.id).team);
   await assert.rejects(stranger.ask('spectate-friend',{id:a.id}),/Only friends/);
   await c.ask('friend-send',{id:a.id});await a.ask('friend-accept',{id:c.id});const social=await c.ask('social');assert.ok(social.friends.find(p=>p.id===a.id).spectatable);assert.match(socialMarkup(c.party,c.id,social),/Spectate Friend/);
   await c.ask('spectate-friend',{id:a.id});await wait(()=>c.launches.length);const watcher=await f.launch(c);await wait(()=>watcher.state.players.find(p=>p.id===watcher.net.id)?.friendSpectator);
-  const p=host.sim.players.get(watcher.net.id);assert.equal(p.health,0);assert.equal(p.contestant,false);assert.equal(p.spectating,true);assert.equal(p.watchId,'host');assert.equal(host.sim.players.size,9);assert.equal(host.sim.players.get('host').team,host.sim.players.get(guest.net.id).team);
+  const p=host.sim.players.get(watcher.net.id);assert.equal(p.health,0);assert.equal(p.contestant,false);assert.equal(p.spectating,true);assert.equal(p.watchId,'host');assert.equal(host.sim.players.size,49);assert.equal(host.sim.players.get('host').team,host.sim.players.get(guest.net.id).team);
   const bots=[...host.sim.players.values()].filter(p=>p.bot).length;
   watcher.net.send({type:'player-action',action:'rejoin'});watcher.net.send({type:'player-action',action:'inventory-drop-1'});watcher.net.input({seq:1,forward:1,fire:true,interact:true,dt:1/60});await new Promise(r=>setTimeout(r,120));assert.equal(p.health,0);assert.equal(p.spectating,true);assert.equal([...host.sim.players.values()].filter(p=>p.bot).length,bots);
-  assert.ok(host.sim.beginBattle());assert.equal(host.sim.alive,8);assert.equal(p.contestant,false);assert.equal(p.team,-1);
+  assert.ok(host.sim.beginBattle());assert.equal(host.sim.alive,48);assert.equal(p.contestant,false);assert.equal(p.team,-1);
   // Watchers remain spectators across rounds and cannot take over the host.
   host.sim.phase='results';host.sim.startRound();assert.equal(p.friendSpectator,true);assert.equal(p.contestant,false);
   host.net.broadcast(host.sim.snapshot());await wait(()=>guest.net.lastCheckpoint&&watcher.net.lastCheckpoint);host.net.destroy();clearInterval(host.clock);await wait(()=>guest.net.isHost);await wait(()=>!watcher.net.migrating);assert.equal(watcher.net.isHost,false);assert.ok(guest.sim.players.get(watcher.net.id).friendSpectator);
@@ -70,26 +70,17 @@ test('ready parties launch private host customs without server capacity; friends
  }finally{await f.close();}
 });
 
-test('public arena queues consolidate pending and running rooms until eight real seats are full',async()=>{
- for(const mode of ['ffa','teams']){const f=await fixture();try{
-  const a=await f.user('Public One'),b=await f.user('Public Two');for(const u of [a,b])await u.ask('select',{mode});
-  await a.ask('queue',{options:{mode,fill:true,bots:7}});await b.ask('queue',{options:{mode,fill:true,bots:7}});
-  assert.equal(b.launches.length,0,'wait for the pending host');assert.equal(f.app.relay.parties.parties.get(b.party.id).launch.code,a.launches[0].code);
-  const host=await f.launch(a);host.net.authorityCommand({type:'start'});await wait(()=>b.launches.length);await f.launch(b);assert.equal(f.app.relay.authority.rooms.size,1);
-  for(let i=2;i<8;i++){const u=await f.user('Public '+i);await u.ask('select',{mode});await u.ask('queue',{options:{mode,fill:true,bots:7}});assert.equal(u.launches[0].code,a.launches[0].code);await f.launch(u);}
-  const room=f.app.relay.authority.rooms.get(host.net.peer.id);assert.equal([...room.sim.players.values()].filter(p=>!p.bot).length,8);assert.equal([...room.sim.players.values()].filter(p=>p.bot).length,0);
-  const next=await f.user('Public Nine');await next.ask('select',{mode});await next.ask('queue',{options:{mode,fill:true,bots:7}});assert.notEqual(next.launches[0].code,a.launches[0].code);await f.launch(next);assert.equal(f.app.relay.authority.rooms.size,2);
-  // A spectator enters the full arena without displacing a real contestant.
-  const viewer=await f.user('Arena Viewer');await viewer.ask('friend-send',{id:a.id});await a.ask('friend-accept',{id:viewer.id});await viewer.ask('spectate-friend',{id:a.id});const watch=await f.launch(viewer);const spectator=room.sim.players.get(watch.net.id);assert.ok(spectator.friendSpectator);assert.equal(room.sim.players.size,9);watch.net.send({type:'player-action',action:'respawn'});await new Promise(r=>setTimeout(r,100));assert.equal(spectator.health,0);
-  room.sim.phase='results';room.restartAt=room.age;f.app.relay.authority.tick();assert.equal(room.sim.phase,'playing');assert.equal(spectator.spectating,true);assert.equal(spectator.awaitingEntry,false);
-  assert.equal(f.app.relay.authority.capacity.pending(room.key,true),0);assert.equal(f.app.relay.authority.capacity.roundPlan(room).cost,98);
-  const departed=f.games[1];departed.net.destroy();await b.ask('returned');await wait(()=>!room.sim.players.has(departed.net.id));
-  const replacement=await f.user('Reused Seat');await replacement.ask('select',{mode});await replacement.ask('queue',{options:{mode,fill:true}});assert.equal(replacement.launches[0].code,a.launches[0].code,'returned tickets cannot hold an empty seat');await f.launch(replacement);
- }finally{await f.close();}}
+test('separate arena queues create independent private hosts and cancellation releases only its own ticket',async()=>{
+ const f=await fixture();try{
+  const a=await f.user('Private One'),b=await f.user('Private Two');for(const u of [a,b]){await u.ask('select',{mode:'ffa'});await u.ask('queue',{options:{mode:'ffa',fill:true,bots:7}});}
+  assert.equal(a.launches[0].hostRun,true);assert.equal(b.launches[0].hostRun,true);assert.notEqual(a.launches[0].code,b.launches[0].code);assert.equal(a.launches[0].visibility,'private');assert.equal(f.app.relay.authority.capacity.reservations.size,0);
+  await a.ask('cancel');assert.equal(f.app.relay.parties.tickets.size,1);const other=await f.launch(b);assert.equal(other.sim.options.mode,'ffa');assert.equal(other.sim.phase,'lobby');assert.equal(f.app.relay.authority.rooms.size,0);
+  await assert.rejects(a.ask('select',{mode:'teams'}),/Free For All or Frontier Royale/);
+ }finally{await f.close();}
 });
 
 test('private party arenas run combat on the host and public pending cancellations free every reservation',async()=>{
- for(const mode of ['ffa','teams']){const f=await fixture();try{
+ for(const mode of ['ffa']){const f=await fixture();try{
   const a=await f.user('Arena Captain'),b=await f.user('Arena Mate');await f.invite(a,b);await b.ask('ready',{value:true});
   await a.ask('queue',{custom:true,options:{mode,fill:true,bots:6}});const host=await f.launch(a);await wait(()=>b.launches.length);const guest=await f.launch(b);
   assert.equal(f.app.relay.authority.rooms.size,0);assert.equal(f.app.relay.authority.capacity.reservations.size,0);assert.equal(guest.state.visibility,'private');
@@ -99,7 +90,7 @@ test('private party arenas run combat on the host and public pending cancellatio
  }finally{await f.close();}}
  const f=await fixture();try{
   const a=await f.user('Pending Creator'),b=await f.user('Pending Guest');for(const u of [a,b]){await u.ask('select',{mode:'ffa'});await u.ask('queue',{options:{fill:true}});}
-  assert.equal(f.app.relay.authority.capacity.reservations.size,2);assert.equal(b.launches.length,0);await a.ask('cancel');await wait(()=>b.party.state==='idle');
+  assert.equal(f.app.relay.authority.capacity.reservations.size,0);assert.equal(b.launches.length,1);await a.ask('cancel');assert.equal(f.app.relay.parties.tickets.size,1);await b.ask('cancel');await wait(()=>b.party.state==='idle');
   assert.equal(f.app.relay.parties.tickets.size,0);assert.equal(f.app.relay.authority.capacity.reservations.size,0);
  }finally{await f.close();}
 });
@@ -110,7 +101,7 @@ test('Fill bot teammates are committed at departure; human Fill has priority and
   assert.equal([...sim.players.values()].filter(p=>p.bot&&teammates(sim.options,h,p)).length,0);
   const solo=sim.admitPlayer('solo',safeProfile({name:'No Fill'}),{partyId:'solo',partySize:1,teamSize:size,teamFill:false});
   const fill=size===4?sim.admitPlayer('f',safeProfile({name:'Human Fill'}),{partyId:'f',partySize:1,teamSize:size,teamFill:true}):null;
-  if(fill)assert.equal(fill.team,h.team);const count=sim.players.size;assert.ok(sim.beginBattle());assert.equal(sim.players.size,count);
+  if(fill)assert.equal(fill.team,h.team);const count=[...sim.players.values()].filter(p=>p.contestant).length;assert.ok(sim.beginBattle());assert.equal([...sim.players.values()].filter(p=>p.contestant).length,count);assert.equal([...sim.players.values()].filter(p=>p.boss).length,3);
   const mates=[...sim.players.values()].filter(p=>teammates(sim.options,h,p));assert.equal(mates.length,size-1);assert.equal(mates.filter(p=>p.bot).length,size-(fill?2:1));assert.equal([...sim.players.values()].filter(p=>teammates(sim.options,solo,p)).length,0);
   const slots=[h,...mates].map(p=>p.teamSlot);assert.equal(new Set(slots).size,size);assert.ok(mates.every(p=>Math.abs(p.botDrop-h.botDrop)<1||!p.bot));
   const restored=new RoyaleSimulation().restore(sim.checkpoint());assert.equal([...restored.players.values()].filter(p=>teammates(restored.options,restored.players.get('h'),p)).length,size-1);

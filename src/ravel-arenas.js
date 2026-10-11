@@ -20,7 +20,7 @@ export function createRavelArenas(){
  relay.boxes.push(solid(0,0,11,12,3.2,'concrete',0,'platform'));steps(relay.boxes,-16,0,'x',1,3.2);steps(relay.boxes,16,0,'x',-1,3.2);
  mirrored(relay.boxes,solid(-10,-7,8,1.2,1.5,'concrete'),solid(-28,-16,3,7,2.2,'equipment',0,'generator'),solid(-7,-27,6,3,1.8,'olive',0,'supply'),solid(-30,23,5,2,1.2,'concrete'));
  relay.boxes.push(solid(0,0,4,4,1.6,'equipment',3.2,'radar-base'));relay.landmarks=[{x:0,z:0,y:3.2,type:'radar',label:'ASTER / 01'}];relay.pickups.push([3.7,0,'ammo'],[-17,-10,'ammo'],[17,10,'ammo']);
- const docks=base('depot','Breakwater Docks',44,'freight port',0x8aa9b4);docks.ground=0x74868c;docks.bases=[[-39,0],[39,0]];
+ const docks=base('depot','Breakwater Docks',44,'freight port',0x8aa9b4);docks.ground=0x74868c;docks.bases=[[-39,0],[39,0]];docks.spawns=docks.spawns.map(([x,z])=>x===38&&z===0?[39,0]:[x,z]);
  docks.description='Storm-worn cargo stacks, loading bays and a cross-dock gantry. Broad outer flanks and covered centre routes connect both deployment zones.';
  docks.lanes=[[0,0,78,10,'road'],[-32,0,6,78,'road'],[32,0,6,78,'road'],[0,-31,66,5,'concrete'],[0,31,66,5,'concrete']];
  mirrored(docks.boxes,solid(-18,-16,14,5,3.0,'teal',0,'container'),solid(-18,16,6,13,3.0,'rust',0,'container'),solid(-18,-16,9,5,2.5,'olive',3,'container'),solid(-33,-17,4,8,2.8,'teal',0,'container'),solid(-10,-31,9,4,1.6,'concrete',0,'platform'),solid(-7,-9,4,2.8,1.3,'olive',0,'supply'));
