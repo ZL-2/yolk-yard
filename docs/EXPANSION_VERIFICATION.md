@@ -1,6 +1,15 @@
 # Expansion verification
 
-Release candidate: Quality Update 142, version 5.2.0, protocol 44.
+Released foundation: Quality Update 142, version 5.2.0, protocol 44.
+Recovery follow-up: version 5.2.1, protocol 44. Live relay logs identified an
+older saved layout referencing removed base objects. Recovery archives only
+those references, preserves an exact original backup, and retains valid edits
+and assets. Invalid records and failed backups still block writes. Owner Map
+Studio exposes the recovery and archived-record download.
+
+Update 142 passed all 606 unit tests, the public-host and map socket scenarios,
+72 bot duels, CPU budgets, desktop/mobile acceptance and owner-editor acceptance
+on candidate `f7876c2504d37bf60c853cd8aeb4f7722506f780` before merge.
 The full 32-category expansion remains tracked individually in
 [EXPANSION_ROADMAP.md](EXPANSION_ROADMAP.md). This release completes the combat,
 movement, inventory, controls, performance and editor foundation described below.

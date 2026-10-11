@@ -19,7 +19,7 @@ await wait(async()=>{
  try{[published,health]=await Promise.all([get(front+'version.json?t='+Date.now()),get(relay+'/health')]);return published.build===expected&&health.build===expected&&published.appVersion===version&&health.gameVersion===VERSION&&health.deployment?.updating===false&&health.socialAvailable;}
  catch(e){lastError=e.message;return false;}
 },'Website and relay must finish the same release'+(lastError||''),360000);
-assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.deepEqual(health.serverModes,[]);assert.equal(health.capacity.rooms,0);
+assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.deepEqual(health.serverModes,[]);assert.equal(health.capacity.rooms,0);assert.equal(health.mapStorage?.available,true,'Owner map storage must be available');
 const history=await get(front+'release-history.json?t='+Date.now());assert.equal(history.build,expected);assert.equal(history.releases[0].number,published.release);
 const board=await get(relay+'/leaderboards');assert.ok(Array.isArray(board.kills.rows)&&Array.isArray(board.wins.rows));
 
