@@ -17,6 +17,7 @@ import {SEASON} from '../src/season-one.js';
 import {SHADOWSTEP} from '../src/shadowstep.js';
 import {useSeasonItem} from '../src/season-world.js';
 import {preferredSpectator,matchOutcome} from '../src/match-presentation.js';
+import {MatchEndUI} from '../src/match-end-ui.js';
 import {EliminationEffects,ELIMINATION_EFFECT_LIMIT} from '../src/elimination-effects.js';
 import {makeHumanoid} from '../src/humanoid.js';
 import {FieldSamples,FIELD_SAMPLES,birdLocation} from '../src/field-samples.js';
@@ -74,7 +75,15 @@ test('elimination selects the nearest living teammate before the killer and repo
  const players=[{id:'me',team:0,contestant:true,health:0,spectating:true,eliminatedAt:10,killerId:'killer',x:0,z:0,kills:2,place:0},{id:'far',team:0,health:100,x:25,z:0},{id:'near',team:0,health:100,x:3,z:0},{id:'killer',team:1,health:100,x:1,z:0}];
  const state={phase:'playing',options:{mode:'royale',teamSize:4},royale:{},players};assert.equal(preferredSpectator(state,'me'),'near');assert.equal(matchOutcome(state,'me').dead,true);assert.equal(matchOutcome(state,'me').place,0);
  state.phase='results';state.royale.winnerId='near';state.royale.winnerTeam=0;assert.equal(matchOutcome(state,'me').win,true);assert.equal(matchOutcome(state,'me').place,1);
+ assert.equal(matchOutcome(state,'me').canCelebrate,false);assert.equal(matchOutcome(state,'near').canCelebrate,true);
  state.options.teamSize=1;assert.equal(matchOutcome(state,'me').win,false);
+});
+test('a shared victory never repeats a dead teammate camera hold or offers an impossible celebration',()=>{
+ const previous=globalThis.document,root={hidden:true,setAttribute(){},contains(){return false;}};globalThis.document={createElement:()=>root,body:{append(){}},activeElement:null};
+ try{
+  const ui=new MatchEndUI(),state={round:1,phase:'results',options:{mode:'royale',teamSize:2},royale:{matchId:'team-end',winnerTeam:0,winnerId:'ally'},players:[{id:'me',team:0,contestant:true,health:0,spectating:true,eliminatedAt:10,place:1},{id:'ally',team:0,contestant:true,health:100}]};
+  const frame=ui.update(state,'me',true,1000);assert.equal(frame.hold,false);assert.equal(frame.phase,'victory');assert.equal(root.innerHTML.includes('data-action="emotes"'),false);
+ }finally{globalThis.document=previous;}
 });
 test('elimination visuals cap at four merged ghosts, expire and release owned resources',()=>{
  const parent=new Group(),effects=new EliminationEffects(parent),model=makeHumanoid(),listener={x:0,z:0};model.updateMatrixWorld(true);

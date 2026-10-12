@@ -967,6 +967,8 @@ function handleState() {
 }
 function processEvents() {
   if (!state) return;
+  const listener=state.players.find(p=>p.id===localId);
+  sound.listener=listener?.spectating?state.players.find(p=>p.id===spectateTarget)||listener:listener;
   for (const e of state.events) {
     if (e.id <= lastEvent) continue;
     lastEvent = e.id;
@@ -1020,7 +1022,7 @@ function processEvents() {
     if(e.type==='build-result'&&e.player===localId)buildUI.result(e);
     if (e.type === "notice") notice(e.text);
     if (e.type === "elimination") {
-      sound.death(me ? Math.hypot(me.x-e.x, me.z-e.z) : 0,e);
+      sound.death(e.target===localId?0:me?Math.hypot(me.x-e.x,me.z-e.z):0,e.target===localId?null:e);
       const row = document.createElement("div");
       row.className = "kill-line" + (e.player === localId ? " me" : "");
       const ally=id=>teammates(state.options,me,state.players.find(p=>p.id===id))?"◆ ":"";
