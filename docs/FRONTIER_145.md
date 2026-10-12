@@ -12,7 +12,8 @@ Ravelfront's physics, models, health and speeds are custom tuning.
 
 Move controls drive/reverse/steer; Sprint boosts; Jump brakes; Reload changes
 seats; Use enters/exits. Labels follow the player's key bindings. Drivers cannot
-fire, passengers can. Only empty or friendly seats are available. Swept vehicle
+fire, passengers can. Any player can take an empty seat; switching never displaces
+an occupied seat. Swept vehicle
 collision, bounded speed, safe exit probes, damage, destruction, storm exposure,
 disconnect cleanup, client prediction and recovery all use shared state. Settled
 empty vehicles do no movement work. Vehicle records use ID-based network deltas.

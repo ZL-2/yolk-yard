@@ -43,12 +43,11 @@ export function vehicleInteract(sim,p,input){
  if(p.vehicleId){const v=sim.vehicles.find(v=>v.id===p.vehicleId);if(!v||v.health<=0||p.downed||p.health<=0||p.connected===false){exitVehicle(sim,p,{force:true});return false;}
   if(fresh&&sim.time>=(p.vehicleLock||0)){exitVehicle(sim,p);return true;}
   const swap=!!input.reload&&!p.vehicleSeatHeld;p.vehicleSeatHeld=!!input.reload;
-  if(swap&&sim.time>=(p.vehicleLock||0)){const other=1-p.vehicleSeat,mate=sim.players.get(v.seats[other]);if(!mate||teammates(sim.options,p,mate)){const old=p.vehicleSeat;v.seats[other]=p.id;v.seats[old]=mate?.id||null;p.vehicleSeat=other;if(mate){mate.vehicleSeat=old;mate.vehicleLock=sim.time+.6;seatPlayer(mate,v);}p.vehicleLock=sim.time+.6;v.revision++;seatPlayer(p,v);}}
+  if(swap&&sim.time>=(p.vehicleLock||0)){const other=1-p.vehicleSeat;if(!v.seats[other]){v.seats[other]=p.id;v.seats[p.vehicleSeat]=null;p.vehicleSeat=other;p.vehicleLock=sim.time+.6;v.revision++;seatPlayer(p,v);}}
   return true;
  }
  if(!fresh||p.bot||p.health<=0||p.downed||p.spectating||p.flight!=='ground'||p.traversal||p.grapple||sim.time<(p.vehicleLock||0))return false;
- const prompt=vehiclePrompt(sim.vehicles,p);if(!prompt)return false;const v=sim.vehicles.find(v=>v.id===prompt.id),seat=v.seats[0]?1:0,driver=sim.players.get(v.seats[0]);
- if(driver&&!teammates(sim.options,p,driver))return false;
+ const prompt=vehiclePrompt(sim.vehicles,p);if(!prompt)return false;const v=sim.vehicles.find(v=>v.id===prompt.id),seat=v.seats[0]?1:0;
  v.seats[seat]=p.id;v.revision++;p.vehicleId=v.id;p.vehicleSeat=seat;p.vehicleLock=sim.time+.6;p.vehicleSeatHeld=!!input.reload;p.interactLatch=true;p.emote=null;p.use=null;p.reloadEnd=0;p.burstLeft=0;p.mantle=null;p.shadowstep=null;p.building=p.editing=false;seatPlayer(p,v);
  sim.emit?.('royale-cue',{cue:'vehicle-enter',player:p.id,x:v.x,y:v.y,z:v.z});return true;
 }

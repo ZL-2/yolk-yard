@@ -20,6 +20,7 @@ import {careerMarkup} from './career-ui.js';
 import {recordCareerReceipt} from './career.js';
 import {lobbyNavigation} from './lobby-ui.js';
 import {leaderboardMarkup} from './leaderboard-ui.js';
+import {installLeaderboardScrollbars} from './leaderboard-scroll.js';
 import './menu-hub.css';
 import {crosshairRadius} from './combat.js';
 import {showWelcomeBack} from './welcome-back.js';
@@ -261,7 +262,7 @@ function titleBar() {
   return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
 function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
-function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}}
+function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}installLeaderboardScrollbars();}
 async function refreshLeaderboards(force=false){
  if(screen!=='menu'||menuSection!=='play'&&dialogType!=='leaderboards'||!party?.ready||leaderboardPending||!force&&leaderboards&&performance.now()-leaderboardFetchedAt<15000)return;
  const offset=dialog.open&&dialogType==='leaderboards'?leaderboardOffset:0;
@@ -288,7 +289,7 @@ function renderMenu(force=false) {
   const shell=document.createElement('template');shell.innerHTML=lobbyNavigation({...model,section:menuSection});root.querySelector('.yard-nav')?.replaceWith(shell.content.querySelector('.yard-nav'));return;
  }
  root.dataset.section=menuSection;
- if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);const footer=root.querySelector('.yard-footer');if(footer){lobbyFooterObserver=new ResizeObserver(()=>document.documentElement.style.setProperty('--lobby-footer-height',Math.ceil(footer.getBoundingClientRect().height)+16+'px'));lobbyFooterObserver.observe(footer);}void refreshLeaderboards();return;}
+ if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);installLeaderboardScrollbars();const footer=root.querySelector('.yard-footer');if(footer){lobbyFooterObserver=new ResizeObserver(()=>document.documentElement.style.setProperty('--lobby-footer-height',Math.ceil(footer.getBoundingClientRect().height)+16+'px'));lobbyFooterObserver.observe(footer);}void refreshLeaderboards();return;}
  root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':'Career'}" tabindex="-1">${menuSection==='career'?careerMarkup({stats,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
  if(menuSection==='career')$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};
  else {
@@ -1267,7 +1268,7 @@ const actions = {
   if(!checked.ok||needsPlayerName(name)){$('#required-name-error').textContent='Choose a nickname other than Player (up to 18 characters).';$('#required-name').focus();return;}
   profile=safeProfile({...profile,name});save('yolk-profile',profile);dialog.close();dialogType='';paused=false;initializeParty();renderMenu();nameChosen?.();nameChosen=null;
  },
- 'leaderboard-open':()=>{leaderboardOffset=0;leaderboardPageBoards=leaderboards;modal('FRONTIER LEADERS',`<section class="frontier-leaderboard frontier-leaderboard-expanded">${leaderboardMarkup({...menuModel(),expanded:true})}</section>`,'leaderboards');void refreshLeaderboards(true);},
+ 'leaderboard-open':()=>{leaderboardOffset=0;leaderboardPageBoards=leaderboards;modal('FRONTIER LEADERS',`<section class="frontier-leaderboard frontier-leaderboard-expanded">${leaderboardMarkup({...menuModel(),expanded:true})}</section>`,'leaderboards');installLeaderboardScrollbars();void refreshLeaderboards(true);},
  'leaderboard-refresh':()=>{void refreshLeaderboards(true);},
  'owner-map-editor':()=>ownerConsole.openMapEditor(),
  'owner-refresh':()=>ownerConsole.refresh(),

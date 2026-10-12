@@ -35,6 +35,7 @@ test('ATV swept motion stops at thin cover, boost is finite, and handbrake reduc
  const fast=quad();fast.speed=31;map.boxes=[{x:0,y:0,z:-4,w:8,h:5,d:.02}];for(let i=0;i<30;i++)stepVehicle(fast,{forward:1,sprint:true},map,1/60);assert.ok(fast.z>-2.65);assert.ok(Number.isFinite(fast.y));
  map.boxes=[];invalidateCollision(map);const braking=quad();braking.speed=17;stepVehicle(braking,{jump:true},map,.1);assert.ok(braking.speed<10);
 });
+test('Solo players can share a two-seat ATV without displacing its driver',()=>{const{s,p}=flat(),v=quad();s.vehicles=[v];vehicleInteract(s,p,{interact:true});const rider=s.addPlayer('rider',{name:'Rider'});Object.assign(rider,{x:1,y:0,z:0,health:100,spectating:false,flight:'ground',grounded:true,connected:true});assert.equal(vehicleInteract(s,rider,{interact:true}),true);assert.equal(rider.vehicleSeat,1);s.time+=1;vehicleInteract(s,rider,{reload:true});assert.equal(v.seats[0],p.id);assert.equal(v.seats[1],rider.id);});
 test('ATV passengers, health and boost survive detached wire snapshots and host recovery',()=>{
  const {s,p}=battle(),v=s.vehicles[0];Object.assign(p,{x:v.x,y:v.y,z:v.z});vehicleInteract(s,p,{interact:true});v.boost=23;v.health=310;
  const encoder=new SnapshotEncoder(),decoder=new SnapshotDecoder(),state=decoder.decode(JSON.parse(JSON.stringify(encoder.encode({state:s.snapshot(),checkpoint:s.checkpoint()}).frame))).state;
