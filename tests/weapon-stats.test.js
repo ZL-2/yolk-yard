@@ -68,13 +68,11 @@ test('ammo pickup adds class-specific amounts and stays available at capacity', 
   assert.deepEqual(player.reserve,[130,44]);
   assert.ok(item.availableAt>sim.time);
 });
-test('rocket only explodes after arming and uses the configured damage', () => {
+test('rocket explodes at close range and applies configured self-damage', () => {
   const {sim,player} = arena('thumper');
   const rocket={owner:player.id,weapon:'thumper',x:0,y:0.85,z:0,popper:false,travelled:2.9};
   sim.explode(rocket);
-  assert.equal(player.health,100);
-  rocket.travelled=weapon('thumper').minRange;
-  sim.explode(rocket);
+  assert.equal(weapon('thumper').minRange,0);
   assert.ok(Math.abs(player.health-(100-weapon('thumper').damage*weapon('thumper').selfDamage))<1e-9);
 });
 test('ordinary shell hits have no limb or edge multiplier',()=>{const w=weapon('sprinter');for(const x of [0,.4,.6])assert.equal(criticalHit({x,y:.9,z:0},{y:0},w),false);});

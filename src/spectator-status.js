@@ -13,5 +13,6 @@ export function spectatorTargets(state,localId){
  const me=state?.players?.find(p=>p.id===localId),alive=(state?.players||[]).filter(p=>p.id!==localId&&p.health>0&&!p.spectating&&!p.boss);
  const teamMode=state?.options?.mode==='royale'&&[2,4].includes(state.options.teamSize);
  const mates=teamMode&&me?.team>=0?alive.filter(p=>p.team===me.team):[];
+ if(state?.players?.find(p=>p.id===me?.killerId)?.bot){const humans=alive.filter(p=>!p.bot);if(humans.length)return humans.sort((a,b)=>Number(b.team===me.team)-Number(a.team===me.team));}
  return (mates.length?mates:alive).sort((a,b)=>{const rank=p=>(teamMode&&me?.team>=0&&p.team===me.team?0:2)+(p.bot?1:0);return rank(a)-rank(b);});
 }

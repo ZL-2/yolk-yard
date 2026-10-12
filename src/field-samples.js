@@ -1,6 +1,5 @@
 export const FIELD_SAMPLES=Object.freeze({
  elimination:{file:'field-elimination.mp3',volume:.55,radius:38,cap:2,category:'effects'},
- step:{file:'field-footstep.mp3',volume:.21,radius:26,cap:8,category:'effects'},
  birds:{file:'field-birds.mp3',volume:.30,radius:65,cap:1,category:'ambience'},
 });
 

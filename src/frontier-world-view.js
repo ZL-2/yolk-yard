@@ -1,4 +1,4 @@
-import {mapVaults} from './vaults.js';
+import {mapVaults,vaultDoorPose} from './vaults.js';
 import {bake} from './royale-view.js';
 import * as THREE from 'three';
 import {getMap} from './maps.js';
@@ -14,8 +14,9 @@ export function updateFrontierView(rv,state,p){
    for(const y of [.18,d.h-.18])k.block(m,w/2,y,frame.depth/2+.03,w,.13,.13,d.vault?0xd3b45e:0x2d444c);
    k.block(m,Math.max(w*.5,w-.25),d.h*.48,frame.depth/2+.09,Math.min(.25,w*.3),.09,.12,0xdbc79d);
    if(d.vault){const vault=mapVaults(map).find(v=>v.doorId===d.id);for(const x of [.3,w-.3])k.block(m,x,d.h/2,.15,.18,d.h,.18,0x203844);if(vault){const reader=new THREE.Group();reader.position.set(vault.reader.x,vault.reader.y+1.25,vault.reader.z-.35);k.block(reader,0,0,0,.65,.85,.25,0x19313e);k.block(reader,0,.12,.15,.43,.28,.04,0x72d8d7);bake(reader,false,true);rv.root.add(reader);m.userData.reader=reader;}}
+   if(d.vault){const wheel=new THREE.Group();wheel.position.set(w/2,d.h*.5,frame.depth/2+.17);k.torus(wheel,0,0,0,Math.min(.52,w*.2),.06,0xd8b77b);for(let i=0;i<4;i++){const a=i*Math.PI/2;k.beam(wheel,[0,0,0],[Math.cos(a)*.44,Math.sin(a)*.44,0],.035,0xadc2c5);}bake(wheel,false,true);m.add(wheel);m.userData.wheel=wheel;const bolts=[];for(const side of [-1,1])for(const y of [d.h*.24,d.h*.76]){const bolt=k.block(m,side<0?.12:w-.12,y,frame.depth/2+.13,.45,.16,.17,0xc0cacc);bolt.userData.keepDynamic=true;bolts.push({mesh:bolt,x:bolt.position.x,side});}m.userData.bolts=bolts;}
    bake(m,false,true);rv.doorMeshes.set(d.id,m);rv.root.add(m);}
-  if(m){m.visible=!!close&&!destroyed;if(m.userData.reader)m.userData.reader.visible=!!close;m.rotation.y=(d.yaw||0)+(r.doors?.[d.id]?.open?Math.PI/2:0);const damage=r.worldDamage?.['world-door-'+d.id],loss=damage?1-damage.health/damage.maxHealth:0;m.userData.panel.material.color.setHex(d.vault?0x526c7c:d.material==='metal'?0x607c81:0x796547).multiplyScalar(1-loss*.45);}
+  if(m){m.visible=!!close&&!destroyed;if(m.userData.reader)m.userData.reader.visible=!!close;const pose=vaultDoorPose(d,r.doors?.[d.id],state.time);m.rotation.y=(d.yaw||0)+pose.angle;if(m.userData.wheel)m.userData.wheel.rotation.z=pose.wheel;for(const bolt of m.userData.bolts||[])bolt.mesh.position.x=bolt.x-bolt.side*pose.bolt*.28;const damage=r.worldDamage?.['world-door-'+d.id],loss=damage?1-damage.health/damage.maxHealth:0;m.userData.panel.material.color.setHex(d.vault?0x526c7c:d.material==='metal'?0x607c81:0x796547).multiplyScalar(1-loss*.45);}
  }
  if(!rv.traversalMesh&&map.traversal?.length){const g=new THREE.Group();rv.traversalMesh=g;rv.root.add(g);for(const line of map.traversal){const a=line.from,b=line.to;
    const route=[a,...line.via||[],b];for(let i=1;i<route.length;i++){const q=route[i-1],r=route[i];k.beam(g,[q.x,q.y+2.1,q.z],[r.x,r.y+2.1,r.z],.035,0x344b53);}

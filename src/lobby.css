@@ -79,3 +79,22 @@ body.in-duos .performance-network{top:320px;left:22px}body.in-duos:has(.chat-hud
 @media(max-height:600px) and (min-width:761px){.yard-left-rail{top:130px;bottom:40px}.yard-left-rail .yard-season h1{display:none}.frontier-leaderboard{height:330px;min-height:330px}.frontier-board-ranks{min-height:180px}}
 @media(max-width:760px){.yard-left-rail{top:auto;bottom:auto}.yard-left-rail .yard-season h1{font-size:28px}.frontier-leaderboard{height:365px;min-height:365px}.frontier-board-ranks{min-height:190px}}
 @media(max-width:760px){.yard-left-rail .yard-season{min-height:170px}.yard-footer .yard-footer-emotes{display:inline-flex}body:has(#menu[data-section=play]:not([hidden])) #emote-button{display:none}}
+/* The private action owns its space. Only rankings scroll on desktop. */
+@media(min-width:761px){
+ .yard-left-rail{top:164px;bottom:var(--lobby-footer-height,58px);gap:10px;overflow:hidden}
+ .yard-left-rail .yard-season{flex:none}
+ .yard-left-rail .yard-season h1{font-size:21px;line-height:1.1;white-space:nowrap;margin:4px 0 8px}
+ .yard-left-rail .yard-season button{padding:8px 12px}
+ .yard-left-rail .frontier-leaderboard{flex:1 1 0;height:auto;min-height:0;max-height:none}
+ .yard-left-rail .frontier-board-ranks{min-height:0;flex:1 1 0}
+ .yard-left-rail .frontier-rank{min-height:28px;padding:4px 3px}
+ .yard-left-rail .yard-private-card{flex:none;margin-top:0;padding:9px 10px}
+ .yard-left-rail .yard-private-card p{font-size:10px;line-height:1.3;margin:4px 0 6px}
+ .yard-left-rail .yard-private-card>.eyebrow{font-size:9px}
+ .yard-left-rail .yard-find{min-height:40px;font-size:13px}
+}
+@media(max-height:650px) and (min-width:761px){.yard-left-rail{top:116px;bottom:var(--lobby-footer-height,48px)}.yard-left-rail .yard-season h1,.yard-left-rail .yard-season>.eyebrow{display:none}.yard-left-rail .yard-private-card>p,.yard-left-rail .yard-private-card>.eyebrow{display:none}.yard-left-rail .frontier-board-heading{display:none}.yard-left-rail .frontier-leaderboard{padding:8px}.yard-left-rail .yard-private-card{padding:6px}.yard-left-rail .yard-find{min-height:36px}}
+.frontier-board-ranks{touch-action:pan-y;scrollbar-width:thin;scrollbar-color:#92bbae #102936;overflow-y:auto;overscroll-behavior:contain}
+.frontier-board-ranks::-webkit-scrollbar{width:9px;background:#102936}
+.frontier-board-ranks::-webkit-scrollbar-thumb{background:#92bbae;border:2px solid #102936;border-radius:9px}
+.feature-request-card{border:1px solid #577983;border-radius:8px;padding:14px;margin:12px 0;background:#142b36}.feature-request-card small{display:block;color:#adcad0;margin-top:5px}.feature-request-card p{white-space:pre-wrap;overflow-wrap:anywhere}.yard-footer{flex-wrap:wrap;row-gap:4px}

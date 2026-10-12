@@ -14,15 +14,16 @@ function validate(data){
  const ids=new Set(),codes=new Set(),tokens=new Set();
  for(const u of data.identities){if(!u||typeof u.id!=='string'||!/^[a-f0-9-]{36}$/.test(u.id)||!/^[A-HJ-NP-Z2-9]{10}$/.test(u.code)||!/^[a-f0-9]{64}$/.test(u.tokenHash)||typeof u.profile?.name!=='string'||ids.has(u.id)||codes.has(u.code)||tokens.has(u.tokenHash))throw Error('Invalid social identity');ids.add(u.id);codes.add(u.code);tokens.add(u.tokenHash);}
  for(const r of data.requests)if(!r||typeof r.id!=='string'||!ids.has(r.from)||!ids.has(r.to)||r.from===r.to)throw Error('Invalid friend request');
+ if(data.featureRequests!==undefined&&(!Array.isArray(data.featureRequests)||data.featureRequests.length>1000||data.featureRequests.some(r=>!r||typeof r.id!=='string'||!ids.has(r.player)||typeof r.text!=='string'||r.text.length>1000||!['open','read','completed','dismissed'].includes(r.status)||!Number.isFinite(r.created))))throw Error('Invalid feature inbox');
  for(const key of ['friends','blocks']){const seen=new Set();for(const row of data[key]){if(!Array.isArray(row)||row.length!==2||!ids.has(row[0])||seen.has(row[0])||!Array.isArray(row[1])||row[1].some(id=>!ids.has(id)||id===row[0]))throw Error('Invalid social relationship');seen.add(row[0]);}}
  return data;
 }
 // Durable identity/relationships, separate from WebSocket sessions and parties.
 export class SocialStore{
  constructor(path=socialDataPath()){
-  this.path=path;this.tempPath=path+'.'+randomUUID()+'.tmp';this.identities=new Map();this.tokens=new Map();this.codes=new Map();this.requests=new Map();this.friends=new Map();this.blocks=new Map();this.chain=Promise.resolve();
+  this.path=path;this.tempPath=path+'.'+randomUUID()+'.tmp';this.identities=new Map();this.tokens=new Map();this.codes=new Map();this.requests=new Map();this.featureRequests=[];this.friends=new Map();this.blocks=new Map();this.chain=Promise.resolve();
   if(path){let data,failed=false;for(const file of [path,path+'.bak'])try{data=validate(JSON.parse(readFileSync(file,'utf8')));this.recoveredBackup=file!==path;break;}catch(e){if(e.code!=='ENOENT')failed=true;if(e.code==='social-schema'){this.loadError=e;break;}}
-   if(data){for(const u of data.identities)this.install(u);for(const r of data.requests)this.requests.set(r.id,r);for(const [id,list]of data.friends)this.friends.set(id,new Set(list));for(const [id,list]of data.blocks)this.blocks.set(id,new Set(list));}
+   if(data){for(const u of data.identities)this.install(u);for(const r of data.requests)this.requests.set(r.id,r);this.featureRequests=data.featureRequests||[];for(const [id,list]of data.friends)this.friends.set(id,new Set(list));for(const [id,list]of data.blocks)this.blocks.set(id,new Set(list));}
    else if(failed)this.loadError=Error('Social storage needs recovery. Existing data has not been replaced.');
   }
  }
@@ -56,7 +57,18 @@ export class SocialStore{
   this.save();return {status:this.status(a,b)};
  }
  save(){if(!this.path)return;this.available();clearTimeout(this.timer);this.timer=setTimeout(()=>{this.flush().catch(()=>console.error('Social persistence failed; credentials and relationships were kept in memory.'));},100);this.timer.unref?.();}
- snapshot(){this.available();return {schema,identities:[...this.identities.values()],requests:[...this.requests.values()],friends:[...this.friends].map(([id,s])=>[id,[...s]]),blocks:[...this.blocks].map(([id,s])=>[id,[...s]])};}
+ snapshot(){this.available();return {schema,identities:[...this.identities.values()],requests:[...this.requests.values()],featureRequests:this.featureRequests,friends:[...this.friends].map(([id,s])=>[id,[...s]]),blocks:[...this.blocks].map(([id,s])=>[id,[...s]])};}
+ featureRequest(player,text){
+  this.available();text=typeof text==='string'?text.normalize('NFKC').trim().replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,''):'';
+  if(text.length<5||text.length>1000)throw Error('Describe your feature in 5 to 1,000 characters.');
+  if(!this.identities.has(player))throw Error('Choose a player name first.');
+  if(this.featureRequests.length>=1000){const old=this.featureRequests.findIndex(r=>['completed','dismissed'].includes(r.status));if(old<0)throw Error('The feature inbox is full. Please try again later.');this.featureRequests.splice(old,1);}
+  const r={id:randomUUID(),player,name:this.identities.get(player).profile.name,text,created:Date.now(),status:'open'};this.featureRequests.push(r);this.save();return {id:r.id,created:r.created};
+ }
+ featureInbox(action='list',id){
+  this.available();if(action!=='list'){if(!['read','completed','dismissed','open'].includes(action))throw Error('Invalid inbox action');const r=this.featureRequests.find(r=>r.id===id);if(!r)throw Error('Request not found');r.status=action;r.updated=Date.now();this.save();}
+  return {requests:this.featureRequests.slice().reverse(),open:this.featureRequests.filter(r=>r.status==='open').length};
+ }
  flush(){
   clearTimeout(this.timer);if(!this.path)return this.chain;if(this.loadError)return Promise.reject(this.loadError);
   const json=JSON.stringify(this.snapshot());

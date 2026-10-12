@@ -279,14 +279,16 @@ function publicMatchChanged(match){
  if(publicJoinChime.update(match,screen==='menu'&&!document.hidden))sound.cue('public-join');
  refreshPublicMatch();
 }
+let lobbyFooterObserver;
 function renderMenu(force=false) {
+ lobbyFooterObserver?.disconnect();
  const root=$('#menu'),model=menuModel();
  view?.setParty(party?.party?.members.filter(m=>m.id!==party.id).map(m=>m.profile)||[]);
  if(!force&&menuSection!=='play'&&root.dataset.section===menuSection&&root.querySelector('.hub-page')){
   const shell=document.createElement('template');shell.innerHTML=lobbyNavigation({...model,section:menuSection});root.querySelector('.yard-nav')?.replaceWith(shell.content.querySelector('.yard-nav'));return;
  }
  root.dataset.section=menuSection;
- if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);void refreshLeaderboards();return;}
+ if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);const footer=root.querySelector('.yard-footer');if(footer){lobbyFooterObserver=new ResizeObserver(()=>document.documentElement.style.setProperty('--lobby-footer-height',Math.ceil(footer.getBoundingClientRect().height)+16+'px'));lobbyFooterObserver.observe(footer);}void refreshLeaderboards();return;}
  root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':'Career'}" tabindex="-1">${menuSection==='career'?careerMarkup({stats,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
  if(menuSection==='career')$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};
  else {
@@ -601,7 +603,7 @@ function callbacks() {
       pendingInputs = pendingInputs.filter((i) => i.seq > me.ack);
       predicted = predictionCopy(me);
       for (const i of pendingInputs)
-        predictMovement(predicted, i, getMap(s.options.map), 1 / 60, s.royale);
+        predictMovement(predicted, i, getMap(s.options.map), 1 / 60, s.royale,s.time);
       if (me.health > 0 && lastHealth <= 0) {
         input.yaw = me.yaw;
         input.pitch = me.pitch;
@@ -1256,6 +1258,8 @@ function inventoryAction(action,index,from){
  if(dialogType==='royale-inventory')royaleUI.updateInventory(state.players.find(p=>p.id===localId));
 }
 const actions = {
+ 'feature-request':()=>{modal('Request a feature',`<p>Tell us what you would like to see in Ravelfront. Your request goes to the administrator’s private inbox.</p><form id="feature-request-form"><label for="feature-request-text">YOUR IDEA</label><textarea id="feature-request-text" class="field" rows="5" minlength="5" maxlength="1000" required placeholder="What would make the frontier better?"></textarea><button class="primary" type="submit">SEND REQUEST</button></form><p id="feature-request-status" role="status"></p>`,'feature-request');$('#feature-request-text').focus();$('#feature-request-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button'),status=$('#feature-request-status');button.disabled=true;status.textContent='Sending…';try{await party.request('feature-request',{text:$('#feature-request-text').value});if(form.isConnected){form.hidden=true;status.textContent='Request sent. Thank you for helping shape the frontier.';}}catch(error){if(form.isConnected){status.textContent=error.message;button.disabled=false;}}};},
+ 'owner-inbox':()=>ownerConsole.inbox(),
  'end-spectate':()=>{matchEndUI.watch();paused=false;},
  'match-stats':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('MATCH STATS',`<p>${p?.place?'PLACEMENT #'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS</p><p>${esc(matchEarnings.status)} · ${matchEarnings.total||0} Marks</p>${scoresHTML()}<button class="primary" data-action="close">BACK TO MATCH</button>`,'royale-stats');},
  'save-player-name':()=>{
@@ -1685,7 +1689,7 @@ dialog.addEventListener('pointercancel',finishInventoryDrag);
 dialog.addEventListener('click',e=>{if(performance.now()<suppressInventoryClickUntil){e.preventDefault();e.stopImmediatePropagation();}},{capture:true});
 dialog.addEventListener('keydown',e=>{if(e.key==='Escape'&&inventoryDrag){e.preventDefault();e.stopPropagation();finishInventoryDrag();}});
 dialog.addEventListener('keydown',e=>{if(dialogType!=='royale-inventory')return;const slot=e.target.closest('[data-royale-slot]');if(slot&&e.altKey&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const from=Number(slot.dataset.royaleSlot),to=1+((from-1+(e.key==='ArrowRight'?1:4))%5);inventoryAction('swap',to,from);dialog.querySelector(`[data-royale-slot="${to}"]`)?.focus();}});
-document.addEventListener('wheel',e=>{if(scoreHeld&&screen==='game'&&!dialog.open){e.preventDefault();$('#scoreboard').scrollTop+=e.deltaY;return;}if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
+document.addEventListener('wheel',e=>{const ranks=e.target.closest?.('.frontier-board-ranks');if(ranks&&ranks.scrollHeight>ranks.clientHeight){e.preventDefault();ranks.scrollTop+=e.deltaY*(e.deltaMode===1?18:e.deltaMode===2?ranks.clientHeight:1);return;}if(scoreHeld&&screen==='game'&&!dialog.open){e.preventDefault();$('#scoreboard').scrollTop+=e.deltaY;return;}if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
 document.addEventListener("contextmenu", (e) => {
   if (screen === "game" || (dialog.open&&dialogType==='settings'&&!e.target.matches('input,textarea'))) e.preventDefault();
 });
@@ -1726,16 +1730,14 @@ look.addEventListener("pointermove", (e) => {
 });
 for (const t of ["pointerup", "pointercancel"])
   look.addEventListener(t, () => (lookPosition = null));
-for (const button of document.querySelectorAll("[data-touch]")) {
-  button.addEventListener("pointerdown", (e) => {
+document.addEventListener('pointerdown',e=>{
+  const button=e.target.closest('[data-touch]');if(!button)return;
     e.preventDefault();
     button.setPointerCapture(e.pointerId);
     touch[button.dataset.touch] = true;
     if (!paused && !dialog.open) queuedActions.add(button.dataset.touch);
-  });
-  for (const t of ["pointerup", "pointercancel"])
-    button.addEventListener(t, () => (touch[button.dataset.touch] = false));
-}
+});
+for(const event of ['pointerup','pointercancel','lostpointercapture'])document.addEventListener(event,e=>{const button=e.target.closest('[data-touch]');if(button)touch[button.dataset.touch]=false;});
 document.addEventListener("graphics-lost", () => {
   paused = true;
   modal(
@@ -1963,6 +1965,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
     bossAlerts:()=>[...view.models].filter(([id])=>state?.players.find(p=>p.id===id)?.boss).map(([id,m])=>({id,visible:!!(m.visible&&m.userData.bossAlert?.visible),symbol:m.userData.bossAlert?.userData.symbol,color:m.userData.bossAlert?.userData.color,nameY:m.userData.nameplate?.position.y,alertY:m.userData.bossAlert?.position.y})),
     bossVoiceAudio:()=>({...sound.bossAudio.debug,active:sound.bossAudio.active.size,loaded:!!sound.bossAudio.buffer}),
     fieldAudio:()=>({...sound.fieldSamples.debug,loaded:[...sound.fieldSamples.buffers.keys()],active:[...sound.fieldSamples.active].map(([id,voices])=>({id,count:voices.size}))}),
+    vehicles:()=>({camera:view.camera.position.toArray(),sky:view.atmosphere.root.visible,meshes:[...(view.royaleView.vehicleMeshes||[])].map(([id,m])=>({id,visible:m.visible}))}),
     endPresentation:()=>({phase:matchEndUI.phase,cinematic:view.cinematic,effects:view.eliminations.diagnostics()}),
     party:()=>({id:party?.id,party:party?.party,ready:party?.ready}),
     partyMembers:()=>view?.partyEggs?.length||0,

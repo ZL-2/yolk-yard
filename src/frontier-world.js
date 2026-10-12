@@ -1,4 +1,4 @@
-import {mapVaults,vaultState,vaultOpen} from './vaults.js';
+import {mapVaults,vaultState,vaultOpen,VAULT_DOOR_SECONDS} from './vaults.js';
 import {canFight,bodyHeight} from './stance.js';
 import {dist,direction,wallDistance,worldHit,canStand,RADIUS} from './physics.js';
 import {rebuildMap} from './building.js';
@@ -13,11 +13,13 @@ export function setDoor(sim,door,open,p=null){
  if(!door||door.vault&&open&&!vaultOpen(sim,door.vaultId||sim.map.vault?.id)||sim.worldDamage['world-door-'+door.id]?.destroyed)return false;
  const state=sim.doors?.[door.id];if(!state||state.open===open||sim.time-state.changedAt<WORLD_RULES.doorCooldown)return false;
  if(!open)for(const p of sim.players.values())if(p.health>0&&!p.spectating&&p.y<door.y+door.h&&p.y+bodyHeight(p)>door.y&&Math.abs(p.x-door.x)<door.w/2+RADIUS+.03&&Math.abs(p.z-door.z)<(door.d||.18)/2+RADIUS+.03)return false;
- state.open=open;state.changedAt=sim.time;sim.buildVersion++;rebuildMap(sim,{navigationChanged:!!door.vault});sim.emit('royale-cue',{cue:open?'door-open':'door-close',player:p?.id,x:door.x,y:door.y,z:door.z});return true;
+ state.open=open;state.changedAt=sim.time;state.passable=!(door.vault&&open);state.openAt=door.vault&&open?sim.time+VAULT_DOOR_SECONDS:0;sim.buildVersion++;rebuildMap(sim,{navigationChanged:!!door.vault});sim.emit('royale-cue',{cue:door.vault&&open?'vault-opening':open?'door-open':'door-close',player:p?.id,x:door.x,y:door.y,z:door.z});return true;
 }
+export function tickVaultDoors(sim){let changed=false;for(const d of sim.map.doors||[]){const s=sim.doors?.[d.id];if(d.vault&&s?.open&&s.passable===false&&sim.time>=s.openAt){s.passable=true;changed=true;}}if(changed){sim.buildVersion++;rebuildMap(sim,{navigationChanged:true});}}
 export function frontierPrompt(map,state,p){
  if(!canFight(p)||p.flight!=='ground')return null;
  if(p.traversal)return {kind:'ride',text:'JUMP TO RELEASE'};
+ const opening=mapVaults(map).find(v=>state.doors?.[v.doorId]?.passable===false&&dist(p,v.reader)<6);if(opening)return {kind:'vault',text:'VAULT OPENING · STAND CLEAR'};
  const v=mapVaults(map).find(v=>!vaultOpen(state,v.id)&&dist(p,v.reader)<3);if(v)return {kind:'vault',text:p.inventory?.some(i=>i?.id===(v.key||'asterKeycard'))?'HOLD USE · UNLOCK '+v.name.toUpperCase():v.name.toUpperCase()+' KEYCARD REQUIRED',progress:p.vaultProgress||0};
  const door=doorNear(map,p);if(door&&!door.vault&&!state.worldDamage?.['world-door-'+door.id]?.destroyed)return {kind:'door',id:door.id,text:state.doors?.[door.id]?.open?'CLOSE DOOR':'OPEN DOOR · SPRINT TO BARGE'};
  for(const line of map.traversal||[])for(const endpoint of ['from','to'])if(dist(p,line[endpoint])<2.6)return {kind:'traversal',id:line.id,endpoint,text:line.type==='ascender'?'USE ASCENDER':'RIDE ZIP LINE'};

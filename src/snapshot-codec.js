@@ -56,7 +56,7 @@ export class SnapshotBatch {
    const name=key==='state'?'royale':'simulation';
    for(const field of Object.keys(source)){
     if(field===name&&source[name]){const world={};cached[name]=world;
-     for(const collection of Object.keys(source[name])){if(collection==='players'&&Array.isArray(source[name][collection])){world[collection]=this.players(source[name][collection]);continue;}const cloned=this.clone(source[name][collection]);if(cloned!==undefined)world[collection]=Array.isArray(cloned)&&['loot','chests','builds'].includes(collection)?this.index(cloned,collection==='loot'?'uid':'id'):cloned;}
+     for(const collection of Object.keys(source[name])){if(collection==='players'&&Array.isArray(source[name][collection])){world[collection]=this.players(source[name][collection]);continue;}const cloned=this.clone(source[name][collection]);if(cloned!==undefined)world[collection]=Array.isArray(cloned)&&['loot','chests','builds','vehicles'].includes(collection)?this.index(cloned,collection==='loot'?'uid':'id'):cloned;}
     }else if(field==='mapLayouts'&&source[field])cached[field]=snapshotLayout(source[field]);else if(field==='players'&&Array.isArray(source[field]))cached[field]=this.players(source[field]);else{const cloned=this.clone(source[field]);if(cloned!==undefined)cached[field]=recordKeys.includes(field)&&Array.isArray(cloned)?this.index(cloned):cloned;}
    }
   }
@@ -86,7 +86,7 @@ function normalize(message){
   let cached=cache.get(source);
   if(!cached){cached=JSON.parse(JSON.stringify({...source,mapLayouts:undefined}));if(source.mapLayouts)cached.mapLayouts=snapshotLayout(source.mapLayouts);
    const world=key==='state'?cached.royale:cached.simulation;
-   for(const [name,id]of [['loot','uid'],['chests','id'],['builds','id']])if(Array.isArray(world?.[name]))world[name]=records(world[name],id);
+   for(const [name,id]of [['loot','uid'],['chests','id'],['builds','id'],['vehicles','id']])if(Array.isArray(world?.[name]))world[name]=records(world[name],id);
    for(const name of recordKeys)if(Array.isArray(cached[name]))cached[name]=records(cached[name]);
    if(Array.isArray(cached.simulation?.players))cached.simulation.players=records(cached.simulation.players);
    cache.set(source,cached);
@@ -169,7 +169,7 @@ export class SnapshotDecoder {
   if(checkpoint&&(frame.full||Object.hasOwn(frame.patch||{},'checkpoint')))message.checkpoint=cloneSnapshot({checkpoint}).checkpoint;
   for(const key of recordKeys)if(message.state?.[key])message.state[key]=Object.values(message.state[key]);
   if(message.checkpoint?.simulation?.players)message.checkpoint.simulation.players=Object.values(message.checkpoint.simulation.players);
-  for(const key of ['loot','chests','builds']){if(message.state?.royale?.[key])message.state.royale[key]=Object.values(message.state.royale[key]);if(message.checkpoint?.simulation?.[key])message.checkpoint.simulation[key]=Object.values(message.checkpoint.simulation[key]);}
+  for(const key of ['loot','chests','builds','vehicles']){if(message.state?.royale?.[key])message.state.royale[key]=Object.values(message.state.royale[key]);if(message.checkpoint?.simulation?.[key])message.checkpoint.simulation[key]=Object.values(message.checkpoint.simulation[key]);}
   return message;
  }
 }

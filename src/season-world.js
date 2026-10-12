@@ -1,6 +1,6 @@
 import {BOSSES,bossDefinition,MYTHIC_WEAPONS} from './bosses.js';
 import {rollChest} from './royale-loot.js';
-import {SEASON,rigCharges} from './season-one.js';
+import {SEASON,rigCharges,startJumpRig} from './season-one.js';
 import {Simulation} from './simulation.js';
 import {weapon,gun} from './data.js';
 import {inventory} from './building.js';
@@ -41,15 +41,15 @@ export function bossInput(sim,p){
  if(sim.time>=(p.scanAt||0)){p.scanAt=sim.time+.2;scanBossAwareness(sim,p,def,smokeBlocks);}
  const noticed=sim.players.get(p.targetId),target=p.bossAlert==='alerted'&&noticed?.health>0&&!noticed.spectating&&!(noticed.aimBreakUntil>sim.time)?noticed:null,farHome=dist(p,p.home)>def.leash&&!(p.pursuitUntil>sim.time);
  if(p.bossWindup){
-  input.yaw=p.yaw;input.fire=false;
+  const focus=sim.players.get(p.bossWindup.target);input.yaw=focus?Math.atan2(p.x-focus.x,p.z-focus.z):p.yaw;input.fire=false;
   if(sim.time>=p.bossWindup.until){const victim=sim.players.get(p.bossWindup.target);p.bossWindup=null;
-   if(victim?.health>0&&!victim.downed&&dist(p,victim)<GRAPPLER.range&&!smokeBlocks(sim,p,victim)&&sim.accessible(p,victim,GRAPPLER.range)){
+   if(victim?.health>0&&!victim.downed&&dist(p,victim)<GRAPPLER.range&&bossHasSight(sim,p,victim,smokeBlocks)){
     p.pursuitUntil=sim.time+5;startGrapple(p,{origin:{x:p.x,y:p.y+1.7,z:p.z},anchor:{x:victim.x,y:victim.y+1.3,z:victim.z},length:dist(p,victim),valid:true},sim.time);sim.emit('boss-winch',{player:p.id,target:victim.id,x:p.x,y:p.y,z:p.z});
    }
   }return input;
  }
  if(target&&!farHome&&sim.time>p.aggroAt&&sim.time>=(p.abilityAt||0)){
-  if(def.ability==='winch'&&dist(p,target)>8&&dist(p,target)<GRAPPLER.range){p.abilityAt=sim.time+5;p.bossWindup={target:target.id,until:sim.time+.95};requestBossVoice(sim,p,'ability');sim.emit('royale-cue',{cue:'boss-windup',player:p.id,x:p.x,y:p.y,z:p.z});return input;}
+  if(def.ability==='winch'&&dist(p,target)>8&&dist(p,target)<GRAPPLER.range&&bossHasSight(sim,p,target,smokeBlocks)){p.abilityAt=sim.time+5;p.bossWindup={target:target.id,until:sim.time+.6,damage:0};requestBossVoice(sim,p,'ability');sim.emit('royale-cue',{cue:'boss-windup',player:p.id,x:p.x,y:p.y,z:p.z});return input;}
   if(def.ability==='shadowstep'&&sim.time-p.lastDamage<3&&p.patrol?.length){const goal=p.patrol[(p.patrolIndex+1)%p.patrol.length];p.shadowDirection={x:goal.x-p.x,z:goal.z-p.z};if(useSeasonItem(sim,p,p.inventory[2])){p.abilityAt=sim.time+4;p.patrolIndex++;p.patrolWait=0;input.fire=false;requestBossVoice(sim,p,'ability');return input;}}
  }
  const investigating=['suspicious','searching'].includes(p.bossAlert),look=noticed||p.bossPerception?.lastKnown;
@@ -64,7 +64,7 @@ export function bossInput(sim,p){
 }
 export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
  if(p.health<=0||!Number.isFinite(amount)||amount<=0)return;
- const def=bossDefinition(p.bossId||p.id);if(p.bossWindup){p.bossWindup=null;p.abilityAt=sim.time+8;sim.emit('boss-interrupted',{player:attacker?.id,target:p.id});}
+ const def=bossDefinition(p.bossId||p.id);if(p.bossWindup&&source!=='Storm'){p.bossWindup.damage=(p.bossWindup.damage||0)+amount;if(p.bossWindup.damage>=125){p.bossWindup=null;p.abilityAt=sim.time+5;sim.emit('boss-interrupted',{player:attacker?.id,target:p.id});}}
  const shield=source==='Storm'?0:Math.min(p.shield,amount);p.shield-=shield;const dealt=Math.min(p.health,amount-shield);p.health-=dealt;p.lastDamage=sim.time;if(attacker?.contestant){p.attackerId=attacker.id;p.attackerAt=sim.time;p.scanAt=0;}
  if(p.health>0)alertBossToDamage(sim,p,attacker);
  sim.emit('hit',{player:attacker?.id,target:p.id,amount:shield+dealt,precision,shield:shield>0,shieldBreak:shield>0&&p.shield===0,shotId,weapon:source,x:p.x,y:p.y+1.4,z:p.z,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z});
@@ -98,7 +98,7 @@ function useBossCache(sim,p,input,dt){
 export function useSeasonItem(sim,p,item){
  if(!item)return false;
  if(item.id==='shadowstep'){if(!startShadowstep(p,item,sim.time))return false;sim.emit('royale-fx',{kind:'shadowstep',player:p.id,x:p.x,y:p.y+1,z:p.z});sim.emit('royale-cue',{cue:'shadowstep',player:p.id,x:p.x,y:p.y,z:p.z});return true;}
- if(item.id==='jumpRig'){if(!rigCharges(item,sim.time)||sim.time<(item.readyAt||0))return false;if(item.charges===SEASON.rig.charges)item.rechargeAt=sim.time+SEASON.rig.recharge;item.charges--;item.readyAt=sim.time+SEASON.rig.cooldown;const d=p.shadowDirection||direction(p.yaw),length=Math.hypot(d.x,d.z)||1;launchPlayer(p,{source:'shockwave',vy:SEASON.rig.vertical,vx:d.x/length*SEASON.rig.horizontal,vz:d.z/length*SEASON.rig.horizontal});sim.emit('royale-fx',{kind:'impulse',x:p.x,y:p.y,z:p.z});sim.emit('rig-used',{player:p.id});return true;}
+ if(item.id==='jumpRig'){if(!startJumpRig(p,item,sim.time))return false;sim.emit('royale-fx',{kind:'impulse',x:p.x,y:p.y,z:p.z});sim.emit('rig-used',{player:p.id});return true;}
  if(item.id==='anchorWinch'){
   if(sim.time<(item.readyAt||0))return false;
   const aim=grappleAim(sim.map,p,wallDistance);item.readyAt=sim.time+GRAPPLER.cooldown;

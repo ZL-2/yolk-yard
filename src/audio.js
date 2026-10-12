@@ -55,6 +55,10 @@ export const SOUND_CUES={
  'door-open':[noise(450,.12,.07),note(160,.09,.025,'triangle',220)],
  'door-close':[noise(240,.12,.1),note(90,.08,.035,'sine',60)],
  'vault-unlock':[note(440,.15,.06),note(660,.18,.06,'sine',0,.18),noise(200,.5,.08,.35)],
+ 'vault-opening':[noise(100,.18,.12,.1),note(65,.38,.07,'triangle',55,.28),noise(210,1.55,.08,.65),note(48,1.5,.055,'triangle',38,.65),noise(85,.22,.13,2.22)],
+ 'vehicle-enter':[noise(280,.08,.075),note(90,.2,.045,'triangle',140)],
+ 'vehicle-exit':[noise(500,.09,.04),note(100,.1,.03)],
+ 'vehicle-destroyed':[noise(70,.6,.21),noise(1300,.22,.075,.07)],
  'traversal-grab':[noise(1800,.08,.065),note(240,.1,.03,'triangle',320)],
  'grappler-fire':[noise(1700,.08,.12),note(240,.18,.09,'triangle',780),noise(3000,.5,.03,.05)],
  'grappler-latch':[noise(400,.12,.1),note(130,.09,.07,'triangle',70)],
@@ -181,21 +185,16 @@ export class Sound {
   if(!playing||!me||me.downed||!(me.reloadEnd>state?.time))this.cancelReload();
   if(!playing||!state||!me){if(this.loops.size||this.bossAudio.active.size||[...this.fieldSamples.active.values()].some(v=>v.size))this.stopWorld();this.bossAudio.update(state,me,false);return;}
   const royale=state.royale,ground=me.flight==='ground'||!royale;
-  this.stepClocks??=new Map();
   const map=getMap(state.options?.map);
   this.bossAudio.update(state,me,playing,map);
-  for(const p of state.phase==='playing'?state.players||[]:[]){if(p.health<=0||p.sliding||p.downed||!p.grounded||p.flight&&p.flight!=='ground'||Math.hypot(p.x-me.x,p.z-me.z)>(p.crouching?8:p.sprinting?26:20))continue;
-   const speed=Math.hypot(p.vx||0,p.vz||0),previous=this.stepClocks.get(p.id)||0,next=previous+speed*dt/(p.sprinting?1:.85);this.stepClocks.set(p.id,next);
-   if(Math.floor(next)>Math.floor(previous)&&speed>.8){const scale=(p.id===me.id?.75:.6)*(p.crouching?.45:1),rate=.96+(Math.floor(next)%5)*.02;if(!this.fieldSamples.play('step',p,scale,rate))this.cue('step-soil',p,scale);}
-  }
   if(me.sliding&&this.clock>(this.nextSlideSound||0)){this.nextSlideSound=this.clock+.25;this.cue('slide-scrape',me,.7);}
-  if(this.stepClocks.size>48)this.stepClocks=new Map([...this.stepClocks].filter(([id])=>state.players.some(p=>p.id===id)));
   if(ground&&me.grounded&&this.wasAirborne&&!royale)this.cue('land',me,.7);this.wasAirborne=!me.grounded;
 
   this.loop('island',royale?.18:0,{freq:900,volume:.055});
+  const vehicle=royale?.vehicles?.find(v=>v.id===me.vehicleId);this.loop('atv-engine',vehicle?(.3+Math.min(1,Math.abs(vehicle.speed)/31)*.6):0,{freq:vehicle?65+Math.abs(vehicle.speed)*5:65,volume:.07,noise:false});this.loop('atv-boost',vehicle?.boosting?.65:0,{freq:480,volume:.07});
   this.loop('transport',me.flight==='transport'?1:0,{freq:72,volume:.13,noise:false});
   this.loop('rotor',me.flight==='transport'?(.7+Math.sin(this.clock*20)*.2):0,{freq:220,volume:.08});
-  this.loop('wind',me.flight==='dive'?1:me.flight==='glide'?.5:0,{freq:me.flight==='dive'?1700:700,volume:.14});
+  this.loop('wind',me.flight==='dive'?1:me.flight==='glide'?.5:!me.grounded&&me.vy<-4?Math.min(.35,(-me.vy-4)/45):0,{freq:me.flight==='dive'?1700:700,volume:.14});
   const outside=!!royale?.storm?.active&&me.health>0&&Math.hypot(me.x-royale.storm.x,me.z-royale.storm.z)>royale.storm.radius;
   this.loop('storm',outside?1:0,{freq:650,volume:.13});
   const countdown=royale?.storm&&!royale.storm.closing?Math.ceil(royale.storm.seconds):0;
