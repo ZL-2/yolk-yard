@@ -1,5 +1,5 @@
 // Shared authoritative/predicted dash. Swept motion with fall protection until landing; no combat invulnerability.
-export const SHADOWSTEP=Object.freeze({charges:6,recharge:10,cooldown:1,duration:.18,speed:50,targetBreak:.65});
+export const SHADOWSTEP=Object.freeze({charges:6,recharge:7,cooldown:.85,duration:.22,speed:60,targetBreak:.85});
 export function shadowCharges(item,time){
  if(item?.id!=='shadowstep')return 0;
  item.charges??=SHADOWSTEP.charges;item.rechargeAt??=0;

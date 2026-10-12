@@ -98,7 +98,7 @@ function useBossCache(sim,p,input,dt){
 export function useSeasonItem(sim,p,item){
  if(!item)return false;
  if(item.id==='shadowstep'){if(!startShadowstep(p,item,sim.time))return false;sim.emit('royale-fx',{kind:'shadowstep',player:p.id,x:p.x,y:p.y+1,z:p.z});sim.emit('royale-cue',{cue:'shadowstep',player:p.id,x:p.x,y:p.y,z:p.z});return true;}
- if(item.id==='jumpRig'){if(!rigCharges(item,sim.time)||sim.time<(item.readyAt||0))return false;if(item.charges===SEASON.rig.charges)item.rechargeAt=sim.time+SEASON.rig.recharge;item.charges--;item.readyAt=sim.time+SEASON.rig.cooldown;const d=direction(p.yaw);launchPlayer(p,{source:'shockwave',vy:SEASON.rig.vertical,vx:d.x*SEASON.rig.horizontal,vz:d.z*SEASON.rig.horizontal});sim.emit('royale-fx',{kind:'impulse',x:p.x,y:p.y,z:p.z});sim.emit('rig-used',{player:p.id});return true;}
+ if(item.id==='jumpRig'){if(!rigCharges(item,sim.time)||sim.time<(item.readyAt||0))return false;if(item.charges===SEASON.rig.charges)item.rechargeAt=sim.time+SEASON.rig.recharge;item.charges--;item.readyAt=sim.time+SEASON.rig.cooldown;const d=p.shadowDirection||direction(p.yaw),length=Math.hypot(d.x,d.z)||1;launchPlayer(p,{source:'shockwave',vy:SEASON.rig.vertical,vx:d.x/length*SEASON.rig.horizontal,vz:d.z/length*SEASON.rig.horizontal});sim.emit('royale-fx',{kind:'impulse',x:p.x,y:p.y,z:p.z});sim.emit('rig-used',{player:p.id});return true;}
  if(item.id==='anchorWinch'){
   if(sim.time<(item.readyAt||0))return false;
   const aim=grappleAim(sim.map,p,wallDistance);item.readyAt=sim.time+GRAPPLER.cooldown;

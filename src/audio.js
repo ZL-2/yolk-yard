@@ -1,6 +1,8 @@
 import {LobbyMusic} from './lobby-music.js';
 import {BossVoiceAudio} from './boss-voice-audio.js';
-// Gameplay effects are procedural; boss voice clips use the supplied reference.
+import {FieldSamples,birdLocation} from './field-samples.js';
+import {wonRoyale} from './teams.js';
+// Cached field/voice samples supplement the procedural firearm and action cues.
 import {FIREARM_SOUNDS,synthesizeShot,reloadSequence} from './firearm-audio.js';
 import {gun} from './data.js';
 import {getMap} from './maps.js';
@@ -92,11 +94,12 @@ for(const [i,id]of Object.keys(ITEMS).entries()){
 }
 export const SHOT_PALETTE={sprinter:[145,1200,.15],scatter:[78,700,.25],needle:[62,2100,.33],zipper:[210,1900,.10],thumper:[52,500,.45],anchor:[100,1100,.19],duet:[185,1800,.14],pip:[240,1800,.12],peeper:[105,2500,.21],doubleyolk:[95,900,.21],comet:[520,2400,.18]};
 export class Sound {
- constructor(){this.lobbyMusic=new LobbyMusic();this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];this.bossAudio=new BossVoiceAudio(this);}
+ constructor(){this.lobbyMusic=new LobbyMusic();this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];this.bossAudio=new BossVoiceAudio(this);this.fieldSamples=new FieldSamples(this);}
  unlock(){
   this.lobbyMusic.unlock();
   if(!this.ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(Audio){this.ctx=new Audio();this.master=this.ctx.createGain();this.compressor=this.ctx.createDynamicsCompressor();this.master.connect(this.compressor).connect(this.ctx.destination);this.master.gain.value=this.volume;const size=this.ctx.sampleRate*2;this.noiseBuffer=this.ctx.createBuffer(1,size,this.ctx.sampleRate);const a=this.noiseBuffer.getChannelData(0);let seed=12345;for(let i=0;i<size;i++){seed=(seed*1664525+1013904223)>>>0;a[i]=seed/2147483648-1;}}}
   this.ctx?.resume().catch(()=>{});
+  void this.fieldSamples.load();
  }
  setVolumes(settings){this.volume=settings.volume??this.volume;this.effectsVolume=settings.effectsVolume??.85;this.ambienceVolume=settings.ambienceVolume??.5;this.musicVolume=settings.musicVolume??.3;this.lobbyMusic.setVolume(this.enabled?this.volume*this.musicVolume:0);if(this.master)this.master.gain.setTargetAtTime(this.enabled?this.volume:0,this.ctx.currentTime,.03);}
  updateLobby(inLobby,dt,hidden=false){this.lobbyMusic.update(inLobby,dt,hidden);}
@@ -138,7 +141,7 @@ export class Sound {
   if(distance<12&&!spec.energy&&!spec.rocket)this.cue('shell-casing',position,.4);
   if(id==='doubleyolk'&&distance<30)for(const p of SOUND_CUES['pump-action'])this.layer({...p,at:(p.at||0)+.35},position,'effects',.55);
  }
- death(distance=0,position=null){if(distance>38)return;this.cue('operator-down',position,1/(1+distance/12));}
+ death(distance=0,position=null){if(distance>38)return;if(!this.fieldSamples.play('elimination',position,1/(1+distance/12)))this.cue('operator-down',position,1/(1+distance/12));}
  hit(kind='body'){
   const tones={body:[950,1400],shield:[620,960],head:[1400,1850],break:[1850,550],knock:[440,880]},[from,to]=tones[kind]||tones.body;
   this.layer(note(from,kind==='break'?.12:.065,.09,'sine',to));
@@ -157,14 +160,14 @@ export class Sound {
   }
   if(loop){loop.gain.gain.setTargetAtTime(Math.max(0,target)*volume*this.ambienceVolume,this.ctx.currentTime,.3);if(!target){if(!loop.silentAt)loop.silentAt=this.clock;if(this.clock-loop.silentAt>1.5){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();this.loops.delete(id);}}else loop.silentAt=0;}
  }
- stopWorld(){this.bossAudio.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;}
+ stopWorld(){this.bossAudio.stop();this.fieldSamples.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.stepClocks?.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;this.nextBirdAt=this.clock+8;}
  event(e,me,state){
   if(e.type==='boss-voice'){const listener=me?.spectating?state.players.find(p=>p.id===this.listener?.id)||me:me;return this.bossAudio.event(e,state,listener);}
   if(e.type==='round')this.cue('round-start');
   if(e.type==='royale-cue'){
    // Personal inventory cues are local, spatial actions are audible to nearby operators.
    if(e.player&&e.player!==me?.id&&e.x===undefined)return;
-   if(e.cue==='victory')this.cue(state.royale?.winnerId===me?.id?'victory':'defeat');
+   if(e.cue==='victory')this.cue(wonRoyale(state,me?.id)?'victory':'defeat');
    else if(e.cue==='weapon-swap'){const actor=state.players.find(p=>p.id===e.player);this.cue(['needle','peeper'].includes(gun(actor||me).id)?'bolt-action':'weapon-swap',e.x===undefined?null:e,.7);}
    else this.cue(e.cue,e.x===undefined?null:e);
   }
@@ -176,14 +179,14 @@ export class Sound {
  update(state,me,dt,playing){
   this.clock+=dt;this.listener=me;
   if(!playing||!me||me.downed||!(me.reloadEnd>state?.time))this.cancelReload();
-  if(!playing||!state||!me){if(this.loops.size||this.bossAudio.active.size)this.stopWorld();this.bossAudio.update(state,me,false);return;}
+  if(!playing||!state||!me){if(this.loops.size||this.bossAudio.active.size||[...this.fieldSamples.active.values()].some(v=>v.size))this.stopWorld();this.bossAudio.update(state,me,false);return;}
   const royale=state.royale,ground=me.flight==='ground'||!royale;
   this.stepClocks??=new Map();
   const map=getMap(state.options?.map);
   this.bossAudio.update(state,me,playing,map);
-  for(const p of state.players||[]){if(p.health<=0||p.sliding||p.downed||!p.grounded||p.flight&&p.flight!=='ground'||Math.hypot(p.x-me.x,p.z-me.z)>(p.crouching?8:p.sprinting?26:20))continue;
+  for(const p of state.phase==='playing'?state.players||[]:[]){if(p.health<=0||p.sliding||p.downed||!p.grounded||p.flight&&p.flight!=='ground'||Math.hypot(p.x-me.x,p.z-me.z)>(p.crouching?8:p.sprinting?26:20))continue;
    const speed=Math.hypot(p.vx||0,p.vz||0),previous=this.stepClocks.get(p.id)||0,next=previous+speed*dt/(p.sprinting?1:.85);this.stepClocks.set(p.id,next);
-   if(Math.floor(next)>Math.floor(previous)&&speed>.8){const support=map?.boxes?.find(b=>Math.abs(b.y+b.h-p.y)<.08&&Math.abs(b.x-p.x)<b.w/2&&Math.abs(b.z-p.z)<b.d/2),surface=support?(['wood','metal'].includes(support.material)?support.material:'stone'):'soil';this.cue('step-'+surface,p,(p.id===me.id?.75:.6)*(p.crouching?.45:1));}
+   if(Math.floor(next)>Math.floor(previous)&&speed>.8){const scale=(p.id===me.id?.75:.6)*(p.crouching?.45:1),rate=.96+(Math.floor(next)%5)*.02;if(!this.fieldSamples.play('step',p,scale,rate))this.cue('step-soil',p,scale);}
   }
   if(me.sliding&&this.clock>(this.nextSlideSound||0)){this.nextSlideSound=this.clock+.25;this.cue('slide-scrape',me,.7);}
   if(this.stepClocks.size>48)this.stepClocks=new Map([...this.stepClocks].filter(([id])=>state.players.some(p=>p.id===id)));
@@ -202,7 +205,7 @@ export class Sound {
   if(outside!==this.wasStorm){this.cue(outside?'storm-enter':'storm-exit');this.wasStorm=outside;}
   if(me.exhausted&&!this.wasExhausted)this.cue('stamina-empty');if(!me.exhausted&&this.wasExhausted)this.cue('stamina-ready');this.wasExhausted=!!me.exhausted;
   if(royale){if(this.lastAlive>10&&royale.alive<=10)this.cue('top-ten');if(this.lastAlive>2&&royale.alive===2)this.cue('final-duel');this.lastAlive=royale.alive;}
-  if(ground&&royale&&Math.floor(this.clock/9)!==this.lastBird){this.lastBird=Math.floor(this.clock/9);this.cue('ambient-bird',{x:me.x+20,z:me.z-15});}
+  if(ground&&royale&&state.phase==='playing'&&this.clock>=(this.nextBirdAt??8)){this.nextBirdAt=this.clock+11+(Math.floor(this.clock)%4);const position=birdLocation(map,me);if(position&&!this.fieldSamples.play('birds',position))this.cue('ambient-bird',position);}
   if(ground&&royale&&this.clock-(this.lastBell||0)>28&&Math.hypot(me.x,me.z)<70){this.lastBell=this.clock;this.cue('ambient-bell',{x:0,z:-6});}
   if(ground&&royale&&this.clock-(this.lastChestHum||0)>.85){this.lastChestHum=this.clock;const chest=royale.chests?.find(c=>!c.opened&&(!c.landAt||c.landAt<state.time)&&Math.hypot(c.x-me.x,c.z-me.z)<12);if(chest)this.cue('chest-hum',chest);}
   if(this.cooldowns.size>300)this.cooldowns.clear();

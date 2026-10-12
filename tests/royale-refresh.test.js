@@ -33,7 +33,7 @@ test('human footsteps track distance, hover is silent and activation cue remains
  assert.ok(SOUND_CUES['ui-select']);assert.equal(SOUND_CUES['ui-hover'],undefined);assert.ok(SOUND_CUES['step-soil']);
  const s=new Sound(),cues=[];s.cue=id=>cues.push(id);s.loop=()=>{};
  const me={id:'a',x:0,y:0,z:0,yaw:0,health:100,grounded:true,moving:true,vx:5,vz:0};
- for(let i=0;i<120;i++){me.sprinting=i>60;s.update({players:[me]},me,1/60,true);}assert.ok(cues.length>=8&&cues.length<=14);assert.ok(cues.every(c=>c==='step-soil'));
+ for(let i=0;i<120;i++){me.sprinting=i>60;s.update({phase:'playing',players:[me]},me,1/60,true);}assert.ok(cues.length>=8&&cues.length<=14);assert.ok(cues.every(c=>c==='step-soil'));
 });
 test('tactical sprint accelerates beyond arena walking without diagonal advantage',()=>{
  const flat={size:100,boxes:[]};

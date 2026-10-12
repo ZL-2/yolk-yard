@@ -63,4 +63,19 @@ body.in-duos .performance-network{top:320px;left:22px}body.in-duos:has(.chat-hud
 @media(max-width:760px){#menu[data-section=play]{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}.yard-left-rail{position:relative;left:auto;top:auto;bottom:auto;width:calc(100% - 28px);max-width:440px;margin:196px 14px 24px;gap:12px}.yard-left-rail .yard-season{max-width:calc(100% - 165px);min-height:150px}.yard-left-rail .yard-season h1{font-size:28px}.yard-left-rail .yard-season>.eyebrow{display:block}.frontier-leaderboard{flex:none;height:270px;min-height:200px}.yard-left-rail .yard-private-card{margin-top:0}.yard-left-rail .yard-find{font-size:14px;min-height:44px}.yard-footer{position:relative;flex-wrap:wrap;gap:12px}.yard-character-label{display:none}}
 @media(max-width:760px){#menu:has(.yard-party[data-count="3"]) .yard-left-rail,#menu:has(.yard-party[data-count="4"]) .yard-left-rail{padding-top:220px}#menu:has(.yard-party[data-count="3"]) .yard-left-rail .yard-season,#menu:has(.yard-party[data-count="4"]) .yard-left-rail .yard-season{display:block;max-width:none;min-height:0}}
 .yard-footer .yard-footer-emotes{display:none}
+/* Keep several rankings visible on school-laptop viewports; the old flexible
+   card spent almost all of its height on headings and a repeated personal row. */
+.yard-left-rail{top:170px;bottom:52px;overflow-x:hidden;scrollbar-color:#638d89 transparent}
+.yard-left-rail::-webkit-scrollbar,.frontier-board-ranks::-webkit-scrollbar{width:6px;background:transparent}
+.yard-left-rail::-webkit-scrollbar-thumb,.frontier-board-ranks::-webkit-scrollbar-thumb{background:#638d8980;border-radius:8px}
+.yard-left-rail .yard-season h1{font-size:24px;line-height:1.12;margin:5px 0 9px}
+.yard-left-rail .yard-season button{padding:10px 14px}
+.frontier-leaderboard{height:365px;min-height:365px;max-height:none;flex:none;box-sizing:border-box}
+.frontier-board-ranks{min-height:190px;flex:1 1 auto;overflow-x:hidden;overflow-y:auto}
+.frontier-board-note{font-size:9px}.frontier-board-tools>span{font-size:9px}
+.public-royale-card{background:linear-gradient(90deg,#081d2ff0,#0d263db8 62%,#132f4860),linear-gradient(0deg,#0b213add,transparent 78%),url('/art/public-frontier-v144.webp') center/cover;box-shadow:0 15px 40px #04142266;backdrop-filter:none;text-shadow:0 1px 7px #020e1bcc}
+.public-royale-card .primary{text-shadow:none;background:#ffdf7c;color:#132d3b;border-color:#ffeaa6;box-shadow:0 2px 14px #ffda5c28}
+.public-royale-card .public-royale-title strong{color:#fff9e6}.public-royale-card .public-royale-title small,.public-royale-card .public-royale-hint{color:#e0eee8}
+@media(max-height:600px) and (min-width:761px){.yard-left-rail{top:130px;bottom:40px}.yard-left-rail .yard-season h1{display:none}.frontier-leaderboard{height:330px;min-height:330px}.frontier-board-ranks{min-height:180px}}
+@media(max-width:760px){.yard-left-rail{top:auto;bottom:auto}.yard-left-rail .yard-season h1{font-size:28px}.frontier-leaderboard{height:365px;min-height:365px}.frontier-board-ranks{min-height:190px}}
 @media(max-width:760px){.yard-left-rail .yard-season{min-height:170px}.yard-footer .yard-footer-emotes{display:inline-flex}body:has(#menu[data-section=play]:not([hidden])) #emote-button{display:none}}

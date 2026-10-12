@@ -1,6 +1,7 @@
 import {queueMatch,spectateFriend} from './match-launch.js';
 import {randomUUID} from 'node:crypto';
 import {safeProfile,VERSION} from '../../src/data.js';
+import {needsPlayerName} from '../../src/player-name.js';
 import {SocialStore,normalizeFriendCode} from './social-store.js';
 const displayCode=c=>c.slice(0,5)+'-'+c.slice(5);
 export const PARTY_LIMIT=4,RECONNECT_GRACE=30000,HEARTBEAT_TIMEOUT=45000,INVITE_TTL=60000;
@@ -26,7 +27,7 @@ export class PartyService{
   ws.on('message',raw=>{let m;try{if(raw.length>8192)throw Error('Message too large');m=JSON.parse(raw);if(Date.now()-at>1000){at=Date.now();count=0;}if(++count>25)throw Error('Too many requests');}catch(e){ws.close(1008,e.message.slice(0,100));return;}
    // Serialize each session while awaiting durable writes, without blocking gameplay.
    queue=queue.then(async()=>{if(ws.readyState!==1)return;try{
-    if(!user){if(m.type!=='hello'||m.version!==VERSION)throw Error('Refresh Ravelfront to connect.');const {identity,token}=this.store.identify(m.token,safeProfile(m.profile));await this.store.flush();if(ws.readyState!==1)return;user=this.users.get(identity.id);if(!user){user={id:identity.id,profile:identity.profile,ready:false,sessions:new Map(),seen:Date.now()};this.users.set(user.id,user);this.create(user);}user.sessions.set(ws,{seen:Date.now()});user.ws=ws;user.seen=Date.now();delete user.disconnectedAt;clearTimeout(timeout);this.send(user,{type:'hello',id:user.id,token,code:displayCode(identity.code)});if(this.relay.deployment)this.send(user,{type:'deployment',deployment:this.relay.deployment.snapshot()});this.send(user,{type:'public-match',match:this.relay.authority?.publicSummary()||null});this.sync(this.parties.get(user.party));return;}
+    if(!user){if(m.type!=='hello'||m.version!==VERSION)throw Error('Refresh Ravelfront to connect.');const profile=safeProfile(m.profile);if(needsPlayerName(profile.name))throw Error('Choose a player name other than Player.');const {identity,token}=this.store.identify(m.token,profile);await this.store.flush();if(ws.readyState!==1)return;user=this.users.get(identity.id);if(!user){user={id:identity.id,profile:identity.profile,ready:false,sessions:new Map(),seen:Date.now()};this.users.set(user.id,user);this.create(user);}user.profile=identity.profile;user.sessions.set(ws,{seen:Date.now()});user.ws=ws;user.seen=Date.now();delete user.disconnectedAt;clearTimeout(timeout);this.send(user,{type:'hello',id:user.id,token,code:displayCode(identity.code)});if(this.relay.deployment)this.send(user,{type:'deployment',deployment:this.relay.deployment.snapshot()});this.send(user,{type:'public-match',match:this.relay.authority?.publicSummary()||null});this.sync(this.parties.get(user.party));return;}
     const session=user.sessions.get(ws);if(!session)return;session.seen=user.seen=Date.now();const result=this.command(user,m,ws);
     if(['profile','friend-send','friend-accept','friend-decline','friend-cancel','friend-remove','block','unblock'].includes(m.type))await this.store.flush();
     if(m.request&&ws.readyState===1)ws.send(JSON.stringify({type:'reply',request:m.request,result:result??true}));
@@ -39,7 +40,7 @@ export class PartyService{
  command(u,m,ws=u.ws){const p=this.parties.get(u.party),leader=()=>{if(p?.leader!==u.id)throw Error('Only the party leader can do that.');},idle=()=>{if(p?.state!=='idle'||u.inMatch)throw Error('Return to the lobby first.');};
   switch(m.type){
    case 'ping':return {presence:this.presence(u.id)};
-   case 'profile':u.profile=safeProfile(m.profile);this.store.identities.get(u.id).profile=u.profile;this.store.save();this.relay.progression.leaderboardCache=null;this.sync(p);return;
+   case 'profile':{const profile=safeProfile(m.profile);if(needsPlayerName(profile.name))throw Error('Choose a player name other than Player.');u.profile=profile;this.store.identities.get(u.id).profile=u.profile;this.store.save();this.relay.progression.leaderboardCache=null;this.sync(p);return;}
    case 'leaderboards':this.limit(u,'leaderboards',30,60000);this.relay.progression.restoreLeaderboardViewer(m.progressToken,u.id);return this.relay.progression.leaderboards(u.id,{offset:m.offset});
    case 'social':this.limit(u,'browse',30,60000);return this.social(u,m);
    case 'online':this.limit(u,'browse',30,60000);return this.social(u,m).online;

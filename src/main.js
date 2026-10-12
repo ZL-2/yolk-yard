@@ -50,6 +50,10 @@ import {SLIDERS, SLIDER_DEFAULTS, resetSliders, royalePanelAction} from './setti
 import {queueCandidates,ITEMS,itemInfo} from './royale-data.js';
 import { ChatPanel } from "./chat-ui.js";
 import { moderateText, safeName } from "./moderation.js";
+import {needsPlayerName} from './player-name.js';
+import {MatchEndUI} from './match-end-ui.js';
+import {preferredSpectator} from './match-presentation.js';
+import './match-end.css';
 import {matchOptions, targetLabel} from "./match-options.js";
 import "./style.css";
 import "./lobby.css";
@@ -220,6 +224,7 @@ eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(eggWallet.value.balance);if(eggShop?.root?.isConnected)eggShop.render();if(screen==='menu'&&menuSection==='career')renderMenu(true);}});
 const streakUI=new StreakUI(document.querySelector('#hud'));
 const royaleUI = new RoyaleUI(item=>view.itemPreview(item));
+const matchEndUI=new MatchEndUI();
 const buildControls={buildMode:false,buildType:'wall',buildMaterial:'wood',buildRotation:0,editing:false};
 document.addEventListener('build-edit-close',()=>{if(screen==='game'&&!paused&&!matchMedia('(pointer:coarse)').matches)view.renderer.domElement.requestPointerLock?.();});
 const buildUI=new BuildingUI(royaleUI.root,buildControls,action=>{if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});});
@@ -304,9 +309,10 @@ window.addEventListener('popstate',()=>{if(screen==='menu')selectMenuSection(loc
 
 function profileMenu(){
   modal('Player details',`<label for="player-name">YOUR NAME</label><input class="field" id="player-name" maxlength="18" value="${esc(profile.name)}" autocomplete="off"><p id="name-safety" role="status"></p><button class="primary" data-action="close">DONE</button>`,'profile');
-  $('#player-name').onchange=e=>{const checked=moderateText(e.target.value,{kind:'name'});profile.name=safeName(e.target.value);e.target.value=profile.name;$('#name-safety').textContent=checked.ok?'':'That name was filtered. Choose a friendly nickname.';remember();renderMenu();};
+  $('#player-name').onchange=e=>{const checked=moderateText(e.target.value,{kind:'name'}),name=safeName(e.target.value);if(!checked.ok||needsPlayerName(name)){$('#name-safety').textContent='Choose a friendly nickname other than Player.';e.target.value=profile.name;return;}profile.name=name;$('#name-safety').textContent='';remember();renderMenu();};
 }
 function modal(title, body, type = "generic") {
+  if(needsPlayerName(profile.name)&&type!=='name-required'){requiredNamePrompt();return;}
   if(type==="error")sound.cue("ui-error");
   bindingEditor = null;
   dialogType = type;
@@ -324,9 +330,11 @@ function modal(title, body, type = "generic") {
   if (!dialog.open) dialog.showModal();
 }
 function closeDialog() {
+  if(dialogType==='name-required'){document.querySelector('#required-name')?.focus();return;}
   if(dialogType==='egg-shop'&&screen==='menu')renderMenu();
   if(dialogType==='settings'&&bindingEditor?.dirty){bindingEditor.message='Apply or Discard your keybind changes before closing.';bindingEditor.render();dialog.querySelector('.dialog-body').dispatchEvent(new Event('settings-show-bindings'));dialog.querySelector('.binding-footer')?.scrollIntoView({block:'nearest'});return;}
   if(dialogType==='rename'){toast('Choose an available name to continue, or leave the match.');return;}
+  if(dialogType==='royale-stats'){dialog.close();dialogType='';paused=false;return;}
   if(['royale-inventory','royale-map'].includes(dialogType)){void resume();return;}
   sound.cue('ui-back');
   bindingEditor = null;
@@ -520,9 +528,18 @@ function renamePrompt(){
   modal('That name is already in this match',`<p>Choose an unused player name to continue.</p><label for="room-name">Player name</label><input id="room-name" class="field" maxlength="18" value="${esc(profile.name)}" autocomplete="off"><button class="primary" data-action="save-room-name">USE THIS NAME</button><button class="plain" data-action="leave">Leave match</button>`,'rename');
   $('#room-name').focus();$('#room-name').select();$('#room-name').onkeydown=e=>{if(e.key==='Enter')actions['save-room-name']();};
 }
+let nameChosen;
+function requiredNamePrompt(){
+  if(!needsPlayerName(profile.name))return;
+  if(dialogType==='name-required'&&dialog.open)return;
+  modal('CHOOSE YOUR PLAYER NAME',`<p>Your name appears in matches, parties, and the leaderboard. Choose a nickname to continue.</p><label for="required-name">PLAYER NAME</label><input id="required-name" class="field" maxlength="18" placeholder="Your nickname" autocomplete="nickname" spellcheck="false"><p id="required-name-error" role="alert"></p><button class="primary" data-action="save-player-name">LET’S PLAY</button>`,'name-required');
+  dialog.querySelector('.close-btn')?.remove();
+  $('#required-name').focus();$('#required-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();actions['save-player-name']();}};
+}
 function roundIntro(){
   if(!state)return;
   dialog.close();dialogType='';paused=true;keys.clear();queuedActions.clear();input.fire=input.aim=false;
+  if(state.royale){resultAt=0;$('#round-banner').hidden=true;if(document.pointerLockElement)document.exitPointerLock();matchEndUI.update(state,localId,true);return;}
   const p=state.players.find(p=>p.id===localId),ranked=state.players.filter(p=>!p.spectating||p.place).sort((a,b)=>b.kills-a.kills||a.deaths-b.deaths||b.points-a.points);
   const place=state.royale?p?.place:p?1+ranked.filter(other=>other.kills>p.kills||other.kills===p.kills&&other.deaths<p.deaths).length:0;
   const win=state.royale?wonRoyale(state,localId):mode(state.options.mode).teams?state.scores[p?.team]>state.scores[1-p?.team]:place===1;
@@ -754,7 +771,7 @@ function enterGame(capture = false) {
   showLoading(watching?'PREPARING SPECTATOR VIEW':'DEPLOYING TO THE FRONT',watching?'Connecting to the action. Spectators cannot affect the match.':'Preparing the battlefield and your operator.',{kind:watching?'spectate':'enter'});
   guestFire.reset();
   connectionReport.network.reset();
-  resultAt=0;$("#round-banner").hidden=true;
+  resultAt=0;$("#round-banner").hidden=true;matchEndUI.reset();
   screen = "game";
   $("#menu").hidden = true;
   $("#lobby").hidden = true;
@@ -857,7 +874,7 @@ function leave(confirm = false,notifyParty=true) {
   if(notifyParty){activeLaunch=null;void partyRequest("returned");}
   earnMatch++;
   buildControls.buildMode=false;buildUI.cancel();
-  resultAt=0;$("#round-banner").hidden=true;damageDirections.reset();combatConfirmation.reset();
+  resultAt=0;$("#round-banner").hidden=true;matchEndUI.reset();view.eliminations.clear();damageDirections.reset();combatConfirmation.reset();
   matchRequest++;autoQueue=false;sound.stopWorld();royaleUI.waypoint=null;royaleUI.root.hidden=true;document.body.classList.remove('in-royale','in-spawn-island','in-duos');
   net?.destroy();
   net = null;
@@ -911,9 +928,10 @@ function openEmotes(){
 function playEmote(id){
  const def=EMOTES.find(e=>e.id===id);if(!def)return;
  if(screen==='menu'){if(def.locked&&!crownStatus.unlocked)return;view.lobbyEmote={id,start:view.clock,until:def.duration?view.clock+def.duration:0};view.lobbyCrownWins=crownStatus.wins;dialog.close();dialogType='';return;}
- sendPlayerAction('emote-'+id);buildUI.cancel();buildControls.buildMode=false;void resume();
+ sendPlayerAction('emote-'+id);buildUI.cancel();buildControls.buildMode=false;void resume(state?.phase!=='results');
 }
 function resultsMenu() {
+  if(state?.royale){matchEndUI.update(state,localId,true);return;}
   const p = state.players.find((p) => p.id === localId);
 
   modal(
@@ -957,7 +975,7 @@ function processEvents() {
     if(echoed)e.echoed=true;
     if(e.type==='afk-removed'){if(e.player===localId){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');return;}if(net?.isHost)net.kick(e.player);}
     if(e.type==='duo-marker'&&e.player!==localId&&e.team!==state.players.find(p=>p.id===localId)?.team)continue;
-    view.event(e, localId);
+    view.event(e, localId,state);
     recordSeasonEvent(e,state,localId);if(['boss-defeated','relay-captured','rig-used','elimination','hit'].includes(e.type)&&e.player===localId){const earned=masteryRewards().filter(id=>!eggWallet.value.owned.includes(id));if(earned.length)eggWallet.change(w=>({...w,owned:[...new Set([...w.owned,...earned])]})).then(()=>toast('Season 1 cosmetic reward unlocked · Locker')).catch(()=>{});}
     if(e.type==='crown-picked-up'||e.type==='crown-dropped')notice(e.name+(e.type==='crown-picked-up'?' picked up a Victory Crown':' dropped a Victory Crown'));
     if(e.type==='crown-victory'&&e.player===localId)notice(e.crowned?'CROWNED VICTORY · '+e.wins+' this season':'VICTORY CROWN EARNED');
@@ -972,7 +990,7 @@ function processEvents() {
     if(e.type==='knocked'&&teammates(state.options,me,state.players.find(p=>p.id===e.target)))notice(`Teammate downed · ${e.targetName}`,1800);
     if(e.type==='revived'&&(e.player===localId||e.target===localId))notice(e.target===localId?'Back in the fight · 30 health':'Teammate revived',2200);
     if(e.type==='streak-bonus'&&e.player===localId){streakUI.announce(e,state.options.mode);sound.pickup();}
-    if(e.type==='royale-eliminated'&&e.player===localId){spectateTarget=state.players.find(p=>teammates(state.options,me,p)&&p.health>0)?.id||me?.killerId;pendingInputs=[];predicted=null;}
+    if(e.type==='royale-eliminated'&&e.player===localId){spectateTarget=preferredSpectator(state,localId);pendingInputs=[];predicted=null;keys.clear();queuedActions.clear();input.fire=input.aim=false;if(document.pointerLockElement)document.exitPointerLock();}
     if (e.type === "shot"&&!echoed) {
       const distance = me
         ? Math.hypot(e.origin.x - me.x, e.origin.z - me.z)
@@ -1210,6 +1228,8 @@ async function launchParty(launch){
  }catch(error){await partyRequest('failed',{id:launch.id,reason:error.message});if(activeLaunch===launch.id)activeLaunch=null;}
 }
 function initializeParty(){
+ if(needsPlayerName(profile.name))return;
+ if(party){party.updateProfile(profile);return;}
  party=new PartyClient(profile,{
   status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
@@ -1234,6 +1254,13 @@ function inventoryAction(action,index,from){
  if(dialogType==='royale-inventory')royaleUI.updateInventory(state.players.find(p=>p.id===localId));
 }
 const actions = {
+ 'end-spectate':()=>{matchEndUI.watch();paused=false;},
+ 'match-stats':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('MATCH STATS',`<p>${p?.place?'PLACEMENT #'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS</p><p>${esc(matchEarnings.status)} · ${matchEarnings.total||0} Marks</p>${scoresHTML()}<button class="primary" data-action="close">BACK TO MATCH</button>`,'royale-stats');},
+ 'save-player-name':()=>{
+  const raw=$('#required-name')?.value||'',name=safeName(raw),checked=moderateText(raw,{kind:'name'});
+  if(!checked.ok||needsPlayerName(name)){$('#required-name-error').textContent='Choose a nickname other than Player (up to 18 characters).';$('#required-name').focus();return;}
+  profile=safeProfile({...profile,name});save('yolk-profile',profile);dialog.close();dialogType='';paused=false;initializeParty();renderMenu();nameChosen?.();nameChosen=null;
+ },
  'leaderboard-open':()=>{leaderboardOffset=0;leaderboardPageBoards=leaderboards;modal('FRONTIER LEADERS',`<section class="frontier-leaderboard frontier-leaderboard-expanded">${leaderboardMarkup({...menuModel(),expanded:true})}</section>`,'leaderboards');void refreshLeaderboards(true);},
  'leaderboard-refresh':()=>{void refreshLeaderboards(true);},
  'owner-map-editor':()=>ownerConsole.openMapEditor(),
@@ -1286,7 +1313,7 @@ const actions = {
   'chat-controls':()=>{dialog.close();dialogType='';chat.showControls();},
   'save-room-name':()=>{
     const raw=$('#room-name').value;const checked=moderateText(raw,{name:true});
-    if(!checked.ok||!raw.trim()){toast('Choose another player name.');return;}
+    if(!checked.ok||needsPlayerName(safeName(raw))){toast('Choose a nickname other than Player.');return;}
     profile=safeProfile({...profile,name:raw});save('yolk-profile',profile);
     if(net){const button=dialog.querySelector('[data-action="save-room-name"]');button.disabled=true;button.textContent='CHECKING NAME…';}
     if(net)net.submitName(profile);else if(sim?.setProfile(localId,profile)!==false){dialog.close();dialogType='';void resume();}else renamePrompt();
@@ -1360,6 +1387,7 @@ const actions = {
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button,[data-action]");
   if (!b) return;
+  if(needsPlayerName(profile.name)&&b.dataset.action!=='save-player-name'){e.preventDefault();requiredNamePrompt();return;}
   if(b.dataset.leaderboardTab){leaderboardTab=b.dataset.leaderboardTab==='wins'?'wins':'kills';renderLeaderboard(true);}
   if(b.dataset.leaderboardPage!==undefined&&!leaderboardPending&&dialogType==='leaderboards'){leaderboardOffset=Math.max(0,Number(b.dataset.leaderboardPage)||0);$('#dialog .frontier-board-ranks').scrollTop=0;void refreshLeaderboards(true);}
   if(b.dataset.socialTab){socialTab=b.dataset.socialTab;void socialMenu();}
@@ -1434,7 +1462,7 @@ dialog.addEventListener("cancel", (e) => {
     leave();
     return;
   }
-  if (dialogType === "results" || dialogType === "rename") return;
+  if (dialogType === "results" || dialogType === "rename" || dialogType === "name-required") return;
   if (dialogType === "pause" || dialogType === "ready") resume();
   else closeDialog();
 });
@@ -1847,6 +1875,7 @@ function loop(now) {
   }
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
+  view.cinematic=matchEndUI.update(state,localId,screen==='game',now);
   document.body.classList.toggle('is-emoting',screen==='game'&&!!me?.emote);
   emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game';
   const emoteButtonText=(screen==='menu'?!!view.lobbyEmote:!!me?.emote)?'STOP EMOTE':screen==='game'?'EMOTES':'EMOTES · '+bindingLabel(settings.keybinds.emotes[0]||'KeyO');if(emoteButton.textContent!==emoteButtonText)emoteButton.textContent=emoteButtonText;
@@ -1863,7 +1892,7 @@ function loop(now) {
   updateSpectatorStatus(me,now);
   soundVisuals.update(state,me?.spectating?state?.players.find(p=>p.id===spectateTarget):me,{enabled:settings.visualSoundEffects,categories:settings,playing:screen==='game'&&!paused&&!document.hidden},now);
   sound.updateLobby(screen!=='game',dt,document.hidden);
-  sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!(!net&&paused));
+  sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!document.hidden&&(state?.phase==='results'||!(!net&&paused)));
   let renderPlayer = predicted;
   if (sim && !sim.remote && me) {
     renderPlayer = {
@@ -1915,7 +1944,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(()=>showWelcomeBack()).then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return showWelcomeBack();}).then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);
@@ -1931,6 +1960,8 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
     scenery:()=>({labels:(()=>{let n=0;view.world.traverse(m=>{if(m.isSprite)n++;});return n;})(),loot:view.royaleView.loot.size,chests:view.royaleView.chests.size}),
     bossAlerts:()=>[...view.models].filter(([id])=>state?.players.find(p=>p.id===id)?.boss).map(([id,m])=>({id,visible:!!(m.visible&&m.userData.bossAlert?.visible),symbol:m.userData.bossAlert?.userData.symbol,color:m.userData.bossAlert?.userData.color,nameY:m.userData.nameplate?.position.y,alertY:m.userData.bossAlert?.position.y})),
     bossVoiceAudio:()=>({...sound.bossAudio.debug,active:sound.bossAudio.active.size,loaded:!!sound.bossAudio.buffer}),
+    fieldAudio:()=>({...sound.fieldSamples.debug,loaded:[...sound.fieldSamples.buffers.keys()],active:[...sound.fieldSamples.active].map(([id,voices])=>({id,count:voices.size}))}),
+    endPresentation:()=>({phase:matchEndUI.phase,cinematic:view.cinematic,effects:view.eliminations.diagnostics()}),
     party:()=>({id:party?.id,party:party?.party,ready:party?.ready}),
     partyMembers:()=>view?.partyEggs?.length||0,
     chatRead: () => ({rows:chat.inbox.rows,open:chat.opened,muted:[...chat.inbox.muted],chatEnabled:net?.chatEnabled}),

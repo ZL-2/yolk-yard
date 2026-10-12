@@ -46,6 +46,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Desktop/mobile controls, inventory, combat HUD and camera
         run: node scripts/expansion-browser-check.mjs
+      - name: Required names, visible rankings, field audio and match outcome screens
+        run: node scripts/match-polish-browser-check.mjs
       - name: Owner editor, transformations, Test walk, draft conflicts and publishing
         run: EDITOR_CHECK_OUTPUT=test-results/expansion/map-editor node scripts/map-editor-browser-check.mjs
       - uses: actions/upload-artifact@v4

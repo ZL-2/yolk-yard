@@ -1,4 +1,5 @@
 import {groundAt} from './terrain.js';
+import {VAULT_AMMO_STOCK} from './vaults.js';
 
 // Authored identity data is shared by architecture, the map and field briefings.
 export const LOCATION_IDENTITIES={
@@ -111,8 +112,8 @@ export function authorFrontierWorld(c){
   put(a.x+a.w/2,top-.27,z,4,.25,3.4,0x697f85,{indestructible:true});
   traversal.push({id:'asc-'+poi,type:'ascender',label:poi==='observatory'?'COMMAND ROOF ACCESS':poi==='works'?'HEADFRAME LIFT':'DOCK SERVICE LIFT',from:{x:x+3.2,y:yAt(x+3.2,z+.55),z:z+.55},to:{x:x+1,y:top,z:z+.55},via:[{x:x+3.2,y:top+.1,z:z+.55}],speed:6.5});
  }
- // Five ammunition reserves supplement the four locked vault chests.
- for(const [i,type]of ['light','medium','shells','heavy','rockets'].entries())floorLoot.push({x:vx-4+i*2,y:vy,z:vz,poi:'observatory',role:'ammo',ammoType:type,chance:1,vaultId:vault.id});
+ const reserveAmmo=(id,poi,x,y,z)=>{for(const side of [-1,1])for(const [i,[type,count]]of Object.entries(VAULT_AMMO_STOCK).entries())floorLoot.push({x:x-4+i*2,y,z:z+side*.7,poi,role:'ammo',ammoType:type,ammoCount:count,chance:1,vaultId:id});};
+ reserveAmmo(vault.id,'observatory',vx,vy,vz);
  const shieldBarrels=[];
  const barrel=(x,y,z,location)=>{prop('shield-barrel',x,z,.85,.85,1.25,y,{material:'metal',location});shieldBarrels.push({x,y,z,location});};
  for(const dx of [-2,2])barrel(vx+dx,vy,vz-6,'Voss strategic reserve');
@@ -133,7 +134,7 @@ export function authorFrontierWorld(c){
  const sx=196,sz=192,sy=Math.max(yAt(sx,sz),yAt(sx,sz-14))+3.2;
  put(sx,sy-.25,sz,12,.25,18,0x405c68,{indestructible:true});
  for(const side of [-1,1]){put(sx+side*5.7,sy,sz,.3,1.1,18,0x8299a1);put(sx+side*5.7,sy+1.1,sz,.4,.15,18,0xd8b56a);}
- put(sx,sy,sz+8.5,11,.9,.35,0x405c68);
+ for(const side of [-1,1])put(sx+side*4,sy,sz+8.5,3,.9,.35,0x405c68);
  for(let i=0;i<8;i++){const top=sy-2.8+i*.4;put(sx,top-.4,sz-14+i*.6,3,.4,1,0x78898c,{indestructible:true});}
  sign('ROOK / SALVAGE COMMAND',sx,sy+3,sz+7);
  const woods=c.districts.find(p=>p.id==='woods'),wy=yAt(woods.x,woods.z)+23.3;
@@ -142,31 +143,54 @@ export function authorFrontierWorld(c){
  const low={x:woods.x+6,y:yAt(woods.x+6,woods.z),z:woods.z},high={x:woods.x+3.5,y:wy,z:woods.z};
  traversal.push({id:'nyx-lookout-ascender',type:'ascender',from:low,to:high,via:[{x:low.x,y:wy,z:low.z}],speed:9});navLinks.push({from:low,to:high,traversal:true});
  sign('NYX / NIGHTGLASS LOOKOUT',woods.x,wy+3,woods.z);
- // Two nearby walk-in reserves: a dockside armored cargo hold and a forest bunker.
- // These are real sealed rooms, with independent readers, gates and locked loot.
+ // Rook's reserve is an armored freight hold attached to his salvage deck.
+ // Nyx's reserve is recessed beside the lookout, with a real stair approach.
  const reserve=(id,bossId,key,name,poi,x,z,color)=>{
-  const y=yAt(x,z)+.1;
+  const harbor=poi==='docks',surface=yAt(x,z),y=harbor?sy:surface-2.4,w=harbor?18:16,d=14,h=harbor?5.2:4.3;
   for(let iz=0;iz<terrain.n;iz++)for(let ix=0;ix<terrain.n;ix++){
    const tx=ix*terrain.cell-terrain.size,tz=iz*terrain.cell-terrain.size;
-   if(Math.abs(tx-x)<=8&&Math.abs(tz-z)<=8||Math.abs(tx-x)<=4&&tz>z+8&&tz<=z+13)terrain.heights[iz*terrain.n+ix]=y-.1;
+   const room=Math.abs(tx-x)<=w/2+1&&Math.abs(tz-z)<=d/2+1;
+   const approach=Math.abs(tx-x)<=3&&tz>z+d/2&&tz<=z+d/2+11;
+   if(room||approach)terrain.heights[iz*terrain.n+ix]=y-.15;
   }
-  const shell=(dx,dy,dz,w,h,d)=>put(x+dx,y+dy,z+dz,w,h,d,color,{indestructible:true,vaultShell:true,material:'metal'});
-  shell(0,-.25,0,12,.25,12);shell(0,4.2,0,12,.5,12);
-  shell(-5.8,0,0,.4,4.2,12);shell(5.8,0,0,.4,4.2,12);shell(0,0,-5.8,12,4.2,.4);
-  for(const side of [-1,1])shell(side*3.75,0,5.8,4.5,4.2,.4);
-  shell(0,3.2,5.8,3,1,.4);
-  const gate=door(x,y,z+5.8,3,3.2,{vault:true,vaultId:id,material:'metal'});
-  for(const [i,[dx,dz,source]]of [[-3,-2,'epic'],[3,-2,'epic'],[-3,2,'chest'],[3,2,'chest']].entries())chests.push({id:id+'-chest-'+i,x:x+dx,y,z:z+dz,poi,source,chance:1,vaultId:id,room:'vault'});
-  for(const [i,type]of ['medium','shells','heavy'].entries())floorLoot.push({x:x-2+i*2,y,z,poi,role:'ammo',ammoType:type,chance:1,vaultId:id});
-  for(const side of [-1,1]){barrel(x+side*4,y,z-4,name);prop('vault-rack',x+side*5,z, .7,7,3,y,{decorative:true});}
-  if(poi==='woods'){shell(0,4.7,0,13,.6,13);for(const dx of [-4,4])put(x+dx,y+5.3,z,2,.3,8,0x6e795e,{indestructible:true});}
-  else for(const dz of [-4,-2,0,2,4])shell(-5.55,.2,dz,.12,3.7,.18);
-  const reader={x:x+1.1,y,z:z+7.4},entrance={x,y,z:z+11};
-  navLinks.push({from:entrance,to:reader});sign(name.toUpperCase(),x,y+3.6,z+6.1);
-  return {id,bossId,key,name,doorId:gate.id,x,y,z,reader,entrance,stairs:[]};
+  const shell=(dx,dy,dz,ww,hh,dd)=>put(x+dx,y+dy,z+dz,ww,hh,dd,color,{indestructible:true,vaultShell:true,material:'metal'});
+  shell(0,-.25,0,w,.25,d);shell(0,h,0,w+.6,.5,d+.6);
+  for(const side of [-1,1])shell(side*(w/2-.2),0,0,.4,h,d);
+  shell(0,0,-d/2+.2,w,h,.4);
+  for(const side of [-1,1])shell(side*(w/4+.8),0,d/2-.2,w/2-1.6,h,.4);
+  shell(0,3.2,d/2-.2,3.2,h-3.2,.4);
+  const gate=door(x,y,z+d/2-.2,3.2,3.2,{vault:true,vaultId:id,material:'metal'});
+  for(const [i,[dx,dz,source]]of [[-4,-3,'epic'],[4,-3,'epic'],[-4,3,'chest'],[4,3,'chest']].entries())chests.push({id:id+'-chest-'+i,x:x+dx,y,z:z+dz,poi,source,chance:1,vaultId:id,room:'vault'});
+  reserveAmmo(id,poi,x,y,z);
+  for(const side of [-1,1]){barrel(x+side*5.2,y,z-5,name);prop('vault-rack',x+side*(w/2-1),z,.7,8,3,y,{decorative:true});}
+  const reader={x:x+1.1,y,z:z+d/2+1.4},stairs=[],entrance={x,y:harbor?y:surface,z:z+d/2+11};
+  shell(0,-.25,d/2+2.2,5,.25,5);
+  if(harbor){
+   // Reinforced freight hull, support piles, and a level service catwalk from
+   // the boss deck. Exterior trims leave the reader and loot paths clear.
+   for(const side of [-1,1])for(const dz of [-5,-2,1,4])put(x+side*(w/2+.15),y+.1,z+dz,.24,h+.2,.35,0xb29a68,{indestructible:true});
+   put(x,y-.85,z,w+1,.6,d+1,0x243a48,{indestructible:true});
+   for(const side of [-1,1])for(const dz of [-4,4])put(x+side*6,y-2.3,z+dz,.7,1.5,.7,0x364d59,{indestructible:true});
+   put((sx+x)/2,y-.25,sz+11,x-sx+5,.25,3.5,0x576c75,{indestructible:true,kind:'floor'});
+   put(sx,y-.25,sz+9.1,4.5,.25,3,0x576c75,{indestructible:true,kind:'floor'});
+   for(const side of [-1,1])put(x+side*3.2,y,z+d/2+(side<0?1:3),.2,1.1,side<0?1.8:5,0xb79c65,{indestructible:true});
+   sign('BREAKWATER / ARMORED FREIGHT',x,y+h-.7,z+d/2+.15);
+   navLinks.push({from:{x:sx,y:sy,z:sz+7},to:reader});
+  }else{
+   // A moss-capped concrete shelter, rather than a freestanding metal cube.
+   put(x,y+h+.5,z,w+1,.6,d+1,0x616f4d,{indestructible:true,material:'brick'});
+   for(const side of [-1,1])put(x+side*(w/2+.45),y-.15,z,1.1,h+.4,d+1,0x79806c,{indestructible:true,material:'brick'});
+   for(let i=0;i<8;i++){const top=y+(i+1)*.3,zz=z+d/2+4+i*.85;put(x,y-.15,zz,4.4,top-y+.15,.9,0x7b8274,{indestructible:true,kind:'step'});}
+   put(x,surface-.25,entrance.z,4.4,.25,2.2,0x7b8274,{indestructible:true,kind:'floor'});
+   for(const side of [-1,1])put(x+side*2.6,y-.15,z+d/2+7,.5,3.2,9,0x65745e,{indestructible:true,material:'brick'});
+   stairs.push({...entrance},{x,y:y+1.2,z:z+d/2+7},{x,y,z:z+d/2+3});
+   sign('NIGHTGLASS / CONCEALED RESERVE',x,surface+1.3,entrance.z+.8);
+  }
+  navLinks.push({from:entrance,to:reader});sign(name.toUpperCase(),x,y+2.5,z+d/2+.15);
+  return {id,bossId,key,name,doorId:gate.id,x,y,z,reader,entrance,stairs,theme:harbor?'armored-cargo':'recessed-forest',width:w,depth:d};
  };
  const rookVault=reserve('rook-vault','marshal-rook','rookKeycard','Rook Harbor Hold','docks',212,192,0x39566a);
- const nyxVault=reserve('nyx-vault','lieutenant-nyx','nyxKeycard','Nyx Nightglass Bunker','woods',woods.x-20,woods.z,0x52604d);
+ const nyxVault=reserve('nyx-vault','lieutenant-nyx','nyxKeycard','Nyx Nightglass Bunker','woods',woods.x-16,woods.z+1,0x52604d);
  const vaults=[vault,rookVault,nyxVault];
  const bossSites=[{bossId:'marshal-rook',x:sx,y:sy,z:sz,patrol:[{x:sx-3,y:sy,z:sz-4},{x:sx+3,y:sy,z:sz+4}],cache:{id:'rook-hold',key:'rookKeycard',name:'Harbor Hold',x:sx,y:sy,z:sz+6}},
  {bossId:'lieutenant-nyx',x:woods.x,y:wy,z:woods.z,patrol:[{x:woods.x-2,y:wy,z:woods.z-2},{x:woods.x+2,y:wy,z:woods.z+2}],cache:{id:'nyx-cache',key:'nyxKeycard',name:nyxVault.name,...nyxVault.reader,vaultId:nyxVault.id}}];

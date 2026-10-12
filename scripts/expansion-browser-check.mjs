@@ -41,8 +41,9 @@ try{
  await page.mouse.click(720,450,{button:'right'});await page.waitForFunction(()=>{const q=window.__yolkTest.read();return !q.state.players.find(p=>p.id===q.localId).aim&&q.scope.aimBlend<.1;});checks.toggleAimAndCamera=true;
  await page.waitForFunction(()=>window.__yolkTest.fixture(s=>s.players.get(window.__yolkTest.read().localId).pickupPreferences?.shotgun===4));
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{window.__yolkTest.look(0,-.2);const p=s.players.get(window.__yolkTest.read().localId),item=s.dropLoot({...p,z:p.z-1.8},{id:'scatter',weapon:true,count:1,ammo:5,rarity:4});if(!item)throw Error('loot fixture unreachable');}));
- await page.waitForFunction(()=>document.querySelector('#royale-prompt .loot-comparison'));
- await page.screenshot({path:out+'/loot-comparison.png'});await page.keyboard.press('KeyF');
+ await page.waitForFunction(()=>document.querySelector('#royale-prompt').textContent.includes('M12 Combat Shotgun'));
+ assert.equal(await page.locator('#royale-prompt .loot-comparison').count(),0,'ground weapon stats are intentionally hidden');
+ await page.screenshot({path:out+'/loot-pickup.png'});await page.keyboard.press('KeyF');
  await page.waitForFunction(()=>{const q=window.__yolkTest.read();return q.state.players.find(p=>p.id===q.localId).inventory[4]?.id==='scatter';});checks.preferredPickup=true;
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{const id=window.__yolkTest.read().localId,p=s.players.get(id);s.emit('hit',{player:id,target:'qa-enemy',amount:20,shotId:'qa-shield',shield:true,shieldBreak:true});s.emit('hit',{player:'qa-enemy',target:id,amount:10,sourceX:p.x+6,sourceZ:p.z,shield:true});}));
  await page.waitForFunction(()=>document.querySelector('#hit-marker')?.dataset.kind==='break');

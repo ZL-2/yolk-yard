@@ -10,7 +10,7 @@ import {canStand,wallDistance,candidates} from './physics.js';
 const sources=['ground','chest','high','supply','epic'];
 export const AMMO_DROPS=AMMO_RULES;
 export const LOOT_TABLE=[
- ...[['sprinter',28,'assault'],['pip',18,'sidearm'],['zipper',23,'smg'],['scatter',20,'shotgun'],['doubleyolk',16,'shotgun'],['duet',13,'assault'],['anchor',8,'marksman'],['peeper',8,'marksman'],['needle',4,'sniper'],['comet',9,'energy'],['thumper',2,'launcher']].map(([id,weight,category])=>({id,weight,category,weapon:true,ammoType:ammoType(id),sources,rarities:id==='thumper'?[0,0,65,30,5]:[53,30,13,3.5,.5]})),
+ ...[['sprinter',28,'assault'],['pip',18,'sidearm'],['zipper',23,'smg'],['scatter',20,'shotgun'],['doubleyolk',16,'shotgun'],['duet',13,'assault'],['anchor',8,'marksman'],['peeper',8,'marksman'],['needle',4,'sniper'],['comet',9,'energy'],['thumper',4,'launcher']].map(([id,weight,category])=>({id,weight,category,weapon:true,ammoType:ammoType(id),sources,rarities:id==='thumper'?[0,0,65,30,5]:[53,30,13,3.5,.5]})),
  ...[['bandage',18,0],['medkit',10,1],['mini',30,1],['flask',16,2],['splash',9,2],['popper',8,1],['impulse',6,2],['launchpad',3,3],['smoke',7,1],['scanner',4,2]].map(([id,weight,rarity])=>({id,weight,rarity,category:['bandage','medkit'].includes(id)?'health':['mini','flask','splash'].includes(id)?'shield':'utility',sources:id==='launchpad'?['chest','high','supply','epic']:sources,counts:id==='mini'?[3,3]:id==='flask'?[1,1]:id==='bandage'?[2,3]:[1,2]})),
  ...Object.entries(AMMO_DROPS).map(([id,v])=>({id,...v,category:'ammo',ammoType:id,sources:['ground']})),
 ];
@@ -52,7 +52,7 @@ export function* seedIslandLootSteps(sim){
  for(const point of sim.map.floorLoot){
   yield;
   if(sim.random()>point.chance||!validLootPoint(sim.map,point))continue;
-  const item=point.ammoType?{id:point.ammoType,ammoType:point.ammoType,count:AMMO_DROPS[point.ammoType].min,rarity:0}:rollItem(sim.random,'ground',point.role),drop=sim.dropLoot(point,item);
+  const item=point.ammoType?{id:point.ammoType,ammoType:point.ammoType,count:Number.isFinite(point.ammoCount)?Math.max(1,Math.min(AMMO_DROPS[point.ammoType].cap,Math.floor(point.ammoCount))):AMMO_DROPS[point.ammoType].min,rarity:0}:rollItem(sim.random,'ground',point.role),drop=sim.dropLoot(point,item);
   if(drop?.weapon){if(point.floor===0)armed.add(point.building);sim.dropLoot(point,matchingAmmo(item,sim.random));}
  }
  // Each structure has a usable early-game weapon, with variable sockets and contents.

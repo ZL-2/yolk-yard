@@ -3,6 +3,7 @@ import {updateBossAlert} from './boss-alert-view.js';
 import {authoredBoxes} from './building.js';
 import {RenderPool} from './render-pool.js';
 import {makeHumanoid,animateHumanoid,humanoidDiagnostics} from './humanoid.js';
+import {EliminationEffects} from './elimination-effects.js';
 import {lobbyScene} from './lobby-scene.js';
 import {lootModel,gliderModel} from './royale-art.js';
 import {inventoryPreview} from './inventory-previews.js';
@@ -173,6 +174,7 @@ export class View {
     this.scene.add(this.actors);
     this.effects = new THREE.Group();
     this.scene.add(this.effects);
+    this.eliminations=new EliminationEffects(this.effects);
     this.models = new Map();
     this.projectiles = new Map();
     this.renderPool=new RenderPool();
@@ -573,7 +575,7 @@ export class View {
     this.localArms = makeArms(id, p, true);
     this.gunGroup.add(this.localArms);
   }
-  event(e, localId) {
+  event(e, localId,state=null) {
     this.royaleView.event(e);
     if (e.type === "hit" && e.player === localId && Number.isFinite(e.x)) {
       const key=e.shotId!=null?e.player+':'+e.shotId+':'+e.target:null;
@@ -662,7 +664,12 @@ export class View {
         });
       }
     }
-    if (e.type === "elimination" || e.type === "explosion") {
+    if(e.type==='elimination'&&(state?.royale||this.isRoyale)){
+      const me=state?.players.find(p=>p.id===localId)||this.localPlayer,listener=me?.spectating&&e.target!==localId?state?.players.find(p=>p.id===this.spectateTarget)||me:me;
+      const target=state?.players.find(p=>p.id===e.target);
+      this.eliminations.spawn({...e,yaw:target?.yaw},this.models.get(e.target)||(e.target===localId?this.menuEgg:null),listener,this.settings.reducedMotion);
+    }
+    if (e.type === "explosion" || e.type==='elimination'&&!(state?.royale||this.isRoyale)) {
       for (let i = 0; i < (e.type === "elimination" ? 18 : 26); i++) {
         const c =
           e.type === "elimination"
@@ -732,6 +739,8 @@ export class View {
     this.pendingShots.length = 0;
   }
   update(state, local, predicted, dt, playing, aim, profile) {
+    this.isRoyale=!!state?.royale;this.localPlayer=local;
+    if(!playing&&this.eliminations.active.length)this.eliminations.clear();
     // Reduce GPU work when rendering itself delays input and socket processing.
     this.frameAverage=(this.frameAverage||1/60)*.9+dt*.1;
     this.budgetClock=(this.budgetClock||0)+dt;
@@ -752,7 +761,7 @@ export class View {
     for(const egg of this.partyEggs||[])egg.visible=!playing;
     this.actors.visible = playing;
     this.effects.visible = playing;
-    this.gunGroup.visible = playing && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
+    this.gunGroup.visible = playing && !this.cinematic?.victory && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
     if (!playing) {
       this.clearOutgoing(this);
       this.preview(profile);
@@ -768,7 +777,8 @@ export class View {
       this.camera.fov = narrow?47:48;
       this.camera.updateProjectionMatrix();
     } else if (local) {
-      const killer = local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && p.health > 0);
+      const hold=!!this.cinematic?.hold,victory=!!this.cinematic?.victory;
+      const killer = !hold&&local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && p.health > 0);
       const p = killer || (local.health <= 0 ? local : predicted || local);
       this.stairEye=stairCamera(this.stairEye,p,dt,`${state.round}:${p.id}:${local.health>0}`);
       const desiredEye=eyeHeight(p);this.stanceEye=this.stanceEye===undefined?desiredEye:THREE.MathUtils.lerp(this.stanceEye,desiredEye,1-Math.exp(-dt*17));
@@ -779,11 +789,11 @@ export class View {
       );
       this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
       let cameraBoom=false;
-      if (killer || local.downed || local.emote) {
-        const cameraYaw=local.emote?(this.emoteLook?.yaw??p.yaw):p.yaw;
+      if (killer || local.downed || local.emote || hold || victory) {
+        const cameraYaw=victory?p.yaw+Math.PI+.35:local.emote?(this.emoteLook?.yaw??p.yaw):p.yaw;
         const back = this.cameraBack??=new THREE.Vector3();back.set(Math.sin(cameraYaw),local.emote?.2:.35,Math.cos(cameraYaw)).normalize();
         const origin = this.cameraOrigin??=new THREE.Vector3();origin.set(p.x,p.y+Math.min(1.6,eyeHeight(p)),p.z);
-        this.placeCameraBehind(state,p,origin,back,local.emote?4.2:3.5,dt,local.emote?'emote':'spectator');cameraBoom=true;
+        this.placeCameraBehind(state,p,origin,back,victory?5.2:hold?4.8:local.emote?4.2:3.5,dt,victory?'victory':hold?'elimination':local.emote?'emote':'spectator');cameraBoom=true;
         this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
       }
       const draw=equipPose(local,state.time);
@@ -796,7 +806,7 @@ export class View {
       const aiming = !!(canFight(local) && !local.emote && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
       if(!Number.isFinite(this.aimBlend))this.aimBlend=0;
       this.aimBlend += (Number(aiming) - this.aimBlend) * (1-Math.exp(-Math.log(20)*dt/w.adsTime));
-      const fov=aiming?adsFov(w,this.settings.fov):this.settings.fov;
+      const fov=victory?Math.min(65,this.settings.fov):aiming?adsFov(w,this.settings.fov):this.settings.fov;
       this.camera.fov+=(fov-this.camera.fov)*(1-Math.exp(-Math.log(20)*dt/w.adsTime));
       this.camera.updateProjectionMatrix();
       const bob =
@@ -879,7 +889,7 @@ export class View {
         // Transport passengers share one simulation position; the airship
         // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;
-        if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.75)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && !p.emote && !p.downed && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
+        if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.16)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && !this.cinematic?.victory && !p.emote && !p.downed && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
         seen.add(p.id);
         this.actorBounds.center.set(p.x,p.y+.9,p.z);
         if(playing&&!this.actorFrustum.intersectsSphere(this.actorBounds)){const hidden=this.models.get(p.id);if(hidden)hidden.visible=false;continue;}
@@ -938,7 +948,7 @@ export class View {
         model.userData.blaster.visible=!harvesting;
         model.userData.draw=draw;
         const deathAge=p.health<=0?state.time-(p.eliminatedAt??p.respawnAt-3):0;
-        model.visible=p.health>0||deathAge<1.3;
+        model.visible=p.health>0||deathAge<(state.royale ? .16 : 1.3);
         if (model.userData.arms&&poseDue) {
           const recoil = model.userData.armRecoil = Math.max(0, (model.userData.armRecoil || 0) - dt * 7);
           const hands = updateArms(model.userData.arms, draw.active?-1:reloadProgress(p, state.time), model.userData.blaster, recoil,draw.progress,null,!!p.reloadEmpty);
@@ -974,7 +984,7 @@ export class View {
         if(model.userData.nameplate)model.userData.nameplate.position.y=bodyHeight(p)+.3;
         if(p.boss)updateBossAlert(model,p,state.time,bodyHeight(p),distance);
         updateCelebration(model,p,state.time,g=>this.disposeGroup(g));
-        if(poseDue)animateHumanoid(model,{...p,shotRecoil:model.userData.armRecoil||0},poseDt,state.time,{distance:0});
+        if(poseDue)animateHumanoid(model,{...p,...(state.phase==='results'?{vx:0,vz:0,moving:false}:{}),shotRecoil:model.userData.armRecoil||0},poseDt,state.phase==='results'&&!p.emote?this.clock:state.time,{distance:0});
 
       }
       for (const [id, model] of this.models)
@@ -1068,6 +1078,8 @@ export class View {
     }
     for (const [id, offset] of this.shotOffsets)
       if (this.clock - offset.born > 0.12) this.shotOffsets.delete(id);
+    const effectDt=this.cinematic?.slowMotion&&!this.settings.reducedMotion?dt*.35:dt;
+    this.eliminations.update(effectDt);
     for (let i = this.fx.length - 1; i >= 0; i--) {
       const f = this.fx[i];
       if (f.fresh) {
