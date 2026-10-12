@@ -16,7 +16,7 @@ let browser,page;const errors=[],checks={};
 try{
  browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
  page=await browser.newPage({viewport:{width:1366,height:768}});page.setDefaultTimeout(45000);page.on('pageerror',e=>errors.push(e.message));
- await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-145-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:.25,musicVolume:0}));if(!localStorage.getItem('yolk-profile'))localStorage.setItem('yolk-profile',JSON.stringify({name:'Player'}));});
+ await page.addInitScript(()=>{if(!sessionStorage.getItem('polish-fixture-started')){localStorage.setItem('ravelfront-season-1-update-145-dismissed','yes');sessionStorage.setItem('polish-fixture-started','yes');}localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:.25,musicVolume:0}));if(!localStorage.getItem('yolk-profile'))localStorage.setItem('yolk-profile',JSON.stringify({name:'Player'}));});
  await page.goto(origin+'/?qa');await page.locator('#loading-screen').waitFor({state:'hidden'});await page.locator('#dialog[data-kind=name-required]').waitFor({state:'visible'});
  assert.equal(relay.relay.parties.users.size,0,'no anonymous social identity before choosing a name');
  await page.keyboard.press('Escape');assert.equal(await page.locator('#dialog[data-kind=name-required]').isVisible(),true);
