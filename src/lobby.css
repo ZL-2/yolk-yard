@@ -100,3 +100,4 @@ body.in-duos .performance-network{top:320px;left:22px}body.in-duos:has(.chat-hud
 .feature-request-card{border:1px solid #577983;border-radius:8px;padding:14px;margin:12px 0;background:#142b36}.feature-request-card small{display:block;color:#adcad0;margin-top:5px}.feature-request-card p{white-space:pre-wrap;overflow-wrap:anywhere}.yard-footer{flex-wrap:wrap;row-gap:4px}
 .yard-left-rail .frontier-board-ranks{scrollbar-gutter:stable;overflow-y:scroll}
 @media(min-width:761px) and (max-height:850px){.yard-left-rail .yard-private-card>.eyebrow,.yard-left-rail .yard-private-card>p{display:none}.yard-left-rail .yard-private-card{padding:7px 10px}.yard-left-rail .frontier-board-heading{margin-bottom:6px}}
+.frontier-leaderboard,.frontier-board-ranks{pointer-events:auto}
