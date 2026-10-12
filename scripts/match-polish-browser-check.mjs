@@ -15,7 +15,7 @@ await vite.listen();
 let browser,page;const errors=[],checks={};
 try{
  browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
- page=await browser.newPage({viewport:{width:1366,height:768}});page.setDefaultTimeout(45000);page.on('pageerror',e=>errors.push(e.message));
+ page=await browser.newPage({viewport:{width:1366,height:768}});page.setDefaultTimeout(45000);page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&/WebGLProgram|Shader Error/i.test(m.text()))errors.push(m.text());});
  await page.addInitScript(()=>{if(!sessionStorage.getItem('polish-fixture-started')){localStorage.setItem('ravelfront-season-1-update-145-dismissed','yes');sessionStorage.setItem('polish-fixture-started','yes');}localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:.25,musicVolume:0}));if(!localStorage.getItem('yolk-profile'))localStorage.setItem('yolk-profile',JSON.stringify({name:'Player'}));});
  await page.goto(origin+'/?qa');await page.locator('#loading-screen').waitFor({state:'hidden'});await page.locator('#dialog[data-kind=name-required]').waitFor({state:'visible'});
  assert.equal(relay.relay.parties.users.size,0,'no anonymous social identity before choosing a name');
@@ -27,7 +27,7 @@ try{
  // A new release owns its preference; closing without opting out shows it again.
  await page.locator('[data-action=season-guide]:visible').click();await page.locator('.season-poster-ready').waitFor();
  const cover=await page.locator('.season-poster-screen').boundingBox();assert.equal(cover.x,0);assert.equal(cover.y,0);assert.equal(Math.round(cover.width),1366);assert.equal(Math.round(cover.height),768);
- assert.equal(await page.locator('.season-title-impact').count(),3);await page.waitForFunction(()=>[...document.querySelectorAll('.season-title-impact')].every(e=>getComputedStyle(e).opacity==='1'&&getComputedStyle(e).transform==='none'));
+ assert.equal(await page.locator('.season-title-impact').count(),3);await page.waitForFunction(()=>[...document.querySelectorAll('.season-title-impact')].every(e=>Number(getComputedStyle(e).opacity)>.99&&e.getAnimations().every(a=>a.playState==='finished')));
  await page.screenshot({path:out+'/season-opening.png'});await page.locator('.season-enter').click();await page.reload();await page.locator('.season-poster-ready').waitFor();await page.locator('#season-hide').check();await page.locator('.season-enter').click();await page.reload();await page.locator('#loading-screen').waitFor({state:'hidden'});await page.waitForFunction(()=>window.__yolkTest.party().ready);assert.equal(await page.locator('.season-poster-screen').count(),0);checks.openingAndDismissPreference=true;
  await page.locator('[data-action=feature-request]:visible').click();await page.locator('#feature-request-text').fill('Please add a practice target range near the airfield.');await page.locator('#feature-request-form button').click();await page.getByText('Request sent. Thank you for helping shape the frontier.',{exact:true}).waitFor();assert.ok(relay.relay.parties.store.featureRequests.some(r=>r.name==='Polish Scout'&&r.text.includes('practice target range')));await page.locator('#dialog [data-action=close]').first().click();checks.featureRequestSubmission=true;
 

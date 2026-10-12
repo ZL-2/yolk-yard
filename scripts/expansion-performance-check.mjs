@@ -20,16 +20,19 @@ for(let attempt=0;starts.length<64&&attempt<2000;attempt++){
  resetStance(p);if(current.canStand(ROYALE_MAP,p))starts.push(p);
 }
 assert.equal(starts.length,64);
-function movement(api){
+function movement(api,{slides=true}={}){
  const players=starts.map(p=>structuredClone(p));
  for(let tick=0;tick<180;tick++)for(let i=0;i<players.length;i++){
   const p=players[i],x=p.x,z=p.z,dt=tick%20===0?1/30:1/60;
-  api.movePlayer(p,{yaw:starts[i].yaw+tick*.004,forward:1,strafe:i%3-1,sprint:i%4===0,crouch:tick>80&&i%2===0,aim:i%5===0},ROYALE_MAP,dt);p.vx=(p.x-x)/dt;p.vz=(p.z-z)/dt;
+  api.movePlayer(p,{yaw:starts[i].yaw+tick*.004,forward:1,strafe:i%3-1,sprint:i%4===0,crouch:slides&&tick>80&&i%2===0,aim:i%5===0},ROYALE_MAP,dt);p.vx=(p.x-x)/dt;p.vz=(p.z-z)/dt;
  }return players;
 }
 if(baseline)for(const q of rays){const a=current.humanHit(q.o,q.d,q.p,q.radius),b=baseline.humanHit(q.o,q.d,q.p,q.radius);assert.equal(a.region,b.region);assert.ok(a.distance===b.distance||Math.abs(a.distance-b.distance)<1e-10);}
 if(baseline)for(const q of world){const a=current.worldHit(ROYALE_MAP,q.o,q.d,q.max,.04),b=baseline.worldHit(ROYALE_MAP,q.o,q.d,q.max,.04);assert.equal(!!a,!!b);if(a){assert.ok(Math.abs(a.distance-b.distance)<1e-9);for(const axis of ['x','y','z'])assert.ok(Math.abs(a.normal[axis]-b.normal[axis])<1e-9);}}
-if(baseline){const a=movement(current),b=movement(baseline);for(let i=0;i<a.length;i++){for(const key of ['x','y','z','vx','vy','vz','stamina'])assert.ok(Math.abs(a[i][key]-b[i][key])<1e-9,`movement contact mismatch: ${i} ${key}`);for(const key of ['grounded','crouching','lowCrouch','sliding'])assert.equal(a[i][key],b[i][key]);}}
+// Uphill slide behavior deliberately changed in 145. Keep exact ordinary
+// contact equivalence; include both engines' slides in the timed workload.
+// The new uphill stop/direction rule has its own focused gameplay regression.
+if(baseline){const a=movement(current,{slides:false}),b=movement(baseline,{slides:false});for(let i=0;i<a.length;i++){for(const key of ['x','y','z','vx','vy','vz','stamina'])assert.ok(Math.abs(a[i][key]-b[i][key])<1e-9,`movement contact mismatch: ${i} ${key}`);for(const key of ['grounded','crouching','lowCrouch','sliding'])assert.equal(a[i][key],b[i][key]);}}
 let checksum=0;
 const workloads={hitboxes:api=>{for(let repeat=0;repeat<3;repeat++)for(const q of rays){const hit=api.humanHit(q.o,q.d,q.p,q.radius);if(Number.isFinite(hit.distance))checksum+=hit.distance;}},collision:api=>{for(const q of world)checksum+=api.wallDistance(ROYALE_MAP,q.o,q.d,q.max);},projectiles:api=>{for(const q of world){const hit=api.worldHit(ROYALE_MAP,q.o,q.d,q.max,.04);if(hit)checksum+=hit.distance;}}};
 workloads.movement=api=>{for(const p of movement(api))checksum+=p.x+p.y+p.z;};
