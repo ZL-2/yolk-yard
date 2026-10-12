@@ -6,7 +6,9 @@ import {startRealtimeServer} from '../server/realtime/index.js';
 
 const out='test-results/expansion/match-polish',port=5233,origin=`http://127.0.0.1:${port}`;
 await mkdir(out,{recursive:true});
-const relay=await startRealtimeServer({port:0,host:'127.0.0.1',origins:[origin]}),relayPort=relay.server.address().port;
+// The dev CSP explicitly allows port 9000; use that isolated relay rather than
+// a random port (which would correctly be blocked by the page's policy).
+const relay=await startRealtimeServer({port:9000,host:'127.0.0.1',origins:[origin]}),relayPort=relay.server.address().port;
 relay.relay.progression.path=null;
 const vite=await createServer({plugins:[{name:'match-polish-relay',configureServer(server){server.middlewares.use((req,res,next)=>{if(req.url?.split('?')[0]!=='/network-config.js')return next();res.setHeader('Content-Type','text/javascript');res.end(`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${relayPort}/game'};`);});}}],server:{host:'127.0.0.1',port,strictPort:true,watch:null}});
 await vite.listen();
