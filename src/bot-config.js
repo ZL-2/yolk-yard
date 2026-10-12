@@ -9,6 +9,15 @@ export const BOT_SKILL=[
  {name:'Advanced',reaction:.28,error:.036,hit:.72,lead:.60,cover:.76,grenade:.65,turn:5.2,burst:.72,pause:.45,vision:125,fov:1.4,hearing:95,steps:14,perception:.16,decision:1.1,memory:11,retreat:45,build:.52,stormMargin:35,search:16,teamRange:35},
  {name:'Impossible',reaction:.18,error:.023,hit:.85,lead:.85,cover:.92,grenade:.85,turn:7,burst:.88,pause:.3,vision:145,fov:1.5,hearing:105,steps:16,perception:.13,decision:.75,memory:14,retreat:52,build:.78,stormMargin:42,search:20,teamRange:40},
 ];
-const ROYALE_BOT_SKILL=BOT_SKILL.map(s=>({...s,vision:Math.min(s.vision,ROYALE_BOT_RANGE.vision),hearing:Math.min(s.hearing,75),reaction:s.reaction*1.05,error:s.error*1.07,hit:s.hit*.97,stormMargin:s.stormMargin+10}));
+// Intelligence still scales, but even strong bots need time to aim and correct.
+// These are execution errors, never damage multipliers or extra perception jobs.
+const HUMAN_EXECUTION=[
+ {reaction:1.05,trackingDelay:.34,trackingRate:4.2,trackingLead:.55,aimOffset:.28,flinch:.48,burstGap:.34},
+ {reaction:.78,trackingDelay:.24,trackingRate:5.5,trackingLead:.7,aimOffset:.18,flinch:.36,burstGap:.28},
+ {reaction:.55,trackingDelay:.18,trackingRate:7,trackingLead:.8,aimOffset:.13,flinch:.28,burstGap:.23},
+ {reaction:.4,trackingDelay:.14,trackingRate:8.5,trackingLead:.85,aimOffset:.1,flinch:.22,burstGap:.2},
+];
+for(let i=0;i<BOT_SKILL.length;i++)Object.assign(BOT_SKILL[i],HUMAN_EXECUTION[i]);
+const ROYALE_BOT_SKILL=BOT_SKILL.map(s=>({...s,vision:Math.min(s.vision,ROYALE_BOT_RANGE.vision),hearing:Math.min(s.hearing,75),error:s.error*1.07,hit:s.hit*.97,stormMargin:s.stormMargin+10}));
 export const skillFor=sim=>(sim.options.mode==='royale'?ROYALE_BOT_SKILL:BOT_SKILL)[Math.max(0,Math.min(3,(sim.options.difficulty||2)-1))];
 export const wrapAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));

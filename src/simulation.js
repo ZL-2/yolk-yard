@@ -11,6 +11,8 @@ import {updateCombatAccuracy,firedAccuracy,pelletOffsets,falloffAt,structureDama
 import {arenaBonuses,resetBonuses,updateBonuses,awardBonus} from './streaks.js';
 import {botInput as tacticalBotInput} from './bots.js';
 import {scheduledBotInput} from './bot-runtime.js';
+import {botBurstGap,botCombatReady} from './bot-aim.js';
+import {skillFor} from './bot-config.js';
 import {beginEquip} from './equip.js';
 import {matchOptions} from "./match-options.js";
 import {
@@ -438,9 +440,10 @@ export class Simulation {
   }
   combatInput(p,input){
     const w=gun(p),requested=triggerRequested(p,w,input,this.time);
+    if(p.bot&&!p.boss&&p.burstLeft&&(!input.botBurstReady||!botCombatReady(p.brain??={},p,skillFor(this),this.time)))p.burstLeft=0;
     if(reloadRequested(p,w,input,this.time)||input.fire&&p.ammo[p.slot]===0){if(this.reload(p))p.pendingReload=null;}
     if(p.burstLeft&&this.time+1e-9>=p.burstTime){
-      if(this.fire(p,true)){p.burstLeft--;p.burstTime=this.time+w.burstInterval;}
+      if(this.fire(p,true)){p.burstLeft--;p.burstTime=this.time+(p.bot&&!p.boss?botBurstGap(w,skillFor(this)):w.burstInterval);}
       else if(p.reloadEnd||p.ammo[p.slot]<=0)p.burstLeft=0;
     }
     if(requested&&!p.burstLeft)this.fire(p);
@@ -521,7 +524,7 @@ export class Simulation {
     if(burst){if(!w.burst||p.burstWeapon!==w.id||!p.burstLeft||this.time+1e-9<p.burstTime||this.time-(p.lastBurstShotAt??-100)+1e-9<w.burstInterval)return false;}
     else {if(p.burstLeft||this.time+1e-9<Math.max(p.nextShot||0,weaponReadyAt(p,w)))return false;
       p.shotGroup=++this.shotId;rememberShot(p,w,this.time);p.pendingFireUntil=0;
-      if(w.burst){p.burstWeapon=w.id;p.burstLeft=w.burst-1;p.burstTime=this.time+w.burstInterval;}}
+      if(w.burst){p.burstWeapon=w.id;p.burstLeft=w.burst-1;p.burstTime=this.time+(p.bot&&!p.boss?botBurstGap(w,skillFor(this)):w.burstInterval);}}
     p.lastBurstShotAt=this.time;p.ammo[p.slot]--;p.shieldUntil=0;
     const accuracy=p.accuracyState[p.slot]??={},spread=accuracy.spread??(p.aim?w.adsSpread:w.spread);
     const pitch=accuracy.recoilPitch||0,yaw=accuracy.recoilYaw||0,serial=firedAccuracy(p,w,accuracy,this.time);

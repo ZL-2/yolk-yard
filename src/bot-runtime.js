@@ -48,8 +48,8 @@ export function scheduledBotInput(sim,p,think,{combat=.06,roam=.1}={}){
  if(input.buildMode)input.fire=false;
  if(!p.inventory)input.fire=false;
  input.popper=false;
- if(input.fire&&brain?.target){const target=sim.players.get(brain.target);
-  if(!target||target.health<=0||target.spectating)input.fire=false;
+ if((input.fire||input.botBurstReady)&&brain?.target){const target=sim.players.get(brain.target);
+  if(!target||target.health<=0||target.spectating)input.fire=input.botBurstReady=false;
  }
  return executeRoyaleIntent(sim,p,input);
 }

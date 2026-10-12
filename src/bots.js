@@ -12,7 +12,7 @@ import {ARENA_BOT_COMBAT,smoothArenaCombatMovement} from './bot-movement.js';
 import {squadAnchor,followGoal} from './bot-team.js';
 import {ROYALE_TEAM_BOT as teamPolicy} from './bot-config.js';
 import {tacticalGoal,keepCommittedTask,commitTask} from './bot-tactics.js';
-import {botAim,steadyBotFire} from './bot-aim.js';
+import {botAim,botTargetAim,botCombatReady,steadyBotFire} from './bot-aim.js';
 import {botWorld} from './bot-work.js';
 import {activeBotUtility} from './bot-utility.js';
 export {BOT_SKILL};
@@ -88,9 +88,8 @@ export function botInput(sim,p){
  }
  if(visible){
   if(!p.inventory){const error=botAim(brain,p,skill,distance,now,clamp(now-brain.turnAt,0,.1),false,w.stableScope);brain.errorX=error.x;brain.errorY=error.y;brain.height=1.16;}
-  const lead=w.hitscan?0:Math.min(1,distance/w.boltSpeed)*skill.lead,tx=target.x+(target.vx||0)*lead-p.x,tz=target.z+(target.vz||0)*lead-p.z;
-  yaw=Math.atan2(-tx,-tz)+(brain.errorX||0)+Math.sin(now*1.7+(p.botSeed||0))*skill.error*.15;
-  pitch=Math.atan2(target.y+(brain.height??1.22)*bodyHeight(target)/1.85-p.y-eyeHeight(p),Math.hypot(tx,tz))+(brain.errorY||0);
+  const aim=p.inventory?{yaw:Math.atan2(p.x-target.x,p.z-target.z),pitch:Math.atan2(target.y+bodyHeight(target)*.63-p.y-eyeHeight(p),distance)}:botTargetAim(brain,p,target,w,skill,distance,now,clamp(now-brain.turnAt,0,.1));
+  yaw=aim.yaw+(brain.errorX||0);pitch=aim.pitch+(brain.errorY||0);
   fire=!p.inventory&&steadyBotFire(brain,p,w,skill,now,distance<(w.flightRange??w.range)*.95&&(!w.projectile||distance>7));
   if(task.kind==='rotate'&&task.urgent&&distance>12)fire=false;
   if(sim.options.building!==false&&p.inventory&&now-(brain.attackedAt??-100)<1.5&&now>(brain.buildAt||0)&&r()<skill.build*.12){
@@ -114,7 +113,7 @@ export function botInput(sim,p){
  const movement=smoothArenaCombatMovement(brain,move,yaw,now,arenaCombat);
  const moving=Math.hypot(move.mx,move.mz)>.1;
  const topUp=!visible&&now-(brain.attackedAt??-100)>2.5&&p.ammo[slot]<w.magazine*.65;
- return {yaw,pitch,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,moveTarget:move.mx||move.mz?move.moveTarget:null,utilityItem:!!brain.utility,combatAim:visible&&!brain.utility&&task.kind!=='melee'}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:(p.ammo[slot]===0||topUp)&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
+ return {yaw,pitch,botBurstReady:visible&&botCombatReady(brain,p,skill,now)&&Math.abs(wrapAngle(desiredYaw-yaw))<=.12,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,moveTarget:move.mx||move.mz?move.moveTarget:null,utilityItem:!!brain.utility,combatAim:visible&&!brain.utility&&task.kind!=='melee'}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:(p.ammo[slot]===0||topUp)&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
 }
 import {teammates} from './teams.js';
 import {ammoType,ITEMS} from './royale-data.js';

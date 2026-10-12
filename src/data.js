@@ -3,8 +3,8 @@ import { safeName } from './moderation.js';
 import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
-// Immediate pickups and revised Royale combat require matching clients.
-export const VERSION = 44;
+// Bot execution and burst timing require matching host/client releases.
+export const VERSION = 45;
 export const WEAPONS = [
   {
     "id": "sprinter",
