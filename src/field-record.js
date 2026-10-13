@@ -44,10 +44,10 @@ export function recordFieldEvent(sim,type,e) {
   if(!p.field)resetFieldRecord(p);
   const f=p.field,target=sim.players.get(e.target);
   if(type==='shot'||type==='launch') {
-    if(!e.popper&&unique(p,'fieldShotGroups',e.shotId))f.shots++;
+    if(!e.popper&&unique(p,'fieldShotGroups',e.shotId)){f.shots++;if(p.fieldHitShots.includes(e.shotId))f.hits++;}
   } else if(type==='hit'&&target&&target!==p&&!target.boss&&!teammates(sim.options,p,target)&&e.amount>0) {
     f.damage+=e.amount;
-    if(unique(p,'fieldHitShots',e.shotId))f.hits++;
+    if(unique(p,'fieldHitShots',e.shotId)&&p.fieldShotGroups.includes(e.shotId))f.hits++;
     if(e.precision&&unique(p,'fieldCriticalShots',e.shotId)){f.critical++;if(f.critical===5)awardMedal(sim,p,'precision');}
   } else if(type==='elimination'&&target&&target!==p&&!target.boss&&!teammates(sim.options,p,target)) {
     p.fieldChain=sim.time-p.fieldLastElim<=8?p.fieldChain+1:1;p.fieldLastElim=sim.time;

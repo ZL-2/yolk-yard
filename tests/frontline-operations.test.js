@@ -77,6 +77,11 @@ test('combat medals honor first strike, eight-second chains and capped repeat re
  assert.equal(p.field.medals.find(m=>m.id==='first').count,1);assert.equal(p.field.medals.find(m=>m.id==='double').count,1);assert.equal(p.field.medals.find(m=>m.id==='triple').count,1);assert.equal(p.field.medals.find(m=>m.id==='clutch').count,5);
  resetFieldRecord(p);s.fieldFirstElim=null;enemy.bot=true;s.emit('elimination',{player:enemy.id,target:p.id});s.emit('elimination',{player:p.id,target:enemy.id});assert.ok(!p.field.medals.some(m=>m.id==='first'));
 });
+test('hitscan damage arriving before its shot counts once; grenades cannot inflate trigger accuracy',()=>{
+ const {s,p,enemy}=battle();s.emit('hit',{player:p.id,target:enemy.id,amount:20,shotId:30});assert.equal(p.field.hits,0);
+ s.emit('shot',{player:p.id,shotId:30});assert.equal(p.field.hits,1);assert.equal(p.field.shots,1);
+ s.emit('launch',{player:p.id,shotId:31,popper:true});s.emit('hit',{player:p.id,target:enemy.id,amount:35,shotId:31});assert.equal(p.field.hits,1);assert.equal(p.field.shots,1);assert.equal(p.field.damage,55);
+});
 test('trauma kit setup can cancel freely; interrupted recovery consumes exactly one kit',()=>{
  const {s,p,enemy}=battle();p.slot=1;p.health=20;p.inventory[1]={id:'medkit',count:2};s.beginUse(p);s.time+=.8;tickHealing(s,p);s.cancelUse(p);assert.equal(p.health,20);assert.equal(p.inventory[1].count,2);
  s.beginUse(p);s.time+=3.5;tickHealing(s,p);assert.equal(p.health,70);assert.equal(p.inventory[1].count,1);assert.equal(p.field.healing,50);
