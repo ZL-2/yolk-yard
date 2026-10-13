@@ -748,8 +748,9 @@ export class View {
     this.budgetClock=(this.budgetClock||0)+dt;
     if(this.budgetClock>1){
       this.budgetClock=0;const previous=this.renderScale||1;
-      if(this.frameAverage>1/55){this.renderScale=Math.max(.35,previous-.15);this.renderer.shadowMap.enabled=false;}
+      if(this.frameAverage>1/55){this.renderScale=playing?Math.max(.85,previous-.05):1;this.renderer.shadowMap.enabled=false;}
       else if(this.frameAverage<1/59)this.renderScale=Math.min(1,previous+.025);
+      this.renderScale=playing?Math.max(.85,this.renderScale||1):1;
       if(this.renderScale!==previous)this.resize();
     }
     this.clock += dt;
