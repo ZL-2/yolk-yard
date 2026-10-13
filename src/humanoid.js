@@ -193,6 +193,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   if(h.slide>.01)foot.lerp(V(sideSign*.17,.12,-.67),h.slide);
   if(h.down>.01)foot.lerp(V(sideSign*.2,.12,.43+Math.sin(phase)*.10*moving),h.down);
   if(h.revive>.01)foot.lerp(V(sideSign*.15,sideSign<0?.10:.13,sideSign<0?-.32:.25),h.revive);
+  if(p.vehicleId)foot=V(sideSign*.4,.43,-.35);
   if(dead)foot=V(sideSign*.23,.12,-.12);
   if(emote)foot=V(...emotePose(emote.id,emote.t,sideSign).foot);
   solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,V(sideSign*.15,.5,-1));const footBone=b['foot'+S];footBone.quaternion.copy(footBone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(h.mesh.getWorldQuaternion(new T.Quaternion())));if(!stance)footBone.rotateX(-lift*1.5);
@@ -202,6 +203,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  if(held&&arms){held.updateMatrixWorld(true);h.mesh.updateMatrixWorld(true);}
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R';let target;
   if(emote)target=V(...emotePose(emote.id,emote.t,sideSign).hand);
+  else if(p.vehicleId&&p.vehicleSeat===0)target=V(sideSign*.36,1.2,-.58);
   else if(p.mantle)target=V(sideSign*.28,1.68,-.38);
   else if(p.traversal)target=V(sideSign*.24,1.95,-.08);
   else if(airborne)target=p.flight==='glide'?V(sideSign*.33,1.93,-.06):V(sideSign*.61,1.42+Math.sin(time*2.1+sideSign)*.025,-.17);

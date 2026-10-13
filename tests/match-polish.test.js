@@ -67,7 +67,7 @@ test('distinct Rook and Nyx approaches are reachable without jumps, including th
  for(let i=0;i<140;i++)movePlayer(p,{forward:1,yaw:-Math.PI/2},map,1/60);assert.ok(p.x>210,'walk the service catwalk to the hold');assert.ok(Math.abs(p.y-rook.y)<.02);assert.ok(canStand(map,p));
 });
 test('mobility buffs preserve protected directional motion without reducing Grappler utility',()=>{
- assert.equal(SEASON.rig.charges,4);assert.equal(SEASON.rig.recharge,8);assert.equal(SHADOWSTEP.charges,6);assert.equal(SHADOWSTEP.recharge,7);assert.ok(Math.abs(SHADOWSTEP.duration*SHADOWSTEP.speed-13.2)<1e-8);
+ assert.equal(SEASON.rig.charges,4);assert.equal(SEASON.rig.recharge,15);assert.equal(SHADOWSTEP.charges,Infinity);assert.equal(SHADOWSTEP.recharge,5);assert.ok(Math.abs(SHADOWSTEP.duration*SHADOWSTEP.speed-13.2)<1e-8);
  const p={x:0,y:0,z:0,health:100,flight:'ground',grounded:true,yaw:0,shadowDirection:{x:1,z:0}},sim={time:10,emit(){}};
  assert.equal(useSeasonItem(sim,p,{id:'jumpRig'}),true);assert.equal(p.launchVelocity.x,30);assert.equal(p.launchVelocity.z,0);assert.equal(p.vy,26);assert.equal(p.fall.immune,true);
 });
@@ -102,9 +102,9 @@ test('field samples decode once, obey categories and distance, bound overlap and
  const node=()=>({gain:{value:0},pan:{value:0},playbackRate:{value:1},connect(n){return n;},disconnect(){},start(){},stop(){this.onended?.();}}),sound={ctx:{createBufferSource:node,createGain:node,createStereoPanner:node,decodeAudioData:async()=>({duration:1})},enabled:true,volume:.5,effectsVolume:.8,ambienceVolume:.4,voices:new Set(),spatial:p=>({gain:p?.x>100?0:1,pan:0}),master:node()};
  let loads=0;globalThis.document={baseURI:'https://example.invalid/yolk-yard/'};globalThis.fetch=async()=>{loads++;return {ok:true,arrayBuffer:async()=>new ArrayBuffer(8)};};
  try{
-  const samples=new FieldSamples(sound);await Promise.all([samples.load(),samples.load()]);await samples.load();assert.equal(loads,3);
-  for(let i=0;i<100;i++)samples.play('step');assert.equal(sound.voices.size,FIELD_SAMPLES.step.cap);for(const v of [...sound.voices])v.onended();assert.equal(sound.voices.size,0);
+  const samples=new FieldSamples(sound);await Promise.all([samples.load(),samples.load()]);await samples.load();assert.equal(loads,2);assert.equal(FIELD_SAMPLES.step,undefined);assert.equal(samples.play('step'),false);
+  for(let i=0;i<100;i++)samples.play('elimination');assert.equal(sound.voices.size,FIELD_SAMPLES.elimination.cap);for(const v of [...sound.voices])v.onended();assert.equal(sound.voices.size,0);
   samples.play('birds');samples.play('birds');assert.equal(sound.voices.size,1);samples.stop();assert.equal(sound.voices.size,0);
-  sound.effectsVolume=0;samples.play('step');assert.equal(sound.voices.size,0);sound.effectsVolume=.8;samples.play('step',{x:1000});assert.equal(sound.voices.size,0);
+  sound.effectsVolume=0;samples.play('elimination');assert.equal(sound.voices.size,0);sound.effectsVolume=.8;samples.play('elimination',{x:1000});assert.equal(sound.voices.size,0);
  }finally{globalThis.fetch=beforeFetch;globalThis.document=beforeDocument;}
 });

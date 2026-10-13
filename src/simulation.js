@@ -193,15 +193,15 @@ export class Simulation {
     return {steps,input};
   }
   moveWithCommands(p,input,dt,commands) {
-    if(!commands){movePlayer(p,input,this.map,dt);p.ack=Math.max(p.ack,input.seq||0);return;}
+    if(!commands){movePlayer(p,input,this.map,dt,this.time);p.ack=Math.max(p.ack,input.seq||0);return;}
     p.motionFresh=this.time-(p.motionAt??-100)<.4;
     for(const step of commands.steps){
-      const x=p.x,z=p.z;movePlayer(p,step,this.map,1/60);
+      const x=p.x,z=p.z;movePlayer(p,step,this.map,1/60,this.time);
       p.motionVX=(p.x-x)*60;p.motionVZ=(p.z-z)*60;p.motionAt=this.time;p.motionFresh=true;
       p.ack=Math.max(p.ack,step.seq);
     }
     // After an actual interruption, keep gravity running without inventing input acknowledgements.
-    if(!commands.steps.length&&this.time-p.lastInput>.4)movePlayer(p,input,this.map,dt);
+    if(!commands.steps.length&&this.time-p.lastInput>.4)movePlayer(p,input,this.map,dt,this.time);
   }
   addBots() {
     let i = 0;
@@ -539,6 +539,7 @@ export class Simulation {
       if(w.hitscan){
         const hit=worldHit(this.map,origin,path.d,w.range);
         let distance=hit?.distance??w.range,victim=null,pose=null,region=null;
+        const vehicle=this.vehicleHit?.(origin,path.d,distance,p);if(vehicle)distance=vehicle.distance;
         for(const target of this.players.values()){
           if(target===p||target.health<=0||target.spectating||target.flight==='transport'||teammates(this.options,p,target))continue;
           const candidate=this.shotPose(target,p,w),contact=humanHit(origin,path.d,candidate),d=contact.distance;
@@ -546,9 +547,10 @@ export class Simulation {
         }
         const point={x:origin.x+path.d.x*distance,y:origin.y+path.d.y*distance,z:origin.z+path.d.z*distance};
         if(victim){const critical=w.critical>1&&region==='head';this.damage(victim,p,w.damage*falloffAt(w,distance)*(critical?w.critical:1),w.name,critical,p.shotGroup);}
+        else if(vehicle)this.damageVehicle?.(vehicle.vehicle,structureDamage(w,distance),p);
         else if(hit?.box)this.damageWorld?.(hit.box,structureDamage(w,distance));
         shots.push({id:++this.projectileId,vx:path.d.x*w.tracerSpeed,vy:path.d.y*w.tracerSpeed,vz:path.d.z*w.tracerSpeed,end:point});
-        if(victim||hit)this.emit('impact',{...point,normal:victim?{x:-path.d.x,y:-path.d.y,z:-path.d.z}:hit.normal,weapon:w.id,surface:hit?.box?.material||'stone',tag:!!victim});
+        if(victim||hit||vehicle)this.emit('impact',{...point,normal:victim?{x:-path.d.x,y:-path.d.y,z:-path.d.z}:vehicle?.normal||hit.normal,weapon:w.id,surface:vehicle?'metal':hit?.box?.material||'stone',tag:!!victim});
       }else{
         const b={id:++this.projectileId,owner:p.id,shotId:p.shotGroup,weapon:w.id,kind:'bolt',...origin,vx:path.d.x*w.boltSpeed,vy:path.d.y*w.boltSpeed,vz:path.d.z*w.boltSpeed,gravity:w.gravity,hitRadius:w.hitRadius,buildFalloff:w.buildFalloff,damage:w.damage,critical:w.critical,buildDamage:w.buildDamage,range:w.flightRange,born:this.time,fuse:w.flightRange/w.boltSpeed,travelled:0,popper:false};
         this.projectiles.push(b);shots.push({id:b.id,vx:b.vx,vy:b.vy,vz:b.vz});
@@ -577,6 +579,7 @@ export class Simulation {
         origin,
         blocked: true,
       });
+      if(w.id==='thumper')this.explode({...path.blocked.point,owner:p.id,weapon:w.id,damage:w.damage,buildDamage:w.buildDamage,shotId:p.shotGroup,travelled:0,impactNormal:path.blocked.normal});
       return;
     }
     const config=popper?UTILITY_WEAPONS.popper:w,speed=popper?config.speed:w.boltSpeed;
@@ -637,6 +640,7 @@ export class Simulation {
       let distance = hit?.distance ?? length,
         victim = null,region=null;
       const attacker = this.players.get(b.owner);
+      const vehicle=this.vehicleHit?.(b,d,distance,attacker);if(vehicle)distance=vehicle.distance;
       if (!b.popper)
         for (const p of this.players.values()) {
           if (
@@ -655,7 +659,7 @@ export class Simulation {
       b.y += d.y * distance;
       b.z += d.z * distance;
       b.travelled = (b.travelled || 0) + distance;
-      if (victim || hit) {
+      if (victim || hit || vehicle) {
         if (b.kind === "bolt") {
           if (victim) {
             const w=weapon(b.weapon),precision=(b.critical??w.critical)>1&&region==='head',hitFactor=falloffAt(w,b.travelled)*(precision?(b.critical??w.critical):1);
@@ -667,19 +671,20 @@ export class Simulation {
               precision, b.shotId,
             );
           }
-          if(!victim&&hit?.box)this.damageWorld?.(hit.box,(b.buildDamage??weapon(b.weapon).buildDamage)*((b.buildFalloff??weapon(b.weapon).buildFalloff)?falloffAt(weapon(b.weapon),b.travelled):1));
+          if(!victim&&vehicle)this.damageVehicle?.(vehicle.vehicle,b.buildDamage??b.damage,attacker);
+          else if(!victim&&hit?.box)this.damageWorld?.(hit.box,(b.buildDamage??weapon(b.weapon).buildDamage)*((b.buildFalloff??weapon(b.weapon).buildFalloff)?falloffAt(weapon(b.weapon),b.travelled):1));
           this.emit("impact", {
             x: b.x,
             y: b.y,
             z: b.z,
-            normal: victim ? { x: -d.x, y: -d.y, z: -d.z } : hit.normal,
+            normal: victim ? { x: -d.x, y: -d.y, z: -d.z } : vehicle?.normal||hit.normal,
             weapon: b.weapon,
             surface:hit?.box?.material||'stone',
             tag: !!victim,
           });
           this.projectiles.splice(i, 1);
         } else if (b.popper) {
-          const n = hit.normal,
+          const n = vehicle?.normal||hit.normal,
             dot = b.vx * n.x + b.vy * n.y + b.vz * n.z;
           b.vx = (b.vx - 1.58 * dot * n.x) * 0.82;
           b.vy = (b.vy - 1.58 * dot * n.y) * 0.82;
@@ -694,6 +699,7 @@ export class Simulation {
           }
           this.emit("bounce", { x: b.x, y: b.y, z: b.z, normal: n });
         } else {
+          b.directTarget=victim?.id;b.directVehicle=victim?null:vehicle?.vehicle.id;b.impactNormal=victim?{x:-d.x,y:-d.y,z:-d.z}:vehicle?.normal||hit.normal;
           this.explode(b);
           this.projectiles.splice(i, 1);
         }
@@ -705,13 +711,14 @@ export class Simulation {
       config=b.popper?UTILITY_WEAPONS.popper:weapon(b.weapon),radius=config.splashRadius;
     if (!b.popper && (b.travelled || 0) < config.minRange) return;
     this.emit("explosion", { x: b.x, y: b.y, z: b.z, popper: b.popper });
+    const n=b.impactNormal||{x:0,y:0,z:0},origin={x:b.x+n.x*.14,y:b.y+n.y*.14,z:b.z+n.z*.14};
     for (const p of this.players.values()) {
       if (
         p.health <= 0 ||p.spectating||p.flight==='transport'||
         teammates(this.options,p,attacker)
       )
         continue;
-      const to = { x: p.x - b.x, y: p.y + 0.85 - b.y, z: p.z - b.z },
+      const direct=p.id===b.directTarget,to = { x: p.x - origin.x, y: p.y + 0.85 - origin.y, z: p.z - origin.z },
         distance = Math.hypot(to.x, to.y, to.z);
       if (distance > radius) continue;
       const d = {
@@ -719,11 +726,11 @@ export class Simulation {
         y: to.y / (distance || 1),
         z: to.z / (distance || 1),
       };
-      if (wallDistance(this.map, b, d, distance) < distance - 0.2) continue;
+      if (!direct&&wallDistance(this.map, origin, d, distance) < distance - 0.2) continue;
       this.damage(
         p,
         attacker,
-        (b.damage??config.damage)*Math.max(0,1-distance/(radius*config.splashFalloff))*(p===attacker?config.selfDamage:1),
+        (b.damage??config.damage)*(direct?1:Math.max(0,1-distance/(radius*config.splashFalloff)))*(p===attacker?config.selfDamage:1),
         b.popper ? "Frag Grenade" : weapon(b.weapon||"thumper").name, false, b.shotId,
       );
     }
@@ -880,7 +887,7 @@ export class Simulation {
   snapshot() {
     const keys = [
       'friendSpectator','lateSpectator','watchId','sprinting','tacticalSprint','sprintBlend','sprintRecovery','stamina','sprintRest','exhausted',
-      'crouching','lowCrouch','sliding','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','downed','lifeState','downedAt','revivedAt','downCount','reviving','reviverId','reviveProgress','revives','connected','teamSlot',
+      'crouching','lowCrouch','sliding','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','slideUphill','slideStartX','slideStartZ','mobilityJumpWindow','mobilitySerial','mobilityKind','vehicleId','vehicleSeat','vehicleLock','downed','lifeState','downedAt','revivedAt','downCount','reviving','reviverId','reviveProgress','revives','connected','teamSlot',
       "afkRemaining", "afkRemoved", "lastDamage", "assists", "quickstep", "focus",
       "id", "joinedOrder", "vx", "vz", "place",
       "name",

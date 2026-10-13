@@ -7,7 +7,7 @@ const live=process.env.RAVEL_FRONTEND_URL,origin=(live||'http://127.0.0.1:5205')
 const vite=live?null:await createServer({server:{host:'127.0.0.1',port:5205,strictPort:true,watch:null}});await vite?.listen();await mkdir(out,{recursive:true});
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']}),page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[],metrics={live:!!live};page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
 try{
- await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Polish Check'}));});
+ await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-145-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Polish Check'}));});
  await page.goto(origin+'/?qa&polish='+Date.now());await page.locator('#loading-screen').waitFor({state:'hidden'});assert.equal(await page.locator('vite-error-overlay').count(),0);
  const image=await page.request.get(origin+'/art/boss-sound.png');assert.equal(image.status(),200);assert.match(image.headers()['content-type'],/image\/png/);
  await page.locator('#emote-button').click();await page.locator('[data-emote=shuffle]').click();await page.waitForTimeout(700);await page.screenshot({path:out+'/lobby-forward-emote.png'});

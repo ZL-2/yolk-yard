@@ -15,6 +15,7 @@ import {makeShopBack,makeShopPickaxe,makeShopGlider,makeShopTrail} from './shop-
 import {stairCamera} from './stair-camera.js';
 import {cameraDistance,cameraNearPlane,smoothCameraDistance} from './camera-collision.js';
 import {LobbyMotion} from './lobby-motion.js';
+import {FrontierAtmosphere} from './atmosphere.js';
 import {eyeHeight,bodyHeight,canFight} from './stance.js';
 import * as THREE from "three";
 import {equipPose} from "./equip.js";
@@ -145,6 +146,7 @@ export class View {
     this.renderer.shadowMap.enabled = settings.quality !== "low";
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
+    this.atmosphere=new FrontierAtmosphere(this.scene);
     this.camera = new THREE.PerspectiveCamera(
       settings.fov || 85,
       1,
@@ -153,7 +155,7 @@ export class View {
     );
     this.camera.rotation.order = "YXZ";
     this.scene.add(this.camera);
-    this.scene.add(new THREE.HemisphereLight(0xe9faff, 0x918777, 2.25));
+    this.scene.add(new THREE.HemisphereLight(0xe5f4ff, 0x88a16a, 2.25));
     const sun = new THREE.DirectionalLight(0xfff3de, 2.2);
     sun.position.set(-15, 38, 18);
     sun.castShadow = true;
@@ -319,7 +321,7 @@ export class View {
     const map = getMap(id);
     this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;
     this.scene.background = new THREE.Color(map.sky);
-    this.scene.fog = new THREE.Fog(map.sky, map.theme==='royale'?330:72, map.theme==='royale'?1000:175);
+    this.scene.fog = new THREE.Fog(map.theme==='royale'?0xc1e6f0:map.sky, map.theme==='royale'?280:72, map.theme==='royale'?1050:175);
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;
     this.camera.near=map.theme==='royale'?.15:.025;
     this.camera.updateProjectionMatrix();this.scopeCamera.updateProjectionMatrix();
@@ -755,13 +757,13 @@ export class View {
     if(playing)this.loadMap(state?.options.map || "yard");
     if(playing&&state?.royale?.practice&&!state.options.training)this.prepareBattleMap();
     this.world.visible=playing;
-    if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x6f9295;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(sky,playing?(map.theme==='royale'?330:72):35,playing?(map.theme==='royale'?1000:175):125);}
+    if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x6f9295;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(playing&&map.theme==='royale'?0xc1e6f0:sky,playing?(map.theme==='royale'?280:72):35,playing?(map.theme==='royale'?1050:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
     if(this.lobbyStage)this.lobbyStage.visible=!playing;
     for(const egg of this.partyEggs||[])egg.visible=!playing;
     this.actors.visible = playing;
     this.effects.visible = playing;
-    this.gunGroup.visible = playing && !this.cinematic?.victory && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
+    this.gunGroup.visible = playing && !local?.vehicleId && !this.cinematic?.victory && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
     if (!playing) {
       this.clearOutgoing(this);
       this.preview(profile);
@@ -780,6 +782,7 @@ export class View {
       const hold=!!this.cinematic?.hold,victory=!!this.cinematic?.victory;
       const killer = !hold&&local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && p.health > 0);
       const p = killer || (local.health <= 0 ? local : predicted || local);
+      this.predictedVehicle=p.predictedVehicle||null;
       this.stairEye=stairCamera(this.stairEye,p,dt,`${state.round}:${p.id}:${local.health>0}`);
       const desiredEye=eyeHeight(p);this.stanceEye=this.stanceEye===undefined?desiredEye:THREE.MathUtils.lerp(this.stanceEye,desiredEye,1-Math.exp(-dt*17));
       this.camera.position.set(
@@ -789,12 +792,12 @@ export class View {
       );
       this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
       let cameraBoom=false;
-      if (killer || local.downed || local.emote || hold || victory) {
+      if (killer || local.downed || local.emote || hold || victory || p.vehicleId) {
         const cameraYaw=victory?p.yaw+Math.PI+.35:local.emote?(this.emoteLook?.yaw??p.yaw):p.yaw;
-        const back = this.cameraBack??=new THREE.Vector3();back.set(Math.sin(cameraYaw),local.emote?.2:.35,Math.cos(cameraYaw)).normalize();
+        const back = this.cameraBack??=new THREE.Vector3();back.set(Math.sin(cameraYaw)*Math.cos(p.vehicleId?p.pitch*.55:0),p.vehicleId?.4-Math.sin(p.pitch*.55):local.emote?.2:.35,Math.cos(cameraYaw)*Math.cos(p.vehicleId?p.pitch*.55:0)).normalize();
         const origin = this.cameraOrigin??=new THREE.Vector3();origin.set(p.x,p.y+Math.min(1.6,eyeHeight(p)),p.z);
-        this.placeCameraBehind(state,p,origin,back,victory?5.2:hold?4.8:local.emote?4.2:3.5,dt,victory?'victory':hold?'elimination':local.emote?'emote':'spectator');cameraBoom=true;
-        this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
+        this.placeCameraBehind(state,p,origin,back,p.vehicleId?6.2:victory?5.2:hold?4.8:local.emote?4.2:3.5,dt,p.vehicleId?'vehicle':victory?'victory':hold?'elimination':local.emote?'emote':'spectator');cameraBoom=true;
+        if(p.vehicleId){const aim=direction(p.yaw,p.pitch);this.camera.lookAt(p.x+aim.x*30,p.y+eyeHeight(p)+aim.y*30,p.z+aim.z*30);}else this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
       }
       const draw=equipPose(local,state.time);
       this.drawPresentation=draw;
@@ -803,7 +806,7 @@ export class View {
       this.gunGroup.visible=this.gunGroup.visible&&draw.visible;
       const w = gun(local),
         scoped = w.optic === "scope" || w.optic === "prism";
-      const aiming = !!(canFight(local) && !local.emote && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
+      const aiming = !!(canFight(local) && !local.vehicleId && !local.emote && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
       if(!Number.isFinite(this.aimBlend))this.aimBlend=0;
       this.aimBlend += (Number(aiming) - this.aimBlend) * (1-Math.exp(-Math.log(20)*dt/w.adsTime));
       const fov=victory?Math.min(65,this.settings.fov):aiming?adsFov(w,this.settings.fov):this.settings.fov;
@@ -885,11 +888,12 @@ export class View {
       this.actorMatrix ||= new THREE.Matrix4();
       this.actorBounds ||= new THREE.Sphere(new THREE.Vector3(),2.5);
       this.actorFrustum.setFromProjectionMatrix(this.actorMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse));
-      for (const p of state.players) {
+      for (const source of state.players) {
+        const p=source.id===local?.id&&predicted?.vehicleId?predicted:source;
         // Transport passengers share one simulation position; the airship
         // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;
-        if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.16)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && !this.cinematic?.victory && !p.emote && !p.downed && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
+        if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.16)) || p.awaitingEntry || (p.id === local?.id && p.health > 0 && !p.vehicleId && !this.cinematic?.victory && !p.emote && !p.downed && (!p.inventory || p.flight==='ground'||p.flight==='transport'))) continue;
         seen.add(p.id);
         this.actorBounds.center.set(p.x,p.y+.9,p.z);
         if(playing&&!this.actorFrustum.intersectsSphere(this.actorBounds)){const hidden=this.models.get(p.id);if(hidden)hidden.visible=false;continue;}
@@ -955,7 +959,7 @@ export class View {
           if(harvesting&&model.userData.shopTool)animatePickaxe(model.userData.shopTool,model.userData.arms,p.pickaxe,state.time-(p.swingAt??-100));
           const throwT=(this.clock-(model.userData.throwStart??-Infinity))/.78;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1)throwArms(model.userData.arms,throwT);
-          model.userData.held.visible=draw.visible&&canFight(p)&&!p.emote;
+          model.userData.held.visible=draw.visible&&canFight(p)&&!p.emote&&(!p.vehicleId||p.vehicleSeat===1);
           model.userData.held.rotation.set(p.pitch + hands.rotation[0] + recoil * .045 + draw.rotation[0], hands.rotation[1]+draw.rotation[1], hands.rotation[2]+draw.rotation[2]);
           model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
           const sprint=p.sprintBlend||0;model.userData.held.position.y-=sprint*.3;model.userData.held.position.x+=sprint*.08;model.userData.held.rotation.x+=sprint*.65;model.userData.held.rotation.z+=sprint*.2;
@@ -972,9 +976,9 @@ export class View {
         const lag = (this.actorLag ||=new THREE.Vector3()).copy(base).sub(targetPosition).clampLength(0, 0.04);
         base.copy(targetPosition).add(lag);
         model.position.copy(base);
-        let delta = p.yaw - model.rotation.y;
+        const bodyYaw=p.vehicleId&&p.vehicleSeat===0?(state.royale.vehicles.find(v=>v.id===p.vehicleId)?.yaw??p.yaw):p.yaw;let delta = bodyYaw - model.rotation.y;
         delta = Math.atan2(Math.sin(delta), Math.cos(delta));
-        model.rotation.y = p.id===local?.id ? p.yaw : model.rotation.y + delta * Math.min(1, dt * 18);
+        model.rotation.y = p.id===local?.id ? bodyYaw : model.rotation.y + delta * Math.min(1, dt * 18);
         model.scale.setScalar(1);model.rotation.x=model.rotation.z=0;
         const aura=model.userData.bonusAura;
         aura.visible=p.health>0&&(p.streakArmor>0||p.damageUntil>state.time||state.time<p.shieldUntil);
@@ -1149,6 +1153,7 @@ export class View {
     }
     if(playing&&this.scopeActive&&gun(local).ads?.overlay&&this.aimBlend>.8)this.gunGroup.visible=false;
     this.royaleView.update(state,local,dt,playing);
+    this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
     if(this.needsMapCompile){
       this.needsMapCompile=false;
       const job=this.renderer.compileAsync(this.scene,this.camera);this.mapCompile=job;

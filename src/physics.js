@@ -2,6 +2,7 @@ import {TACTICAL_SPRINT} from './world-rules.js';
 import {beginMantle,stepMantle} from './mantle.js';
 import {stepGrapple} from './grappler.js';
 import {stepShadowstep} from './shadowstep.js';
+import {mobilityJump} from './mobility-input.js';
 import {SEASON} from './season-one.js';
 import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon, gun } from "./data.js";
@@ -160,17 +161,17 @@ function pushAxis(p,map,axis,delta) {
  }
  p[axis]=target;
 }
-export function movePlayer(p, input, map, dt) {
+export function movePlayer(p, input, map, dt, time=0) {
   // Bound displacement through narrow risers, including low-frame-rate clients.
   const steps=Math.max(1,Math.ceil(Math.min(dt,.1)/(1/60)));
   for(let i=0;i<steps;i++){
-    const before=beginFallStep(p);movePlayerStep(p,input,map,Math.min(dt,.1)/steps);
+    const before=beginFallStep(p);movePlayerStep(p,input,map,Math.min(dt,.1)/steps,time);
     let normalY=1;
     if(p.fall&&p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.sqrt(1+gx*gx+gz*gz);}
     if(p.flight!=='transport')finishFallStep(p,before,normalY);
   }
 }
-function movePlayerStep(p, input, map, dt) {
+function movePlayerStep(p, input, map, dt, time) {
   if (p.health <= 0) return;
   const freshJump=(input.jumpPress||0)>(p.lastJumpPress||0)||input.jump&&!p.jumpHeld;
   if(p.jumpHeld!==!!input.jump)p.jumpHeld=!!input.jump;
@@ -187,10 +188,11 @@ function movePlayerStep(p, input, map, dt) {
     1.48,
   );
   if (p.flight === 'transport') return;
+  mobilityJump(p,input,freshJump,dt,time);
+  if(p.shadowstep){p.jumpBuffer=0;p.jumpLatch=!!input.jump;if(stepShadowstep(p,map,dt,canOccupy,groundAt,bodyHeight(p),RADIUS))return;}
   if(p.mantle&&stepMantle(p,map,dt,canStand))return;
   if(p.jumpBuffer>0&&beginMantle(p,input,map,{candidates,rayBox,canStand,radius:RADIUS})){stepMantle(p,map,dt,canStand);return;}
   if(stepGrapple(p,input,map,dt,canStand,groundAt))return;
-  stepShadowstep(p,map,dt,canOccupy,groundAt,bodyHeight(p),RADIUS);
   p.traversalLock=Math.max(0,(p.traversalLock||0)-dt);
   if(p.traversal){
     const ride=p.traversal,line=map.traversal?.find(l=>l.id===ride.id);
@@ -244,11 +246,12 @@ function movePlayerStep(p, input, map, dt) {
   const momentumX=p.motionFresh?p.motionVX:p.vx,momentumZ=p.motionFresh?p.motionVZ:p.vz;
   const speedBefore=Math.sqrt((momentumX||0)**2+(momentumZ||0)**2);
   const gx=p.grounded&&input.crouch?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=p.grounded&&input.crouch?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0,slope=Math.sqrt(gx*gx+gz*gz);
-  if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&speedBefore<SEASON.slide.startSpeed&&slope>=SEASON.slide.slope&&p.slideCooldown===0){p.sliding=true;p.slideAge=0;p.slideVX=-gx/slope*3;p.slideVZ=-gz/slope*3;}
+  const intentX=-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s,intentZ=-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s,uphillIntent=intentX*gx+intentZ*gz>0;
+  if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&speedBefore<SEASON.slide.startSpeed&&slope>=SEASON.slide.slope&&p.slideCooldown===0&&!uphillIntent){p.sliding=true;p.slideAge=0;p.slideVX=-gx/slope*3;p.slideVZ=-gz/slope*3;p.slideUphill=false;}
   // Holding crouch can queue a slide through a jump or mobility-item landing.
   // Actual momentum, not the sprint button or terrain slope, admits the slide.
   if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&speedBefore>=SEASON.slide.startSpeed&&p.slideCooldown===0){
-    p.sliding=true;p.slideAge=0;const boost=Math.min(9,speedBefore+.35)/Math.max(.01,speedBefore);p.slideVX=momentumX*boost;p.slideVZ=momentumZ*boost;
+    p.sliding=true;p.slideAge=0;const boost=Math.min(9,speedBefore+.35)/Math.max(.01,speedBefore);p.slideVX=momentumX*boost;p.slideVZ=momentumZ*boost;p.slideUphill=momentumX*gx+momentumZ*gz>0;p.slideStartX=momentumX/speedBefore;p.slideStartZ=momentumZ/speedBefore;
   }
   p.crouchLatch=!!input.crouch;
   if(p.sliding){
@@ -274,7 +277,8 @@ function movePlayerStep(p, input, map, dt) {
     }
     v=Math.sqrt(vx*vx+vz*vz);const wanted=Math.sqrt(mx*mx+mz*mz);
     if(wanted>.1){const blend=Math.min(.055,dt*.85);vx=vx*(1-blend)+mx/wanted*v*blend;vz=vz*(1-blend)+mz/wanted*v*blend;const n=Math.sqrt(vx*vx+vz*vz)||1;vx*=v/n;vz*=v/n;}
-    const cap=Math.min(1,SEASON.slide.cap/(Math.sqrt(vx*vx+vz*vz)||1));p.slideVX=mx=vx*cap;p.slideVZ=mz=vz*cap;
+    if(p.slideUphill&&(vx*p.slideStartX+vz*p.slideStartZ<SEASON.slide.stopSpeed)){p.sliding=false;p.slideCooldown=.65;p.slideAge=0;p.slideVX=p.slideVZ=mx=mz=0;}
+    else{const cap=Math.min(1,SEASON.slide.cap/(Math.sqrt(vx*vx+vz*vz)||1));p.slideVX=mx=vx*cap;p.slideVZ=mz=vz*cap;}
   }else if(!p.grounded&&p.slideAge>0&&!p.downed){mx=mx*.2+(p.slideVX||0)*.8;mz=mz*.2+(p.slideVZ||0)*.8;}
   else if(p.grounded&&!p.sliding)p.slideAge=0;
   const dx=mx*dt,dz=mz*dt;

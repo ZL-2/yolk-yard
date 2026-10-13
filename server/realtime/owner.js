@@ -56,6 +56,11 @@ export class OwnerService {
       res.writeHead(204,{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Vary':'Origin'});res.end();return;
     }
     try{
+      if(req.url==='/owner/requests'&&req.method==='POST'){
+        const body=await readBody(req);if(!this.authorized(req,body)){json(res,401,{error:'Owner access expired. Unlock Owner Access again.'},origin);return;}
+        const store=relay.parties?.store;if(!store){json(res,503,{error:'Feature inbox unavailable'},origin);return;}
+        const data=store.featureInbox(body.action||'list',body.id);if(body.action&&body.action!=='list')await store.flush();json(res,200,data,origin);return;
+      }
       if(req.url==='/owner/maps'&&req.method==='POST'){
         const body=await readBody(req,1_100_000);
         if(!this.authorized(req,body)){json(res,401,{error:'Owner access expired. Lock and unlock Owner Access again.'},origin);return;}
