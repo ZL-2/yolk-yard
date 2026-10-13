@@ -10,6 +10,7 @@ export const REVIVE_RULES=Object.freeze({seconds:10,range:2.6,health:30,vitality
 export const activeMember=p=>!!p&&p.contestant&&p.health>0&&!p.downed&&!p.spectating&&!p.afkRemoved;
 export function mayDown(sim,p,source){return isTeamRoyale(sim.options)&&!p.downed&&!['Left round','Team eliminated','Disconnected'].includes(source)&&[...sim.players.values()].some(o=>teammates(sim.options,p,o)&&activeMember(o));}
 export function downPlayer(sim,p,attacker,source,precision,shotId){
+ sim.cancelUse?.(p,'damage');
  const applied=p.health;if(attacker&&attacker!==p){p.damageLedger??={};p.damageLedger[attacker.id]=sim.time;}
  recordCombatDamage(p,attacker,applied,source,sim.time,precision);
  // `health` is vitality while DOWNED, not normal combat health. All normal

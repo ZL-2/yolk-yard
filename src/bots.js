@@ -69,7 +69,7 @@ export function botInput(sim,p){
   if(visible||now-(brain.attackedAt??-100)<2)brain.decision=0;
   else return {yaw:p.yaw,pitch:p.pitch,slot:task.slot,forward:0,strafe:0,fire:!p.useLatch,swapSlot:-1};
  }
- const move=navigate(sim,p,brain,goal,skill),distance=target?dist(p,target):Infinity;
+ const move=task.kind==='uplink'&&dist(p,goal)<5?{mx:0,mz:0,jump:false}:navigate(sim,p,brain,goal,skill),distance=target?dist(p,target):Infinity;
  let yaw=Math.atan2(-move.mx,-move.mz),pitch=0,fire=false,popper=false,interact=move.interact&&!p.interactLatch;
  if(!move.mx&&!move.mz)yaw=p.yaw+(target?0:Math.sin(now*.35+(p.botSeed||0))*.03);
  if(task.kind==='loot'&&(unarmed||!visible&&now-(brain.attackedAt??-100)>2)){
@@ -113,7 +113,7 @@ export function botInput(sim,p){
  const movement=smoothArenaCombatMovement(brain,move,yaw,now,arenaCombat);
  const moving=Math.hypot(move.mx,move.mz)>.1;
  const topUp=!visible&&now-(brain.attackedAt??-100)>2.5&&p.ammo[slot]<w.magazine*.65;
- return {yaw,pitch,botBurstReady:visible&&botCombatReady(brain,p,skill,now)&&Math.abs(wrapAngle(desiredYaw-yaw))<=.12,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,moveTarget:move.mx||move.mz?move.moveTarget:null,utilityItem:!!brain.utility,combatAim:visible&&!brain.utility&&task.kind!=='melee'}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:(p.ammo[slot]===0||topUp)&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow'].includes(task.kind)};
+ return {yaw,pitch,botBurstReady:visible&&botCombatReady(brain,p,skill,now)&&Math.abs(wrapAngle(desiredYaw-yaw))<=.12,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,moveTarget:move.mx||move.mz?move.moveTarget:null,utilityItem:!!brain.utility,combatAim:visible&&!brain.utility&&task.kind!=='melee'}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:(p.ammo[slot]===0||topUp)&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow','uplink'].includes(task.kind)};
 }
 import {teammates} from './teams.js';
 import {ammoType,ITEMS} from './royale-data.js';

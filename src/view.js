@@ -1,3 +1,4 @@
+import {weaponMotion} from './weapon-motion.js';
 import {decorateBoss,updateCelebration} from './celebration-view.js';
 import {updateBossAlert} from './boss-alert-view.js';
 import {authoredBoxes} from './building.js';
@@ -813,11 +814,7 @@ export class View {
       const fov=victory?Math.min(65,this.settings.fov):aiming?adsFov(w,this.settings.fov):this.settings.fov;
       this.camera.fov+=(fov-this.camera.fov)*(1-Math.exp(-Math.log(20)*dt/w.adsTime));
       this.camera.updateProjectionMatrix();
-      const bob =
-        Math.sin(this.clock * 11) *
-        0.012 *
-        (p.moving ? 1 : 0) * (this.settings.reducedMotion?0:(this.settings.headBob??1)) *
-        (1 - this.aimBlend);
+      const motion=weaponMotion(this.weaponMotionState??={},p,dt,this.clock,this.aimBlend,this.settings,`${state.round}:${p.id}`);
       const reload = reloadProgress(local, state.time);
       const hands = updateArms(this.localArms, draw.active?-1:reload, this.localModel, this.recoil,draw.progress,null,!!local.reloadEmpty);
       const throwT=(this.clock-this.localThrowStart)/.78;
@@ -832,20 +829,20 @@ export class View {
         front,
       );
       this.gunGroup.position.set(
-        vm.x * (1 - this.aimBlend) + draw.position[0],
+        vm.x * (1 - this.aimBlend) + draw.position[0] + motion.x,
         THREE.MathUtils.lerp(
           vm.y,
           -w.sightY * vm.scale,
           this.aimBlend,
         ) +
-          bob -
+          motion.y -
           hands.dip + draw.position[1],
-        vm.z + this.recoil * 0.025 * (this.settings.reducedMotion?0:(this.settings.weaponMotion??1)) + draw.position[2],
+        vm.z + this.recoil * 0.025 * (this.settings.reducedMotion?0:(this.settings.weaponMotion??1)) + draw.position[2] + motion.z,
       );
       this.gunGroup.rotation.set(
-        this.recoil * 0.045 * (this.settings.reducedMotion?0:(this.settings.weaponMotion??1)) * (1 - this.aimBlend * 0.65) + hands.rotation[0] + draw.rotation[0],
+        this.recoil * 0.045 * (this.settings.reducedMotion?0:(this.settings.weaponMotion??1)) * (1 - this.aimBlend * 0.65) + hands.rotation[0] + draw.rotation[0] + motion.pitch,
         hands.rotation[1] + draw.rotation[1],
-        hands.rotation[2] + draw.rotation[2],
+        hands.rotation[2] + draw.rotation[2] + motion.roll,
       );
       if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1){
         const gesture=Math.sin(Math.PI*throwT);

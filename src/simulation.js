@@ -1,4 +1,5 @@
 import {recordCombatDamage,combatRecap} from './combat-feedback.js';
+import {recordFieldEvent,resetFieldRecord,fieldSnapshot} from './field-record.js';
 import {reloadRequested} from './reload-buffer.js';
 import {startEmote,cancelEmote,emoteInput} from './emotes.js';
 import {watcherAction} from './spectator-status.js';
@@ -79,6 +80,7 @@ export class Simulation {
     const e = { id: ++this.eventId, time: this.time, type, ...data };
     this.events.push(e);
     if (this.events.length > 120) this.events.shift();
+    recordFieldEvent(this,type,e);
     return e;
   }
   addPlayer(id, profile, bot = false, spectator = false) {
@@ -126,7 +128,7 @@ export class Simulation {
       ack: 0,
       lastInput: 0,
     };
-    p.activity=newActivity(this.time);
+    p.activity=newActivity(this.time);resetFieldRecord(p);
     this.players.set(id, p);
     this.spawn(p);
     if (!p.bot) this.waitForEntry(p);
@@ -257,6 +259,7 @@ export class Simulation {
       p.deaths = 0;
       p.points = 0;
       p.assists = 0;
+      resetFieldRecord(p);this.fieldFirstElim=null;
       p.streak = 0;
       this.spawn(p);
       if (!p.bot) this.waitForEntry(p);
@@ -556,7 +559,7 @@ export class Simulation {
         this.projectiles.push(b);shots.push({id:b.id,vx:b.vx,vy:b.vy,vz:b.vz});
       }
     }
-    this.emit('shot',{player:p.id,weapon:w.id,origin,shots,blocked});return true;
+    this.emit('shot',{player:p.id,weapon:w.id,shotId:p.shotGroup,origin,shots,blocked});return true;
   }
   launch(p, popper, spread = 0, recoil = {}) {
     const w = gun(p),
@@ -576,6 +579,7 @@ export class Simulation {
         player: p.id,
         popper,
         weapon: w.id,
+        shotId:p.shotGroup,
         origin,
         blocked: true,
       });
@@ -603,7 +607,7 @@ export class Simulation {
       bounces: 0,
       resting: false,
     });
-    this.emit("launch", { player: p.id, popper, weapon: w.id, origin });
+    this.emit("launch", { player: p.id, popper, weapon: w.id, shotId:p.shotGroup, origin });
   }
   updateProjectiles(dt) {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -781,6 +785,7 @@ export class Simulation {
       attacker.streak++;
       attacker.points += 100;
       awardBonus(this,attacker);
+      if(this.options.mode==='royale'&&attacker.health>0&&!attacker.downed){attacker.stamina=Math.min(100,(attacker.stamina||0)+35);attacker.exhausted=false;}
       if (this.options.mode === "teams") this.scores[attacker.team]++;
     }
     this.emit("elimination", {
@@ -949,6 +954,7 @@ export class Simulation {
         const row={inputQueue:this.remoteInputs.get(p.id)?.queue.length||0};
         for(const key of keys){const value=p[key];row[key]=Array.isArray(value)?value.slice():key==='weaponCooldowns'?{...value}:key==='mantle'&&value?{...value,from:{...value.from},lift:{...value.lift},across:{...value.across},to:{...value.to}}:value;}
         return Object.assign(row,{
+        field:fieldSnapshot(p),
         shotSpread: p.accuracyState[p.slot]?.spread ?? gun(p).spread * (p.aim ? gun(p).aimSpread : 1),
         recoilPitch:p.recoilPitch||0,recoilYaw:p.recoilYaw||0,firstShot:!!p.accuracyState[p.slot]?.firstShot,shotSerial:p.shotSerial||0,combatState:{...p.accuracyState[p.slot]},
       });}),

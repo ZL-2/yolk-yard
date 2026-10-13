@@ -1,3 +1,5 @@
+import './field-operations.css';
+import {FieldOperationsUI,fieldOrdersHTML,fieldStatsHTML} from './field-operations-ui.js';
 import {CombatConfirmation,CONFIRM_LABEL,DamageDirections} from './combat-feedback.js';
 import {preferencesFromSettings,inventoryPreferencesHTML,USE_CANCEL_REASONS} from './inventory-policy.js';
 import {COMFORT_DEFAULTS,ActionToggles,comfortHTML,applyComfort,sensitivityFor} from './comfort-settings.js';
@@ -226,6 +228,7 @@ window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.v
 const streakUI=new StreakUI(document.querySelector('#hud'));
 const royaleUI = new RoyaleUI(item=>view.itemPreview(item));
 const matchEndUI=new MatchEndUI();
+const fieldUI=new FieldOperationsUI();
 const buildControls={buildMode:false,buildType:'wall',buildMaterial:'wood',buildRotation:0,editing:false};
 document.addEventListener('build-edit-close',()=>{if(screen==='game'&&!paused&&!matchMedia('(pointer:coarse)').matches)view.renderer.domElement.requestPointerLock?.();});
 const buildUI=new BuildingUI(royaleUI.root,buildControls,action=>{if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});});
@@ -338,7 +341,7 @@ function closeDialog() {
   if(dialogType==='settings'&&bindingEditor?.dirty){bindingEditor.message='Apply or Discard your keybind changes before closing.';bindingEditor.render();dialog.querySelector('.dialog-body').dispatchEvent(new Event('settings-show-bindings'));dialog.querySelector('.binding-footer')?.scrollIntoView({block:'nearest'});return;}
   if(dialogType==='rename'){toast('Choose an available name to continue, or leave the match.');return;}
   if(dialogType==='royale-stats'){dialog.close();dialogType='';paused=false;return;}
-  if(['royale-inventory','royale-map'].includes(dialogType)){void resume();return;}
+  if(['royale-inventory','royale-map','field-orders'].includes(dialogType)){void resume();return;}
   sound.cue('ui-back');
   bindingEditor = null;
   dialog.close();
@@ -862,7 +865,7 @@ function playerAction(action) {
 }
 function pauseMenu() {
   if(screen!=='game')return;
-  if(state?.royale){modal('FIELD MENU',`<p>${net?'The match keeps running while this menu is open.':'The local match is paused.'} One life per round. Eliminated players spectate the survivors.</p><button class="primary" data-action="resume">RESUME</button><div class="split-actions"><button data-action="royale-map">Island map</button><button data-action="royale-inventory">Inventory</button><button data-action="settings">Settings</button></div>${net?'<button class="plain" data-action="chat-controls">Player controls & quick chat</button>':''}${visibilityButton()}<button class="secondary" data-action="leave-confirm">Leave match</button>`,'pause');return;}
+  if(state?.royale){modal('FIELD MENU',`<p>${net?'The match keeps running while this menu is open.':'The local match is paused.'} One life per round. Eliminated players spectate the survivors.</p><button class="primary" data-action="resume">RESUME</button><div class="split-actions"><button data-action="royale-map">Island map</button><button data-action="royale-inventory">Inventory</button><button data-action="settings">Settings</button></div><div class="split-actions"><button data-action="field-orders">Field orders & report</button></div>${net?'<button class="plain" data-action="chat-controls">Player controls & quick chat</button>':''}${visibilityButton()}<button class="secondary" data-action="leave-confirm">Leave match</button>`,'pause');return;}
 
   modal(
     "Take a breather",
@@ -981,7 +984,10 @@ function processEvents() {
     if(e.type==='afk-removed'){if(e.player===localId){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');return;}if(net?.isHost)net.kick(e.player);}
     if(e.type==='duo-marker'&&e.player!==localId&&e.team!==state.players.find(p=>p.id===localId)?.team)continue;
     view.event(e, localId,state);
+    fieldUI.event(e,localId);
     recordSeasonEvent(e,state,localId);if(['boss-defeated','relay-captured','rig-used','elimination','hit'].includes(e.type)&&e.player===localId){const earned=masteryRewards().filter(id=>!eggWallet.value.owned.includes(id));if(earned.length)eggWallet.change(w=>({...w,owned:[...new Set([...w.owned,...earned])]})).then(()=>toast('Season 1 cosmetic reward unlocked · Locker')).catch(()=>{});}
+    if(e.type==='uplink-active')notice('UPLINK LIVE · '+e.name+' · Hold the marked area for bonus supplies',4000);
+    if(e.type==='uplink-secured')notice((e.players?.includes(localId)?'SIGNAL SECURED · Open your supply cache':'UPLINK CLAIMED · '+e.name),3500);
     if(e.type==='crown-picked-up'||e.type==='crown-dropped')notice(e.name+(e.type==='crown-picked-up'?' picked up a Victory Crown':' dropped a Victory Crown'));
     if(e.type==='crown-victory'&&e.player===localId)notice(e.crowned?'CROWNED VICTORY · '+e.wins+' this season':'VICTORY CROWN EARNED');
     if(e.type==='boss-cache-open')notice(e.name.toUpperCase()+' UNLOCKED');
@@ -1070,6 +1076,7 @@ function hud() {
   const watched=p.spectating?state.players.find(k=>k.id===spectateTarget):null;
   if(state?.royale){const me=state.players.find(p=>p.id===localId);if(me)buildUI.update(state,me,view.buildMap,controlLabel);}
   royaleUI.update(state,p,watched,controlLabel,paused);
+  fieldUI.update(state,p,true,paused,point=>view.projectMarker(point));
   view.waypoint=royaleUI.waypoint;
   $("#hud-mode").textContent = m.name.toUpperCase();
   $("#hud-map").textContent = getMap(state.options.map).name;
@@ -1262,7 +1269,8 @@ const actions = {
  'feature-request':()=>{modal('Request a feature',`<p>Tell us what you would like to see in Ravelfront. Your request goes to the administrator’s private inbox.</p><form id="feature-request-form"><label for="feature-request-text">YOUR IDEA</label><textarea id="feature-request-text" class="field" rows="5" minlength="5" maxlength="1000" required placeholder="What would make the frontier better?"></textarea><button class="primary" type="submit">SEND REQUEST</button></form><p id="feature-request-status" role="status"></p>`,'feature-request');$('#feature-request-text').focus();$('#feature-request-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button'),status=$('#feature-request-status');button.disabled=true;status.textContent='Sending…';try{await party.request('feature-request',{text:$('#feature-request-text').value});if(form.isConnected){form.hidden=true;status.textContent='Request sent. Thank you for helping shape the frontier.';}}catch(error){if(form.isConnected){status.textContent=error.message;button.disabled=false;}}};},
  'owner-inbox':()=>ownerConsole.inbox(),
  'end-spectate':()=>{matchEndUI.watch();paused=false;},
- 'match-stats':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('MATCH STATS',`<p>${p?.place?'PLACEMENT #'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS</p><p>${esc(matchEarnings.status)} · ${matchEarnings.total||0} Marks</p>${scoresHTML()}<button class="primary" data-action="close">BACK TO MATCH</button>`,'royale-stats');},
+ 'field-orders':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('FIELD OPERATIONS',fieldOrdersHTML(p,state.royale.operations)+fieldStatsHTML(p)+'<button class="primary" data-action="resume">RETURN TO GAME</button>','field-orders');},
+ 'match-stats':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('MATCH STATS',`<p>${p?.place?'PLACEMENT #'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS</p><p>${esc(matchEarnings.status)} · ${matchEarnings.total||0} Marks</p>${fieldStatsHTML(p)}${scoresHTML()}<button class="primary" data-action="close">BACK TO MATCH</button>`,'royale-stats');},
  'save-player-name':()=>{
   const raw=$('#required-name')?.value||'',name=safeName(raw),checked=moderateText(raw,{kind:'name'});
   if(!checked.ok||needsPlayerName(name)){$('#required-name-error').textContent='Choose a nickname other than Player (up to 18 characters).';$('#required-name').focus();return;}
@@ -1897,6 +1905,7 @@ function loop(now) {
   updateSpectatorStatus(me,now);
   soundVisuals.update(state,me?.spectating?state?.players.find(p=>p.id===spectateTarget):me,{enabled:settings.visualSoundEffects,categories:settings,playing:screen==='game'&&!paused&&!document.hidden},now);
   sound.updateLobby(screen!=='game',dt,document.hidden);
+  sound.collisionMap=view.buildMap;
   sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!document.hidden&&(state?.phase==='results'||!(!net&&paused)));
   let renderPlayer = predicted;
   if (sim && !sim.remote && me) {
@@ -1965,6 +1974,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
     scenery:()=>({labels:(()=>{let n=0;view.world.traverse(m=>{if(m.isSprite)n++;});return n;})(),loot:view.royaleView.loot.size,chests:view.royaleView.chests.size}),
     bossAlerts:()=>[...view.models].filter(([id])=>state?.players.find(p=>p.id===id)?.boss).map(([id,m])=>({id,visible:!!(m.visible&&m.userData.bossAlert?.visible),symbol:m.userData.bossAlert?.userData.symbol,color:m.userData.bossAlert?.userData.color,nameY:m.userData.nameplate?.position.y,alertY:m.userData.bossAlert?.position.y})),
     bossVoiceAudio:()=>({...sound.bossAudio.debug,active:sound.bossAudio.active.size,loaded:!!sound.bossAudio.buffer}),
+    frontline:()=>({score:{scene:sound.score.scene,voices:sound.score.voices.size,musicVolume:sound.musicVolume},motion:view.weaponMotionState?.out,uplink:!!view.royaleView.operationMesh?.visible,drawCalls:view.renderer.info.render.calls}),
     fieldAudio:()=>({...sound.fieldSamples.debug,loaded:[...sound.fieldSamples.buffers.keys()],active:[...sound.fieldSamples.active].map(([id,voices])=>({id,count:voices.size}))}),
     vehicles:()=>({camera:view.camera.position.toArray(),sky:view.atmosphere.root.visible,meshes:[...(view.royaleView.vehicleMeshes||[])].map(([id,m])=>({id,visible:m.visible}))}),
     endPresentation:()=>({phase:matchEndUI.phase,cinematic:view.cinematic,effects:view.eliminations.diagnostics()}),

@@ -14,5 +14,5 @@ export function matchOutcome(state,id){
  const win=state.phase==='results'&&wonRoyale(state,id),dead=p.health<=0&&p.eliminatedAt!=null;
  if(!win&&!dead&&state.phase!=='results')return null;
  const killer=state.players.find(k=>k.id===p.killerId);
- return {win,dead,canCelebrate:win&&p.health>0&&!p.spectating&&!p.downed,place:win?1:p.place||0,kills:p.kills||0,crowned:!!p.crownedVictory,killer:killer?.name||'',weapon:p.recap?.weapon||'',damage:p.damageDealt||0,finished:state.phase==='results',spectator:!win&&!dead};
+ return {win,dead,canCelebrate:win&&p.health>0&&!p.spectating&&!p.downed,place:win?1:p.place||0,kills:p.kills||0,crowned:!!p.crownedVictory,killer:killer?.name||'',weapon:p.recap?.weapon||'',damage:p.field?.damage||p.damageDealt||0,serviceXP:p.field?.xp||0,assists:p.assists||0,orders:p.field?.orders||0,finished:state.phase==='results',spectator:!win&&!dead};
 }
