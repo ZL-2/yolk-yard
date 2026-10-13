@@ -42,7 +42,7 @@ function builders(group,p,detail){
 }
 function fender(sign,z,lip=false,detail=2){
  const vertices=[],uv=[],indices=[],steps=detail===2?20:8,across=3;
- for(let layer=0;layer<2;layer++)for(let i=0;i<=steps;i++)for(let j=0;j<=across;j++){const t=-1.10+i/steps*2.2,u=j/across,x=sign*(.36+u*.70),r=.61+(lip?.025:0);vertices.push(x,.53+Math.cos(t)*r-.025*u*u-layer*.028,z+Math.sin(t)*r);uv.push(u,i/steps);}
+ for(let layer=0;layer<2;layer++)for(let i=0;i<=steps;i++)for(let j=0;j<=across;j++){const t=-1.10+i/steps*2.2,u=j/across,x=sign*(lip?1.035+u*.060:.36+u*.70),r=.61;vertices.push(x,.53+Math.cos(t)*r-(lip?.018:.025*u*u)-layer*.028,z+Math.sin(t)*r);uv.push(u,i/steps);}
  const stride=across+1,half=(steps+1)*stride;
  for(let layer=0;layer<2;layer++)for(let i=0;i<steps;i++)for(let j=0;j<across;j++){const a=layer*half+i*stride+j,b=a+stride;if(layer===0)indices.push(a,b,a+1,a+1,b,b+1);else indices.push(a,a+1,b,a+1,b+1,b);}
  for(let i=0;i<steps;i++)for(const j of [0,across]){const a=i*stride+j,b=a+stride;indices.push(a,a+half,b,b,b+half,a+half);}
@@ -73,7 +73,7 @@ export function makeATV({detail=2,environment=null}={}){
  for(const z of [-.76,.76]){k.tube([-.74,.49,z],[.74,.49,z],.032,'engine');for(const s of [-1,1]){k.tube([s*.27,.58,z-.14],[s*.77,.43,z],.028);k.tube([s*.27,.58,z+.14],[s*.77,.43,z],.028);}}
  // Contoured cowling, curved fenders and independently fitted black mud lips.
  k.box(0,.84,-.26,.55,.30,.70,'paint',.11);const hood=k.box(0,.89,-.84,.75,.23,.49,'paint',.075);hood.rotation.x=-.18;k.box(0,.94,-.19,.22,.035,.43,'plastic',.04);const cap=k.cylinder(0,.971,-.27,.065,.022,'alloy');cap.rotation.x=-.08;
- for(const s of [-1,1])for(const z of [-.76,.76]){k.add(fender(s,z,false,detail),'paint');if(detail>0){const lip=k.add(fender(s,z,true,detail),'plastic');lip.scale.x=1.028;lip.position.y=-.030;}}
+ for(const s of [-1,1])for(const z of [-.76,.76]){k.add(fender(s,z,false,detail),'paint');if(detail>0)k.add(fender(s,z,true,detail),'plastic');}
  for(const s of [-1,1]){k.box(s*.43,.80,.15,.09,.17,.63,'plastic',.035);k.box(s*.455,.83,.04,.012,.045,.31,'alloy',.004);}
  // Driver and passenger cushions with stitching and a separate grab rail.
  for(const [z,d,h]of [[-.27,.56,.10],[.34,.64,.14]])k.box(0,1.05-h/2,z,.43,h,d,'seat',.055);
