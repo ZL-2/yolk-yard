@@ -12,8 +12,10 @@ import {initializeBossAwareness,scanBossAwareness,alertBossToDamage,bossHasSight
 import {requestBossVoice} from './boss-voice.js';
 import {GRAPPLER,grappleAim,startGrapple} from './grappler.js';
 import {shadowCharges,startShadowstep} from './shadowstep.js';
+import {initializeHenchmen,henchmanDefinition} from './henchmen.js';
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 export function initializeSeason(sim){
+ sim.guardOccupancy=null;sim.guardVoiceAt={};
  sim.smokes=[];sim.relays=(sim.map.relays||[]).map(r=>({...r,cooldown:0,progress:0,user:null}));
  sim.bossCaches=[];
  for(const def of BOSSES){
@@ -23,11 +25,11 @@ export function initializeSeason(sim){
   const b=Simulation.prototype.addPlayer.call(sim,def.id,{name:def.name,color:def.color,accent:def.accent,outfit:def.outfit,backbling:def.backbling},true);
   if(!b)continue;Object.assign(b,{boss:true,bossId:def.id,contestant:false,spectating:false,lateSpectator:false,connected:false,team:-2,x:spot.x,y:spot.y,z:spot.z,home:{x:spot.x,y:spot.y,z:spot.z},health:def.health,shield:def.shield,maxHealth:def.health,maxShield:def.shield,grounded:true,flight:'ground',slot:1,inventory:inventory(),materials:{wood:0,brick:0,metal:0},bank:{medium:210,light:0,shells:60,heavy:36,rockets:0},stamina:100,lastDamage:-100,aggroAt:0});
   b.patrol=house?[[-1.5,-7],[1.5,-3],[1.5,6],[-1.5,3]].map(([dx,dz])=>({x:house.x+dx,y:house.baseY,z:house.z+dz})):site.patrol;b.patrolIndex=0;b.patrolWait=0;
-  b.inventory[1]={id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:MYTHIC_WEAPONS[def.id].magazine||weapon(def.weapon).magazine};b.inventory[1].ammo=gun(b).magazine;if(def.ability==='shadowstep')b.inventory[2]={id:'shadowstep',rarity:5,count:1,charges:6,rechargeAt:0};sim.syncInventory(b);initializeBossAwareness(sim,b);
+  b.inventory[1]={id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:MYTHIC_WEAPONS[def.id].magazine||weapon(def.weapon).magazine};b.inventory[1].ammo=gun(b).magazine;if(def.ability==='shadowstep')b.inventory[2]={id:'shadowstep',rarity:5,count:1,charges:6,rechargeAt:0};sim.syncInventory(b);initializeBossAwareness(sim,b);initializeHenchmen(sim,b,def);
  }
 }
 export function bossInput(sim,p){
- const def=bossDefinition(p.bossId||p.id),input={yaw:p.yaw,pitch:p.pitch||0,slot:1,forward:0,strafe:0,interact:false};
+ const boss=bossDefinition(p.bossId||p.id),def=p.henchman?henchmanDefinition(boss):boss,input={yaw:p.yaw,pitch:p.pitch||0,slot:1,forward:0,strafe:0,interact:false};
  if(p.grapple&&p.grapple.phase!=='return')return {...input,fire:false};
  if(p.bossVeil){
   const veil=p.bossVeil;input.fire=false;
@@ -59,7 +61,7 @@ export function bossInput(sim,p){
   input.yaw=p.yaw+Math.max(-.026,Math.min(.026,wrap(yaw+error-p.yaw)));const pitch=target?Math.atan2(goal.y+.85-(p.y+1.55),d)+Math.sin(sim.time*.83)*.025:0;input.pitch=p.pitch+(pitch-p.pitch)*.07;
   const close=def.ability==='winch'?8:23;
   input.forward=farHome?.4:target?(d>close&&dist(p,p.home)<def.leash*.65?.3:0):investigating?(d>2&&dist(p,p.home)<def.leash*.65&&Math.abs(wrap(yaw-p.yaw))<.4?.22:0):!p.patrolWait&&Math.abs(wrap(yaw-p.yaw))<.4?.34:0;
-  input.aim=!!target&&def.ability==='shadowstep';input.fire=!!target&&!farHome&&d<(def.ability==='winch'?10:def.notice)&&sim.time>p.aggroAt&&Math.abs(wrap(yaw-p.yaw))<.13&&sim.time%def.cycle<def.burst&&bossHasSight(sim,p,target,smokeBlocks);input.reload=p.ammo[1]===0;
+  input.aim=!!target&&def.ability==='shadowstep';input.fire=!!target&&!farHome&&d<(def.ability==='winch'?10:def.notice)&&sim.time>p.aggroAt&&Math.abs(wrap(yaw-p.yaw))<.13&&(sim.time+(p.guardIndex||0)*.8)%def.cycle<def.burst&&bossHasSight(sim,p,target,smokeBlocks);input.reload=p.ammo[1]===0;
  }return input;
 }
 export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
@@ -70,6 +72,7 @@ export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
  sim.emit('hit',{player:attacker?.id,target:p.id,amount:shield+dealt,precision,shield:shield>0,shieldBreak:shield>0&&p.shield===0,shotId,weapon:source,x:p.x,y:p.y+1.4,z:p.z,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z});
  if(shield&&p.shield===0)sim.emit('royale-cue',{cue:'shield-break',player:p.id,x:p.x,y:p.y,z:p.z});
  if(p.health===0&&!p.bossDefeated){p.bossDefeated=true;p.spectating=true;p.flight='out';p.reloadEnd=0;p.bossWindup=null;p.bossVeil=null;p.bossAlert='unaware';p.bossSuspicion=0;p.targetId=null;
+  if(p.henchman){sim.dropLoot(p,{id:'sprinter',weapon:true,rarity:1,count:1,ammo:gun(p).magazine});sim.dropAmmo(p,'medium',18);sim.emit('henchman-defeated',{player:attacker?.id,target:p.id,name:attacker?.name||'Storm',targetName:p.name,weapon:source,x:p.x,y:p.y,z:p.z});return;}
   sim.dropLoot(p,{id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:gun(p).magazine});
   if(def.ability==='rig'){sim.dropLoot(p,{id:'jumpRig',rarity:5,count:1,charges:SEASON.rig.charges,rechargeAt:0,readyAt:0});sim.dropAmmo(p,'medium',60);sim.dropLoot(p,{id:'asterKeycard',count:1,rarity:4});}
   if(def.ability==='winch'){sim.dropLoot(p,{id:'anchorWinch',rarity:5,count:1,readyAt:0});sim.dropLoot(p,{id:'rookKeycard',count:1,rarity:4});sim.dropAmmo(p,'shells',12);sim.dropLoot(p,{id:'metal',resource:'metal',count:60,rarity:0});}

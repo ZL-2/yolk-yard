@@ -1,4 +1,7 @@
 import './field-operations.css';
+import {MatchConnectionUI} from './match-connection-ui.js';
+import {PublicArrivalUI} from './public-arrival-ui.js';
+import {departureFeed,eliminationNotice} from './match-roster.js';
 import {FieldOperationsUI,fieldOrdersHTML,fieldStatsHTML} from './field-operations-ui.js';
 import {CombatConfirmation,CONFIRM_LABEL,DamageDirections} from './combat-feedback.js';
 import {preferencesFromSettings,inventoryPreferencesHTML,USE_CANCEL_REASONS} from './inventory-policy.js';
@@ -73,6 +76,7 @@ import {KeybindEditor} from "./keybind-editor.js";
 import './field-update.css';
 import './frontier-ui.css';
 import './field-refinement.css';
+import './field-stability.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
@@ -229,6 +233,8 @@ const streakUI=new StreakUI(document.querySelector('#hud'));
 const royaleUI = new RoyaleUI(item=>view.itemPreview(item));
 const matchEndUI=new MatchEndUI();
 const fieldUI=new FieldOperationsUI();
+const matchConnectionUI=new MatchConnectionUI();
+const publicArrivalUI=new PublicArrivalUI();
 const buildControls={buildMode:false,buildType:'wall',buildMaterial:'wood',buildRotation:0,editing:false};
 document.addEventListener('build-edit-close',()=>{if(screen==='game'&&!paused&&!matchMedia('(pointer:coarse)').matches)view.renderer.domElement.requestPointerLock?.();});
 const buildUI=new BuildingUI(royaleUI.root,buildControls,action=>{if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});});
@@ -280,7 +286,7 @@ function refreshPublicMatch(){
 }
 const publicJoinChime=new PublicJoinChime();
 function publicMatchChanged(match){
- if(publicJoinChime.update(match,screen==='menu'&&!document.hidden))sound.cue('public-join');
+ if(publicJoinChime.update(match,screen==='menu'&&!document.hidden)){sound.cue('public-join');publicArrivalUI.show(match);}
  refreshPublicMatch();
 }
 let lobbyFooterObserver;
@@ -981,6 +987,7 @@ function processEvents() {
     if (state.time - e.time > 1.6) continue;
     const echoed=(!sim||sim.remote)&&e.player===localId&&guestFire.confirm(e,performance.now()/1000);
     if(echoed)e.echoed=true;
+    const departed=departureFeed(e);if(departed){const row=document.createElement('div');row.className='kill-line checkout';row.innerHTML=esc(departed.name)+' <span>'+departed.text+'</span>';row.dataset.expire=String(performance.now()+5500);$('#feed').prepend(row);while($('#feed').children.length>4)$('#feed').lastChild.remove();}
     if(e.type==='afk-removed'){if(e.player===localId){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');return;}if(net?.isHost)net.kick(e.player);}
     if(e.type==='duo-marker'&&e.player!==localId&&e.team!==state.players.find(p=>p.id===localId)?.team)continue;
     view.event(e, localId,state);
@@ -1030,7 +1037,7 @@ function processEvents() {
     }
     if(e.type==='build-result'&&e.player===localId)buildUI.result(e);
     if (e.type === "notice") notice(e.text);
-    if (e.type === "elimination") {
+    if (e.type === "elimination"||e.type==='henchman-defeated') {
       sound.death(e.target===localId?0:me?Math.hypot(me.x-e.x,me.z-e.z):0,e.target===localId?null:e);
       const row = document.createElement("div");
       row.className = "kill-line" + (e.player === localId ? " me" : "");
@@ -1042,7 +1049,7 @@ function processEvents() {
       if (e.player === localId && e.target !== localId) {
         sound.eliminate();
         notice(
-          e.streak >= 3 ? `${e.streak} in a row!` : `Tagged ${e.targetName}`,
+          eliminationNotice(e,!!state.royale),
         );
       }
       if (e.target === localId)
@@ -1099,6 +1106,7 @@ function hud() {
   $("#arena-stamina").hidden=!!state.royale;$("#arena-stamina-fill").value=vitals.stamina??100;$("#arena-stamina").classList.toggle("exhausted",!!vitals.exhausted);
   $("#health").textContent = Math.ceil(vitals.health);
   $("#health-fill").style.width = Math.max(0, Math.min(100, vitals.health)) + "%";
+  $("#streak").hidden=!!state.royale&&state.time>=p.shieldUntil;
   $("#streak").textContent =
     state.time < p.shieldUntil
       ? "Spawn shield · firing ends it"
@@ -1846,6 +1854,8 @@ function loop(now) {
   if(screen==='editor'){lastTime=now;requestAnimationFrame(loop);return;}
   lobbyStatus.update(now,now-lastTime,net,screen);
   performanceHUD.update(now,now-lastTime,net,settings,screen==='game'&&!document.hidden);
+  matchConnectionUI.update(net,screen==='game',now);
+  publicArrivalUI.update(party?.publicMatch,screen==='menu'&&!dialog.open&&!document.hidden,party?.party,party?.id,now);
   pumpNetworkInput(now);
   if(state?.royale){view.buildMap=getMap(state.options.map);applyBuildState(view.buildMap,state.royale);}
   if(screen==='game'&&!document.hidden)connectionReport.performance.frame(now-lastTime,net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');

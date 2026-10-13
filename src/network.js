@@ -354,7 +354,7 @@ export class Network {
           const now=performance.now();this.hostHeartbeat.contact(now);
           this.latency = Math.max(0, Math.round(now - msg.time));
         }
-        else if(msg.type==='host-left')this.beginMigration();
+        else if(msg.type==='host-left'){if(msg.checkpoint?.simulation)this.lastCheckpoint=msg.checkpoint;if(Array.isArray(msg.members))this.members=msg.members;this.beginMigration();}
         else if(msg.type==='kicked') {this.callbacks.onError?.('You were removed from this room.');this.destroy();}
       });
       conn.on("close", () => {
@@ -529,8 +529,9 @@ export class Network {
     if(!next){this.callbacks.onError?.('No connected players remain in this room.');return;}
     if(next.id===this.id){this.promote();return;}
     const attempt=this.peer.connect(next.peerId,{reliable:true,serialization:'binary'});
-    let welcomed=false;this.hostConnection=attempt;
-    const timer=this.later(()=>{if(!welcomed){attempt.close();this.failedHosts.add(next.id);this.electHost();}},5000);
+    let welcomed=false,failed=false;this.hostConnection=attempt;
+    const retry=()=>{if(failed||welcomed||this.closed||!this.migrating||this.hostConnection!==attempt)return;failed=true;clearTimeout(timer);this.timers.delete(timer);attempt.close();this.failedHosts.add(next.id);this.electHost();};
+    const timer=this.later(retry,5000);
     attempt.on('open',()=>attempt.send({type:'hello',version:VERSION,profile:this.joinProfile||safeProfile(this.snapshot?.players.find(p=>p.id===this.id))}));
     attempt.on('data',msg=>{
       if(this.hostConnection!==attempt||!msg||typeof msg!=='object')return;
@@ -550,13 +551,13 @@ export class Network {
       }else if(msg.type==='chat-message')this.callbacks.onChat?.(msg.message);
       else if(msg.type==='chat-status')this.callbacks.onChatStatus?.(msg);
       else if(msg.type==='pong'&&Number.isFinite(msg.time)){const now=performance.now();this.hostHeartbeat.contact(now);this.latency=Math.max(0,Math.round(now-msg.time));}
-      else if(msg.type==='host-left'&&welcomed)this.beginMigration();
+      else if(msg.type==='host-left'&&welcomed){if(msg.checkpoint?.simulation)this.lastCheckpoint=msg.checkpoint;if(Array.isArray(msg.members))this.members=msg.members;this.beginMigration();}
       else if(msg.type==='kicked'){this.callbacks.onError?.('You were removed from this room.');this.destroy();}
       else if(msg.type==='name-required'){this.nameJoining=msg.joining;this.callbacks.onNameRequired?.();}
       else if(msg.type==='name-accepted')this.callbacks.onNameAccepted?.();
     });
-    attempt.on('close',()=>{if(welcomed&&this.hostConnection===attempt&&!this.closed)this.beginMigration();});
-    attempt.on('error',()=>{if(welcomed&&this.hostConnection===attempt&&!this.closed)this.beginMigration();});
+    attempt.on('close',()=>{if(!welcomed)retry();else if(this.hostConnection===attempt&&!this.closed)this.beginMigration();});
+    attempt.on('error',()=>{if(!welcomed)retry();else if(this.hostConnection===attempt&&!this.closed)this.beginMigration();});
   }
   promote(){
     this.isHost=true;this.migrating=false;this.hostId=this.id;
@@ -600,9 +601,10 @@ export class Network {
     if (this.isHost && !relayURL()) directory.publish(null);
     for (const timer of this.timers) clearTimeout(timer);
     clearInterval(this.heartbeat);
+    const handoff=this.isHost&&[...this.connections.values()].some(c=>c.open)?this.migrationData():null;
     if (this.isHost)
       for (const conn of this.connections.values())
-        if (conn.open) conn.send({ type: "host-left" });
+        if (conn.open) conn.send({ type: "host-left",...(handoff?{checkpoint:handoff,members:this.members}:{}) });
     this.aliasPeer?.destroy();
     this.peer?.destroy();
     this.connections.clear();

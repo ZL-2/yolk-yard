@@ -1,0 +1,55 @@
+/* Update 151: clear status, a live departure roster, and separate HUD lanes. */
+#hud #field-operations{left:20px;right:auto;width:200px;max-height:calc(100dvh - 330px);overflow:auto}
+#hud #field-capture-status{position:absolute;left:50%;top:86px;transform:translateX(-50%);width:min(380px,58vw);padding:14px 18px;color:#ecfff9;background:linear-gradient(110deg,#153c43ef,#102b3beb);border:1px solid #76ebcc88;border-top:3px solid #76ebcc;border-radius:6px;z-index:8;pointer-events:none;box-shadow:0 8px 22px #0004}
+#field-capture-status[hidden]{display:none!important}
+#field-capture-status>div{display:grid;grid-template-columns:1fr auto;gap:5px 12px}
+#field-capture-status strong{font-size:14px;letter-spacing:.07em;color:#9ff3dc}
+#field-capture-status span{grid-column:1;font-size:11px;color:#d1e7e4}
+#field-capture-status b{grid-column:2;grid-row:1/3;font-size:24px;align-self:center}
+#field-capture-status progress{display:block;width:100%;height:7px;margin-top:11px;accent-color:#77edcb}
+#field-capture-status[data-state=contested]{border-color:#edaa75}
+#field-capture-status[data-state=contested] strong{color:#ffbc85}
+#field-capture-status[data-state=contested] progress{accent-color:#ffbc85}
+#hud #match-connection{position:absolute;left:50%;top:92px;transform:translateX(-50%);display:flex;align-items:center;gap:15px;width:min(480px,76vw);padding:18px 22px;border:1px solid #f7d88288;border-left:4px solid #f7d882;background:#112b40f2;box-shadow:0 8px 25px #0005;border-radius:6px;z-index:20;color:#eef7ff;pointer-events:none}
+#match-connection[hidden]{display:none!important}
+#match-connection strong{display:block;font-size:16px;letter-spacing:.05em;color:#ffe1a2}
+#match-connection span{display:block;margin-top:6px;font-size:12px;line-height:1.45;color:#c3d8e8}
+#match-connection i{flex:none;width:27px;height:27px;border:3px solid #9bbccd44;border-top-color:#ffdc85;border-radius:50%;animation:connection-turn 1.3s linear infinite}
+@keyframes connection-turn{to{transform:rotate(360deg)}}
+#hud .kill-line.checkout{border-left:2px solid #9cc1d8;color:#eef6ff;background:#123046bb}
+#hud .kill-line.checkout span{color:#b2c9d6}
+body.in-spawn-island #royale-flight{width:min(500px,calc(100vw - 36px));max-width:500px;top:92px;padding:15px 18px!important;background:#102e42ee;border-color:#74aec2;box-shadow:0 8px 28px #00162366;text-align:left;pointer-events:auto}
+body.in-spawn-island #royale-flight .eyebrow{font-size:9px;color:#83d4db;letter-spacing:.12em}
+body.in-spawn-island #royale-flight-title{font-size:20px;letter-spacing:.03em;color:#f5f8ff}
+body.in-spawn-island #royale-flight-help{font-size:11px;color:#b6cedb;line-height:1.5;margin:8px 0 12px}
+#island-roster[hidden]{display:none}
+.island-roster-heading{display:flex;align-items:center;gap:8px;border-top:1px solid #95c3d344;padding-top:11px;color:#d2e8ed}
+.island-roster-heading>b{font-size:23px;color:#a0f5dc}
+.island-roster-heading>span{font-size:10px;font-weight:800;letter-spacing:.06em}
+.island-roster-heading>small{margin-left:auto;font-size:8px;color:#87b0c2;white-space:nowrap}
+.island-roster-names{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;max-height:72px;overflow:auto;scrollbar-width:thin}
+.island-roster-names>span{display:flex;align-items:center;gap:8px;border:1px solid #61879c66;border-radius:4px;padding:6px 9px;background:#214455;font-size:11px;color:#e3f0f5;overflow-wrap:anywhere}
+.island-roster-names>span.you{border-color:#7be4c5;background:#254f4d}
+.island-roster-names b{font-size:8px;color:#95f7d6}
+#dialog .presence-badge,.yard-member .presence-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:750;line-height:1.2;vertical-align:middle;padding:5px 7px;border-radius:4px;border:1px solid var(--presence-border,#72b9a066);background:var(--presence-bg,#1e443d);color:var(--presence-color,#a6efcc);white-space:nowrap;letter-spacing:.01em}
+.presence-badge svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+.presence-badge[data-presence=away]{--presence-border:#d3aa6955;--presence-bg:#493c28;--presence-color:#f1d397}
+.presence-badge[data-presence=in-match]{--presence-border:#ee946655;--presence-bg:#4b302d;--presence-color:#ffbc94}
+.presence-badge[data-presence=offline]{--presence-border:#8ea3b444;--presence-bg:#2b3a45;--presence-color:#b4c5d3}
+.presence-badge[data-presence=matchmaking],.presence-badge[data-presence=reconnecting]{--presence-border:#82bcdf55;--presence-bg:#223f57;--presence-color:#b3def6}
+.presence-badge[data-presence=spectating]{--presence-border:#b799d155;--presence-bg:#393149;--presence-color:#dec5f1}
+#dialog .social-person small.presence,.yard-member small{opacity:1}
+.presence-detail{font-size:10px;color:#a4bfce;margin-left:7px;vertical-align:middle}
+#public-match-arrival{position:fixed;left:50%;top:105px;transform:translateX(-50%);width:min(640px,90vw);display:flex;gap:16px;align-items:center;padding:18px 20px;border:1px solid #86d7d2;border-left:5px solid #85e9c9;border-radius:7px;background:linear-gradient(120deg,#173d4cf5,#102939f5);color:#edfaff;box-shadow:0 14px 38px #00151e88;z-index:110}
+#public-match-arrival[hidden]{display:none}
+#public-match-arrival small{display:block;color:#96edda;letter-spacing:.13em;font-size:9px;font-weight:850}
+#public-match-arrival strong{display:block;font-size:19px;line-height:1.2;margin:7px 0 5px;overflow-wrap:anywhere}
+#public-match-arrival span{display:block;color:#bfd7e4;font-size:11px}
+#public-match-arrival>div{flex:1;min-width:0}
+#public-match-arrival button{border:1px solid #a6eace;background:#96e3c4;color:#10293b;border-radius:5px;font-size:11px;font-weight:900;padding:11px;white-space:nowrap}
+#public-match-arrival button:disabled{opacity:.5;cursor:default}
+#public-match-arrival [data-arrival-close]{padding:5px;background:transparent;border:0;color:#c8e4e9;font-size:21px;align-self:flex-start}
+#dialog .clear-ticket{border-color:#91b9d1;color:#d9edff;background:#254152}
+@media(max-width:760px){#hud #field-operations{left:12px;right:auto;width:160px;padding:8px}#hud #field-capture-status{width:min(330px,78vw);padding:11px 13px}#field-capture-status strong{font-size:12px}#field-capture-status span{font-size:10px}#field-capture-status b{font-size:20px}body.in-spawn-island #royale-flight{width:min(440px,calc(100vw - 32px));top:235px}#public-match-arrival{top:137px;gap:10px;flex-wrap:wrap;padding:14px 16px}#public-match-arrival>div{flex-basis:75%}#public-match-arrival strong{font-size:17px}#public-match-arrival [data-arrival-close]{position:absolute;right:8px;top:6px}}
+@media(max-height:700px){#hud #field-operations{width:155px;max-height:140px;padding:8px}#field-operations .field-detail{display:none}#field-operations .field-eyebrow{font-size:8px;letter-spacing:.05em}#field-operations .field-title{font-size:11px}#field-operations button{padding-top:6px;margin-top:6px}#field-operations .field-order-progress{display:none}.island-roster-names{max-height:48px}}
+@media(prefers-reduced-motion:reduce){#match-connection i{animation:none}}

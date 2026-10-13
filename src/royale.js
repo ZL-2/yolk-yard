@@ -1,4 +1,5 @@
 import {recordCombatDamage} from './combat-feedback.js';
+import {henchmanAwake} from './henchmen.js';
 import {sanitizeSlotPreferences,vacantSlot,targetLoot,USE_CANCEL_REASONS,canAutoStack} from './inventory-policy.js';
 import {vaultOpen} from './vaults.js';
 import {initializeVehicles,tickVehicles,vehicleInteract,seatPlayer,exitVehicle,vehicleHit,damageVehicle} from './vehicles.js';
@@ -323,15 +324,15 @@ export class RoyaleSimulation extends Simulation {
   this.emit('royale-cue',{player:p.id,cue:'complete-'+use.id,x:p.x,y:p.y,z:p.z});
  }
  cancelUse(p,reason='action'){cleanHealingUse(p);if(p.use)this.emit('royale-cue',{player:p.id,cue:'use-cancel',reason:Object.hasOwn(USE_CANCEL_REASONS,reason)?reason:'action'});p.use=null;}
- reload(p){if(!canFight(p)||!p.inventory[p.slot]?.weapon)return false;this.syncInventory(p);const accepted=super.reload(p);if(accepted&&p.boss)requestBossVoice(this,p,'reload');return accepted;}
+ reload(p){if(!canFight(p)||!p.inventory[p.slot]?.weapon)return false;this.syncInventory(p);const accepted=super.reload(p);if(accepted&&(p.boss||p.henchman))requestBossVoice(this,p,'reload');return accepted;}
  fire(p,burst=false){
   if(p.vehicleId&&p.vehicleSeat===0)return false;
   const item=p.inventory[p.slot];if(!canFight(p)||!item?.weapon||p.flight!=='ground'||p.use)return false;
-  const accepted=super.fire(p,burst);item.ammo=p.ammo[p.slot];if(accepted&&p.boss)bossCombatVoice(this,p);return accepted;
+  const accepted=super.fire(p,burst);item.ammo=p.ammo[p.slot];if(accepted&&(p.boss||p.henchman))bossCombatVoice(this,p);return accepted;
  }
  damage(victim,attacker,amount,source,precision=false,shotId=null){
   if(this.options.training){if(victim.bot){super.damage(victim,attacker,amount,source,precision,shotId);if(victim.health<=0)this.spawnWarmup(victim);}return;}
-  if(victim.boss){damageBoss(this,victim,attacker,amount,source,precision,shotId);return;}
+  if(victim.boss||victim.henchman){damageBoss(this,victim,attacker,amount,source,precision,shotId);return;}
   if(teammates(this.options,victim,attacker))return;
   if(source==='Disconnected')victim.shieldUntil=0;
   if(victim.health<=0||victim.spectating||source!=='Disconnected'&&(this.time<(victim.shieldUntil||0)||isWarmup(this.stage)||victim.flight==='transport'))return;
@@ -388,15 +389,15 @@ export class RoyaleSimulation extends Simulation {
  }
 
  leavePlayer(id){
-  const p=this.players.get(id);if(!p)return;
-  if(isTeamRoyale(this.options)&&this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant){p.connected=false;if(p.health>0)this.damage(p,null,p.health+p.shield+1,'Disconnected');resolveDownedTeams(this);this.emit('leave',{name:p.name});return;}
+  const p=this.players.get(id);if(!p||p.checkedOut)return;const departed={player:id,name:p.name,human:!p.bot};
+  if(isTeamRoyale(this.options)&&this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant){p.checkedOut=true;p.connected=false;if(p.health>0)this.damage(p,null,p.health+p.shield+1,'Disconnected');resolveDownedTeams(this);this.emit('leave',departed);return;}
   if(this.phase==='playing'&&!isWarmup(this.stage)&&p.contestant&&p.health>0&&!p.spectating&&(this.options.fill||this.options.bots>0)){
    cancelEmote(p);dropCrown(this,p);p.crownProgress=null;p.crownIdentity=null;p.crownWins=0;p.crownEmoteUnlocked=false;
    this.players.delete(id);this.inputs.delete(id);
    let botId='bot-fill-'+this.joinOrder++;while(this.players.has(botId))botId+='x';
    Object.assign(p,randomAppearance(this.random),{id:botId,bot:true,name:this.uniqueBotName('Sunny'),brain:null,ack:0,botThink:0,botPath:[],botLand:p.botLand||this.map.floorLoot[0],botDrop:this.elapsed+2});
    for(const b of this.projectiles)if(b.owner===id)b.owner=botId;for(const b of this.builds)if(b.owner===id)b.owner=botId;
-   this.players.set(botId,p);this.emit('leave',{name:p.name});
+   this.players.set(botId,p);this.emit('leave',departed);
   }else this.removePlayer(id);
   if(this.options.recurring&&isWarmup(this.stage)){this.addBots();this.advanceWarmupClock();}
  }
@@ -470,6 +471,7 @@ export class RoyaleSimulation extends Simulation {
   seasonTick(this);tickVaultDoors(this);tickVehicles(this,dt);this.recordPoses();if(!this.options.training)this.tickActivity(dt);
   for(const p of this.players.values()){
    if(p.health<=0||p.spectating)continue;
+   if(p.henchman&&!henchmanAwake(this,p)){p.moving=false;p.vx=p.vz=0;if(!warmup&&this.storm.active&&Math.hypot(p.x-this.storm.x,p.z-this.storm.z)>this.storm.radius)this.damage(p,null,this.storm.dps*dt,'Storm');continue;}
    const commands=p.bot?null:this.movementInput(p,dt);
    let input=commands?.input||(p.bot?this.botInput(p):this.inputs.get(p.id));
    if(!input||!p.bot&&this.time-p.lastInput>.4)input={yaw:p.yaw,pitch:p.pitch,slot:p.slot};
@@ -555,7 +557,7 @@ export class RoyaleSimulation extends Simulation {
   this.emit('finish',{winner:this.winner});this.emit('royale-cue',{cue:'victory'});
  }
  botInput(p){
-  if(p.boss)return bossInput(this,p);
+  if(p.boss||p.henchman)return bossInput(this,p);
   const rescue=rescueBotInput(this,p);if(rescue){suspendBotInput(this,p);return rescue;}
   if(p.flight!=='ground'){suspendBotInput(this,p);return this.thinkBot(p);}
   return scheduledBotInput(this,p,()=>this.thinkBot(p),{combat:.16,roam:.25});
@@ -594,7 +596,7 @@ export class RoyaleSimulation extends Simulation {
  restore(checkpoint){this.publicRestartAt=checkpoint.publicRestartAt;battlePreparation.delete(this);super.restore(checkpoint);const base=getMap(isWarmup(this.stage)?'hatchery-atoll':'sunnybreak',this.mapLayouts);this.worldBoxes=(base.authored||base.boxes).filter(b=>!b.buildId).map(b=>({...b}));this.map={...base,boxes:[]};rebuildMap(this);this.nav=navigation(base);this.vaults??=[];this.vault=this.vaults.find(v=>v.id===this.map.vault?.id)||this.vault;if(!crownsEnabled(this))for(const p of this.players.values())p.crown=false;return this;}
  snapshot({includeLoot=true,includeBuilds=true}={}){
   const state=super.snapshot();state.options={...state.options,map:this.map.id};
-  state.players=state.players.map(p=>{const source=this.players.get(p.id);return Object.assign(p,{fieldOrders:source.fieldOrders?.map(o=>({...o})),tutorial:source.tutorial?{...source.tutorial}:null,training:!!this.options.training,grapple:source.grapple?structuredClone(source.grapple):null,shadowstep:source.shadowstep?{...source.shadowstep}:null,aimBreakUntil:source.aimBreakUntil,traversal:source.traversal?structuredClone(source.traversal):null,traversalLock:source.traversalLock,swapUid:source.swapUid,swapProgress:source.swapProgress||0,emote:source.emote?{...source.emote}:null,crown:!!source.crown,crownWins:source.crownWins||0,crownEmoteUnlocked:!!source.crownEmoteUnlocked,crownedVictory:!!source.crownedVictory,crownPulseAt:source.crownPulseAt,bossId:source.bossId,bossAlert:source.bossAlert,bossSuspicion:source.bossSuspicion,bossAlertAt:source.bossAlertAt,bossWindup:source.bossWindup?{...source.bossWindup}:null,bossVeil:source.bossVeil?{...source.bossVeil,goal:{...source.bossVeil.goal}}:null,cacheProgress:source.cacheProgress||0,vaultProgress:source.vaultProgress,boss:source.boss,maxHealth:source.maxHealth,maxShield:source.maxShield,contestant:source.contestant,lateSpectator:source.lateSpectator,fall:source.fall?{...source.fall}:null,redeploy:source.redeploy,forceGlider:source.forceGlider,launchVelocity:source.launchVelocity?{...source.launchVelocity}:null,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,editing:source.editing,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestId:source.chestId,chestProgress:source.chestProgress||0});});
+  state.players=state.players.map(p=>{const source=this.players.get(p.id);return Object.assign(p,{fieldOrders:source.fieldOrders?.map(o=>({...o})),tutorial:source.tutorial?{...source.tutorial}:null,training:!!this.options.training,grapple:source.grapple?structuredClone(source.grapple):null,shadowstep:source.shadowstep?{...source.shadowstep}:null,aimBreakUntil:source.aimBreakUntil,traversal:source.traversal?structuredClone(source.traversal):null,traversalLock:source.traversalLock,swapUid:source.swapUid,swapProgress:source.swapProgress||0,emote:source.emote?{...source.emote}:null,crown:!!source.crown,crownWins:source.crownWins||0,crownEmoteUnlocked:!!source.crownEmoteUnlocked,crownedVictory:!!source.crownedVictory,crownPulseAt:source.crownPulseAt,henchman:!!source.henchman,bossId:source.bossId,bossAlert:source.bossAlert,bossSuspicion:source.bossSuspicion,bossAlertAt:source.bossAlertAt,bossWindup:source.bossWindup?{...source.bossWindup}:null,bossVeil:source.bossVeil?{...source.bossVeil,goal:{...source.bossVeil.goal}}:null,cacheProgress:source.cacheProgress||0,vaultProgress:source.vaultProgress,boss:source.boss,maxHealth:source.maxHealth,maxShield:source.maxShield,contestant:source.contestant,lateSpectator:source.lateSpectator,fall:source.fall?{...source.fall}:null,redeploy:source.redeploy,forceGlider:source.forceGlider,launchVelocity:source.launchVelocity?{...source.launchVelocity}:null,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,editing:source.editing,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestId:source.chestId,chestProgress:source.chestProgress||0});});
   state.publicRestartAt=this.publicRestartAt;state.royale={operations:this.operations?structuredClone(this.operations):null,vehicles:(this.vehicles||[]).map(v=>({...v,seats:[...v.seats]})),matchEnd:this.stormSteps.at(-1)?.end||600,bossCaches:structuredClone(this.bossCaches||[]),doors:structuredClone(this.doors||{}),vault:this.vault?{...this.vault}:null,vaults:structuredClone(this.vaults||[]),relays:structuredClone(this.relays||[]),smokes:structuredClone(this.smokes||[]),markers:(this.markers||[]).filter(m=>m.until>this.time).map(m=>({...m})),stage:this.stage,accepting:acceptsContestants(this.stage),practice:isWarmup(this.stage),contestants:[...this.players.values()].filter(p=>p.contestant).length,round:this.round,...(includeBuilds?{builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage)}:{}),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,...(includeLoot?{loot:snapshotLoot(this).loot,chests:snapshotLoot(this).chests}:{}),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds,countdownStarted:!!this.queueEnds,humanContestants:this.humanContestants().length,botContestants:[...this.players.values()].filter(p=>p.bot&&p.contestant).length,humanLimit:Math.min(this.options.capacity,MAX_HUMANS),startReason:this.startReason};
   state.royale.teams=Object.values(this.matchTeams||{}).filter(t=>t.members.length).map(t=>({...t,members:[...t.members]}));state.royale.winnerTeam=this.winnerTeam??-1;state.royale.teamsAlive=livingTeams(this.options,this.players.values()).size;
   return state;

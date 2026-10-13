@@ -6,6 +6,12 @@ const fixture=()=>{
  const accounts=new Map(),frames=[],relay={peers:new Map(),parties:{tickets:new Map(),parties:new Map(),publishPublicMatch(){},cancel(){}},progression:{account(id){if(!accounts.has(id))accounts.set(id,{});return accounts.get(id);},save(){},frame:(p,s)=>frames.push([p,s])},remove(p){this.peers.delete(p.id);this.publicHost.left(p);}};
  relay.publicHost=new PublicHost(relay).enable();return {relay,host:relay.publicHost,accounts,frames};
 };
+test('main-match arrival notices count real admissions, exclude spectators, and expose only a public name',()=>{
+ const {relay,host}=fixture();relay.parties.store={identities:new Map([['member',{profile:{name:'Arriving Operator'}}]])};host.host={address:host.key,peer:host.key,id:'host'};
+ const player={id:'player',progressId:'participant',ws:{readyState:1}},viewer={id:'viewer',progressId:'observer',ws:{readyState:1}};relay.peers.set(player.id,player);relay.peers.set(viewer.id,viewer);
+ host.admission(player,{recurring:true,memberId:'member'});assert.equal(host.joinSerial,1);assert.equal(host.summary().lastJoin.name,'Arriving Operator');host.admission(player,{recurring:true,memberId:'member'});assert.equal(host.joinSerial,1);
+ host.admission(viewer,{recurring:true,spectator:true});assert.equal(host.joinSerial,1);assert.equal(host.summary().humanPlayers,1);assert.equal(host.summary().spectators,1);assert.equal(Object.hasOwn(host.summary().lastJoin,'memberId'),false);
+});
 test('the public address requires the reserved leader ticket or the elected live session proof',()=>{
  const {relay,host}=fixture();assert.equal(host.authorize({}),false);host.pending={party:'party',leader:'first'};relay.parties.tickets.set('ticket',{recurring:true,member:'first',party:'party',expires:Date.now()+1000});assert.equal(host.authorize({publicTicket:'ticket'}),true);assert.equal(host.authorize({publicTicket:'unknown'}),false);
  host.pending=null;for(const [id,order]of [['oldest',1],['later',2]]){relay.peers.set(id,{id,token:id+'-secret',ws:{readyState:1}});host.members.set(id,{peer:id,order,admission:{}});}

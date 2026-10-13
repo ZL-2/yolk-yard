@@ -11,6 +11,7 @@ export class OwnerConsole {
     this.dialog.addEventListener('submit',e=>{if(e.target.id==='owner-eggs-form'){e.preventDefault();void this.addEggs(e.target);}});
     document.addEventListener('keydown',e=>this.key(e));
     document.addEventListener('click',e=>{
+      const view=e.target.closest('[data-owner-inbox-view]');if(view){this.inboxShowCleared=view.dataset.ownerInboxView==='cleared';void this.inbox();return;}
       const request=e.target.closest('[data-owner-request]');if(request){void this.inbox(request.dataset.requestStatus,request.dataset.ownerRequest);return;}
       if(this.screen()!=='menu'||this.dialog.open||!e.target.closest('.yard-logo, [data-owner-trigger]'))return;
       const now=Date.now();this.taps=now-this.lastTap<1200?this.taps+1:1;this.lastTap=now;
@@ -73,8 +74,8 @@ export class OwnerConsole {
     finally{if(button?.isConnected)button.disabled=false;}
   }
   async inbox(action='list',id){
-    try{if(!this.token||this.expires<=Date.now()){this.open();return;}const data=await this.request('/requests',{method:'POST',body:JSON.stringify({token:this.token,action,id})});
-      this.modal('Feature inbox',`<p>${data.open} new requests · ${data.requests.length} total</p><div class="owner-toolbar"><button data-action="owner-inbox">REFRESH</button><button data-action="owner-refresh">OWNER OVERVIEW</button></div>${data.requests.length?data.requests.map(r=>`<article class="feature-request-card"><strong>${escape(r.name)}</strong><small>${new Date(r.created).toLocaleString()} · ${escape(r.status)}</small><p>${escape(r.text)}</p><div class="split-actions">${['read','completed','dismissed','open'].filter(s=>s!==r.status).map(s=>`<button data-owner-request="${escape(r.id)}" data-request-status="${s}">${s==='open'?'REOPEN':s.toUpperCase()}</button>`).join('')}</div></article>`).join(''):'<p>No feature requests yet.</p>'}`,'owner-inbox');
+    try{if(!this.token||this.expires<=Date.now()){this.open();return;}const data=await this.request('/requests',{method:'POST',body:JSON.stringify({token:this.token,action,id,showCleared:!!this.inboxShowCleared})});
+      this.modal(this.inboxShowCleared?'Cleared tickets':'Feature inbox',`<p>${this.inboxShowCleared?data.cleared+' cleared tickets':data.open+' new requests · '+data.requests.length+' in your inbox'}</p><div class="owner-toolbar"><button data-owner-inbox-view="active">INBOX</button><button data-owner-inbox-view="cleared">CLEARED (${data.cleared})</button><button data-action="owner-inbox">REFRESH</button><button data-action="owner-refresh">OWNER OVERVIEW</button></div>${data.requests.length?data.requests.map(r=>`<article class="feature-request-card"><strong>${escape(r.name)}</strong><small>${new Date(r.created).toLocaleString()} · ${escape(r.status)}</small><p>${escape(r.text)}</p><div class="split-actions">${r.clearedAt?`<button data-owner-request="${escape(r.id)}" data-request-status="restore">RESTORE TO INBOX</button>`:['read','completed','dismissed','open'].filter(s=>s!==r.status).map(s=>`<button data-owner-request="${escape(r.id)}" data-request-status="${s}">${s==='open'?'REOPEN':s.toUpperCase()}</button>`).join('')+`<button class="clear-ticket" data-owner-request="${escape(r.id)}" data-request-status="clear">CLEAR FROM INBOX</button>`}</div></article>`).join(''):`<p>${this.inboxShowCleared?'No cleared tickets.':'Your inbox is clear.'}</p>`}`,'owner-inbox');
     }catch(error){if(error.status===401){this.token=null;this.open();}else this.modal('Feature inbox',`<p role="alert">${escape(error.message)}</p><button data-action="owner-refresh">BACK</button>`,'owner-inbox');}
   }
   logout(){void this.request('/logout',{method:'POST',body:JSON.stringify({token:this.token})}).catch(()=>{});this.token=null;this.expires=0;this.dialog.close();}

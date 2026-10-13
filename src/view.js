@@ -984,7 +984,7 @@ export class View {
         aura.material.opacity=.13+Math.sin(this.clock*5)*.025;
         if(p.inventory&&poseDue)this.royaleView.animateActor(model,p,this.clock,poseDt);
         if(model.userData.nameplate)model.userData.nameplate.position.y=bodyHeight(p)+.3;
-        if(p.boss)updateBossAlert(model,p,state.time,bodyHeight(p),distance);
+        if(p.boss||p.henchman)updateBossAlert(model,p,state.time,bodyHeight(p),distance);
         updateCelebration(model,p,state.time,g=>this.disposeGroup(g));
         if(poseDue)animateHumanoid(model,{...p,...(state.phase==='results'?{vx:0,vz:0,moving:false}:{}),shotRecoil:model.userData.armRecoil||0},poseDt,state.phase==='results'&&!p.emote?this.clock:state.time,{distance:0});
 

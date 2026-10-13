@@ -141,7 +141,7 @@ export class Simulation {
     if (!p) return;
     this.players.delete(id);
     this.inputs.delete(id);this.remoteInputs.delete(id);
-    this.emit("leave", { name: p.name });
+    this.emit("leave", { player:id, name:p.name, human:!p.bot });
   }
   setProfile(id, profile) {
     const p = this.players.get(id);

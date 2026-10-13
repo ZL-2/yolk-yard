@@ -46,6 +46,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Sentinels, capture HUD, live roster, presence, reconnection and inbox
+        run: node scripts/field-stability-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: field-stability-browser-evidence
+          path: test-results/expansion/stability
+          retention-days: 14
       - name: Shop collections, boss models, styles, bundles, purchases and update art
         run: node scripts/shop-overhaul-browser-check.mjs
       - uses: actions/upload-artifact@v4
@@ -87,11 +95,18 @@ jobs:
           git worktree add --detach ../expansion-baseline c2866b6edbaaae26c4aac6f0717960e2c5a2bf7e
           ln -s "$GITHUB_WORKSPACE/node_modules" ../expansion-baseline/node_modules
           PERFORMANCE_BASELINE=../expansion-baseline node scripts/expansion-performance-check.mjs
+      - name: Two and three player snapshot CPU comparison
+        run: |
+          git worktree add --detach ../network-baseline d66f9f64017c3cbebbef980df575dcc96a4ff930
+          ln -s "$GITHUB_WORKSPACE/node_modules" ../network-baseline/node_modules
+          NETWORK_PERF_BASELINE=../network-baseline node scripts/field-stability-performance-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: release-performance-evidence
-          path: test-results/expansion/performance.json
+          path: |
+            test-results/expansion/performance.json
+            test-results/expansion/field-stability-performance.json
           retention-days: 14
   deploy:
     # Every release uses the same gates. Commit titles cannot skip tests.

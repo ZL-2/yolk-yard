@@ -12,7 +12,11 @@ export function addOperatorDesign(item,c,{add,panel,ellipsoid,rings}){
  const shoulders=(color,width=.14)=>{for(const s of [-1,1])plate(s*.27,1.414,0,width,.084,.17,color,s<0?'armL':'armR',s*.22);};
  const hood=()=>{const g=new T.SphereGeometry(1,16,10,0,Math.PI,0,Math.PI*.74);g.scale(.153,.188,.156);g.translate(0,1.68,0);add(g,c.cloth,'head');for(const s of [-1,1])plate(s*.123,1.675,-.046,.055,.25,.14,c.cloth,'head',-s*.18);plate(0,1.819,-.057,.17,.038,.15,c.cloth,'head');};
  const bracers=color=>{for(const s of [-1,1])plate(s*.405,1.04,-.034,.085,.18,.085,color,s<0?'forearmL':'forearmR',s*.16);};
- if(model==='voss'){
+ if(model?.startsWith('guard-')){
+  if(model==='guard-nyx'){helmet(dark);hood();faceMask(dark);for(const s of [-1,1])plate(s*.035,1.702,-.183,.075,.012,.012,trim,'head',s*.62);}
+  else{helmet(armor);visor(trim,.20,.06,-.145);panel(0,1.611,-.13,.10,.054,.035,dark,'head');}
+  rings([[1.45,.092,.08],[1.525,.084,.08]],dark,'neck');shoulders(armor,.13);bracers(c.cloth);panel(0,1.385,-.187,.072,.025,.013,trim,'chest');for(const s of [-1,1])plate(s*.12,.51,-.095,.08,.05,.012,trim,s<0?'shinL':'shinR');
+ }else if(model==='voss'){
   helmet(armor);faceMask(trim);plate(0,1.655,-.182,.018,.18,.014,dark,'head');
   for(const s of [-1,1]){plate(s*.048,1.713,-.183,.062,.014,.014,'#83e1e2','head',s*.12);plate(s*.055,1.588,-.152,.072,.036,.045,armor,'head',s*.35);}
   rings([[1.786,.139,.128],[1.827,.14,.128]],trim,'head');
