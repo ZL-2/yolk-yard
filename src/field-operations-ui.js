@@ -53,9 +53,10 @@ export class FieldOperationsUI {
     }
     // Keep clear of minimap standings at every viewport and HUD scale. Read
     // layout only when those settings change, not on every HUD refresh.
-    const warning=document.querySelector('.royale-storm-warning');
-    const layout=window.innerWidth+':'+window.innerHeight+':'+document.documentElement.className+':'+document.documentElement.style.getPropertyValue('--hud-scale')+':'+warning?.hidden+':'+!!warning?.textContent+':'+capturing+':'+state.options.teamSize;
-    if(layout!==this.layout){this.layout=layout;const team=document.querySelector('.duo-hud'),box=team&&!team.hidden?team.getBoundingClientRect():null,storm=warning?.textContent?warning.getBoundingClientRect():null,mobile=innerWidth<=760,map=mobile?document.querySelector('.royale-map-stack')?.getBoundingClientRect():null;this.capture.style.top=Math.max(86,storm?.height?storm.bottom+12:0,map?.height?map.bottom+12:0)+'px';const captureBottom=capturing?this.capture.getBoundingClientRect().bottom:0;this.root.style.top=Math.max(112,box?.height?box.bottom+12:0,mobile&&captureBottom?captureBottom+12:0)+'px';this.medal.style.top=Math.max(154,storm?.height?storm.bottom+16:0,captureBottom?captureBottom+12:0)+'px';}
+    const warning=document.querySelector('.royale-storm-warning'),network=document.querySelector('.performance-network');
+    const networkLayout=[network?.hidden,network?.parentElement.hidden,network?.querySelector('.net-details')?.hidden,network?.querySelector('.connection-signal')?.hidden].join(':');
+    const layout=window.innerWidth+':'+window.innerHeight+':'+document.documentElement.className+':'+document.documentElement.style.getPropertyValue('--hud-scale')+':'+warning?.hidden+':'+!!warning?.textContent+':'+capturing+':'+state.options.teamSize+':'+networkLayout;
+    if(layout!==this.layout){this.layout=layout;const team=document.querySelector('.duo-hud'),box=team&&!team.hidden?team.getBoundingClientRect():null,diagnostics=network?.getBoundingClientRect(),storm=warning?.textContent?warning.getBoundingClientRect():null,mobile=innerWidth<=760,map=mobile?document.querySelector('.royale-map-stack')?.getBoundingClientRect():null;this.capture.style.top=Math.max(86,storm?.height?storm.bottom+12:0,map?.height?map.bottom+12:0)+'px';const captureBottom=capturing?this.capture.getBoundingClientRect().bottom:0;this.root.style.top=Math.max(112,box?.height?box.bottom+12:0,diagnostics?.height?diagnostics.bottom+12:0,mobile&&captureBottom?captureBottom+12:0)+'px';this.medal.style.top=Math.max(154,storm?.height?storm.bottom+16:0,captureBottom?captureBottom+12:0)+'px';}
     const n=this.nodes,d=u?Math.round(Math.hypot(p.x-u.x,p.z-u.z)):0;
     this.root.dataset.state=u?.contested?'contested':u?.status||'waiting';
     if(u){
