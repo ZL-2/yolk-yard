@@ -97,7 +97,9 @@ export class RelayPeer extends Events {
    }if(m.resumed){this.flush();for(const message of this.deferredControls)this.control(message);this.deferredControls=[];}else this.emit('open',this.id);return;}
   if(m.type==='rooms'){const waiter=this.waiters.get(m.request);if(waiter){this.waiters.delete(m.request);waiter.resolve(m.rooms);}return;}
   if(m.type==='error'){
-   const conn=this.connections.get(m.channel);if(conn){conn.emit('error',{type:m.error});conn.finish();}
+   // A failed election candidate belongs to its channel. Its error must not
+   // become a peer-wide fatal error after the next candidate is promoted.
+   if(m.channel){const conn=this.connections.get(m.channel);if(conn){conn.emit('error',{type:m.error});conn.finish();}return;}
    this.emit('error',{type:m.error});return;
   }
   if(m.type==='incoming'){

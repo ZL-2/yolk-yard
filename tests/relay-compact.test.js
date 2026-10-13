@@ -19,5 +19,12 @@ test('older connections retain full states and input steps are never merged',()=
  for(let seq=1;seq<=3;seq++)peer.enqueue({type:'data',channel:'a',data:{type:'input',input:{seq,fire:seq===2}}});
  peer.flush();assert.equal(frames[0].messages[0].data.type,'state');assert.equal(frames[0].messages.length,4);
 });
+test('channel failures stay local during election; registration failures still reach the peer',()=>{
+ const {peer}=transport();peer.events=new Map();let channelErrors=0,peerErrors=0;peer.on('error',()=>peerErrors++);
+ peer.connections.set('candidate',{emit(type){if(type==='error')channelErrors++;},finish(){peer.connections.delete('candidate');}});
+ peer.message({type:'error',channel:'candidate',error:'peer-unavailable'});assert.equal(channelErrors,1);assert.equal(peerErrors,0);
+ peer.message({type:'error',channel:'candidate',error:'peer-unavailable'});assert.equal(peerErrors,0);
+ peer.message({type:'error',error:'auth-failed'});assert.equal(peerErrors,1);
+});
 
 test('private hosts admit all 48 contestant seats and spectator transport channels',()=>{const peer=Object.assign(Object.create(RelayPeer.prototype),{connections:new Map(),events:new Map(),enqueue(){},flush(){}});for(let i=0;i<63;i++)peer.message({type:'incoming',channel:'seat-'+i,peer:'player-'+i});assert.equal(peer.connections.size,63);for(const c of peer.connections.values())assert.equal(c.open,true);});
