@@ -746,10 +746,10 @@ export class View {
     // Reduce GPU work when rendering itself delays input and socket processing.
     this.frameAverage=(this.frameAverage||1/60)*.9+dt*.1;
     this.budgetClock=(this.budgetClock||0)+dt;
-    if(this.budgetClock>1.5){
+    if(this.budgetClock>1){
       this.budgetClock=0;const previous=this.renderScale||1;
-      if(this.frameAverage>1/32){this.renderScale=Math.max(.5,previous-.15);this.renderer.shadowMap.enabled=false;}
-      else if(this.frameAverage<1/55)this.renderScale=Math.min(1,previous+.05);
+      if(this.frameAverage>1/55){this.renderScale=Math.max(.35,previous-.15);this.renderer.shadowMap.enabled=false;}
+      else if(this.frameAverage<1/59)this.renderScale=Math.min(1,previous+.025);
       if(this.renderScale!==previous)this.resize();
     }
     this.clock += dt;
