@@ -20,7 +20,7 @@ export function initializeSeason(sim){
   const house=def.id===SEASON.boss.id?sim.map.buildings[sim.map.bossHouse]:null,site=sim.map.bossSites?.find(s=>s.bossId===def.id);
   const spot=house?{x:house.x-1.5,y:house.baseY,z:house.z-3}:site;
   if(!spot||!canStand(sim.map,spot))continue;
-  const b=Simulation.prototype.addPlayer.call(sim,def.id,{name:def.name,color:def.color,accent:def.accent,outfit:def.outfit,backbling:'backbling-royal'},true);
+  const b=Simulation.prototype.addPlayer.call(sim,def.id,{name:def.name,color:def.color,accent:def.accent,outfit:def.outfit,backbling:def.backbling},true);
   if(!b)continue;Object.assign(b,{boss:true,bossId:def.id,contestant:false,spectating:false,lateSpectator:false,connected:false,team:-2,x:spot.x,y:spot.y,z:spot.z,home:{x:spot.x,y:spot.y,z:spot.z},health:def.health,shield:def.shield,maxHealth:def.health,maxShield:def.shield,grounded:true,flight:'ground',slot:1,inventory:inventory(),materials:{wood:0,brick:0,metal:0},bank:{medium:210,light:0,shells:60,heavy:36,rockets:0},stamina:100,lastDamage:-100,aggroAt:0});
   b.patrol=house?[[-1.5,-7],[1.5,-3],[1.5,6],[-1.5,3]].map(([dx,dz])=>({x:house.x+dx,y:house.baseY,z:house.z+dz})):site.patrol;b.patrolIndex=0;b.patrolWait=0;
   b.inventory[1]={id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:MYTHIC_WEAPONS[def.id].magazine||weapon(def.weapon).magazine};b.inventory[1].ammo=gun(b).magazine;if(def.ability==='shadowstep')b.inventory[2]={id:'shadowstep',rarity:5,count:1,charges:6,rechargeAt:0};sim.syncInventory(b);initializeBossAwareness(sim,b);

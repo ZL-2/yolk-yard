@@ -9,7 +9,7 @@ await mkdir(out,{recursive:true});
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[],metrics={live:!!live,viewports:[]};page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
 try{
- await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-145-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Field Check'}));});
+ await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-150-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Field Check'}));});
  await page.goto(origin+'/?qa&refinement='+Date.now());await page.locator('#loading-screen').waitFor({state:'hidden'});assert.equal(await page.locator('vite-error-overlay').count(),0);
  await page.locator('[data-action=settings]').click();await page.locator('[data-settings-tab=audio]').click();assert.equal(await page.locator('#visualSoundEffects').isChecked(),true);await page.locator('#visualSoundEffects').uncheck();assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('yolk-settings')).visualSoundEffects),false);await page.locator('#visualSoundEffects').check();await page.locator('#dialog [data-action=close]').first().click();
  await page.locator('[data-action=training]').click();await page.locator('[data-action=start-training]').click();await page.locator('#loading-screen').waitFor({state:'hidden'});

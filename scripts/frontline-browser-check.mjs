@@ -10,7 +10,7 @@ let browser,page;const errors=[],checks={};
 try{
  browser=await chromium.launch({executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
  page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
- await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-145-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:.3,musicVolume:.3}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Frontline QA'}));});
+ await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-150-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:.3,musicVolume:.3}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Frontline QA'}));});
  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest);await page.locator('#loading-screen').waitFor({state:'hidden'});
  await page.locator('[data-action=training]:visible').click();await page.locator('[data-action=start-training]').click();await page.locator('#loading-screen').waitFor({state:'hidden'});
  const resume=page.locator('#dialog [data-action=resume]');if(await resume.isVisible())await resume.click();else await page.mouse.click(720,450);
