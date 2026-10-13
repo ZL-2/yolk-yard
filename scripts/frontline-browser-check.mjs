@@ -26,8 +26,9 @@ try{
  await page.waitForFunction(()=>['objective','final'].includes(window.__yolkTest.frontline().score.scene));checks.objectiveHUDAndMusic=true;
  await page.screenshot({path:out+'/uplink-gameplay.png'});
  await page.evaluate(()=>window.__yolkTest.fixture(s=>s.emit('field-medal',{player:window.__yolkTest.read().localId,medal:'uplink',xp:150})));
- await page.waitForFunction(()=>!document.querySelector('#field-medal').hidden);
- const medalBox=await page.locator('#field-medal').boundingBox(),stormBox=await page.locator('.royale-storm-warning').boundingBox();if(stormBox)assert.ok(medalBox.y>=stormBox.y+stormBox.height,'medals clear the storm countdown');
+ // Read both rectangles in one browser frame: under software rendering a
+ // 2.5-second toast can expire between separate protocol round trips.
+ await page.waitForFunction(()=>{const medal=document.querySelector('#field-medal'),storm=document.querySelector('.royale-storm-warning');if(!medal||medal.hidden)return false;const a=medal.getBoundingClientRect(),b=storm?.getBoundingClientRect();if(b?.height&&a.top<b.bottom)throw Error('Medals overlap the storm countdown');return true;});
  await page.screenshot({path:out+'/medal.png'});checks.medal=true;
  await page.keyboard.press('Escape');await page.locator('#dialog [data-action=field-orders]').click();
  assert.equal(await page.locator('.field-order-list article').count(),3);assert.equal(await page.locator('.field-report-grid>div').count(),8);assert.equal(await page.locator('#dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
