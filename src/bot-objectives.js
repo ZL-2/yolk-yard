@@ -16,6 +16,7 @@ import {eyeHeight} from './stance.js';
 import {coverPoint} from './bot-cover.js';
 import {searchObjective} from './bot-tactics.js';
 import {takeBotWork} from './bot-work.js';
+import {operationObjective} from './field-operations.js';
 export {coverPoint};
 export function selectWeapon(p,target){
  const distance=target?dist(p,target):22;
@@ -99,6 +100,7 @@ export function chooseObjective(sim,p,brain,skill,target){
   if(anchor&&dist(p,anchor)>teamPolicy.regroupDistance)return {kind:'follow',goal:followGoal(sim,p,anchor),id:anchor.id};
   if(target&&!target.visible){const search=searchObjective(sim,p,brain,target);if(search)return search;target=null;}
   // Items become known by proximity + LOS. Authored rooms guide searches, not hidden rolls.
+  const operation=operationObjective(sim,p,nearSquad);if(operation)return operation;
   const loot=lootObjective(sim,p,brain,nearSquad);if(loot)return loot;
   const weapons=p.inventory.filter(i=>i?.weapon),needs=weapons.length<2||!weapons.some(i=>i.ammo+p.bank[ammoType(i.id)]>10)||p.shield<35;
   if(needs){const chest=chestObjective(sim,p,brain,nearSquad);if(chest)return chest;}

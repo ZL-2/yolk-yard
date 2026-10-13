@@ -224,11 +224,12 @@ export function actionArms(rig,targets,rotation=-.15){
  for(const limb of rig.userData.limbs){limb.hand.position.set(...targets[limb.side<0?0:1]);limb.hand.rotation.set(rotation,limb.side*.15,limb.side*.12);shapeArm(limb);}
 }
 export function utilityArms(rig,id,progress=-1,time=0){
- const lift=progress<0?0:Math.sin(Math.PI*clamp(progress,0,1));
+ const t=clamp(progress,0,1),ease=x=>x*x*(3-2*x);
+ const lift=progress<0?0:ease(Math.min(1,t/.18))*(1-ease(Math.max(0,(t-.86)/.14)));
  let left=[-.43,-.25,-.15],right=[.06,-.2,-.2];
- if(['mini','flask'].includes(id)){right=[.03,-.2+lift*.3,-.2+lift*.22];left=[-.38,-.33,-.11];}
+ if(['mini','flask'].includes(id)){right=[.03-lift*.06,-.2+lift*.29,-.2+lift*.2];left=[-.38+lift*.16,-.33+lift*.09,-.11-lift*.06];}
  else if(id==='bandage'){left=[-.42+lift*.38,-.25+lift*.06,-.17];right=[.07,-.2,-.17];}
- else if(id==='medkit'){left=[-.35,-.28,-.22];right=[.02,-.23+lift*.08,-.2+(progress>=0?Math.sin(time*8)*.025:0)];}
+ else if(id==='medkit'){left=[-.35,-.28,-.22];right=[.02-lift*.1,-.23+lift*.11,-.2+(progress>=0?Math.sin(t*Math.PI*10)*.018*lift:0)];}
  else if(['popper','splash','impulse'].includes(id))right=[.06+lift*.25,-.2+lift*.12,-.2+lift*.34];
  else if(id==='anchorWinch'){left=[-.12,-.18,-.52];right=[.01,-.2,-.24];}
  else if(id==='launchpad'){left[1]-=lift*.28;right[1]-=lift*.28;}

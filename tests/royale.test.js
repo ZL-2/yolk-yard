@@ -11,7 +11,7 @@ const advance=(s,seconds)=>{for(let i=0;i<seconds*60;i++)s.tick(1/60);};
 test('the expanded island can open every chest without the old loot cap swallowing rewards',()=>{
  const s=make();s.map={...ROYALE_MAP,boxes:ROYALE_MAP.boxes};for(const v of s.vaults)v.open=true;const p=s.players.get('host'),initial=s.loot.length,expected=s.chests.reduce((n,c)=>n+c.contents.length,0);
  for(const chest of s.chests){ground(p,chest.x,chest.z);p.y=chest.y;assert.equal(s.openChest(p,chest),true,chest.id);}
- assert.equal(s.loot.length,initial+expected);
+ assert.equal(s.loot.length,initial+expected+p.field.orders);
  assert.ok(s.loot.length>700);
 });
 test('Royale isolates loadouts, fills to capacity, and waits on Spawn Island for two contestants before departure',()=>{

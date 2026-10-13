@@ -27,6 +27,8 @@ jobs:
         run: node scripts/public-host-network-check.mjs
       - name: Map publishing and pinned multiplayer layouts
         run: node scripts/map-editor-network-check.mjs
+      - name: Frontline captures, rewards and interrupted recovery across real sockets
+        run: node scripts/frontline-network-check.mjs
       - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
@@ -46,6 +48,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Desktop/mobile controls, inventory, combat HUD and camera
         run: node scripts/expansion-browser-check.mjs
+      - name: Frontline objective HUD, orders, medals, weapon motion and real Web Audio
+        run: node scripts/frontline-browser-check.mjs
       - name: Required names, visible rankings, field audio and match outcome screens
         run: node scripts/match-polish-browser-check.mjs
       - name: Owner editor, transformations, Test walk, draft conflicts and publishing

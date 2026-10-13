@@ -38,7 +38,7 @@ test('match loot varies, restores exactly, pairs ammunition and survives support
  assert.equal(restored.random(),a.random());
  const high=a.loot.find(i=>i.y>groundAt(a.map,i.x,i.z)+3),support=a.map.boxes.find(b=>Math.abs(b.y+b.h-high.y)<.01&&Math.abs(b.x-high.x)<b.w/2&&Math.abs(b.z-high.z)<b.d/2);
  const uid=high.uid,before=a.loot.length;assert.ok(support);damageObject(a,support,10000);assert.equal(a.loot.length,before);assert.equal(a.loot.filter(i=>i.uid===uid).length,1);tickLootMotion(a);a.time+=3;tickLootMotion(a);assert.ok(validLootPoint(a.map,high));
- a.phase='results';a.startRound();a.beginBattle();assert.notDeepEqual(a.loot,same.loot);assert.ok(a.chests.every(c=>!c.opened&&c.contents.length===(['bandage','medkit','mini','flask','splash'].includes(c.contents[2].id)?4:5)&&c.contents[0].weapon&&c.contents[1].ammoType));assert.ok(a.loot.every(i=>validLootPoint(a.map,i)));
+ a.phase='results';a.startRound();a.beginBattle();assert.notDeepEqual(a.loot,same.loot);assert.ok(a.chests.every(c=>!c.opened&&c.contents.length===(['bandage','medkit','mini','flask','splash'].includes(c.contents[2].id)?4:5)+(c.hot?1:0)&&c.contents[0].weapon&&c.contents[1].ammoType));assert.ok(a.loot.every(i=>validLootPoint(a.map,i)));
 });
 test('pickup deltas stay small after intervening movement frames and preserve removals',()=>{
  const items=Array.from({length:700},(_,uid)=>({uid,id:'sprinter',x:uid,y:0,z:4,weapon:true}));

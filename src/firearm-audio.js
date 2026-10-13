@@ -25,7 +25,11 @@ export function synthesizeShot(id,sampleRate=44100,variation=0){
   const crack=highBand*Math.exp(-t*280)*.4;
   const tail=(midBand*.65+lowBand*.35)*p.tail*Math.exp(-t*6)*(1-Math.exp(-t*80));
   const a=t-p.action,action=a>0?(highBand*.65+Math.sin(a*Math.PI*2600)*.35)*p.metal*Math.exp(-a*120):0;
-  let value=blast+pressure+crack+tail+action;
+  // Two quiet early reflections add space without allocating audio nodes or
+  // blurring the immediate mechanical transient of each weapon.
+  const early=t-.039,late=t-.083;
+  const reflections=(early>0?Math.sin(2*Math.PI*p.body*(early-.26*early*early))*p.bass*.11*Math.exp(-early*p.decay):0)+(late>0?Math.sin(2*Math.PI*p.body*(late-.26*late*late))*p.bass*.055*Math.exp(-late*p.decay):0);
+  let value=blast+pressure+crack+tail+action+reflections;
   if(p.pellets)for(let k=1;k<=p.pellets;k++){const q=t-k*.0027;if(q>0)value+=highBand*.10*Math.exp(-q*200);}
   if(p.rocket)value+=lowBand*Math.sin(Math.min(1,t/.24)*Math.PI/2)*.3*Math.exp(-t*5);
   if(p.energy)value+=Math.sin(2*Math.PI*(780*t-620*t*t)+Math.sin(t*150)*2)*.18*Math.exp(-t*11);
