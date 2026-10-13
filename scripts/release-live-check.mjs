@@ -42,7 +42,7 @@ try{
  clearInterval(clock);guest.destroy();host.destroy();
  browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
  page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
- await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-145-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Release Lobby'}));});
+ await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-150-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Release Lobby'}));});
  await page.goto(front+'?release='+expected);await page.locator('#loading-screen').waitFor({state:'hidden'});
  await page.locator('#menu [data-action=settings]:visible').first().waitFor();
  assert.match(await page.locator('body').innerText(),/FRONTIER LEADERS/i);

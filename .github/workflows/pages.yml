@@ -46,6 +46,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Shop collections, boss models, styles, bundles, purchases and update art
+        run: node scripts/shop-overhaul-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shop-browser-evidence
+          path: test-results/expansion/shop
+          retention-days: 14
       - name: Desktop/mobile controls, inventory, combat HUD and camera
         run: node scripts/expansion-browser-check.mjs
       - name: Frontline objective HUD, orders, medals, weapon motion and real Web Audio

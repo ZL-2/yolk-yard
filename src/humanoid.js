@@ -3,6 +3,7 @@ import * as T from 'three';
 import {mergeGeometries,mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {shopItem} from './shop-catalog.js';
+import {addOperatorDesign} from './operator-designs.js';
 
 // One anatomical bind pose and skeleton contract for every cosmetic. Distances
 // are metres. Rigid gear and clothing are cosmetic; physics never reads this mesh.
@@ -20,11 +21,11 @@ const ids=Object.fromEntries(defs.map((d,i)=>[d[0],i])),points=Object.fromEntrie
 const geometries=new Map();
 const material=new T.MeshStandardMaterial({vertexColors:true,roughness:.76,metalness:.07});material.userData.shared=true;
 function template(profile){
- const item=shopItem(profile.outfit),style=item?.shape??0,skin=['#c58a65','#754b37','#d7a47f','#a86d4f','#dfb696','#543728'][style%6];
- const colors={cloth:item?.color||profile.color||'#334952',trim:item?.accent||profile.accent||'#e8ae4c',skin,armor:'#243039',dark:'#121c23',sole:'#11171b',hair:['#241b19','#161619','#302620','#3e2b21'][style%4]};
+ const item=shopItem(profile.outfit),style=item?.shape??0,skin=['voss','rook','nyx','morrow'].includes(item?.model)?'#121c23':item?.skin||['#c58a65','#754b37','#d7a47f','#a86d4f','#dfb696','#543728'][style%6];
+ const colors={cloth:item?.color||profile.color||'#334952',trim:item?.accent||profile.accent||'#e8ae4c',skin,armor:item?.armor||'#243039',dark:'#121c23',sole:'#11171b',hair:item?.hair||['#241b19','#161619','#302620','#3e2b21'][style%4]};
  if(profile.teamColor){colors.cloth=profile.teamColor;colors.trim=profile.teamColor;}
- const trouser=new T.Color(colors.cloth).multiplyScalar(.84),seam=new T.Color(colors.cloth).multiplyScalar(.68);
- colors.cloth=new T.Color(colors.cloth).lerp(new T.Color('#43504b'),item?.12:.58).getStyle();colors.trim=new T.Color(colors.trim).lerp(new T.Color('#b7b099'),.25).getStyle();
+ const trouser=new T.Color(item?.model?colors.armor:colors.cloth).multiplyScalar(.84),seam=new T.Color(colors.cloth).multiplyScalar(.68);
+ colors.cloth=new T.Color(colors.cloth).lerp(new T.Color('#43504b'),item?.model?0:item?.12:.58).getStyle();colors.trim=new T.Color(colors.trim).lerp(new T.Color('#b7b099'),item?.model?0:.25).getStyle();
  const key=JSON.stringify([colors,style]);if(geometries.has(key))return geometries.get(key);
  const parts=[];
  function add(g,color,bone,next=null,blend=null){
@@ -90,16 +91,18 @@ function template(profile){
  panel(.15,1.455,-.114,.008,.09,.008,'#18272b','chest');
  panel(-.07,1.39,-.172,.068,.027,.008,colors.trim,'chest');
  // Close-cropped hair or fitted field helmet, all following the same head bone.
+ if(!item?.model){
  const helmet=style%4!==2;
  const hair=new T.SphereGeometry(1,20,10,0,Math.PI*2,0,Math.PI*(helmet?.60:.49));hair.scale(helmet?.13:.12,helmet?.171:.166,.116);hair.translate(0,1.669,.005);add(hair,helmet?colors.armor:colors.hair,'head');
  if(helmet){for(const side of [-1,1]){panel(side*.129,1.74,.012,.021,.07,.09,colors.cloth,'head');panel(side*.095,1.606,-.025,.013,.092,.018,colors.armor,'head');ellipsoid(side*.133,1.674,.008,.025,.042,.03,colors.armor,'head');}panel(0,1.799,-.09,.041,.04,.02,colors.dark,'head');if(style===6){panel(0,1.687,-.119,.192,.033,.022,'#b98147','head');panel(0,1.611,-.091,.156,.08,.05,colors.dark,'head');}
  ellipsoid(0,1.745,-.093,.088,.014,.038,colors.trim,'head');for(const s of [-1,1])ellipsoid(s*.12,1.67,.007,.024,.035,.025,colors.dark,'head');}
  if(style===6){const hood=new T.SphereGeometry(1,16,12,5.4,4.9,0,Math.PI*.72);hood.scale(.157,.189,.153);hood.translate(0,1.676,.027);add(hood,colors.dark,'head');rings([[1.34,.22,.17],[1.4,.235,.16],[1.48,.14,.13],[1.53,.105,.105]],colors.dark,'chest');}
  if(style%6===4)ellipsoid(0,1.617,-.093,.08,.04,.035,colors.cloth,'head');
+ }else addOperatorDesign(item,colors,{add,panel,ellipsoid,rings});
  for(const side of [-1,1]){const s=side<0?'L':'R';
   limb('arm'+s,'forearm'+s,[[0,.062],[.12,.074],[.4,.07],[.75,.049],[1,.045]],colors.cloth,'arm'+s,'forearm'+s);
   ellipsoid(side*.39,1.14,.012,.047,.048,.048,colors.cloth,'forearm'+s);
-  limb('forearm'+s,'hand'+s,[[0,.046],[.2,.055],[.5,.052],[.8,.037],[1,.031]],style%3===0?skin:colors.cloth,'forearm'+s,'hand'+s);
+  limb('forearm'+s,'hand'+s,[[0,.046],[.2,.055],[.5,.052],[.8,.037],[1,.031]],item?.model?item.model==='wren'?skin:colors.cloth:style%3===0?skin:colors.cloth,'forearm'+s,'hand'+s);
   ellipsoid(side*.405,1.065,-.028,.043,.058,.025,colors.armor,'forearm'+s);
   ellipsoid(side*.44,.86,0,.042,.057,.027,colors.dark,'hand'+s);
   for(let i=0;i<5;i++){const b='finger'+s+i,P=points[b];const curve=new T.CatmullRomCurve3([P.clone(),P.clone().add(V(side*.002,-.026,-.008)),P.clone().add(V(side*.002,-.042,-.025)),P.clone().add(V(0,-.032,-.033))]);add(new T.TubeGeometry(curve,5,i===4?.01:.008,5,false),colors.dark,b);}

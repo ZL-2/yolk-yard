@@ -6,7 +6,8 @@ import {patternedShell} from './cosmetics.js';
 
 export function armAppearance(value={}) {
   const p=typeof value==='string'?{color:value}:value;
-  return {color:p.color||'#fff6da',pattern:p.pattern||0,accent:p.accent||'#f9b74a',finish:p.finish||0};
+  const item=shopItem(p.outfit);
+  return {color:item?.color||p.color||'#fff6da',pattern:p.pattern||0,accent:item?.accent||p.accent||'#f9b74a',finish:p.finish||0};
 }
 
 // Weapon-category grip poses in blaster-local coordinates. The camera and other
@@ -112,11 +113,12 @@ function armGeometry() {
 }
 export function makeArms(id, profile={}, firstPerson=true) {
   const group=new THREE.Group();group.name='Operator arms';
-  const appearance=armAppearance(profile),material=new THREE.MeshStandardMaterial({color:shopItem(profile.outfit)?.color||profile.color||'#334952',roughness:.82});
+  const item=shopItem(profile.outfit),appearance=armAppearance(profile),material=new THREE.MeshStandardMaterial({color:item?.model==='wren'?item.skin:item?.color||profile.color||'#334952',roughness:.82});
   const mesh=(geo)=>{const m=new THREE.Mesh(geo,material);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
   const limbs=[-1,1].map(side=>{
     const hand=firstPerson?mesh(handGeometry(side)):new THREE.Group();if(!firstPerson)group.add(hand);hand.material=new THREE.MeshStandardMaterial({color:'#17262e',roughness:.9});hand.userData.ownedMaterial=true;hand.name=side<0?'Support hand':'Grip hand';
     const arm=firstPerson?mesh(armGeometry()):new THREE.Group();arm.name='Smooth tapered arm';arm.frustumCulled=false;
+    if(firstPerson&&item?.model){const cuff=new THREE.Mesh(new THREE.BoxGeometry(.18,.11,.075),new THREE.MeshStandardMaterial({color:item.armor,roughness:.65,metalness:.2}));cuff.position.set(side*.035,.112,.045);cuff.userData.ownedMaterial=true;hand.add(cuff);const badge=new THREE.Mesh(new THREE.BoxGeometry(.11,.035,.012),new THREE.MeshStandardMaterial({color:item.accent,roughness:.55}));badge.position.set(side*.035,.12,.089);badge.userData.ownedMaterial=true;hand.add(badge);}
     const shoulder=new THREE.Vector3(side<0?-.72:.38,firstPerson?-.72:-.4,firstPerson?.42:.9);
     return {side,hand,arm,shoulder,lastWrist:new THREE.Vector3(Infinity,Infinity,Infinity)};
   });
