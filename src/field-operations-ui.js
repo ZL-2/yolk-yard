@@ -42,8 +42,9 @@ export class FieldOperationsUI {
     this.marker.hidden=true;if(this.root.hidden)return;
     // Keep clear of minimap standings at every viewport and HUD scale. Read
     // layout only when those settings change, not on every HUD refresh.
-    const layout=window.innerWidth+':'+window.innerHeight+':'+document.documentElement.className+':'+document.documentElement.style.getPropertyValue('--hud-scale');
-    if(layout!==this.layout){this.layout=layout;const map=document.querySelector('.royale-map-stack'),box=map?.getBoundingClientRect();this.root.style.top=(box?.height?box.bottom+12:83)+'px';}
+    const warning=document.querySelector('.royale-storm-warning');
+    const layout=window.innerWidth+':'+window.innerHeight+':'+document.documentElement.className+':'+document.documentElement.style.getPropertyValue('--hud-scale')+':'+warning?.hidden;
+    if(layout!==this.layout){this.layout=layout;const map=document.querySelector('.royale-map-stack'),box=map?.getBoundingClientRect(),storm=warning?.getBoundingClientRect();this.root.style.top=(box?.height?box.bottom+12:83)+'px';this.medal.style.top=Math.max(154,storm?.height?storm.bottom+16:0)+'px';}
     const n=this.nodes,d=u?Math.round(Math.hypot(p.x-u.x,p.z-u.z)):0;
     this.root.dataset.state=u?.contested?'contested':u?.status||'waiting';
     if(u){
