@@ -119,7 +119,7 @@ export function tickOperations(sim) {
     const origin={x:p.x,y:p.y+.8,z:p.z},delta={x:u.x-p.x,y:u.y+.8-origin.y,z:u.z-p.z},len=Math.hypot(delta.x,delta.y,delta.z);
     return len<.01||wallDistance(sim.map,origin,{x:delta.x/len,y:delta.y/len,z:delta.z/len},len)>=len-.1;
   });
-  const teams=new Set(occupants.map(p=>teamKey(sim.options,p)));u.contested=teams.size>1;
+  u.occupants=occupants.map(p=>p.id);const teams=new Set(occupants.map(p=>teamKey(sim.options,p)));u.contested=teams.size>1;
   if(teams.size!==1){if(!teams.size&&sim.time-u.lastOccupied>3)u.progress=Math.max(0,u.progress-dt);return;}
   const team=teams.values().next().value;u.lastOccupied=sim.time;
   if(u.team!==team&&u.progress>0){u.progress=Math.max(0,u.progress-dt*2);return;}

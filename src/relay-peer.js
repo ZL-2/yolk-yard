@@ -2,6 +2,7 @@ import {MAX_HUMANS,MAX_SPECTATORS} from './royale-phases.js';
 import {mergeRelayMessage} from './relay-queue.js';
 import {SnapshotEncoder,SnapshotDecoder} from './snapshot-codec.js';
 import {HostHeartbeat} from './host-heartbeat.js';
+import {RelaySnapshotWork} from './relay-snapshot-work.js';
 // Peer-shaped, ordered WebSocket transport; the game rules stay in Network.
 // Explicit peer configuration retains the local WebRTC development path.
 export const relayURL=()=>globalThis.window?.YOLK_NETWORK?.relay||'';
@@ -23,7 +24,7 @@ export class RelayPeer extends Events {
   super();this.registration=registration;this.id=id;this.destroyed=false;this.disconnected=false;this.connections=new Map();this.waiters=new Map();this.queue=[];this.queueBytes=0;this.requestId=0;this.deferredControls=[];this.commandSeq=0;this.unacked=new Map();this.cursor=0;this.protocol=1;
   // Defer errors so Network can attach listeners before anything fires.
   queueMicrotask(()=>this.start());
-  this.sentTimes=new Map();this.receivedBytes=0;this.sentBytes=0;this.relayLatency=null;this.sentPackets=0;this.receivedPackets=0;this.byteEncoder=new TextEncoder();
+  this.sentTimes=new Map();this.receivedBytes=0;this.sentBytes=0;this.relayLatency=null;this.sentPackets=0;this.receivedPackets=0;this.byteEncoder=new TextEncoder();this.queuedSizes=new WeakMap();this.queuedWork=new WeakMap();this.snapshotWork=new WeakMap();
  }
  get bufferedAmount(){return (this.socket?.bufferedAmount||0)+this.queueBytes;}
  sendRaw(ws,raw){if(ws?.readyState!==1)return;this.sentBytes+=this.byteEncoder.encode(raw).byteLength;this.sentPackets++;ws.send(raw);}
@@ -96,7 +97,9 @@ export class RelayPeer extends Events {
    }if(m.resumed){this.flush();for(const message of this.deferredControls)this.control(message);this.deferredControls=[];}else this.emit('open',this.id);return;}
   if(m.type==='rooms'){const waiter=this.waiters.get(m.request);if(waiter){this.waiters.delete(m.request);waiter.resolve(m.rooms);}return;}
   if(m.type==='error'){
-   const conn=this.connections.get(m.channel);if(conn){conn.emit('error',{type:m.error});conn.finish();}
+   // A failed election candidate belongs to its channel. Its error must not
+   // become a peer-wide fatal error after the next candidate is promoted.
+   if(m.channel){const conn=this.connections.get(m.channel);if(conn){conn.emit('error',{type:m.error});conn.finish();}return;}
    this.emit('error',{type:m.error});return;
   }
   if(m.type==='incoming'){
@@ -130,11 +133,14 @@ export class RelayPeer extends Events {
   const index=this.queue.findLastIndex(item=>item.channel===message.channel);
   const last=this.queue[index],merged=mergeRelayMessage(last,message);
   if(merged){
-   const oldBytes=JSON.stringify(last).length;this.queue.splice(index,1);this.queueBytes-=oldBytes;
+   const oldBytes=this.queuedSizes.get(last);this.queue.splice(index,1);this.queueBytes-=oldBytes;
    const conn=this.connections.get(last.channel);if(conn)conn.queuedBytes-=oldBytes;
    message=merged;
   }
-  const bytes=JSON.stringify(message).length;
+  const connection=this.connections.get(message.channel),frame=message.data?.state?.network;
+  let work;
+  if(connection?.compact&&message.data?.type==='state'&&frame){work=this.snapshotWork.get(frame);if(!work){work=new RelaySnapshotWork();this.snapshotWork.set(frame,work);}this.queuedWork.set(message,work);}
+  const bytes=work?work.measure(message):JSON.stringify(message).length;this.queuedSizes.set(message,bytes);
   if(this.queueBytes+bytes>1_800_000){this.emit('error',{type:'server-error'});this.destroy();return;}
   this.queue.push(message);this.queueBytes+=bytes;const conn=this.connections.get(message.channel);if(conn)conn.queuedBytes+=bytes;
   if(this.queue.length>=64||this.queueBytes>200000)this.flush();
@@ -144,8 +150,8 @@ export class RelayPeer extends Events {
   if(this.destroyed)return;
   if(this.rotating||this.socket?.readyState!==1||this.socket.bufferedAmount>65536||this.unacked.size>32){
    clearTimeout(this.flushTimer);this.flushTimer=setTimeout(()=>this.flush(),20);return;
-  }clearTimeout(this.flushTimer);this.flushTimer=null;if(!this.queue.length)return;const messages=this.queue.splice(0,64);this.queueBytes=this.queue.reduce((n,m)=>n+JSON.stringify(m).length,0);for(const conn of this.connections.values())conn.queuedBytes=this.queue.filter(m=>m.channel===conn.channel).reduce((n,m)=>n+JSON.stringify(m).length,0);if(this.queue.length)this.flushTimer=setTimeout(()=>this.flush(),10);
-  for(const m of messages){const conn=this.connections.get(m.channel);if(conn?.compact&&m.data?.type==='state'){conn.encoder??=new SnapshotEncoder();m.data=conn.encoder.encode(m.data);}}
+  }clearTimeout(this.flushTimer);this.flushTimer=null;if(!this.queue.length)return;const messages=this.queue.splice(0,64);this.queueBytes=0;for(const conn of this.connections.values())conn.queuedBytes=0;for(const m of this.queue){const bytes=this.queuedSizes.get(m);this.queueBytes+=bytes;const conn=this.connections.get(m.channel);if(conn)conn.queuedBytes+=bytes;}if(this.queue.length)this.flushTimer=setTimeout(()=>this.flush(),10);
+  for(const m of messages){const conn=this.connections.get(m.channel);if(conn?.compact&&m.data?.type==='state'){conn.encoder??=new SnapshotEncoder();m.data=conn.encoder.encode(m.data,this.queuedWork.get(m)?.batch);}}
   this.control({type:'batch',messages});}
  publish(room){this.control({type:'publish',room});}
  list(){

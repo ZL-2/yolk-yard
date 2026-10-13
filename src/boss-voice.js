@@ -37,6 +37,7 @@ export function initializeBossVoice(sim,p){
 }
 export function requestBossVoice(sim,p,cue,{chance=true}={}){
  const rule=BOSS_VOICE_RULES[cue],bank=BOSS_VOICE_BANKS[cue];if(!rule||!bank||p.health<=0||p.spectating||p.flight!=='ground')return false;
+ if(p.henchman){sim.guardVoiceAt??={};if(sim.time<(sim.guardVoiceAt[p.bossId]||0))return false;}
  if(!p.bossVoice)initializeBossVoice(sim,p);const v=p.bossVoice;
  if(sim.time<(v.lastByCue[cue]??-100)+rule.cooldown)return false;
  const interrupt=rule.priority>v.priority&&rule.priority>=2;
@@ -47,9 +48,10 @@ export function requestBossVoice(sim,p,cue,{chance=true}={}){
  const clipId=eligible[Math.min(eligible.length-1,Math.floor(random(p)*eligible.length))];bag.splice(bag.indexOf(clipId),1);
  const clip=BOSS_VOICE_CLIPS[clipId],profile=BOSS_VOICE_PROFILES[p.bossId]||BOSS_VOICE_PROFILES['warden-aster'];
  v.lastClip=clipId;v.lastByCue[cue]=sim.time;v.lastAt=sim.time;v.busyUntil=sim.time+clip.duration/profile.rate;v.priority=rule.priority;
+ if(p.henchman)sim.guardVoiceAt[p.bossId]=sim.time+(rule.priority>=2?1.4:4);
  sim.emit('boss-voice',{player:p.id,bossId:p.bossId,cue,clip:clipId,x:p.x,y:p.y+1.55,z:p.z});return true;
 }
-// Called only by the existing staggered perception scan (5 Hz, three bosses).
+// Called by staggered encounter scans; sleeping sentinels do not scan.
 export function bossVoiceTick(sim,p){
  const v=p.bossVoice;if(!v||sim.time<v.nextAt||p.health<=0||p.bossVeil||p.bossWindup)return;
  const cue=p.bossAlert==='searching'?'search':p.bossAlert==='alerted'?'pursuit':p.bossAlert==='suspicious'?null:p.moving?'patrol':'idle';

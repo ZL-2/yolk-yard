@@ -21,12 +21,12 @@ const ids=Object.fromEntries(defs.map((d,i)=>[d[0],i])),points=Object.fromEntrie
 const geometries=new Map();
 const material=new T.MeshStandardMaterial({vertexColors:true,roughness:.76,metalness:.07});material.userData.shared=true;
 function template(profile){
- const item=shopItem(profile.outfit),style=item?.shape??0,skin=['voss','rook','nyx','morrow'].includes(item?.model)?'#121c23':item?.skin||['#c58a65','#754b37','#d7a47f','#a86d4f','#dfb696','#543728'][style%6];
+ const outfit=shopItem(profile.outfit),item=profile.henchman&&outfit?{...outfit,model:'guard-'+outfit.model}:outfit,style=item?.shape??0,skin=(item?.model?.startsWith('guard-')||['voss','rook','nyx','morrow'].includes(item?.model))?'#121c23':item?.skin||['#c58a65','#754b37','#d7a47f','#a86d4f','#dfb696','#543728'][style%6];
  const colors={cloth:item?.color||profile.color||'#334952',trim:item?.accent||profile.accent||'#e8ae4c',skin,armor:item?.armor||'#243039',dark:'#121c23',sole:'#11171b',hair:item?.hair||['#241b19','#161619','#302620','#3e2b21'][style%4]};
  if(profile.teamColor){colors.cloth=profile.teamColor;colors.trim=profile.teamColor;}
  const trouser=new T.Color(item?.model?colors.armor:colors.cloth).multiplyScalar(.84),seam=new T.Color(colors.cloth).multiplyScalar(.68);
  colors.cloth=new T.Color(colors.cloth).lerp(new T.Color('#43504b'),item?.model?0:item?.12:.58).getStyle();colors.trim=new T.Color(colors.trim).lerp(new T.Color('#b7b099'),item?.model?0:.25).getStyle();
- const key=JSON.stringify([colors,style]);if(geometries.has(key))return geometries.get(key);
+ const key=JSON.stringify([colors,style,item?.model]);if(geometries.has(key))return geometries.get(key);
  const parts=[];
  function add(g,color,bone,next=null,blend=null){
   if(bone==='head'){g.translate(0,-1.666,0);g.scale(1,1,1);g.translate(0,1.666,0);}

@@ -1,4 +1,5 @@
 import {drawOperationMap} from './field-operations-ui.js';
+import {realMatchPlayers} from './match-roster.js';
 import {mapVaults,vaultOpen} from './vaults.js';
 import {bossMapMarkers} from './bosses.js';
 import {nearbyItems} from './nearby-items.js';
@@ -32,7 +33,7 @@ export class RoyaleUI{
    <div id="duo-markers" aria-live="polite"></div><div id="downed-status" role="status" hidden></div><div class="royale-compass" id="royale-compass"></div>
    <div class="royale-map-stack"><button class="royale-minimap" data-action="royale-map" aria-label="Open island map"><canvas id="royale-mini" width="260" height="260"></canvas><span id="royale-phase">STORM 1</span></button><div class="royale-map-stats" aria-label="Battle Royale standings"><span><b id="royale-alive">32</b> ALIVE</span><span><b id="royale-elims">0</b> ELIMS</span><span class="royale-spectator-count" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg><b id="royale-watch-count">0</b></span></div></div>
    <div class="royale-storm-warning" id="royale-storm-warning" role="status"></div>
-   <div class="royale-flight" id="royale-flight"><button class="flight-close" data-action="royale-close-flight" id="royale-flight-close" aria-label="Close flight tips">L Close</button><span class="eyebrow">KESTREL TACTICAL AIRLIFT</span><strong id="royale-flight-title"></strong><p id="royale-flight-help"></p><button data-action="royale-jump" class="primary" id="royale-flight-button">JUMP</button></div>
+   <div class="royale-flight" id="royale-flight"><button class="flight-close" data-action="royale-close-flight" id="royale-flight-close" aria-label="Close flight tips">L Close</button><span class="eyebrow">KESTREL TACTICAL AIRLIFT</span><strong id="royale-flight-title"></strong><p id="royale-flight-help"></p><div id="island-roster" hidden></div><button data-action="royale-jump" class="primary" id="royale-flight-button">JUMP</button></div>
    <div id="keycard-guide" class="keycard-guide" hidden></div><div class="royale-prompt" id="royale-prompt" role="status"></div>
    <div class="royale-vitals"><div class="royale-meter stamina"><span>↟ STAMINA</span><b id="royale-stamina">100</b><i id="royale-stamina-fill"></i></div></div>
    <div class="royale-hotbar" id="royale-hotbar" role="group" aria-label="Inventory slots"></div>
@@ -139,7 +140,13 @@ export class RoyaleUI{
   setText($('royale-flight-title'),local.flight==='transport'?`${r.elapsed<3?'Doors open in '+Math.ceil(3-r.elapsed):'Choose your landing spot'}${r.elapsed>=3?' · '+Math.ceil(r.route.duration-r.elapsed)+'s':''}`:local.flight==='dive'?'Freefall':'Glider deployed');
   setText($('royale-flight-help'),local.flight==='transport'?'Look around with your mouse or touch look. Open the map, choose a district, then jump.':local.flight==='dive'?`${label('forward')} to steer · ${label('jump')} to deploy glider`:`${label('jump')} to dive again at altitude. Your glider opens automatically near the ground.`);
   $('royale-flight-button').hidden=['glide','launch'].includes(local.flight);$('royale-flight-button').disabled=local.flight==='transport'&&r.elapsed<3;setText($('royale-flight-button'),local.flight==='transport'?`JUMP · ${label('jump')}`:`DEPLOY GLIDER · ${label('jump')}`);
-  if(warmup){setText($('royale-flight-title'),`KESTREL AIRFIELD · ${r.contestants}/${state.options.capacity} contestants`);setText($('royale-flight-help'),`${state.options.session==='offline'?'Offline · ':''}Kestrel departs in ${r.countdownStarted===false?'Waiting for players':Math.max(0,Math.ceil(r.queueEnds-state.time))+'s'} · ${r.humanContestants??state.players.filter(p=>!p.bot&&p.contestant&&!p.spectating).length} real players · ${r.botContestants??state.players.filter(p=>p.bot&&p.contestant).length} bots · Practice equipment resets at departure`);$('royale-flight-button').hidden=true;}
+  const roster=$('island-roster');roster.hidden=!warmup;
+  if(warmup){
+   const players=realMatchPlayers(state),countdown=r.countdownStarted===false?'WAITING FOR PLAYERS':Math.max(0,Math.ceil(r.queueEnds-state.time))+'s TO DEPARTURE';
+   setText($('royale-flight-title'),'KESTREL AIRFIELD');setText($('royale-flight-help'),countdown+' · Practice equipment resets at departure');$('royale-flight-button').hidden=true;
+   const rosterKey=players.map(o=>o.id+':'+o.name).join('|');if(rosterKey!==this.rosterKey){this.rosterKey=rosterKey;roster.innerHTML=`<div class="island-roster-heading"><b>${players.length}</b><span>REAL ${players.length===1?'PLAYER':'PLAYERS'} ON THE ISLAND</span><small>${state.options.session==='offline'?'OFFLINE PRACTICE':'LIVE ROSTER'}</small></div><div class="island-roster-names">${players.map(o=>`<span class="${o.id===local.id?'you':''}">${escape(o.name)}${o.id===local.id?' <b>YOU</b>':''}</span>`).join('')||'<span>Waiting for connected players</span>'}</div>`;}
+  }
+
   const outside=r.storm.active&&Math.hypot(p.x-r.storm.x,p.z-r.storm.z)>r.storm.radius;
   setText($('royale-storm-warning'),outside?`IN THE STORM · ${Math.ceil(Math.hypot(p.x-r.storm.x,p.z-r.storm.z)-r.storm.radius)} m TO SAFETY`:r.storm.active?`${r.storm.closing?'STORM CLOSING':'STORM CLOSES IN'} ${Math.ceil(r.storm.seconds)}s`:'');
   $('royale-storm-warning').classList.toggle('danger',outside);this.root.classList.toggle('outside-storm',outside);

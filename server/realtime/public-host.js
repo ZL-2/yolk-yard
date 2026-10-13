@@ -34,7 +34,7 @@ export class PublicHost {
   const record={...admission,spectator:!!spectator,publicSpectator:!!spectator,crownRecord:crownRecord(this.relay.progression.account(peer.progressId).crowns)};
   this.relay.progression.bindPublicPlayer?.(peer,record.memberId,{participant:!spectator});
   this.members.set(peer.id,{peer:peer.id,id:peer.id===this.host?.peer?this.host.id:peer.id,order:++this.order,admission:record});
-  peer.publicMember=true;this.joinSerial++;return record;
+  peer.publicMember=true;if(!spectator){this.joinSerial++;const player=this.relay.parties.store?.identities.get(record.memberId);this.lastJoin={serial:this.joinSerial,name:player?.profile?.name||'A player',at:Date.now()};}return record;
  }
  isTarget(peer){return peer.id===this.host?.address||peer.id===this.host?.peer;}
  publish(peer,r){
@@ -53,7 +53,7 @@ export class PublicHost {
   const s=this.state,warmup=!s||['spawn-island','starting'].includes(s.stage),recovering=!this.host&&(!!this.members.size||!!this.pending);
   const members=[...this.members.values()].filter(x=>this.relay.peers.get(x.peer)?.ws),humanPlayers=members.filter(x=>!x.admission.spectator).length,spectators=members.length-humanPlayers;
   const countdownSeconds=warmup&&s?.queueEnds?Math.max(0,Math.ceil(s.queueEnds-s.time)):0;
-  return {availability:publicWindow(Date.now()),code:PUBLIC_ROYALE.code,version:VERSION,hosting:'player',hostReady:!!this.host&&!!s,recovering,joinSerial:this.joinSerial,round:s?.round||0,matchId:s?.matchId||null,stage:s?.stage||'spawn-island',phase:s?.phase||'playing',capacity:48,difficulty:2,humanPlayers,spectators,botPlayers:s?.botPlayers??48,alive:warmup?48:s.alive,joinable:warmup&&!recovering,countdownStarted:countdownSeconds>0,countdownSeconds,estimatedSeconds:s?.estimatedSeconds||0,restartSeconds:s?.phase==='results'?s.estimatedSeconds:0,availableSeats:Math.max(0,48-humanPlayers-this.pendingCount()),availableSpectators:Math.max(0,16-spectators-this.pendingCount(true))};
+  return {availability:publicWindow(Date.now()),code:PUBLIC_ROYALE.code,version:VERSION,hosting:'player',hostReady:!!this.host&&!!s,recovering,joinSerial:this.joinSerial,lastJoin:this.lastJoin,round:s?.round||0,matchId:s?.matchId||null,stage:s?.stage||'spawn-island',phase:s?.phase||'playing',capacity:48,difficulty:2,humanPlayers,spectators,botPlayers:s?.botPlayers??48,alive:warmup?48:s.alive,joinable:warmup&&!recovering,countdownStarted:countdownSeconds>0,countdownSeconds,estimatedSeconds:s?.estimatedSeconds||0,restartSeconds:s?.phase==='results'?s.estimatedSeconds:0,availableSeats:Math.max(0,48-humanPlayers-this.pendingCount()),availableSpectators:Math.max(0,16-spectators-this.pendingCount(true))};
  }
  left(peer){
   const member=this.members.get(peer.id);if(member&&!member.admission.spectator&&peer.progressId&&this.state?.phase==='playing'&&!['spawn-island','starting'].includes(this.state?.stage)){const account=this.relay.progression.account(peer.progressId);account.crowns={...crownRecord(account.crowns),owned:false};this.relay.progression.dirty=true;void this.relay.progression.save();}

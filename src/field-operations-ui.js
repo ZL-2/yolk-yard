@@ -19,6 +19,7 @@ export class FieldOperationsUI {
     this.medal=document.createElement('div');this.medal.id='field-medal';this.medal.hidden=true;this.medal.setAttribute('role','status');
     this.medal.innerHTML='<i></i><div><small></small><strong></strong><span></span></div>';document.querySelector('#hud').append(this.medal);
     this.marker=document.createElement('div');this.marker.id='field-uplink-marker';this.marker.hidden=true;document.querySelector('#hud').append(this.marker);
+    this.capture=document.createElement('aside');this.capture.id='field-capture-status';this.capture.hidden=true;this.capture.setAttribute('role','status');this.capture.innerHTML='<div><strong></strong><span></span><b></b></div><progress max="14" value="0"></progress>';document.querySelector('#hud').append(this.capture);
     this.queue=[];this.at=0;
   }
   event(e,id) {
@@ -30,7 +31,7 @@ export class FieldOperationsUI {
   update(state,p,playing,paused,project,now=performance.now()) {
     const key=state?.royale?.matchId||state?.round;
     if(key!==this.key){this.key=key;this.queue=[];this.until=0;this.medal.hidden=true;this.at=0;}
-    if(!playing){this.root.hidden=this.medal.hidden=this.marker.hidden=true;this.queue=[];return;}
+    if(!playing){this.root.hidden=this.medal.hidden=this.marker.hidden=this.capture.hidden=true;this.queue=[];return;}
     if(now>=(this.until||0)){
       const m=this.queue.shift();this.medal.hidden=!m;
       if(m){this.until=now+2500;if(!document.documentElement.classList.contains('reduced-motion'))this.medal.animate?.([{opacity:0,translate:'0 -10px'},{opacity:1,translate:'0 0'}],{duration:260,easing:'cubic-bezier(.2,.8,.2,1)'});set(this.medal.querySelector('i'),m.icon);set(this.medal.querySelector('small'),'+'+m.xp+' SERVICE XP');set(this.medal.querySelector('strong'),m.name);set(this.medal.querySelector('span'),m.detail);}
@@ -39,12 +40,23 @@ export class FieldOperationsUI {
     if(now<this.at)return;this.at=now+100;
     const r=state?.royale,ops=r?.operations,u=ops?.uplink;
     this.root.hidden=!ops||r.practice||p?.spectating||p?.health<=0||paused;
-    this.marker.hidden=true;if(this.root.hidden)return;
+    this.marker.hidden=true;this.capture.hidden=true;if(this.root.hidden)return;
+    const capturing=u?.status==='active'&&u.occupants?.includes(p.id);
+    this.capture.hidden=!capturing;
+    if(capturing){
+      const clearing=u.team!==null&&u.team!==teamKey(state.options,p)&&u.progress>0;
+      const progress=clearing?OPERATIONS.capture-u.progress:u.progress;
+      this.capture.dataset.state=u.contested?'contested':'capturing';
+      set(this.capture.querySelector('strong'),u.contested?'UPLINK CONTESTED':clearing?'TAKING CONTROL':'CAPTURING UPLINK');
+      set(this.capture.querySelector('span'),u.contested?'Enemy in the capture area · Progress paused':clearing?'Clearing the enemy signal':u.name+' · Hold your position');
+      set(this.capture.querySelector('b'),Math.round(progress/OPERATIONS.capture*100)+'%');this.capture.querySelector('progress').value=progress;
+    }
     // Keep clear of minimap standings at every viewport and HUD scale. Read
     // layout only when those settings change, not on every HUD refresh.
-    const warning=document.querySelector('.royale-storm-warning');
-    const layout=window.innerWidth+':'+window.innerHeight+':'+document.documentElement.className+':'+document.documentElement.style.getPropertyValue('--hud-scale')+':'+warning?.hidden;
-    if(layout!==this.layout){this.layout=layout;const map=document.querySelector('.royale-map-stack'),box=map?.getBoundingClientRect(),storm=warning?.getBoundingClientRect();this.root.style.top=(box?.height?box.bottom+12:83)+'px';this.medal.style.top=Math.max(154,storm?.height?storm.bottom+16:0)+'px';}
+    const warning=document.querySelector('.royale-storm-warning'),network=document.querySelector('.performance-network');
+    const networkLayout=[network?.hidden,network?.parentElement.hidden,network?.querySelector('.net-details')?.hidden,network?.querySelector('.connection-signal')?.hidden].join(':');
+    const layout=window.innerWidth+':'+window.innerHeight+':'+document.documentElement.className+':'+document.documentElement.style.getPropertyValue('--hud-scale')+':'+warning?.hidden+':'+!!warning?.textContent+':'+capturing+':'+state.options.teamSize+':'+networkLayout;
+    if(layout!==this.layout){this.layout=layout;const team=document.querySelector('.duo-hud'),box=team&&!team.hidden?team.getBoundingClientRect():null,diagnostics=network?.getBoundingClientRect(),storm=warning?.textContent?warning.getBoundingClientRect():null,mobile=innerWidth<=760,map=mobile?document.querySelector('.royale-map-stack')?.getBoundingClientRect():null;this.capture.style.top=Math.max(86,storm?.height?storm.bottom+12:0,map?.height?map.bottom+12:0)+'px';const captureBottom=capturing?this.capture.getBoundingClientRect().bottom:0;this.root.style.top=Math.max(112,box?.height?box.bottom+12:0,diagnostics?.height?diagnostics.bottom+12:0,mobile&&captureBottom?captureBottom+12:0)+'px';this.medal.style.top=Math.max(154,storm?.height?storm.bottom+16:0,captureBottom?captureBottom+12:0)+'px';}
     const n=this.nodes,d=u?Math.round(Math.hypot(p.x-u.x,p.z-u.z)):0;
     this.root.dataset.state=u?.contested?'contested':u?.status||'waiting';
     if(u){

@@ -17,12 +17,12 @@ try{
  await page.waitForFunction(()=>!window.__yolkTest.read().paused&&document.pointerLockElement);
  await page.evaluate(async()=>{const {initializeOperations}=await import('/src/field-operations.js'),{groundAt}=await import('/src/terrain.js');window.__yolkTest.fixture(s=>{
   const id=window.__yolkTest.read().localId,p=s.players.get(id);s.options.training=false;s.stage='active';s.startedAt=s.time-80;s.alive=20;initializeOperations(s);s.operations.nextAt=1000;s.operations.sequence=1;
-  const x=18,z=30,y=groundAt(s.map,x,z);s.operations.uplink={id:1,x,y,z,name:'Coastal station',status:'active',progress:6,team:id,contested:false,expiresAt:s.time+300,lastOccupied:s.time};s.operations.scanAt=s.time+300;
+  const x=18,z=30,y=groundAt(s.map,x,z);s.operations.uplink={id:1,x,y,z,name:'Coastal station',status:'active',progress:6,team:id,occupants:[id],contested:false,expiresAt:s.time+300,lastOccupied:s.time};s.operations.scanAt=s.time+300;
   p.shieldUntil=s.time+300;p.inventory[1]={id:'sprinter',weapon:true,count:1,ammo:30,rarity:2};p.slot=1;s.syncInventory(p);window.__yolkTest.pose({x,y,z:z+6,yaw:0,pitch:0,slot:1,grounded:true,flight:'ground',vy:0});window.__yolkTest.look(0,0);
  });});
  await page.waitForFunction(()=>document.querySelector('#field-operations .field-title')?.textContent==='CAPTURING UPLINK'&&window.__yolkTest.frontline().uplink);
  assert.equal(await page.locator('#field-operations progress.field-capture').getAttribute('max'),'14');
- const panel=await page.locator('#field-operations').boundingBox(),map=await page.locator('.royale-map-stack').boundingBox();assert.ok(panel.y>=map.y+map.height,'objective panel clears minimap');
+ const layout=await page.evaluate(()=>{const box=s=>document.querySelector(s)?.getBoundingClientRect(),overlap=(a,b)=>a&&b&&a.width&&b.width&&a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;const panel=box('#field-operations');return {clearMap:!overlap(panel,box('.royale-map-stack')),clearBuild:!overlap(panel,box('.build-hud')),capture:!document.querySelector('#field-capture-status').hidden};});assert.equal(layout.clearMap,true);assert.equal(layout.clearBuild,true);assert.equal(layout.capture,true);
  await page.waitForFunction(()=>['objective','final'].includes(window.__yolkTest.frontline().score.scene));checks.objectiveHUDAndMusic=true;
  await page.screenshot({path:out+'/uplink-gameplay.png'});
  await page.evaluate(()=>window.__yolkTest.fixture(s=>s.emit('field-medal',{player:window.__yolkTest.read().localId,medal:'uplink',xp:150})));

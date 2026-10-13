@@ -65,9 +65,15 @@ export class SocialStore{
   if(this.featureRequests.length>=1000){const old=this.featureRequests.findIndex(r=>['completed','dismissed'].includes(r.status));if(old<0)throw Error('The feature inbox is full. Please try again later.');this.featureRequests.splice(old,1);}
   const r={id:randomUUID(),player,name:this.identities.get(player).profile.name,text,created:Date.now(),status:'open'};this.featureRequests.push(r);this.save();return {id:r.id,created:r.created};
  }
- featureInbox(action='list',id){
-  this.available();if(action!=='list'){if(!['read','completed','dismissed','open'].includes(action))throw Error('Invalid inbox action');const r=this.featureRequests.find(r=>r.id===id);if(!r)throw Error('Request not found');r.status=action;r.updated=Date.now();this.save();}
-  return {requests:this.featureRequests.slice().reverse(),open:this.featureRequests.filter(r=>r.status==='open').length};
+ featureInbox(action='list',id,showCleared=false){
+  this.available();if(action!=='list'){
+   if(!['read','completed','dismissed','open','clear','restore'].includes(action))throw Error('Invalid inbox action');
+   const r=this.featureRequests.find(r=>r.id===id);if(!r)throw Error('Request not found');
+   if(action==='clear'){r.clearedAt=Date.now();r.status='dismissed';}
+   else if(action==='restore'){delete r.clearedAt;r.status='open';}
+   else r.status=action;r.updated=Date.now();this.save();
+  }
+  return {requests:this.featureRequests.filter(r=>showCleared?!!r.clearedAt:!r.clearedAt).slice().reverse(),open:this.featureRequests.filter(r=>!r.clearedAt&&r.status==='open').length,cleared:this.featureRequests.filter(r=>r.clearedAt).length};
  }
  flush(){
   clearTimeout(this.timer);if(!this.path)return this.chain;if(this.loadError)return Promise.reject(this.loadError);

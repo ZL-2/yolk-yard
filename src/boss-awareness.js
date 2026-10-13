@@ -65,7 +65,7 @@ export function scanBossAwareness(sim,p,def,smokeBlocks){
  p.bossSuspicion=Math.round(p.bossSuspicion*100)/100;bossVoiceTick(sim,p);
 }
 export function bossAlertVisual(p,time=0){
- if(!p.boss||p.health<=0||p.spectating||p.flight!=='ground'||!['suspicious','alerted','searching'].includes(p.bossAlert))return null;
+ if(!(p.boss||p.henchman)||p.health<=0||p.spectating||p.flight!=='ground'||!['suspicious','alerted','searching'].includes(p.bossAlert))return null;
  const alerted=p.bossAlert==='alerted',age=Math.max(0,time-(p.bossAlertAt||0));
  return {symbol:alerted?'!':'?',color:alerted?'#ff303c':'#ffd447',fill:alerted||p.bossAlert==='searching'?1:Math.round((p.bossSuspicion||0)*10)/10,scale:1+Math.max(0,1-age/.35)*.35};
 }
