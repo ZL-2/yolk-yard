@@ -19,6 +19,11 @@ export function stackCapacity(p,item){
  for(let i=1;i<=5;i++){const entry=p.inventory?.[i];if(!entry)room+=max;else if(entry.id===item.id)room+=Math.max(0,max-entry.count);}
  return room;
 }
+export function canAutoStack(p,item){
+ if(!['healing','mobility'].includes(itemGroup(item))||item.weapon)return false;
+ const max=ITEMS[item.id]?.stack||1;
+ return p.inventory?.some((entry,i)=>i>0&&entry?.id===item.id&&(entry.count||0)<max)||false;
+}
 // Exact same scoring is used by authority and UI; callers supply reachability.
 // No sort/allocation of a temporary candidate list for every interaction tick.
 export function targetLoot(items,p,allowed=()=>true){

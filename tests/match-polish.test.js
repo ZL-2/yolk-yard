@@ -67,7 +67,7 @@ test('distinct Rook and Nyx approaches are reachable without jumps, including th
  for(let i=0;i<140;i++)movePlayer(p,{forward:1,yaw:-Math.PI/2},map,1/60);assert.ok(p.x>210,'walk the service catwalk to the hold');assert.ok(Math.abs(p.y-rook.y)<.02);assert.ok(canStand(map,p));
 });
 test('mobility buffs preserve protected directional motion without reducing Grappler utility',()=>{
- assert.equal(SEASON.rig.charges,4);assert.equal(SEASON.rig.recharge,15);assert.equal(SHADOWSTEP.charges,Infinity);assert.equal(SHADOWSTEP.recharge,5);assert.ok(Math.abs(SHADOWSTEP.duration*SHADOWSTEP.speed-13.2)<1e-8);
+ assert.equal(SEASON.rig.charges,4);assert.equal(SEASON.rig.recharge,15);assert.equal(SHADOWSTEP.charges,Infinity);assert.equal(SHADOWSTEP.recharge,1);assert.ok(Math.abs(SHADOWSTEP.duration*SHADOWSTEP.speed-13.2)<1e-8);
  const p={x:0,y:0,z:0,health:100,flight:'ground',grounded:true,yaw:0,shadowDirection:{x:1,z:0}},sim={time:10,emit(){}};
  assert.equal(useSeasonItem(sim,p,{id:'jumpRig'}),true);assert.equal(p.launchVelocity.x,30);assert.equal(p.launchVelocity.z,0);assert.equal(p.vy,26);assert.equal(p.fall.immune,true);
 });

@@ -1,5 +1,5 @@
-// Unlimited uses; a five-second cooldown bounds movement and target breaking.
-export const SHADOWSTEP=Object.freeze({charges:Infinity,recharge:5,cooldown:5,duration:.22,speed:60,targetBreak:.85});
+// Unlimited uses; a one-second cooldown bounds movement and target breaking.
+export const SHADOWSTEP=Object.freeze({charges:Infinity,recharge:1,cooldown:1,duration:.22,speed:60,targetBreak:.85});
 export function shadowCharges(item){return item?.id==='shadowstep'?Infinity:0;}
 export function shadowRechargeState(item,time){const remaining=item?.id==='shadowstep'?Math.max(0,(item.readyAt||0)-time):0;return {active:remaining>0,charges:Infinity,remaining,progress:1-Math.min(1,remaining/SHADOWSTEP.cooldown)};}
 export function startShadowstep(p,item,time){

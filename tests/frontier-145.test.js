@@ -53,7 +53,7 @@ test('double Jump uses an unequipped rig with matching predicted charges and a f
  assert.equal(p.inventory[4].charges,3);assert.equal(p.inventory[4].rechargeAt,10+2/60+15);assert.equal(SEASON.rig.recharge,15);assert.equal(p.fall.immune,true);assert.equal(p.mobilityKind,'jumpRig');assert.notEqual(predicted.inventory[4],original);assert.ok(Math.abs(p.y-predicted.y)<1e-8);assert.equal(predicted.inventory[4].charges,3);
 });
 test('unlimited Shadowstep follows vertical look, stops at ceilings, and keeps fall protection',()=>{
- const {s,p}=flat(),item={id:'shadowstep',count:1};p.pitch=1.3;assert.equal(startShadowstep(p,item,10),true);for(let i=0;i<14;i++)movePlayer(p,{},s.map,1/60,10);assert.ok(p.y>12);assert.equal(p.fall.immune,true);assert.equal(shadowCharges(item),Infinity);assert.equal(startShadowstep(p,item,14.99),false);assert.equal(startShadowstep(p,item,15),true);
+ const {s,p}=flat(),item={id:'shadowstep',count:1};p.pitch=1.3;assert.equal(startShadowstep(p,item,10),true);for(let i=0;i<14;i++)movePlayer(p,{},s.map,1/60,10);assert.ok(p.y>12);assert.equal(p.fall.immune,true);assert.equal(shadowCharges(item),Infinity);assert.equal(startShadowstep(p,item,10.99),false);assert.equal(startShadowstep(p,item,11),true);
  Object.assign(p,{x:0,y:0,z:0,pitch:1.48,grounded:true});s.map.boxes=[{x:0,y:4,z:0,w:10,h:1,d:10}];startShadowstep(p,{id:'shadowstep'},20);for(let i=0;i<14;i++)movePlayer(p,{},s.map,1/60,20);assert.ok(p.y+1.85<=4.001);assert.ok(canStand(s.map,p));
 });
 test('uphill crouch slides keep forward momentum and stop before reversing downhill',()=>{

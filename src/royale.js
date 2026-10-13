@@ -1,5 +1,5 @@
 import {recordCombatDamage} from './combat-feedback.js';
-import {sanitizeSlotPreferences,vacantSlot,targetLoot,USE_CANCEL_REASONS} from './inventory-policy.js';
+import {sanitizeSlotPreferences,vacantSlot,targetLoot,USE_CANCEL_REASONS,canAutoStack} from './inventory-policy.js';
 import {vaultOpen} from './vaults.js';
 import {initializeVehicles,tickVehicles,vehicleInteract,seatPlayer,exitVehicle,vehicleHit,damageVehicle} from './vehicles.js';
 import {crownsEnabled,attachCrown,resetMatchCrown,dropCrown,takeCrown,awardCrowns,pulseCrowns} from './crowns.js';
@@ -230,15 +230,16 @@ export class RoyaleSimulation extends Simulation {
   if(!this.dropLoot(p,{...item,droppedBy:p.id,pickupAfter:this.time+1.5}))return false;this.cancelUse(p,'drop');p.inventory[index]=null;p.reloadEnd=0;p.burstLeft=0;p.use=null;this.syncInventory(p);
   this.emit('royale-cue',{player:p.id,cue:'item-drop',x:p.x,y:p.y,z:p.z});
  }
- takeLoot(p,item){
+ takeLoot(p,item,{stackOnly=false}={}){
   if(item?.droppedBy===p.id&&item.pickupAfter>this.time)return false;
   if(!item||!vaultOpen(this,item.vaultId)||itemById(this,'loot',item.uid)!==item||!this.accessible(p,item)||!canFight(p)||p.flight!=='ground')return false;
+  if(stackOnly&&!canAutoStack(p,item))return false;
   if(item.resource){const add=Math.min(item.count,999-p.materials[item.resource]);if(add<=0)return false;p.materials[item.resource]+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;return true;}
   if(item.crown)return takeCrown(this,p,item);
   if(item.ammoType){const add=Math.min(item.count,AMMO_CAPS[item.ammoType]-p.bank[item.ammoType]);if(add<=0)return false;p.bank[item.ammoType]+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'ammo-pickup'});return true;}
   let merged=0,slot=-1;const maximum=item.weapon?1:ITEMS[item.id]?.stack||1;
   if(!item.weapon)for(let i=1;i<=5&&item.count>0;i++){const entry=p.inventory[i];if(entry?.id!==item.id)continue;const add=Math.min(item.count,Math.max(0,maximum-entry.count));entry.count+=add;item.count-=add;merged+=add;}
-  while(item.count>0){
+  while(!stackOnly&&item.count>0){
    slot=vacantSlot(p,item);if(slot<0&&!merged){slot=p.slot===0?1:p.slot;if(this.dropSlot(p,slot)===false)return false;}
    if(slot>=0){
    const {uid,x,y,z,motion,spawnFrom,spawnAt,vaultId,droppedBy,pickupAfter,landAt,...entry}=item;
@@ -248,7 +249,7 @@ export class RoyaleSimulation extends Simulation {
    }else break;
   }
   if(!merged)return false;if(!item.count)this.removeLoot(item);else this.lootVersion++;
-  this.cancelUse(p,'swap');p.reloadEnd=0;if(p.bot&&p.brain)p.brain.decision=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'pickup-'+(item.rarity||0),item:item.id});return true;
+  if(!stackOnly){this.cancelUse(p,'swap');p.reloadEnd=0;}if(p.bot&&p.brain)p.brain.decision=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'pickup-'+(item.rarity||0),item:item.id});return true;
  }
  openChest(p,chest){
   if(!this.chests.includes(chest)||!canFight(p)||p.flight!=='ground'||chest.opened||!vaultOpen(this,chest.vaultId)||!this.accessible(p,chest,3.3))return false;
@@ -261,9 +262,12 @@ export class RoyaleSimulation extends Simulation {
  interact(p,input,dt){
   if(!input.interact)p.swapDoneHeld=false;
   if(!canFight(p))return;
+  for(const item of nearbyItems(this,'loot',p,1.6))if(this.accessible(p,item,1.6)){
+   if(item.ammoType||item.resource||item.crown)this.takeLoot(p,item);
+   else if(canAutoStack(p,item))this.takeLoot(p,item,{stackOnly:true});
+  }
   if(input.editing)return;if(frontierInteract(this,p,input,dt))return;if(seasonInteract(this,p,input,dt))return;
   if(input.interact&&!p.interactLatch&&toggleDoor(this,p)){p.interactLatch=true;return;}
-  for(const item of nearbyItems(this,'loot',p,1.6))if((item.ammoType||item.resource||item.crown)&&this.accessible(p,item,1.6))this.takeLoot(p,item);
   let chest=null;
   if(input.interact){const nearbyChests=nearbyItems(this,'chests',p,3.3),available=c=>!c.opened&&vaultOpen(this,c.vaultId)&&this.accessible(p,c,3.3);chest=nearbyChests.find(c=>c.id===p.chestId&&available(c))||targetLoot(nearbyChests,p,available);}
   if(input.interact&&chest){

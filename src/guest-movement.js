@@ -5,7 +5,7 @@ import {stepVehicle,seatPlayer} from './vehicles.js';
 // Prediction owns all mutable movement state. In particular mantle.elapsed
 // must never advance inside the authoritative snapshot being reconciled.
 export function predictionCopy(p){
- return {...p,ammo:p.ammo?.slice()||[],reserve:p.reserve?.slice()||[],inventory:p.inventory?.map(i=>i?{...i}:null),
+ return {...p,phasedBuilds:p.phasedBuilds?.slice(),ammo:p.ammo?.slice()||[],reserve:p.reserve?.slice()||[],inventory:p.inventory?.map(i=>i?{...i}:null),
   mantle:p.mantle?{...p.mantle,from:{...p.mantle.from},lift:{...p.mantle.lift},across:{...p.mantle.across},to:{...p.mantle.to}}:null,
   grapple:p.grapple?structuredClone(p.grapple):null,shadowstep:p.shadowstep?{...p.shadowstep}:null,
   traversal:p.traversal?{...p.traversal}:null,fall:p.fall?{...p.fall}:null,launchVelocity:p.launchVelocity?{...p.launchVelocity}:null};

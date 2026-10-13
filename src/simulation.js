@@ -886,7 +886,7 @@ export class Simulation {
   }
   snapshot() {
     const keys = [
-      'friendSpectator','lateSpectator','watchId','sprinting','tacticalSprint','sprintBlend','sprintRecovery','stamina','sprintRest','exhausted',
+      'phasedBuilds','friendSpectator','lateSpectator','watchId','sprinting','tacticalSprint','sprintBlend','sprintRecovery','stamina','sprintRest','exhausted',
       'crouching','lowCrouch','sliding','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','slideUphill','slideStartX','slideStartZ','mobilityJumpWindow','mobilitySerial','mobilityKind','vehicleId','vehicleSeat','vehicleLock','downed','lifeState','downedAt','revivedAt','downCount','reviving','reviverId','reviveProgress','revives','connected','teamSlot',
       "afkRemaining", "afkRemoved", "lastDamage", "assists", "quickstep", "focus",
       "id", "joinedOrder", "vx", "vz", "place",

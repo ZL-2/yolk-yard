@@ -126,7 +126,7 @@ export function humanHit(o,d,p,radius=0){
 // Stable internal API retained for saved simulations and existing callers.
 export const rayEgg=(o,d,p)=>humanHit(o,d,p).distance;
 export const rayHuman=rayEgg;
-function overlaps(p, b) {
+export function playerBoxOverlap(p, b) {
   return (
     p.y < b.y + b.h - 0.015 &&
     p.y + bodyHeight(p) > b.y + 0.02 &&
@@ -134,23 +134,29 @@ function overlaps(p, b) {
     Math.abs(p.z - b.z) < b.d / 2 + RADIUS
   );
 }
+export const movementBoxSolid=(p,b,phases=p.phasedBuilds)=>!b.buildId||!phases?.includes(b.buildId);
+export function pruneBuildPhases(p,map){
+ if(!p.phasedBuilds?.length)return;
+ const near=candidates(map,p,null,0,RADIUS+.04);
+ p.phasedBuilds=p.phasedBuilds.filter(id=>near.some(b=>b.buildId===id&&p.y<b.y+b.h+.04&&p.y+bodyHeight(p)>b.y-.04&&Math.abs(p.x-b.x)<b.w/2+RADIUS+.04&&Math.abs(p.z-b.z)<b.d/2+RADIUS+.04));
+}
 export function canStand(map,p,margin=RADIUS) {
  return canOccupy(map,p,HEIGHT,margin);
 }
-export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS) {
+export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS,phases=p.phasedBuilds) {
  if(Math.abs(p.x)>map.size-margin||Math.abs(p.z)>map.size-margin)return false;
- for(const b of candidates(map,p,null,0,margin))if(p.y+.035<b.y+b.h&&p.y+height>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin)return false;
+ for(const b of candidates(map,p,null,0,margin))if(movementBoxSolid(p,b,phases)&&p.y+.035<b.y+b.h&&p.y+height>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin)return false;
  return true;
 }
 function pushAxis(p,map,axis,delta) {
  if(Math.abs(delta)<1e-10)return;
  const start=p[axis],base=p.y,other=axis==='x'?'z':'x',size=axis==='x'?'w':'d';
  const proposal=start+delta;let target=proposal;
- const height=bodyHeight(p),point={x:p.x,y:p.y,z:p.z};point[axis]=proposal;
+ const height=bodyHeight(p),point={x:p.x,y:p.y,z:p.z,phasedBuilds:p.phasedBuilds};point[axis]=proposal;
  let hit=false,top=base;
  // All overlaps are tested against the proposed endpoint, not the clamped
  // endpoint. Accumulate the same entry-face clamps without a temporary array.
- for(const b of candidates(map,point))if(p.y<b.y+b.h-.015&&p.y+height>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(proposal-b[axis])<b[size]/2+RADIUS){
+ for(const b of candidates(map,point))if(movementBoxSolid(p,b)&&p.y<b.y+b.h-.015&&p.y+height>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(proposal-b[axis])<b[size]/2+RADIUS){
   hit=true;top=Math.max(top,b.y+b.h);
   const edge=b[axis]-Math.sign(delta)*(b[size]/2+RADIUS+.001);
   target=delta>0?Math.min(target,Math.max(start,edge)):Math.max(target,Math.min(start,edge));
@@ -162,6 +168,7 @@ function pushAxis(p,map,axis,delta) {
  p[axis]=target;
 }
 export function movePlayer(p, input, map, dt, time=0) {
+  pruneBuildPhases(p,map);
   // Bound displacement through narrow risers, including low-frame-rate clients.
   const steps=Math.max(1,Math.ceil(Math.min(dt,.1)/(1/60)));
   for(let i=0;i<steps;i++){
@@ -169,10 +176,13 @@ export function movePlayer(p, input, map, dt, time=0) {
     let normalY=1;
     if(p.fall&&p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.sqrt(1+gx*gx+gz*gz);}
     if(p.flight!=='transport')finishFallStep(p,before,normalY);
+    pruneBuildPhases(p,map);
   }
 }
 function movePlayerStep(p, input, map, dt, time) {
   if (p.health <= 0) return;
+  const movementStand=p.phasedBuilds?.length?(m,q,margin=RADIUS)=>canOccupy(m,q,HEIGHT,margin,p.phasedBuilds):canStand;
+  const movementOccupy=p.phasedBuilds?.length?(m,q,height,margin)=>canOccupy(m,q,height,margin,p.phasedBuilds):canOccupy;
   const freshJump=(input.jumpPress||0)>(p.lastJumpPress||0)||input.jump&&!p.jumpHeld;
   if(p.jumpHeld!==!!input.jump)p.jumpHeld=!!input.jump;
   if(freshJump)p.jumpBuffer=.14;else if(p.jumpBuffer>0)p.jumpBuffer=Math.max(0,p.jumpBuffer-dt);
@@ -189,10 +199,10 @@ function movePlayerStep(p, input, map, dt, time) {
   );
   if (p.flight === 'transport') return;
   mobilityJump(p,input,freshJump,dt,time);
-  if(p.shadowstep){p.jumpBuffer=0;p.jumpLatch=!!input.jump;if(stepShadowstep(p,map,dt,canOccupy,groundAt,bodyHeight(p),RADIUS))return;}
-  if(p.mantle&&stepMantle(p,map,dt,canStand))return;
-  if(p.jumpBuffer>0&&beginMantle(p,input,map,{candidates,rayBox,canStand,radius:RADIUS})){stepMantle(p,map,dt,canStand);return;}
-  if(stepGrapple(p,input,map,dt,canStand,groundAt))return;
+  if(p.shadowstep){p.jumpBuffer=0;p.jumpLatch=!!input.jump;if(stepShadowstep(p,map,dt,movementOccupy,groundAt,bodyHeight(p),RADIUS))return;}
+  if(p.mantle&&stepMantle(p,map,dt,movementStand))return;
+  if(p.jumpBuffer>0&&beginMantle(p,input,map,{candidates,rayBox,canStand:movementStand,radius:RADIUS})){stepMantle(p,map,dt,movementStand);return;}
+  if(stepGrapple(p,input,map,dt,movementStand,groundAt))return;
   p.traversalLock=Math.max(0,(p.traversalLock||0)-dt);
   if(p.traversal){
     const ride=p.traversal,line=map.traversal?.find(l=>l.id===ride.id);
@@ -211,7 +221,7 @@ function movePlayerStep(p, input, map, dt, time) {
     pushAxis(p,map,'x',(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)/length*speed*dt);
     pushAxis(p,map,'z',(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)/length*speed*dt);
     p.x=clamp(p.x,-map.size+.5,map.size-.5);p.z=clamp(p.z,-map.size+.5,map.size-.5);
-    let floor=groundAt(map,p.x,p.z);for(const b of candidates(map,p))if(b.y+b.h<=p.y+.045&&Math.abs(p.x-b.x)<b.w/2+RADIUS-.015&&Math.abs(p.z-b.z)<b.d/2+RADIUS-.015)floor=Math.max(floor,b.y+b.h);
+    let floor=groundAt(map,p.x,p.z);for(const b of candidates(map,p))if(movementBoxSolid(p,b)&&b.y+b.h<=p.y+.045&&Math.abs(p.x-b.x)<b.w/2+RADIUS-.015&&Math.abs(p.z-b.z)<b.d/2+RADIUS-.015)floor=Math.max(floor,b.y+b.h);
     if(!p.fall)p.fall={apex:p.y,immune:true,source:'bus'};
     if(toggle){if(p.flight==='dive')p.flight='glide';else if(p.flight==='glide'&&p.y-floor>32)p.flight='dive';}
     if(p.flight==='launch'){
@@ -302,14 +312,15 @@ function movePlayerStep(p, input, map, dt, time) {
   // Follow short descents without falling and landing on every individual tread.
   if(wasGrounded){
     let support=ground;
-    for(const b of verticalBoxes)if(b.y+b.h<=p.y+.001&&Math.abs(p.x-b.x)<b.w/2+RADIUS&&Math.abs(p.z-b.z)<b.d/2+RADIUS)support=Math.max(support,b.y+b.h);
-    if(p.y-support<=.43&&(support===p.y&&p.vy===0||canOccupy(map,{x:p.x,y:support,z:p.z},bodyHeight(p)))){p.y=support;p.vy=0;}
+    for(const b of verticalBoxes)if(movementBoxSolid(p,b)&&b.y+b.h<=p.y+.001&&Math.abs(p.x-b.x)<b.w/2+RADIUS&&Math.abs(p.z-b.z)<b.d/2+RADIUS)support=Math.max(support,b.y+b.h);
+    if(p.y-support<=.43&&(support===p.y&&p.vy===0||canOccupy(map,{x:p.x,y:support,z:p.z},bodyHeight(p),RADIUS,p.phasedBuilds))){p.y=support;p.vy=0;}
   }
   const oldY = p.y;
   p.vy -= 24 * dt;
   p.y += p.vy * dt;
   p.grounded = false;
   for (const b of verticalBoxes) {
+    if(!movementBoxSolid(p,b))continue;
     if (
       Math.abs(p.x - b.x) >= b.w / 2 + RADIUS ||
       Math.abs(p.z - b.z) >= b.d / 2 + RADIUS

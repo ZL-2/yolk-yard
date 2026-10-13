@@ -1,6 +1,6 @@
 import {SHIELD_BARREL} from './field-refinement.js';
 import {worldDoorBox} from './world-rules.js';
-import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates} from './physics.js';
+import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates,playerBoxOverlap,canOccupy,pruneBuildPhases} from './physics.js';
 import {bodyHeight,eyeHeight,canFight} from './stance.js';
 import {groundAt} from './terrain.js';
 import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,propAt,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
@@ -26,7 +26,7 @@ export function placement(p,type,rotation=0,material='wood'){
 const bounds=p=>{const bs=pieceBoxes(p);return {minX:Math.min(...bs.map(b=>b.x-b.w/2)),maxX:Math.max(...bs.map(b=>b.x+b.w/2)),minY:p.y,maxY:Math.max(...bs.map(b=>b.y+b.h)),minZ:Math.min(...bs.map(b=>b.z-b.d/2)),maxZ:Math.max(...bs.map(b=>b.z+b.d/2))};};
 const touching=(a,b)=>a.minX<=b.maxX+.2&&a.maxX>=b.minX-.2&&a.minY<=b.maxY+.2&&a.maxY>=b.minY-.2&&a.minZ<=b.maxZ+.2&&a.maxZ>=b.minZ-.2;
 // Props declare whether they block a build. Small dressing and pickups do not.
-export const blocksBuilding=b=>b.buildBlocking!==false&&!b.decorative&&!(b.kind==='prop'&&b.w*b.d*b.h<3);
+export const blocksBuilding=b=>b.buildBlocking===true||b.buildBlocking!==false&&!b.decorative&&!['tree','rock','vehicle'].includes(b.kind)&&!['rock','car'].includes(b.harvestType)&&!(b.kind==='prop'&&b.w*b.d*b.h<3);
 function supportSamples(b){return [[b.x,b.z],[b.x-b.w/2+.04,b.z-b.d/2+.04],[b.x+b.w/2-.04,b.z-b.d/2+.04],[b.x-b.w/2+.04,b.z+b.d/2-.04],[b.x+b.w/2-.04,b.z+b.d/2-.04]];}
 function anchored(p,map){
  const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,5)];
@@ -39,7 +39,6 @@ export function validPlacement(p,map,builds,players=[]){
  if(builds.some(b=>b.type===p.type&&b.x===p.x&&Math.abs(b.y-p.y)<.2&&b.z===p.z&&(p.type!=='wall'||b.rotation%2===p.rotation%2)))return 'Already built';
  const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,4)].filter(o=>!o.buildId&&blocksBuilding(o));
  for(const b of bs){
-  if(players.some(o=>o.health>0&&!o.spectating&&!(['floor','stairs'].includes(p.type)&&o.grounded&&b.y>=o.y&&b.y-o.y<=.43)&&o.y<b.y+b.h-.05&&o.y+bodyHeight(o)>b.y+.05&&Math.abs(o.x-b.x)<b.w/2+RADIUS+.02&&Math.abs(o.z-b.z)<b.d/2+RADIUS+.02))return 'Player in the way';
   if(near.some(o=>Math.abs(o.x-b.x)<(o.w+b.w)/2-.06&&Math.abs(o.z-b.z)<(o.d+b.d)/2-.06&&b.y<o.y+o.h-.06&&b.y+b.h>o.y+.06))return 'Blocked';
  }
  // Buried floor/roof surfaces are not usable. Walls and ramps can root in a slope.
@@ -110,7 +109,21 @@ export function rebuildMap(sim,{navigationChanged=true}={}){
  sim.map.boxes=[...sim.worldBoxes.filter(b=>!sim.worldDamage[b.objectId]?.destroyed).flatMap(b=>worldDoorBox(b,sim.doors)||[]),...sim.builds.flatMap(pieceBoxes)];invalidateCollision(sim.map);sim.lootSupportDirty=true;if(navigationChanged)sim.navigationRevision=(sim.navigationRevision||0)+1;
 }
 export function resetBuilding(sim){
+ for(const p of sim.players?.values()||[])p.phasedBuilds=[];
  sim.worldBoxes=authoredBoxes(sim.map);sim.worldDamage={};sim.builds=[];sim.buildId=0;sim.buildVersion=0;rebuildMap(sim);
+}
+// Only players already intersecting newly added geometry can leave through it.
+// Geometry stays solid for everybody else and for bullets; the exception ends
+// once the player clears it. Small floor/ramp rises lift safely instead.
+export function resolveBuildOccupants(sim,piece){
+ const boxes=pieceBoxes(piece);
+ for(const p of sim.players.values()){
+  if(p.health<=0||p.spectating||p.flight!=='ground'||p.vehicleId)continue;
+  const hit=boxes.filter(b=>playerBoxOverlap(p,b));if(!hit.length)continue;
+  const top=Math.max(...hit.map(b=>b.y+b.h));
+  if(p.grounded&&['floor','stairs'].includes(piece.type)&&top>p.y&&top-p.y<=.43&&canOccupy(sim.map,{...p,y:top},bodyHeight(p))){p.y=top;p.vy=0;pruneBuildPhases(p,sim.map);continue;}
+  if(!p.phasedBuilds?.includes(piece.id))p.phasedBuilds=[...(p.phasedBuilds||[]),piece.id].slice(-32);
+ }
 }
 export function collapse(sim){
  const supported=new Set(sim.builds.filter(b=>anchored(b,sim.map)).map(b=>b.id)),cache=new Map(sim.builds.map(b=>[b.id,bounds(b)]));let changed=true;
@@ -175,7 +188,7 @@ export function buildingTick(sim,p,input){
    const mat=p.buildMaterial;
    const {piece:build,reason}=solvePlacement(p,p.buildType,p.buildRotation,mat,sim.map,sim.builds,[...sim.players.values()],input.buildAnchor);
    p.buildReason=reason||(p.materials[mat]<COST?'Not enough '+mat:'');
-   if(!reason&&p.materials[mat]>=COST){p.buildBufferedUntil=0;const def=MATERIALS[mat];p.materials[mat]-=COST;sim.builds.push({...build,id:'build-'+(++sim.buildId),owner:p.id,team:p.team,teamMode:sim.options.mode==='teams',health:def.start,maxHealth:def.health,constructionRemaining:def.health-def.start,constructionTick:sim.time+.5,revision:0,created:sim.time,lastDamage:-100});p.buildMaterial=selectMaterial(p.materials,mat)||mat;sim.buildVersion++;rebuildMap(sim);sim.emit('royale-cue',{cue:'build-place',player:p.id,x:build.x,y:build.y,z:build.z});}
+   if(!reason&&p.materials[mat]>=COST){p.buildBufferedUntil=0;const def=MATERIALS[mat];p.materials[mat]-=COST;sim.builds.push({...build,id:'build-'+(++sim.buildId),owner:p.id,team:p.team,teamMode:sim.options.mode==='teams'||sim.options.mode==='royale'&&(sim.options.teamSize||1)>1,health:def.start,maxHealth:def.health,constructionRemaining:def.health-def.start,constructionTick:sim.time+.5,revision:0,created:sim.time,lastDamage:-100});p.buildMaterial=selectMaterial(p.materials,mat)||mat;sim.buildVersion++;rebuildMap(sim);resolveBuildOccupants(sim,sim.builds.at(-1));sim.emit('royale-cue',{cue:'build-place',player:p.id,x:build.x,y:build.y,z:build.z});}
   }
   return true;
  }
@@ -214,11 +227,9 @@ export function editBuilding(sim,p,action){
   const proposal={...b,mask:cmd.mask,path:cmd.path||[],doorOpen:false};
   if(!validEdit(proposal))return fail('Invalid selection');
   if(JSON.stringify([b.mask,b.path||[]])===JSON.stringify([proposal.mask,proposal.path])){sim.emit('build-result',{player:p.id,buildId:b.id,ok:true});return true;}
-  const overlaps=(box,p)=>p.health>0&&p.y<box.y+box.h-.03&&p.y+bodyHeight(p)>box.y+.03&&Math.abs(p.x-box.x)<box.w/2+RADIUS+.03&&Math.abs(p.z-box.z)<box.d/2+RADIUS+.03;
-  if(pieceBoxes(proposal).some(box=>[...sim.players.values()].some(p=>overlaps(box,p))))return fail('Player in the way');
   b.mask=proposal.mask;b.path=proposal.path;b.doorOpen=false;b.revision=(b.revision||0)+1;
  }
- sim.buildVersion++;rebuildMap(sim);collapse(sim);sim.emit('build-result',{player:p.id,buildId:b.id,ok:true,changed:true});return true;
+ sim.buildVersion++;rebuildMap(sim);resolveBuildOccupants(sim,b);collapse(sim);sim.emit('build-result',{player:p.id,buildId:b.id,ok:true,changed:true});return true;
 }
 export function toggleDoor(sim,p){
  if(!canFight(p))return false;
