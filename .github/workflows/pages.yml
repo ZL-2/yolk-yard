@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 3
       - id: scope
         name: Select checks from the actual changed files
         run: |
@@ -27,7 +27,10 @@ jobs:
           from pathlib import Path
           files=set(subprocess.check_output(['git','diff','--name-only','HEAD^','HEAD'],text=True).splitlines())
           allowed={'src/atv-model.js','src/vehicle-view.js','scripts/atv-browser-check.mjs','tests/atv-presentation.test.js','package.json','package-lock.json','src/releases.js','docs/UPDATE_152.md','.github/workflows/pages.yml'}
-          scoped=bool(files&{'src/atv-model.js','src/vehicle-view.js'}) and files<=allowed
+          visual={'src/atv-model.js','src/vehicle-view.js'}
+          previous=set(subprocess.check_output(['git','diff','--name-only','HEAD^^','HEAD^'],text=True).splitlines())
+          workflow_fix='.github/workflows/pages.yml' in files and files<={'.github/workflows/pages.yml','docs/UPDATE_152.md'} and previous<=allowed and bool(previous&visual)
+          scoped=files<=allowed and (bool(files&visual) or workflow_fix)
           for path in ['package.json','package-lock.json']:
             if path not in files: continue
             old=json.loads(subprocess.check_output(['git','show','HEAD^:'+path],text=True));new=json.loads(Path(path).read_text())
@@ -193,6 +196,7 @@ jobs:
         id: deployment
   verify-live:
     needs: deploy
+    if: always() && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

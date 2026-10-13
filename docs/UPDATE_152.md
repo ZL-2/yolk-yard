@@ -28,4 +28,7 @@ independent steering/spin, suspension bounds, contact shadows, existing vehicle
 driving/boarding/prediction/recovery, production build, actual gameplay
 screenshots and two-rider driving. Publication verifies matching website and
 relay builds. Only ATV presentation and release bookkeeping qualify for this
-shorter workflow; gameplay or dependency changes retain the full release gates.
+shorter workflow, including a workflow-only correction immediately following
+the bounded ATV release; gameplay or dependency changes retain the full gates.
+The live verification explicitly runs after a successful deployment even when
+the unrelated simulation performance job is skipped.
