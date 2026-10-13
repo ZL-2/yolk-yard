@@ -66,6 +66,7 @@ export function bossInput(sim,p){
 }
 export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
  if(p.health<=0||!Number.isFinite(amount)||amount<=0)return;
+ if((attacker?.boss||attacker?.henchman)&&attacker.bossId===p.bossId)return;
  const def=bossDefinition(p.bossId||p.id);if(p.bossWindup&&source!=='Storm'){p.bossWindup.damage=(p.bossWindup.damage||0)+amount;if(p.bossWindup.damage>=125){p.bossWindup=null;p.abilityAt=sim.time+5;sim.emit('boss-interrupted',{player:attacker?.id,target:p.id});}}
  const shield=source==='Storm'?0:Math.min(p.shield,amount);p.shield-=shield;const dealt=Math.min(p.health,amount-shield);p.health-=dealt;p.lastDamage=sim.time;if(attacker?.contestant){p.attackerId=attacker.id;p.attackerAt=sim.time;p.scanAt=0;}
  if(p.health>0)alertBossToDamage(sim,p,attacker);

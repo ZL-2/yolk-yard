@@ -33,6 +33,7 @@ test('exactly four themed sentinels per boss use valid supports, Uncommon rifles
 test('sentinels share alert markers, respect sleep bounds, and drop their rifle once without Mythics or scores',()=>{
  const s=match();s.beginBattle();const p=s.players.get('host'),guard=[...s.players.values()].find(p=>p.henchman);
  assert.equal(henchmanAwake(s,guard),false);Object.assign(p,{...guard.home,flight:'ground',spectating:false,health:100});s.time+=1;assert.equal(henchmanAwake(s,guard),true);
+ const boss=s.players.get(guard.bossId),beforeGuard=guard.health+guard.shield,beforeBoss=boss.health+boss.shield;s.damage(guard,boss,100,'Friendly fire');s.damage(boss,guard,100,'Friendly fire');assert.equal(guard.health+guard.shield,beforeGuard);assert.equal(boss.health+boss.shield,beforeBoss);
  alertBossToDamage(s,guard,p);assert.equal(bossAlertVisual(guard,s.time).symbol,'!');assert.ok(s.events.some(e=>e.type==='boss-voice'&&e.player===guard.id));assert.equal(bossInput(s,guard).slot,1);assert.equal(guard.bossWindup,undefined);
  const before=s.loot.length,kills=p.kills;s.damage(guard,p,999,'Test');const drops=s.loot.slice(before);assert.equal(drops.filter(i=>i.weapon).length,1);assert.equal(drops.find(i=>i.weapon).rarity,1);assert.ok(drops.every(i=>!i.bossId&&!/keycard|Rig|shadowstep|Winch/i.test(i.id)));assert.equal(p.kills,kills);assert.equal(bossAlertVisual(guard,s.time),null);s.damage(guard,p,999,'Test');assert.equal(s.loot.length,before+drops.length);
 });

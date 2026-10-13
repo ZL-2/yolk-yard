@@ -40,7 +40,7 @@ body.in-spawn-island #royale-flight-help{font-size:11px;color:#b6cedb;line-heigh
 .presence-badge[data-presence=spectating]{--presence-border:#b799d155;--presence-bg:#393149;--presence-color:#dec5f1}
 #dialog .social-person small.presence,.yard-member small{opacity:1}
 .presence-detail{font-size:10px;color:#a4bfce;margin-left:7px;vertical-align:middle}
-#public-match-arrival{position:fixed;left:50%;top:105px;transform:translateX(-50%);width:min(640px,90vw);display:flex;gap:16px;align-items:center;padding:18px 20px;border:1px solid #86d7d2;border-left:5px solid #85e9c9;border-radius:7px;background:linear-gradient(120deg,#173d4cf5,#102939f5);color:#edfaff;box-shadow:0 14px 38px #00151e88;z-index:110}
+#public-match-arrival{position:fixed;left:50%;top:105px;transform:translateX(-50%);width:min(640px,90vw);display:flex;gap:16px;align-items:center;padding:18px 20px;border:1px solid #86d7d2;border-left:5px solid #85e9c9;border-radius:7px;background:linear-gradient(120deg,#173d4c,#102939);color:#edfaff;box-shadow:0 14px 38px #00151e88;z-index:110}
 #public-match-arrival[hidden]{display:none}
 #public-match-arrival small{display:block;color:#96edda;letter-spacing:.13em;font-size:9px;font-weight:850}
 #public-match-arrival strong{display:block;font-size:19px;line-height:1.2;margin:7px 0 5px;overflow-wrap:anywhere}
@@ -55,3 +55,5 @@ body.in-spawn-island #royale-flight-help{font-size:11px;color:#b6cedb;line-heigh
 @media(prefers-reduced-motion:reduce){#match-connection i{animation:none}}
 
 .reduced-motion #match-connection i{animation:none}
+
+body:has(#public-match-arrival:not([hidden])) .public-royale-card{visibility:hidden}
