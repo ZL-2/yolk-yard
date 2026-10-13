@@ -11,7 +11,35 @@ concurrency:
   group: ravelfront-release-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      atv_only: ${{ steps.scope.outputs.atv_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: scope
+        name: Select checks from the actual changed files
+        run: |
+          python - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          files=set(subprocess.check_output(['git','diff','--name-only','HEAD^','HEAD'],text=True).splitlines())
+          allowed={'src/atv-model.js','src/vehicle-view.js','scripts/atv-browser-check.mjs','tests/atv-presentation.test.js','package.json','package-lock.json','src/releases.js','docs/UPDATE_152.md','.github/workflows/pages.yml'}
+          scoped=bool(files&{'src/atv-model.js','src/vehicle-view.js'}) and files<=allowed
+          for path in ['package.json','package-lock.json']:
+            if path not in files: continue
+            old=json.loads(subprocess.check_output(['git','show','HEAD^:'+path],text=True));new=json.loads(Path(path).read_text())
+            for value in [old,new]:
+              value.pop('version',None)
+              if path=='package-lock.json': value.get('packages',{}).get('',{}).pop('version',None)
+            scoped=scoped and old==new
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out: out.write('atv_only='+str(scoped).lower()+'\n')
+          print('ATV visual-only release:',scoped)
+          PY
   build:
+    needs: scope
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -21,13 +49,20 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: ATV geometry, animation, driving, seats and recovery
+        if: needs.scope.outputs.atv_only == 'true'
+        run: node --test tests/atv-presentation.test.js tests/frontier-145.test.js
       - name: All unit and real socket regression tests
+        if: needs.scope.outputs.atv_only != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
       - name: Public host election, reconnection, migration, scoring and inventory
+        if: needs.scope.outputs.atv_only != 'true'
         run: node scripts/public-host-network-check.mjs
       - name: Map publishing and pinned multiplayer layouts
+        if: needs.scope.outputs.atv_only != 'true'
         run: node scripts/map-editor-network-check.mjs
       - name: Frontline captures, rewards and interrupted recovery across real sockets
+        if: needs.scope.outputs.atv_only != 'true'
         run: node scripts/frontline-network-check.mjs
       - run: npm run build
       - uses: actions/upload-artifact@v4
@@ -36,6 +71,7 @@ jobs:
           path: dist
           retention-days: 7
   browser:
+    needs: scope
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -46,29 +82,44 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Actual ATV appearance, desktop and mobile, driving and two riders
+        if: needs.scope.outputs.atv_only == 'true'
+        run: node scripts/atv-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.atv_only == 'true'
+        with:
+          name: atv-browser-evidence
+          path: test-results/expansion/atv
+          retention-days: 14
       - name: Sentinels, capture HUD, live roster, presence, reconnection and inbox
+        if: needs.scope.outputs.atv_only != 'true'
         run: node scripts/field-stability-browser-check.mjs
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && needs.scope.outputs.atv_only != 'true'
         with:
           name: field-stability-browser-evidence
           path: test-results/expansion/stability
           retention-days: 14
       - name: Shop collections, boss models, styles, bundles, purchases and update art
+        if: needs.scope.outputs.atv_only != 'true'
         run: node scripts/shop-overhaul-browser-check.mjs
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && needs.scope.outputs.atv_only != 'true'
         with:
           name: shop-browser-evidence
           path: test-results/expansion/shop
           retention-days: 14
       - name: Desktop/mobile controls, inventory, combat HUD and camera
+        if: needs.scope.outputs.atv_only != 'true'
         run: node scripts/expansion-browser-check.mjs
       - name: Frontline objective HUD, orders, medals, weapon motion and real Web Audio
+        if: needs.scope.outputs.atv_only != 'true'
         run: node scripts/frontline-browser-check.mjs
       - name: Required names, visible rankings, field audio and match outcome screens
+        if: needs.scope.outputs.atv_only != 'true'
         run: node scripts/match-polish-browser-check.mjs
       - name: Owner editor, transformations, Test walk, draft conflicts and publishing
+        if: needs.scope.outputs.atv_only != 'true'
         run: EDITOR_CHECK_OUTPUT=test-results/expansion/map-editor node scripts/map-editor-browser-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -77,6 +128,8 @@ jobs:
           path: test-results/expansion
           retention-days: 14
   performance:
+    needs: scope
+    if: needs.scope.outputs.atv_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -109,9 +162,13 @@ jobs:
             test-results/expansion/field-stability-performance.json
           retention-days: 14
   deploy:
-    # Every release uses the same gates. Commit titles cannot skip tests.
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: [build, browser, performance]
+    # Exact ATV presentation scope uses focused checks. Gameplay and dependency
+    # changes retain all gates; commit titles cannot skip them.
+    if: >-
+      always() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
+      needs.scope.result == 'success' && needs.build.result == 'success' && needs.browser.result == 'success' &&
+      (needs.performance.result == 'success' || (needs.scope.outputs.atv_only == 'true' && needs.performance.result == 'skipped'))
+    needs: [scope, build, browser, performance]
     runs-on: ubuntu-latest
     permissions:
       contents: read
