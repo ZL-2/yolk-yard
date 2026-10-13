@@ -8,7 +8,9 @@ Version 5.8.0 · protocol 51.
   Guards share sight, hearing, suspicion markers and spatial voice clips, with
   a district voice budget. They carry no boss abilities or keycards and grant
   no contestant, placement or leaderboard credit. Rifle and ammunition drop once.
-- A shared district check lets distant guards sleep. Guard state, damage, loot,
+- A shared district check lets distant guards sleep. Their active movement uses
+  staggered 10 Hz updates while players keep their existing 60 Hz simulation.
+  Guard state, damage, loot,
   perception and voice schedules survive snapshots and host restoration.
 - The uplink capture HUD appears at the top center when the server lists the
   operator inside the capture area. It distinguishes capture, contested progress

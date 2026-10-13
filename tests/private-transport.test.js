@@ -23,12 +23,12 @@ test('private host still bounds sustained packet floods',t=>{
  for(let seq=1;seq<=2000&&conn.open;seq++){now+=1;conn.emit('data',{type:'input',input:{seq}});}
  assert.equal(conn.open,false,'a sustained 1000-packet/s flood is rejected');
 });
-test('full private matches receive 48 contestants, 16 spectators and all three bosses',async t=>{
+test('full private matches receive 48 contestants, 16 spectators, three bosses and twelve sentinels',async t=>{
  let received=0;const net=new Network({onState:()=>received++}),conn=channel();t.after(()=>net.destroy());
  net.makePeer=async()=>{net.peer={protocol:2,connect:()=>conn,destroy(){}};};
  const joining=net.join('ABCDEFGH',{name:'Guest'});await Promise.resolve();
  conn.emit('open');conn.emit('data',{type:'welcome',version:VERSION,id:'guest',members:[]});await joining;
- const players=Array.from({length:67},(_,i)=>({id:String(i),name:'Operator '+i}));
+ const players=Array.from({length:79},(_,i)=>({id:String(i),name:'Operator '+i}));
  const state={version:VERSION,players,options:{mode:'royale',capacity:48},events:[]};
  conn.emit('data',{type:'state',state});assert.equal(received,1);
  conn.emit('data',{type:'state',state:{...state,players:[...players,{id:'extra'}]}});assert.equal(received,1,'unbounded extra actors remain rejected');

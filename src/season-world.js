@@ -29,7 +29,7 @@ export function initializeSeason(sim){
  }
 }
 export function bossInput(sim,p){
- const boss=bossDefinition(p.bossId||p.id),def=p.henchman?henchmanDefinition(boss):boss,input={yaw:p.yaw,pitch:p.pitch||0,slot:1,forward:0,strafe:0,interact:false};
+ const boss=bossDefinition(p.bossId||p.id),def=p.henchman?henchmanDefinition(boss):boss,turn=p.henchman?.156:.026,input={yaw:p.yaw,pitch:p.pitch||0,slot:1,forward:0,strafe:0,interact:false};
  if(p.grapple&&p.grapple.phase!=='return')return {...input,fire:false};
  if(p.bossVeil){
   const veil=p.bossVeil;input.fire=false;
@@ -37,7 +37,7 @@ export function bossInput(sim,p){
   else{
    if(sim.time<veil.releaseAt)return input;
    if(!veil.released){veil.released=true;sim.smokes.push({id:++sim.lootId,x:p.x,y:p.y+1.3,z:p.z,radius:3.2,until:sim.time+4});}
-   const yaw=Math.atan2(p.x-veil.goal.x,p.z-veil.goal.z);input.yaw=p.yaw+Math.max(-.026,Math.min(.026,wrap(yaw-p.yaw)));input.forward=dist(p,veil.goal)>.6&&Math.abs(wrap(yaw-p.yaw))<.4?.4:0;return input;
+   const yaw=Math.atan2(p.x-veil.goal.x,p.z-veil.goal.z);input.yaw=p.yaw+Math.max(-turn,Math.min(turn,wrap(yaw-p.yaw)));input.forward=dist(p,veil.goal)>.6&&Math.abs(wrap(yaw-p.yaw))<.4?.4:0;return input;
   }
  }
  if(sim.time>=(p.scanAt||0)){p.scanAt=sim.time+.2;scanBossAwareness(sim,p,def,smokeBlocks);}
@@ -58,7 +58,7 @@ export function bossInput(sim,p){
  let goal=farHome?p.home:target||(investigating?look:null);
  if(!goal&&p.patrol?.length){goal=p.patrol[p.patrolIndex%p.patrol.length];if(dist(p,goal)<.85){if(!p.patrolWait)p.patrolWait=sim.time+1.6;if(sim.time>=p.patrolWait){p.patrolIndex++;p.patrolWait=0;goal=p.patrol[p.patrolIndex%p.patrol.length];}}}
  if(goal){const dx=goal.x-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz),yaw=Math.atan2(-dx,-dz),error=target&&!farHome?Math.sin(sim.time*1.37)*def.aimError:0;
-  input.yaw=p.yaw+Math.max(-.026,Math.min(.026,wrap(yaw+error-p.yaw)));const pitch=target?Math.atan2(goal.y+.85-(p.y+1.55),d)+Math.sin(sim.time*.83)*.025:0;input.pitch=p.pitch+(pitch-p.pitch)*.07;
+  input.yaw=p.yaw+Math.max(-turn,Math.min(turn,wrap(yaw+error-p.yaw)));const pitch=target?Math.atan2(goal.y+.85-(p.y+1.55),d)+Math.sin(sim.time*.83)*.025:0;input.pitch=p.pitch+(pitch-p.pitch)*(p.henchman?.35:.07);
   const close=def.ability==='winch'?8:23;
   input.forward=farHome?.4:target?(d>close&&dist(p,p.home)<def.leash*.65?.3:0):investigating?(d>2&&dist(p,p.home)<def.leash*.65&&Math.abs(wrap(yaw-p.yaw))<.4?.22:0):!p.patrolWait&&Math.abs(wrap(yaw-p.yaw))<.4?.34:0;
   input.aim=!!target&&def.ability==='shadowstep';input.fire=!!target&&!farHome&&d<(def.ability==='winch'?10:def.notice)&&sim.time>p.aggroAt&&Math.abs(wrap(yaw-p.yaw))<.13&&(sim.time+(p.guardIndex||0)*.8)%def.cycle<def.burst&&bossHasSight(sim,p,target,smokeBlocks);input.reload=p.ammo[1]===0;

@@ -12,7 +12,7 @@ export function initializeHenchmen(sim,boss,def){
  for(let i=0;i<HENCHMEN.count;i++){
   const point=candidates.find(q=>reserved.every(r=>Math.hypot(q.x-r.x,q.z-r.z)>1.2)&&canStand(sim.map,q))||boss.home;reserved.push(point);
   const p=Simulation.prototype.addPlayer.call(sim,def.id+'-guard-'+(i+1),{name:name+' Sentinel '+(i+1),color:def.color,accent:def.accent,outfit:def.outfit},true);
-  Object.assign(p,{henchman:true,guardIndex:i,boss:false,bossId:def.id,contestant:false,spectating:false,lateSpectator:false,connected:false,team:-2,...point,home:{...point},health:HENCHMEN.health,shield:HENCHMEN.shield,maxHealth:HENCHMEN.health,maxShield:HENCHMEN.shield,grounded:true,flight:'ground',slot:1,inventory:inventory(),materials:{wood:0,brick:0,metal:0},bank:{medium:90,light:0,shells:0,heavy:0,rockets:0},stamina:100,lastDamage:-100,aggroAt:0,patrolIndex:i,patrolWait:0,scanAt:sim.time+i*.05});
+  Object.assign(p,{henchman:true,guardIndex:i,boss:false,bossId:def.id,contestant:false,spectating:false,lateSpectator:false,connected:false,team:-2,...point,home:{...point},health:HENCHMEN.health,shield:HENCHMEN.shield,maxHealth:HENCHMEN.health,maxShield:HENCHMEN.shield,grounded:true,flight:'ground',slot:1,inventory:inventory(),materials:{wood:0,brick:0,metal:0},bank:{medium:90,light:0,shells:0,heavy:0,rockets:0},stamina:100,lastDamage:-100,aggroAt:0,patrolIndex:i,patrolWait:0,scanAt:sim.time+i*.05,guardNextAt:sim.time+i*.025+(p.joinedOrder%3)*.008});
   p.patrol=(boss.patrol||[]).filter(q=>canStand(sim.map,q));if(!p.patrol.length)p.patrol=[{...point}];
   p.inventory[1]={id:HENCHMEN.weapon,weapon:true,rarity:HENCHMEN.rarity,count:1,ammo:weapon(HENCHMEN.weapon,HENCHMEN.rarity).magazine};
   sim.syncInventory(p);initializeBossAwareness(sim,p);
@@ -26,5 +26,5 @@ export function henchmanAwake(sim,p){
   for(const boss of sim.players.values())if(boss.boss)sites[boss.bossId]=contestants.some(o=>(o.x-boss.home.x)**2+(o.z-boss.home.z)**2<96*96);
   sim.guardOccupancy={at:sim.time+.5,sites};
  }
- return sim.guardOccupancy.sites[p.bossId]||sim.time-p.lastDamage<3;
+ return sim.guardOccupancy.sites[p.bossId]||sim.time-(p.attackerAt??-100)<3;
 }

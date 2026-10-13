@@ -51,7 +51,7 @@ export function requestBossVoice(sim,p,cue,{chance=true}={}){
  if(p.henchman)sim.guardVoiceAt[p.bossId]=sim.time+(rule.priority>=2?1.4:4);
  sim.emit('boss-voice',{player:p.id,bossId:p.bossId,cue,clip:clipId,x:p.x,y:p.y+1.55,z:p.z});return true;
 }
-// Called only by the existing staggered perception scan (5 Hz, three bosses).
+// Called by staggered encounter scans; sleeping sentinels do not scan.
 export function bossVoiceTick(sim,p){
  const v=p.bossVoice;if(!v||sim.time<v.nextAt||p.health<=0||p.bossVeil||p.bossWindup)return;
  const cue=p.bossAlert==='searching'?'search':p.bossAlert==='alerted'?'pursuit':p.bossAlert==='suspicious'?null:p.moving?'patrol':'idle';
