@@ -105,7 +105,7 @@ export function addOperatorDesign(item,c,{add,panel,ellipsoid,rings}){
   for(const s of [-1,1]){cord([[s*.10,1.455,-.070],[s*.124,1.39,-.124],[s*.070,1.185,-.143]],.012,'#d6cdb6','chest','cloth');for(let j=0;j<5;j++)ellipsoid(s*(.105-j*.007),1.443-j*.041,-.10-j*.011,.021,.027,.019,'#d6cdb6','chest',6,'cloth');knee('#d6cdb6',s);buckle(s*.153,1.39,-.131,'chest','#afa693');}
   rings([[1.452,.091,.083],[1.49,.085,.077]],trim,'neck',null,'cloth');plate(-.1,1.291,-.202,.070,.27,.015,trim,'chest',-.24,0,'cloth');
   facet(-.274,1.424,-.068,.16,.12,.024,'#d6cdb6','armL');
-  for(const s of [-1,1]){plate(s*.371,1.195,-.003,.084,.046,.086,'#d6cdb6',s<0?'forearmL':'forearmR',s*.25,0,'cloth');plate(s*.12,.158,-.042,.089,.035,.014,armor,s<0?'footL':'footR',0,0,'leather');}
+  for(const s of [-1,1]){plate(s*.371,1.195,-.003,.084,.046,.086,'#d6cdb6',s<0?'forearmL':'forearmR',s*.25,0,'cloth');plate(s*.12,.158,-.042,.089,.035,.014,'#604331',s<0?'footL':'footR',0,0,'leather');}
  }else if(model==='morrow'){
   helmet(dark,.127,.171,.122,'polymer');hood();mask('#d4cbb1',.20,.23);for(const s of [-1,1]){plate(s*.038,1.699,-.171,.047,.012,.012,trim,'head',s*.13,0,'glass');facet(s*.047,1.615,-.157,.053,.075,.021,'#bab29e','head');}
   cape(c.cloth,.77,.365,.186,-.01);cape(c.cloth,.55,.335,-.174,-.06);rings([[1.414,.218,.174],[1.473,.135,.117],[1.517,.095,.104]],c.cloth,'chest',null,'cloth');

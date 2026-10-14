@@ -25,7 +25,7 @@ can require a small separate draw, while opaque assemblies remain batched.
 
 | Asset | Maximum triangles | Draw budget |
 | --- | ---: | --- |
-| Operator/outfit/guard | 13,734 | One skinned mesh |
+| Operator/outfit/guard | Below 14,000 | One skinned mesh |
 | Held firearm | 11,564 | 20 meshes, including moving/optic parts |
 | Ground firearm | 11,564 | One atlas mesh |
 | Standard pickup/launch pad | 4,592 | 1–4 meshes; crowns are batched |

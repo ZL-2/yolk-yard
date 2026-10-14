@@ -122,9 +122,9 @@ export function makeArms(id, profile={}, firstPerson=true) {
   const item=shopItem(profile.outfit),appearance=armAppearance(profile),material=modelMaterial(item?.model==='wren'?item.skin:item?.color||profile.color||'#334952',item?.model==='wren'?'skin':'cloth',{roughness:.94,metalness:0});
   const mesh=(geo)=>{const m=new THREE.Mesh(geo,material);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
   const limbs=[-1,1].map(side=>{
-    const hand=firstPerson?mesh(handGeometry(side)):new THREE.Group();if(!firstPerson)group.add(hand);hand.material=modelMaterial('#17262e','leather',{roughness:.9,metalness:0});hand.name=side<0?'Support hand':'Grip hand';
+    const hand=firstPerson?mesh(handGeometry(side)):new THREE.Group();if(!firstPerson)group.add(hand);hand.material=modelMaterial(item?.model==='wren'?'#48332b':'#17262e','leather',{roughness:.9,metalness:0});hand.name=side<0?'Support hand':'Grip hand';
     const arm=firstPerson?mesh(armGeometry()):new THREE.Group();arm.name='Smooth tapered arm';arm.frustumCulled=false;
-    if(firstPerson&&item?.model){const cuff=new THREE.Mesh(new RoundedBoxGeometry(.18,.11,.075,1,.015),modelMaterial(item.armor,'polymer'));cuff.position.set(side*.035,.112,.045);hand.add(cuff);const badge=new THREE.Mesh(new RoundedBoxGeometry(.11,.035,.012,1,.004),modelMaterial(item.accent,'paint'));badge.position.set(side*.035,.12,.089);hand.add(badge);}
+    if(firstPerson&&item?.model){const cuff=new THREE.Mesh(new RoundedBoxGeometry(.18,.11,.075,1,.015),modelMaterial(item.model==='wren'?'#48332b':item.armor,item.model==='wren'?'leather':'polymer'));cuff.position.set(side*.035,.112,.045);hand.add(cuff);const badge=new THREE.Mesh(new RoundedBoxGeometry(.11,.035,.012,1,.004),modelMaterial(item.accent,'paint'));badge.position.set(side*.035,.12,.089);hand.add(badge);}
     const shoulder=new THREE.Vector3(side<0?-.72:.38,firstPerson?-.72:-.4,firstPerson?.42:.9);
     return {side,hand,arm,shoulder,lastWrist:new THREE.Vector3(Infinity,Infinity,Infinity)};
   });

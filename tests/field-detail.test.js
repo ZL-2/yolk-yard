@@ -25,7 +25,7 @@ test('PBR material kinds share bounded maps and a cross-renderer HDR reflection 
 });
 test('all 36 outfit styles, default operators and themed guards keep one finite 32-bone rig',()=>{
  const profiles=[{},...SHOP_ITEMS.filter(i=>i.slot==='outfit').map(i=>({outfit:i.id})),...BOSSES.map(b=>({outfit:b.outfit,henchman:true}))],unique=new Set();
- for(const profile of profiles){const m=makeHumanoid(profile),h=m.userData.human,d=humanoidDiagnostics(m),b=budget(m);assert.equal(d.bones,32);assert.equal(b.meshes,1);assert.ok(b.triangles<=15000,JSON.stringify(profile));assert.ok(d.vertices<=13000);assert.ok(h.mesh.material.userData.surfaceAtlas);assert.equal(m.userData.artRevision,155);unique.add(signature(h.mesh.geometry));
+ for(const profile of profiles){const m=makeHumanoid(profile),h=m.userData.human,d=humanoidDiagnostics(m),b=budget(m);assert.equal(d.bones,32);assert.equal(b.meshes,1);assert.ok(b.triangles<14000,JSON.stringify(profile));assert.ok(d.vertices<=13000);assert.ok(h.mesh.material.userData.surfaceAtlas);assert.equal(m.userData.artRevision,155);unique.add(signature(h.mesh.geometry));
   const weights=h.mesh.geometry.attributes.skinWeight;for(let i=0;i<weights.count;i++)assert.ok(Math.abs(weights.getX(i)+weights.getY(i)+weights.getZ(i)+weights.getW(i)-1)<1e-5);
   for(const pose of [{grounded:true},{grounded:true,vz:-5},{downed:true},{flight:'dive',grounded:false},{flight:'glide',grounded:false},{health:0}]){animateHumanoid(m,{health:100,...pose},1/30,2);m.updateMatrixWorld(true);assert.ok(h.mesh.skeleton.bones.every(b=>b.matrixWorld.elements.every(Number.isFinite)));}
  }assert.ok(unique.size>=20);

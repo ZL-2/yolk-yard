@@ -27,7 +27,7 @@ function template(profile){
  const trouser=new T.Color(item?.model?colors.armor:colors.cloth).multiplyScalar(.84),seam=new T.Color(colors.cloth).multiplyScalar(.68);
  colors.cloth=new T.Color(colors.cloth).lerp(new T.Color('#43504b'),item?.model?0:item?.12:.58).getStyle();colors.trim=new T.Color(colors.trim).lerp(new T.Color('#b7b099'),item?.model?0:.25).getStyle();
  const key=JSON.stringify([colors,style,item?.model]);if(geometries.has(key))return geometries.get(key);
- const parts=[],finishes=new Set(),light=['wren','pulse'].includes(item?.model);
+ const parts=[],finishes=new Set(),light=['wren','pulse'].includes(item?.model),signature=['voss','rook','nyx','wren','pulse','morrow'].includes(item?.model),leather=item?.model==='wren'?'#604331':colors.dark;
  function finishFor(color,bone){const value=color?.isColor?color.getHexString():new T.Color(color).getHexString();if(value===new T.Color(colors.dark).getHexString())return bone.startsWith('hand')||bone.startsWith('finger')||bone.startsWith('foot')?'leather':'polymer';if(value===new T.Color(skin).getHexString())return 'skin';if(value===new T.Color(colors.hair).getHexString())return 'cloth';if(value===new T.Color(colors.sole).getHexString())return 'rubber';if(value===new T.Color(colors.armor).getHexString())return 'polymer';return 'cloth';}
  function add(g,color,bone,next=null,blend=null,finish=null){
   if(bone==='head'){g.translate(0,-1.666,0);g.scale(1,1,1);g.translate(0,1.666,0);}
@@ -46,11 +46,11 @@ function template(profile){
   const g=new T.LatheGeometry(radii.map(([t,r])=>new T.Vector2(r,t*length)),12);g.applyQuaternion(new T.Quaternion().setFromUnitVectors(V(0,1,0),delta.clone().normalize()));g.translate(A.x,A.y,A.z);add(g,color,bone,next,(p,i)=>{const t=V(p.getX(i),p.getY(i),p.getZ(i)).sub(A).dot(delta)/(length*length);return next?T.MathUtils.smoothstep(t,.72,1)*.48:0;});
  }
  // Shaped hips, abdomen, ribcage and clavicles, underneath fitted outerwear.
- rings([[.84,.13,.10],[.88,.18,.12],[.98,.178,.115],[1.04,light?.137:.15,.10],[1.1,light?.137:.153,.105],[1.18,light?.171:.18,.12],[1.3,light?.22:.241,.145],[1.39,light?.232:.25,.13],[1.46,.195,.09],[1.49,.10,.07]],light?colors.armor:colors.cloth,'hips','chest');
- if(!light)rings([[1.02,.161,.105],[1.06,.174,.12],[1.19,.203,.144],[1.34,.23,.15],[1.41,.22,.125],[1.435,.17,.095]],style%3===2?colors.cloth:colors.armor,'spine','chest');
+ rings([[.84,.13,.10],[.88,.18,.12],[.98,.178,.115],[1.04,light?.137:.15,.10],[1.1,light?.137:.153,.105],[1.18,light?.171:.18,.12],[1.3,light?.22:.241,.145],[1.39,light?.232:.25,.13],[1.46,.195,.09],[1.49,.10,.07]],light?colors.armor:colors.cloth,'hips','chest','cloth');
+ if(!signature)rings([[1.02,.161,.105],[1.06,.174,.12],[1.19,.203,.144],[1.34,.23,.15],[1.41,.22,.125],[1.435,.17,.095]],style%3===2?colors.cloth:colors.armor,'spine','chest');
  // Shoulder straps, segmented carrier panels and fitted collar.
  for(const s of [-1,1]){
-  if(!light){
+  if(!signature){
   panel(s*.098,1.30,-.145,.158,.188,.030,colors.armor,'chest');
   panel(s*.099,1.365,-.166,.125,.012,.008,colors.cloth,'chest');
   panel(s*.080,1.12,-.145,.127,.108,.043,colors.cloth,'spine');
@@ -59,7 +59,7 @@ function template(profile){
   ellipsoid(s*.265,1.42,.0,.068,.067,.071,colors.cloth,`arm${s<0?'L':'R'}`);
   panel(s*.074,1.255,-.163,.116,.011,.008,colors.dark,'chest');
   panel(s*.074,1.232,-.163,.116,.011,.008,colors.dark,'chest');
-  }else ellipsoid(s*.26,1.42,0,.06,.065,.069,colors.cloth,`arm${s<0?'L':'R'}`);
+  }else ellipsoid(s*(light?.26:.265),1.42,0,light?.06:.068,.065,.069,colors.cloth,`arm${s<0?'L':'R'}`);
  }
  panel(0,.997,-.11,.29,.038,.015,colors.dark,'hips','leather');panel(0,.997,-.125,.042,.032,.012,colors.trim,'hips','metal');
  for(const x of [-.125,-.06,.06,.125])panel(x,1.002,-.12,.013,.046,.012,colors.cloth,'hips');
@@ -83,7 +83,7 @@ function template(profile){
   ellipsoid(side*.071,1.65,-.078,.037,.029,.022,skin,'head',14);
   ellipsoid(side*.043,1.682,-.107,.024,.003,.004,new T.Color(skin).multiplyScalar(.84),'head');
   ellipsoid(side*.017,1.639,-.121,.01,.005,.009,new T.Color(skin).multiplyScalar(.72),'head');
-  if(!light){panel(side*.142,1.32,-.165,.043,.22,.03,'#4b5350','chest','cloth');
+  if(!signature){panel(side*.142,1.32,-.165,.043,.22,.03,'#4b5350','chest','cloth');
   for(let row=0;row<4;row++)panel(side*.09,1.235+row*.031,-.19,.126,.012,.012,'#3b4847','chest');
   panel(side*.085,1.125,-.178,.117,.16,.053,colors.armor,'spine');
   panel(side*.083,1.195,-.205,.093,.027,.014,colors.cloth,'spine');
@@ -92,7 +92,7 @@ function template(profile){
   panel(side*.22,.91,-.02,.077,.125,.076,colors.armor,'hips');
   panel(side*.117,.63,-.066,.012,.23,.012,seam,side<0?'thighL':'thighR');
  }
- if(!light){panel(.143,1.4,-.123,.038,.068,.035,'#1b2b33','chest','polymer');
+ if(!signature){panel(.143,1.4,-.123,.038,.068,.035,'#1b2b33','chest','polymer');
  panel(.15,1.455,-.114,.008,.09,.008,'#18272b','chest','polymer');
  panel(-.07,1.39,-.172,.068,.027,.008,colors.trim,'chest','paint');}
  // Close-cropped hair or fitted field helmet, all following the same head bone.
@@ -108,26 +108,26 @@ function template(profile){
   limb('arm'+s,'forearm'+s,[[0,.062],[.12,.074],[.28,.07],[.32,.073],[.38,.068],[.6,.061],[.66,.064],[.75,.049],[.85,.052],[.93,.044],[1,.045]],colors.cloth,'arm'+s,'forearm'+s);
   ellipsoid(side*.39,1.14,.012,.047,.048,.048,colors.cloth,'forearm'+s);
   const bare=light||(!item?.model&&style%3===0);limb('forearm'+s,'hand'+s,bare?[[0,.046],[.2,.055],[.5,.047],[.8,.033],[1,.031]]:[[0,.046],[.2,.055],[.3,.052],[.34,.054],[.5,.05],[.62,.044],[.68,.047],[.8,.037],[.87,.039],[1,.031]],bare?skin:colors.cloth,'forearm'+s,'hand'+s);
-  ellipsoid(side*.405,1.065,-.028,.043,.058,.025,colors.armor,'forearm'+s);
-  ellipsoid(side*.44,.86,0,.042,.057,.027,colors.dark,'hand'+s);
-  for(let i=0;i<5;i++){const b='finger'+s+i,P=points[b];const curve=new T.CatmullRomCurve3([P.clone(),P.clone().add(V(side*.002,-.026,-.008)),P.clone().add(V(side*.002,-.042,-.025)),P.clone().add(V(0,-.032,-.033))]);add(new T.TubeGeometry(curve,5,i===4?.01:.008,5,false),colors.dark,b);}
+  ellipsoid(side*.405,1.065,-.028,.043,.058,.025,item?.model==='wren'?leather:colors.armor,'forearm'+s,10,item?.model==='wren'?'leather':null);
+  ellipsoid(side*.44,.86,0,.042,.057,.027,leather,'hand'+s,10,'leather');
+  for(let i=0;i<5;i++){const b='finger'+s+i,P=points[b];const curve=new T.CatmullRomCurve3([P.clone(),P.clone().add(V(side*.002,-.026,-.008)),P.clone().add(V(side*.002,-.042,-.025)),P.clone().add(V(0,-.032,-.033))]);add(new T.TubeGeometry(curve,5,i===4?.01:.008,5,false),leather,b,null,null,'leather');}
   limb('thigh'+s,'shin'+s,[[0,.094],[.13,.103],[.35,.095],[.4,.098],[.45,.092],[.60,.081],[.66,.084],[.72,.076],[.79,.074],[.82,.077],[.86,.069],[.94,.068],[1,.062]],trouser,'thigh'+s,'shin'+s);
   limb('shin'+s,'foot'+s,[[0,.062],[.14,.071],[.2,.068],[.26,.071],[.45,.063],[.54,.055],[.59,.061],[.65,.053],[.70,.055],[.76,.052],[.81,.045],[.88,.048],[1,.042]],trouser,'shin'+s,'foot'+s);
   panel(side*.12,.495,-.068,.105,.122,.037,colors.armor,'shin'+s);
   panel(side*.12,.51,-.09,.074,.054,.009,seam,'shin'+s);
   panel(side*.202,.78,.006,.044,.146,.127,trouser,'thigh'+s);
   panel(side*.226,.824,.006,.012,.03,.117,seam,'thigh'+s);
-  ellipsoid(side*.12,.145,.004,.05,.099,.059,colors.dark,'foot'+s);
-  ellipsoid(side*.12,.055,-.065,.055,.054,.125,colors.dark,'foot'+s);
+  ellipsoid(side*.12,.145,.004,.05,.099,.059,leather,'foot'+s,10,'leather');
+  ellipsoid(side*.12,.055,-.065,.055,.054,.125,leather,'foot'+s,10,'leather');
   ellipsoid(side*.12,.024,-.065,.059,.022,.13,colors.sole,'foot'+s);
-  for(let j=0;j<3;j++)ellipsoid(side*.12,.099-j*.011,-.063-j*.018,.04,.006,.006,colors.trim,'foot'+s,8,'leather');
+  for(let j=0;j<3;j++)ellipsoid(side*.12,.099-j*.011,-.063-j*.018,.04,.006,.006,item?.model==='wren'?'#947555':colors.trim,'foot'+s,8,'leather');
   // Boot construction, reinforced glove knuckles and sewn cargo closures are
   // real geometry, not extra scene objects or additional character draw calls.
-  panel(side*.12,.177,-.048,.086,.047,.008,colors.armor,'foot'+s,'leather');
-  for(let j=0;j<3;j++)panel(side*.12,.129+j*.025,.06,.080,.009,.012,colors.dark,'foot'+s,'leather');
+  panel(side*.12,.177,-.048,.086,.047,.008,item?.model==='wren'?leather:colors.armor,'foot'+s,'leather');
+  for(let j=0;j<3;j++)panel(side*.12,.129+j*.025,.06,.080,.009,.012,leather,'foot'+s,'leather');
   for(let j=0;j<4;j++)for(const edge of [-1,1])panel(side*.12+edge*.047,.022,-.14+j*.052,.014,.025,.025,colors.sole,'foot'+s,'rubber');
-  panel(side*.44,.87,-.026,.055,.025,.008,colors.armor,'hand'+s,'polymer');
-  for(let j=0;j<3;j++)panel(side*.44+(j-1)*.016,.838,-.016,.011,.014,.009,colors.armor,'hand'+s,'polymer');
+  panel(side*.44,.87,-.026,.055,.025,.008,item?.model==='wren'?leather:colors.armor,'hand'+s,item?.model==='wren'?'leather':'polymer');
+  for(let j=0;j<3;j++)panel(side*.44+(j-1)*.016,.838,-.016,.011,.014,.009,item?.model==='wren'?leather:colors.armor,'hand'+s,item?.model==='wren'?'leather':'polymer');
   panel(side*.226,.79,-.038,.009,.09,.014,colors.dark,'thigh'+s,'leather');
   panel(side*.226,.813,-.050,.013,.025,.008,colors.trim,'thigh'+s,'metal');
  }
