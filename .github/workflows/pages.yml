@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       atv_only: ${{ steps.scope.outputs.atv_only }}
+      kestrel_only: ${{ steps.scope.outputs.kestrel_only }}
+      visual_only: ${{ steps.scope.outputs.visual_only }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,7 +25,7 @@ jobs:
         name: Select checks from the actual changed files
         run: |
           python - <<'PY'
-          import json,os,subprocess
+          import json,os,re,subprocess
           from pathlib import Path
           files=set(subprocess.check_output(['git','diff','--name-only','HEAD^','HEAD'],text=True).splitlines())
           allowed={'src/atv-model.js','src/vehicle-view.js','scripts/atv-browser-check.mjs','tests/atv-presentation.test.js','package.json','package-lock.json','src/releases.js','docs/UPDATE_152.md','.github/workflows/pages.yml'}
@@ -31,6 +33,17 @@ jobs:
           previous=set(subprocess.check_output(['git','diff','--name-only','HEAD^^','HEAD^'],text=True).splitlines())
           workflow_fix='.github/workflows/pages.yml' in files and files<={'.github/workflows/pages.yml','docs/UPDATE_152.md'} and previous<=allowed and bool(previous&visual)
           scoped=files<=allowed and (bool(files&visual) or workflow_fix)
+          aircraft_allowed={'src/kestrel-model.js','src/royale-view.js','scripts/kestrel-visual-browser-check.mjs','tests/kestrel-presentation.test.js','package.json','package-lock.json','src/releases.js','docs/UPDATE_154.md','.github/workflows/pages.yml'}
+          aircraft_visual={'src/kestrel-model.js','src/royale-view.js'}
+          aircraft_fix='.github/workflows/pages.yml' in files and files<={'.github/workflows/pages.yml','docs/UPDATE_154.md'} and previous<=aircraft_allowed and bool(previous&aircraft_visual)
+          aircraft=files<=aircraft_allowed and (bool(files&aircraft_visual) or aircraft_fix)
+          if aircraft and 'src/royale-view.js' in files:
+            def normalize(s):
+              s=s.replace("import {createKestrel,animateKestrel} from './kestrel-model.js';\n",'')
+              s=re.sub(r' createTransport\(\)\{.*?(?= createStorm\(\)\{)','',s,flags=re.S)
+              s=s.replace('  this.createTransport();\n','').replace('this.rotors.forEach(m=>m.rotation.y+=dt*(r.practice?.15:18));','').replace('animateKestrel(this.transport,{parked:r.practice,time:t,elapsed:r.elapsed},dt);','')
+              return s
+            aircraft=normalize(subprocess.check_output(['git','show','HEAD^:src/royale-view.js'],text=True))==normalize(Path('src/royale-view.js').read_text())
           for path in ['package.json','package-lock.json']:
             if path not in files: continue
             old=json.loads(subprocess.check_output(['git','show','HEAD^:'+path],text=True));new=json.loads(Path(path).read_text())
@@ -38,8 +51,10 @@ jobs:
               value.pop('version',None)
               if path=='package-lock.json': value.get('packages',{}).get('',{}).pop('version',None)
             scoped=scoped and old==new
-          with open(os.environ['GITHUB_OUTPUT'],'a') as out: out.write('atv_only='+str(scoped).lower()+'\n')
-          print('ATV visual-only release:',scoped)
+            aircraft=aircraft and old==new
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('visual_only',scoped or aircraft)]: out.write(key+'='+str(value).lower()+'\n')
+          print('Focused visual release:',{'ATV':scoped,'Kestrel':aircraft})
           PY
   build:
     needs: scope
@@ -55,17 +70,20 @@ jobs:
       - name: ATV geometry, animation, driving, seats and recovery
         if: needs.scope.outputs.atv_only == 'true'
         run: node --test tests/atv-presentation.test.js tests/frontier-145.test.js
+      - name: Kestrel geometry, animation, airfield support and guest flight look
+        if: needs.scope.outputs.kestrel_only == 'true'
+        run: node --test tests/kestrel-presentation.test.js tests/kestrel-fix.test.js
       - name: All unit and real socket regression tests
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
       - name: Public host election, reconnection, migration, scoring and inventory
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: node scripts/public-host-network-check.mjs
       - name: Map publishing and pinned multiplayer layouts
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: node scripts/map-editor-network-check.mjs
       - name: Frontline captures, rewards and interrupted recovery across real sockets
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: node scripts/frontline-network-check.mjs
       - run: npm run build
       - uses: actions/upload-artifact@v4
@@ -88,6 +106,15 @@ jobs:
       - name: Actual ATV appearance, desktop and mobile, driving and two riders
         if: needs.scope.outputs.atv_only == 'true'
         run: node scripts/atv-browser-check.mjs
+      - name: Actual Kestrel airfield, cockpit, cargo, flight, host and guest deployment
+        if: needs.scope.outputs.kestrel_only == 'true'
+        run: node scripts/kestrel-visual-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.kestrel_only == 'true'
+        with:
+          name: kestrel-browser-evidence
+          path: test-results/expansion/kestrel
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         if: always() && needs.scope.outputs.atv_only == 'true'
         with:
@@ -95,34 +122,34 @@ jobs:
           path: test-results/expansion/atv
           retention-days: 14
       - name: Sentinels, capture HUD, live roster, presence, reconnection and inbox
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: node scripts/field-stability-browser-check.mjs
       - uses: actions/upload-artifact@v4
-        if: always() && needs.scope.outputs.atv_only != 'true'
+        if: always() && needs.scope.outputs.visual_only != 'true'
         with:
           name: field-stability-browser-evidence
           path: test-results/expansion/stability
           retention-days: 14
       - name: Shop collections, boss models, styles, bundles, purchases and update art
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: node scripts/shop-overhaul-browser-check.mjs
       - uses: actions/upload-artifact@v4
-        if: always() && needs.scope.outputs.atv_only != 'true'
+        if: always() && needs.scope.outputs.visual_only != 'true'
         with:
           name: shop-browser-evidence
           path: test-results/expansion/shop
           retention-days: 14
       - name: Desktop/mobile controls, inventory, combat HUD and camera
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: node scripts/expansion-browser-check.mjs
       - name: Frontline objective HUD, orders, medals, weapon motion and real Web Audio
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: node scripts/frontline-browser-check.mjs
       - name: Required names, visible rankings, field audio and match outcome screens
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: node scripts/match-polish-browser-check.mjs
       - name: Owner editor, transformations, Test walk, draft conflicts and publishing
-        if: needs.scope.outputs.atv_only != 'true'
+        if: needs.scope.outputs.visual_only != 'true'
         run: EDITOR_CHECK_OUTPUT=test-results/expansion/map-editor node scripts/map-editor-browser-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -132,7 +159,7 @@ jobs:
           retention-days: 14
   performance:
     needs: scope
-    if: needs.scope.outputs.atv_only != 'true'
+    if: needs.scope.outputs.visual_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -165,12 +192,12 @@ jobs:
             test-results/expansion/field-stability-performance.json
           retention-days: 14
   deploy:
-    # Exact ATV presentation scope uses focused checks. Gameplay and dependency
+    # Exact vehicle presentation scope uses focused checks. Gameplay and dependency
     # changes retain all gates; commit titles cannot skip them.
     if: >-
       always() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
       needs.scope.result == 'success' && needs.build.result == 'success' && needs.browser.result == 'success' &&
-      (needs.performance.result == 'success' || (needs.scope.outputs.atv_only == 'true' && needs.performance.result == 'skipped'))
+      (needs.performance.result == 'success' || (needs.scope.outputs.visual_only == 'true' && needs.performance.result == 'skipped'))
     needs: [scope, build, browser, performance]
     runs-on: ubuntu-latest
     permissions:
