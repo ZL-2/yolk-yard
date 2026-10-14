@@ -4,7 +4,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Bot execution and burst timing require matching host/client releases.
-export const VERSION = 51;
+export const VERSION = 52;
 export const WEAPONS = [
   {
     "id": "sprinter",

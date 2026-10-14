@@ -151,7 +151,7 @@ export function authorFrontierWorld(c){
    const tx=ix*terrain.cell-terrain.size,tz=iz*terrain.cell-terrain.size;
    const room=Math.abs(tx-x)<=w/2+1&&Math.abs(tz-z)<=d/2+1;
    const approach=Math.abs(tx-x)<=3&&tz>z+d/2&&tz<=z+d/2+11;
-   if(room||approach)terrain.heights[iz*terrain.n+ix]=y-.15;
+   if(room||approach)terrain.heights[iz*terrain.n+ix]=!harbor&&approach?y+Math.max(0,Math.min(1,(tz-(z+d/2+2))/10))*(surface-y):harbor?y-.15:y;
   }
   const shell=(dx,dy,dz,ww,hh,dd)=>put(x+dx,y+dy,z+dz,ww,hh,dd,color,{indestructible:true,vaultShell:true,material:'metal'});
   shell(0,-.25,0,w,.25,d);shell(0,h,0,w+.6,.5,d+.6);
@@ -180,9 +180,9 @@ export function authorFrontierWorld(c){
    // A moss-capped concrete shelter, rather than a freestanding metal cube.
    put(x,y+h+.5,z,w+1,.6,d+1,0x616f4d,{indestructible:true,material:'brick'});
    for(const side of [-1,1])put(x+side*(w/2+.45),y-.15,z,1.1,h+.4,d+1,0x79806c,{indestructible:true,material:'brick'});
-   for(let i=0;i<8;i++){const top=y+(i+1)*.3,zz=z+d/2+4+i*.85;put(x,y-.15,zz,4.4,top-y+.15,.9,0x7b8274,{indestructible:true,kind:'step'});}
-   put(x,surface-.25,entrance.z,4.4,.25,2.2,0x7b8274,{indestructible:true,kind:'floor'});
-   for(const side of [-1,1])put(x+side*2.6,y-.15,z+d/2+7,.5,3.2,9,0x65745e,{indestructible:true,material:'brick'});
+   // Continuous graded earth keeps the bunker doorway clear without a stair object.
+   entrance.y=yAt(entrance.x,entrance.z);
+   // Low retaining edges are terrain; no walls or stairs obstruct this approach.
    stairs.push({...entrance},{x,y:y+1.2,z:z+d/2+7},{x,y,z:z+d/2+3});
    sign('NIGHTGLASS / CONCEALED RESERVE',x,surface+1.3,entrance.z+.8);
   }

@@ -1,3 +1,4 @@
+import {thrownProjectile,stepThrowable} from './throwables.js';
 import {recordCombatDamage,combatRecap} from './combat-feedback.js';
 import {recordFieldEvent,resetFieldRecord,fieldSnapshot} from './field-record.js';
 import {reloadRequested} from './reload-buffer.js';
@@ -562,6 +563,7 @@ export class Simulation {
     this.emit('shot',{player:p.id,weapon:w.id,shotId:p.shotGroup,origin,shots,blocked});return true;
   }
   launch(p, popper, spread = 0, recoil = {}) {
+    if(popper){const b={...thrownProjectile(p,recoil.throwable||'popper'),id:++this.projectileId,shotId:++this.shotId,born:this.time};this.projectiles.push(b);this.emit('launch',{player:p.id,popper:true,weapon:b.weapon,shotId:b.shotId,origin:{x:b.x,y:b.y,z:b.z}});return;}
     const w = gun(p),
       aim = direction(p.yaw + (recoil.yaw||0) + (this.random() - 0.5) * spread, p.pitch + (recoil.pitch||0) + (this.random() - 0.5) * spread),
       path = this.shotPath(p, w, aim),
@@ -617,6 +619,7 @@ export class Simulation {
         this.projectiles.splice(i, 1);
         continue;
       }
+      if(b.popper){const hit=stepThrowable(b,this.map,dt,(o,d,r)=>this.vehicleHit?.(o,d,r,this.players.get(b.owner)));if(hit)this.emit('bounce',{x:b.x,y:b.y,z:b.z,normal:hit.normal});continue;}
       if (b.resting) continue;
       const dy = b.vy * dt - 0.5 * b.gravity * dt * dt;
       b.vy -= b.gravity * dt;
@@ -734,7 +737,7 @@ export class Simulation {
       this.damage(
         p,
         attacker,
-        (b.damage??config.damage)*(direct?1:Math.max(0,1-distance/(radius*config.splashFalloff)))*(p===attacker?config.selfDamage:1),
+        (b.damage??config.damage)*(direct||config.flatSplash?1:Math.max(0,1-distance/(radius*config.splashFalloff)))*(p===attacker?config.selfDamage:1),
         b.popper ? "Frag Grenade" : weapon(b.weapon||"thumper").name, false, b.shotId,
       );
     }

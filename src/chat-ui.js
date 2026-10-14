@@ -117,8 +117,8 @@ export class ChatPanel {
     const teams=(ctx.state?.options.mode==='teams'||ctx.state?.options.mode==='royale'&&[2,4].includes(ctx.state.options.teamSize))&&!me?.spectating;
     // Changing native select options during each HUD refresh reopens its popup.
     const channelKey=teams+':'+spectator;
-    if(channelKey!==this.channelKey){this.channelKey=channelKey;this.channel.options[1].hidden=!teams;this.channel.options[1].disabled=!teams;if(!teams)this.channel.value='room';this.channel.options[0].textContent=spectator?'Spectators':'Room';}
-    this.spectatorChannel=spectator;this.updateAudience();
+    if(channelKey!==this.channelKey){this.channelKey=channelKey;this.channel.options[1].hidden=!teams;this.channel.options[1].disabled=!teams;if(!teams)this.channel.value='room';this.channel.options[0].textContent='Room';if(spectator)this.channel.value='room';}
+    this.spectatorChannel=false;this.updateAudience();
     this.preference.value=ctx.preference;
     const disabled=ctx.preference==='off'||ctx.enabled===false||ctx.roomMuted?.includes(ctx.localId);
     this.input.disabled=disabled||ctx.preference==='quick';this.hud.querySelector('.chat-send').disabled=this.input.disabled;

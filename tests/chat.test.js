@@ -69,13 +69,13 @@ test('ordinary names pass chat, profiles and public listings without a privacy f
   assert.equal(moderateText('Alex',{previous:['Hi Sam']}).ok,true);
   for(const text of ['Alex user@example.com','Alex 202 555 0149','Alex lives at 123 Main Street','my full name is Alex Smith','I live in Philadelphia'])assert.equal(moderateText(text).ok,false);
 });
-test('host binds sender identity, routes teams privately, and isolates spectators',()=>{
+test('host binds sender identity, routes teams privately, and includes spectators in room chat',()=>{
   const room=new ChatRoom();
   const team=room.submit('host',{...packet('Defend here','team'),sender:'a',name:'Fake'},state,1000);
   assert.equal(team.ok,true);assert.equal(team.message.sender,'host');assert.equal(team.message.name,'Host egg');
   assert.deepEqual(team.recipients,['host','b']);
   const spectate=room.submit('s',packet('Nice round'),state,1000);
-  assert.equal(spectate.message.channel,'spectators');assert.deepEqual(spectate.recipients,['s','t']);
+  assert.equal(spectate.message.channel,'room');assert.deepEqual(spectate.recipients,['host','a','b','s','t']);
   assert.equal(room.submit('absent',packet('Hello'),state,1000).ok,false);
   assert.equal(room.submit('bot',packet('Hello'),state,1000).ok,false);
   assert.equal(room.submit('a',packet('Hello','team'),{...state,options:{mode:'ffa'}},1000).ok,false);
@@ -120,11 +120,11 @@ test('recipient rejects hostile hosts, replayed packets, forged identities and c
   assert.equal(inbox.accept({...msg,id:2,text:profanity},state,'host','all',3000),null);
   assert.equal(inbox.accept({...msg,id:3,sender:'absent'},state,'host','all',5000),null);
   assert.equal(inbox.accept({...msg,id:4,channel:'team'},state,'host','all',7000),null);
-  assert.equal(inbox.accept({...msg,id:5,sender:'s'},state,'host','all',9000),null);
+  assert.equal(inbox.accept({...msg,id:5,sender:'s'},state,'host','all',9000).name,'Watcher');
   assert.equal(inbox.accept({...msg,id:99999,text:profanity},state,'host','all',11000),null);
   assert.equal(inbox.accept({...msg,id:99999,text:'pistol'},state,'host','all',11000),null);
   assert.ok(inbox.accept({...msg,id:6,text:'Thanks!'},state,'host','all',13000));
-  assert.equal(inbox.rows.length,2);
+  assert.equal(inbox.rows.length,3);
 });
 test('mute, quick-only, off, and bounded history apply at receipt',()=>{
   const inbox=new ChatInbox();const msg={version:FILTER_VERSION,sender:'a',channel:'room',text:'Nice round'};

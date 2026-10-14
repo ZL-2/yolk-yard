@@ -29,7 +29,7 @@ export function confirmationKind(e,id){
  if(e.player!==id||e.target===id)return null;
  if(e.type==='elimination')return 'elimination';
  if(e.type==='knocked')return 'knock';
- if(e.type!=='hit'||!(e.amount>0))return null;
+ if(!['hit','vehicle-hit'].includes(e.type)||!(e.amount>0))return null;
  return e.shieldBreak?'break':e.precision?'head':e.shield?'shield':'body';
 }
 export class CombatConfirmation{

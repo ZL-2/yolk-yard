@@ -18,7 +18,7 @@ const timing=sim=>sim.options.storm==='quick'?.65:1;
 
 export function initializeOperations(sim) {
   const districts=sim.map.districts||[],available=districts.filter(d=>sim.chests.some(c=>c.poi===d.id&&!c.vaultId));
-  const hot=available[Math.floor(sim.random()*available.length)];
+  const hot=available.find(d=>d.id===sim.operations?.hotspot?.id)||available[Math.floor(sim.random()*available.length)];
   sim.operations={hotspot:hot?{id:hot.id,name:hot.name,x:hot.x,z:hot.z}:null,uplink:null,sequence:0,nextAt:OPERATIONS.first*timing(sim),scanAt:sim.time};
   sim.fieldFirstElim=null;
   for(const p of sim.players.values()) {

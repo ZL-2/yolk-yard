@@ -10,7 +10,6 @@ const fail = (reason, retryAfter = 0) => ({ok:false, reason, retryAfter:Math.max
 const playersOf = state => Array.isArray(state?.players) ? state.players : [];
 const teamMode = state => state?.options?.mode==='teams'||state?.options?.mode==='royale'&&[2,4].includes(state.options.teamSize);
 export function chatChannel(player, requested, state) {
-  if (player?.spectating && state?.phase === 'playing') return 'spectators';
   if (requested === 'team') return teamMode(state) && !player?.spectating ? 'team' : null;
   return requested === 'room' ? 'room' : null;
 }
@@ -83,7 +82,6 @@ export class ChatInbox {
     const sender=playersOf(state).find(p=>p.id===message.sender&&!p.bot);
     if (!sender || this.muted.has(sender.id) || !audienceFor(sender,message.channel,state).includes(localId)) return null;
     if (message.channel==='team' && (!teamMode(state)||sender.spectating)) return null;
-    if (state?.phase==='playing' && sender.spectating && message.channel!=='spectators') return null;
     if (message.channel==='spectators' && !sender.spectating) return null;
     const quick=typeof message.quick==='string' && Object.hasOwn(QUICK_MESSAGES,message.quick) ? message.quick : null;
     if ((message.quick!=null&&!quick) || (preference==='quick'&&!quick)) return null;

@@ -57,3 +57,7 @@ body.in-spawn-island #royale-flight-help{font-size:11px;color:#b6cedb;line-heigh
 .reduced-motion #match-connection i{animation:none}
 
 body:has(#public-match-arrival:not([hidden])) .public-royale-card{visibility:hidden}
+
+/* Chat and feed occupy the left; operations follow the minimap on the right. */
+#hud #field-operations{left:auto;right:20px;width:190px}body:has(.chat-hud.typing) #field-operations{pointer-events:none}
+@media(max-width:760px){#hud #field-operations{left:auto;right:12px;width:145px;padding:8px}body:has(.chat-hud.typing) #field-operations{visibility:hidden}}

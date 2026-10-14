@@ -109,7 +109,7 @@ export function useSeasonItem(sim,p,item){
   startGrapple(p,aim,sim.time);sim.emit('royale-cue',{cue:'grappler-fire',player:p.id,x:p.x,y:p.y,z:p.z});sim.emit('winch-used',{player:p.id,valid:aim.valid});return true;
  }
  if(item.id==='veilProjector'){sim.smokes.push({id:++sim.lootId,x:p.x,y:p.y+1.3,z:p.z,radius:4,until:sim.time+6});return true;}
- if(item.id==='smoke'){sim.smokes??=[];if(sim.smokes.length>=12)sim.smokes.shift();const d=direction(p.yaw);const range=wallDistance(sim.map,{x:p.x,y:p.y+1,z:p.z},d,5);const x=p.x+d.x*Math.max(0,range-.5),z=p.z+d.z*Math.max(0,range-.5);sim.smokes.push({id:++sim.lootId,x,y:groundAt(sim.map,x,z)+1.3,z,radius:4.5,until:sim.time+12});return true;}
+ if(item.id==='smoke'){sim.launch(p,true,0,{throwable:'smoke'});return true;}
  if(item.id==='scanner'){scan(sim,p,55,8);return true;}return false;
 }
 export function smokeBlocks(sim,a,b){for(const s of sim.smokes||[]){if(s.until<=sim.time)continue;const dx=b.x-a.x,dy=(b.y||0)-(a.y||0),dz=b.z-a.z,l=dx*dx+dy*dy+dz*dz||1,t=Math.max(0,Math.min(1,((s.x-a.x)*dx+(s.y-a.y)*dy+(s.z-a.z)*dz)/l));if(Math.hypot(a.x+dx*t-s.x,(a.y||0)+dy*t-s.y,a.z+dz*t-s.z)<s.radius)return true;}return false;}

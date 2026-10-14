@@ -56,7 +56,7 @@ export class FieldOperationsUI {
     const warning=document.querySelector('.royale-storm-warning'),network=document.querySelector('.performance-network');
     const networkLayout=[network?.hidden,network?.parentElement.hidden,network?.querySelector('.net-details')?.hidden,network?.querySelector('.connection-signal')?.hidden].join(':');
     const layout=window.innerWidth+':'+window.innerHeight+':'+document.documentElement.className+':'+document.documentElement.style.getPropertyValue('--hud-scale')+':'+warning?.hidden+':'+!!warning?.textContent+':'+capturing+':'+state.options.teamSize+':'+networkLayout;
-    if(layout!==this.layout){this.layout=layout;const team=document.querySelector('.duo-hud'),box=team&&!team.hidden?team.getBoundingClientRect():null,diagnostics=network?.getBoundingClientRect(),storm=warning?.textContent?warning.getBoundingClientRect():null,mobile=innerWidth<=760,map=mobile?document.querySelector('.royale-map-stack')?.getBoundingClientRect():null;this.capture.style.top=Math.max(86,storm?.height?storm.bottom+12:0,map?.height?map.bottom+12:0)+'px';const captureBottom=capturing?this.capture.getBoundingClientRect().bottom:0;this.root.style.top=Math.max(112,box?.height?box.bottom+12:0,diagnostics?.height?diagnostics.bottom+12:0,mobile&&captureBottom?captureBottom+12:0)+'px';this.medal.style.top=Math.max(154,storm?.height?storm.bottom+16:0,captureBottom?captureBottom+12:0)+'px';}
+    if(layout!==this.layout){this.layout=layout;const map=document.querySelector('.royale-map-stack')?.getBoundingClientRect(),storm=warning?.textContent?warning.getBoundingClientRect():null;this.capture.style.top=Math.max(86,storm?.height?storm.bottom+12:0,innerWidth<=760&&map?.height?map.bottom+12:0)+'px';const captureBottom=capturing?this.capture.getBoundingClientRect().bottom:0;this.root.style.top=Math.max(112,map?.height?map.bottom+10:0)+'px';this.root.style.maxHeight=Math.max(48,innerHeight-150-parseFloat(this.root.style.top))+'px';this.medal.style.top=Math.max(154,storm?.height?storm.bottom+16:0,captureBottom?captureBottom+12:0)+'px';}
     const n=this.nodes,d=u?Math.round(Math.hypot(p.x-u.x,p.z-u.z)):0;
     this.root.dataset.state=u?.contested?'contested':u?.status||'waiting';
     if(u){
@@ -76,7 +76,7 @@ export class FieldOperationsUI {
   }
 }
 export function drawOperationMap(c,state,point,scale,full) {
-  const ops=state.royale?.operations;if(!ops||state.royale.practice)return;c.save();
+  const ops=state.royale?.operations;if(!ops||state.royale.practice&&!full)return;c.save();
   if(ops.hotspot&&state.royale.elapsed<150){const h=ops.hotspot,[x,z]=point(h.x,h.z);c.strokeStyle='#ffd166';c.fillStyle='#ffd16620';c.lineWidth=2;c.beginPath();c.arc(x,z,42*scale,0,Math.PI*2);c.fill();c.stroke();c.fillStyle='#ffe095';c.font='900 '+(full?12:9)+'px system-ui';c.textAlign='center';c.fillText('HOT DROP',x,z+24*scale);}
   const u=ops.uplink;if(u){const [x,z]=point(u.x,u.z);c.strokeStyle=u.contested?'#ff876b':'#74f5db';c.fillStyle=u.status==='secured'?'#ffd166':'#74f5db';c.lineWidth=2;c.beginPath();c.arc(x,z,full?10:6,0,Math.PI*2);c.stroke();c.fillRect(x-2,z-2,4,4);if(full){c.font='bold 11px system-ui';c.textAlign='center';c.fillText(u.status==='secured'?'SUPPLY CACHE':'UPLINK',x,z+23);}}c.restore();
 }

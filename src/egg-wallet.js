@@ -31,6 +31,7 @@ export class EggWallet {
   const result=globalThis.navigator?.locks?await globalThis.navigator.locks.request(WALLET_KEY,run):run();
   if(result.error)throw result.error;return result.value;
  }
+ syncReferrals(record){if(!record?.id||!Number.isSafeInteger(record.marks)||record.marks<0)return Promise.resolve({amount:0});let amount=0;return this.change(w=>{const paid=w.referralCredits?.[record.id]||0;amount=Math.max(0,record.marks-paid);return {...w,balance:w.balance+amount,earned:w.earned+amount,referralCredits:{...w.referralCredits,[record.id]:Math.max(paid,record.marks)}};}).then(()=>({amount}));}
  buy(id,expectedPrice){return this.change(w=>purchase(w,id,expectedPrice));}
  award(id,amount,label){return this.change(w=>reward(w,id,amount,label));}
  async awardVerified(receipt){let applied=false;const wallet=await this.change(w=>{if(w.receipts.includes(receipt.id))return w;applied=true;return reward(w,receipt.id,receipt.amount,receipt.label);});return {applied,wallet};}

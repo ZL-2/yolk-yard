@@ -1,7 +1,7 @@
 import {teammates,wonRoyale} from './teams.js';
 import {spectatorTargets} from './spectator-status.js';
 
-export const ELIMINATION_HOLD=1.25,VICTORY_REVEAL=1.35;
+export const ELIMINATION_HOLD=1.25,VICTORY_REVEAL=2;
 export function preferredSpectator(state,id){
  const me=state?.players.find(p=>p.id===id);if(!me)return null;
  const eligible=spectatorTargets(state,id),nearest=eligible.filter(p=>teammates(state.options,me,p)).sort((a,b)=>Math.hypot(a.x-me.x,a.z-me.z)-Math.hypot(b.x-me.x,b.z-me.z));

@@ -96,5 +96,5 @@ export function vehicleHit(sim,origin,direction,range,attacker){
 export function damageVehicle(sim,v,amount,attacker){
  if(v.health<=0||!Number.isFinite(amount)||amount<=0)return false;
  if(attacker&&v.seats.some(id=>teammates(sim.options,attacker,sim.players.get(id))))return false;
- v.health=Math.max(0,v.health-amount);v.revision++;if(v.health<=0){v.speed=v.vx=v.vz=0;v.boosting=false;for(const id of [...v.seats]){const p=sim.players.get(id);if(p)exitVehicle(sim,p,{force:true});}sim.emit?.('royale-fx',{kind:'explosion',x:v.x,y:v.y+.7,z:v.z});sim.emit?.('royale-cue',{cue:'vehicle-destroyed',x:v.x,y:v.y,z:v.z});}return true;
+ const applied=Math.min(v.health,amount);v.health=Math.max(0,v.health-amount);v.revision++;if(attacker)sim.emit?.('vehicle-hit',{player:attacker.id,target:v.id,amount:applied,x:v.x,y:v.y+1.3,z:v.z,destroyed:v.health<=0});if(v.health<=0){v.speed=v.vx=v.vz=0;v.boosting=false;for(const id of [...v.seats]){const p=sim.players.get(id);if(p)exitVehicle(sim,p,{force:true});}sim.emit?.('royale-fx',{kind:'explosion',x:v.x,y:v.y+.7,z:v.z});sim.emit?.('royale-cue',{cue:'vehicle-destroyed',x:v.x,y:v.y,z:v.z});}return true;
 }

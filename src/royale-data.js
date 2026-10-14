@@ -18,7 +18,7 @@ export const ITEMS={
  victoryCrown:{name:'Victory Crown',rarity:5,kind:'crown',duration:0,stack:1,color:'#ffd46b',icon:'♛'},
  asterKeycard:{name:'Voss Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#80d9ed',icon:'▣'},
  jumpRig:{name:'Kestrel Jump Rig',rarity:5,kind:'jumpRig',duration:.16,stack:1,color:'#ffd46b',icon:'↟'},
- smoke:{name:'Smoke Canister',kind:'smoke',duration:.4,stack:3,color:'#c5d0cc',icon:'◌'},
+ smoke:{name:'Smoke Canister',kind:'smoke',duration:.4,stack:10,color:'#c5d0cc',icon:'◌'},
  scanner:{name:'Recon Pulse',kind:'scanner',duration:1.2,stack:2,color:'#5cd9d0',icon:'◎'},
  bandage:{name:'Field Dressing',kind:'heal',amount:25,cap:75,duration:2.5,stack:5,color:'#f4f4dd',icon:'✚'},
  medkit:{name:'Trauma Kit',kind:'heal',amount:100,cap:100,duration:6,progressive:true,setup:1,stack:2,color:'#8be4b7',icon:'✚'},

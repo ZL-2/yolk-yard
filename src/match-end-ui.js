@@ -15,6 +15,7 @@ export class MatchEndUI{
   if(this.outcomeKey!==outcomeKey){this.outcomeKey=outcomeKey;this.started=now;this.watching=false;this.markupKey='';}
   if(outcome.finished&&!this.resultStarted)this.resultStarted=now;
   const age=(now-this.started)/1000,hold=!outcome.win&&outcome.dead&&!this.watching&&age<ELIMINATION_HOLD;
+  if(outcome.win&&outcome.canCelebrate&&age<VICTORY_REVEAL){this.root.hidden=true;this.phase='victory-slow';return {phase:this.phase,hold:false,victory:false,age,slowMotion:true};}
   this.phase=outcome.win?'victory':hold?'eliminating':this.watching&&!outcome.finished?'watching':'placement';
   const key=JSON.stringify([this.phase,outcome]);
   this.root.hidden=false;

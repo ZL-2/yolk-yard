@@ -124,7 +124,7 @@ export function animateKestrel(root,{parked,time,elapsed},dt){
  const mix=first?1:1-Math.exp(-Math.min(.1,Math.max(0,dt))*4),spool=parked?0:T.MathUtils.smoothstep(elapsed,0,5),tilt=-.55*spool;
  for(let i=0;i<2;i++){n.engines[i].rotation.x=parked?0:T.MathUtils.lerp(n.engines[i].rotation.x,tilt,mix);n.rotors[i].rotation.y=(time*(parked?.15:30)*(i===0?1:-1))%(Math.PI*2);n.blur[i].visible=!parked;}
  for(let i=0;i<3;i++){const axis=i<2?'z':'x',target=parked?0:(i===0?1.20:i===1?-1.20:1.28)*spool;n.gear[i].rotation[axis]=parked?0:T.MathUtils.lerp(n.gear[i].rotation[axis],target,mix);}
- n.door.position.z=parked?4.95:T.MathUtils.lerp(n.door.position.z,4.1,mix);n.beacon.material.emissiveIntensity=parked?.4:Math.sin(time*5)> .78?2.2:.15;n.shadow.visible=!!parked;
+ const doorOpen=parked?1:T.MathUtils.smoothstep(elapsed,0,3);n.door.position.x=-2.87-.12*Math.min(1,doorOpen*6);n.door.position.z=T.MathUtils.lerp(1.92,4.95,doorOpen);n.beacon.material.emissiveIntensity=parked?.4:Math.sin(time*5)> .78?2.2:.15;n.shadow.visible=!!parked;
 }
 export function kestrelModelBudget(root){let triangles=0,meshes=0;root.traverse(o=>{if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;}});return {triangles,meshes};}
 export function kestrelDiagnostics(){const m=presentedModel;if(!m)return null;return {revision:m.userData.artRevision,detail:m.userData.detail,visible:m.visible,engines:[0,1].map(i=>m.getObjectByName('kestrel-engine-'+i).rotation.x),rotors:[0,1].map(i=>m.getObjectByName('kestrel-rotor-'+i).rotation.y),gear:[0,1,2].map(i=>m.getObjectByName('kestrel-gear-'+i).rotation.toArray().slice(0,3)),shadow:m.getObjectByName('kestrel-contact-shadow').visible,...kestrelModelBudget(m)};}

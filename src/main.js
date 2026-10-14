@@ -28,6 +28,8 @@ import {leaderboardMarkup} from './leaderboard-ui.js';
 import {installLeaderboardScrollbars} from './leaderboard-scroll.js';
 import './menu-hub.css';
 import {crosshairRadius} from './combat.js';
+import './referrals.css';
+import {showReferrals} from './referrals.js';
 import {showWelcomeBack} from './welcome-back.js';
 import {loadingMarkup,showLoading,hideLoading,waitForLoading,waitUntilLoadingHidden} from './loading-screen.js';
 import {predictionCorrection} from './network-stats.js';
@@ -270,6 +272,9 @@ function remember() {
 function titleBar() {
   return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
+let socialActivityKey='';
+function syncSocialActivity(me){if(!party?.ready)return;const activity=screen==='game'?(me?.spectating||me?.health<=0?'spectating':'in-match'):'lobby',key=activity+':'+party.id;if(key===socialActivityKey)return;socialActivityKey=key;party.request('presence',{activity,visible:!document.hidden&&document.hasFocus()}).catch(()=>{socialActivityKey='';});}
+window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();if(screen==='menu')renderMenu();}});
 function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
 function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}installLeaderboardScrollbars();}
 async function refreshLeaderboards(force=false){
@@ -347,7 +352,7 @@ function closeDialog() {
   if(dialogType==='settings'&&bindingEditor?.dirty){bindingEditor.message='Apply or Discard your keybind changes before closing.';bindingEditor.render();dialog.querySelector('.dialog-body').dispatchEvent(new Event('settings-show-bindings'));dialog.querySelector('.binding-footer')?.scrollIntoView({block:'nearest'});return;}
   if(dialogType==='rename'){toast('Choose an available name to continue, or leave the match.');return;}
   if(dialogType==='royale-stats'){dialog.close();dialogType='';paused=false;return;}
-  if(['royale-inventory','royale-map','field-orders'].includes(dialogType)){void resume();return;}
+  if(['royale-inventory','royale-map','field-orders','emotes'].includes(dialogType)){void resume();return;}
   sound.cue('ui-back');
   bindingEditor = null;
   dialog.close();
@@ -550,8 +555,8 @@ function requiredNamePrompt(){
 }
 function roundIntro(){
   if(!state)return;
-  dialog.close();dialogType='';paused=true;keys.clear();queuedActions.clear();input.fire=input.aim=false;
-  if(state.royale){resultAt=0;$('#round-banner').hidden=true;if(document.pointerLockElement)document.exitPointerLock();matchEndUI.update(state,localId,true);return;}
+  dialog.close();dialogType='';paused=true;if(!state.royale||!wonRoyale(state,localId))keys.clear();queuedActions.clear();input.fire=input.aim=false;
+  if(state.royale){resultAt=0;$('#round-banner').hidden=true;matchEndUI.update(state,localId,true);if(wonRoyale(state,localId)){paused=false;}else if(document.pointerLockElement)document.exitPointerLock();return;}
   const p=state.players.find(p=>p.id===localId),ranked=state.players.filter(p=>!p.spectating||p.place).sort((a,b)=>b.kills-a.kills||a.deaths-b.deaths||b.points-a.points);
   const place=state.royale?p?.place:p?1+ranked.filter(other=>other.kills>p.kills||other.kills===p.kills&&other.deaths<p.deaths).length:0;
   const win=state.royale?wonRoyale(state,localId):mode(state.options.mode).teams?state.scores[p?.team]>state.scores[1-p?.team]:place===1;
@@ -1251,7 +1256,8 @@ function initializeParty(){
  if(needsPlayerName(profile.name))return;
  if(party){party.updateProfile(profile);return;}
  party=new PartyClient(profile,{
-  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
+  referrals:record=>{void eggWallet.syncReferrals(record).then(({amount})=>{if(amount)toast('CREW RECRUITED · +'+amount.toLocaleString()+' Marks');if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
+  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   'public-match':publicMatchChanged,
@@ -1301,6 +1307,7 @@ const actions = {
  'social-new-identity':()=>modal('Create New Friend Code?',`<p>This creates a separate identity with an empty friend list. It does not restore your old friendships. Your previous browser credential will be kept for recovery.</p><div class="actions"><button class="primary" data-action="social-confirm-new-identity">CREATE NEW CODE</button><button data-action="social">GO BACK</button></div>`,'social-new-identity'),
  'social-confirm-new-identity':()=>{party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
+ referrals:()=>showReferrals({party,force:true}),
  'quick-rematch':()=>{if(net?.officialPublic)return toast('The next public round starts automatically.');if(sim&&!sim.remote&&state?.phase==='results'&&(!net||net.isHost)){closeDialog();launchRound();}},
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
  'start-training':()=>{if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
@@ -1325,6 +1332,7 @@ const actions = {
  'royale-clear-marker':()=>{sendMarker('clear');royaleUI.waypoint=null;},
  'duo-marker':()=>sendMarker('normal'), 'duo-danger':()=>sendMarker('danger'),
  'royale-close-flight':()=>royaleUI.dismissFlight(),
+ 'royale-start-now':()=>{if(!net?.isHost||net?.visibility!=='private'||net?.officialPublic||!state?.royale?.practice||!sim||sim.remote)return;sim.beginBattle('host-start');state=sim.snapshot();net.broadcast(state);if(paused)void resume();},
  'royale-jump':()=>{if(paused)resume(false);queuedActions.add('jump');sound.unlock();},
  'royale-drop':()=>inventoryAction('drop'),
  'royale-drop-one':()=>inventoryAction('drop-one'),
@@ -1899,6 +1907,8 @@ function loop(now) {
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
   view.cinematic=matchEndUI.update(state,localId,screen==='game',now);
+  const startNow=document.getElementById('royale-start-now');if(startNow)startNow.hidden=!(screen==='game'&&state?.royale?.practice&&net?.isHost&&net?.visibility==='private'&&!net?.officialPublic);
+  syncSocialActivity(me);
   document.body.classList.toggle('is-emoting',screen==='game'&&!!me?.emote);
   emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game';
   const emoteButtonText=(screen==='menu'?!!view.lobbyEmote:!!me?.emote)?'STOP EMOTE':screen==='game'?'EMOTES':'EMOTES · '+bindingLabel(settings.keybinds.emotes[0]||'KeyO');if(emoteButton.textContent!==emoteButtonText)emoteButton.textContent=emoteButtonText;
@@ -1935,7 +1945,7 @@ function loop(now) {
     presentation.state,
     (!sim||sim.remote)&&presentation.player?.health>0?presentation.player:me,
     presentation.player,
-    dt,
+    view.cinematic?.slowMotion?dt*.25:dt,
     screen === "game",
     !paused && !chat.opened && !buildControls.editing && (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim),
     profile,
@@ -1968,7 +1978,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return showWelcomeBack();}).then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return showWelcomeBack().then(()=>showReferrals({party}));}).then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);
@@ -1987,6 +1997,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
     frontline:()=>({score:{scene:sound.score.scene,voices:sound.score.voices.size,musicVolume:sound.musicVolume},motion:view.weaponMotionState?.out,uplink:!!view.royaleView.operationMesh?.visible,drawCalls:view.renderer.info.render.calls}),
     fieldAudio:()=>({...sound.fieldSamples.debug,loaded:[...sound.fieldSamples.buffers.keys()],active:[...sound.fieldSamples.active].map(([id,voices])=>({id,count:voices.size}))}),
     vehicles:()=>({camera:view.camera.position.toArray(),sky:view.atmosphere.root.visible,meshes:[...(view.royaleView.vehicleMeshes||[])].map(([id,m])=>({id,visible:m.visible}))}),
+    throwables:()=>({visible:view.throwablePreview.root.visible,smokeClouds:[...view.royaleView.seasonMeshes.keys()].filter(k=>k.startsWith('smoke')).length}),
     endPresentation:()=>({phase:matchEndUI.phase,cinematic:view.cinematic,effects:view.eliminations.diagnostics()}),
     party:()=>({id:party?.id,party:party?.party,ready:party?.ready}),
     partyMembers:()=>view?.partyEggs?.length||0,

@@ -1,3 +1,4 @@
+import {ThrowablePreview} from './throwable-view.js';
 import {weaponMotion} from './weapon-motion.js';
 import {modelMaterial,MODEL_ART_REVISION} from './model-surfaces.js';
 import {decorateBoss,updateCelebration} from './celebration-view.js';
@@ -148,6 +149,7 @@ export class View {
     this.renderer.shadowMap.enabled = settings.quality !== "low";
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
+    this.throwablePreview=new ThrowablePreview(this.scene);
     this.atmosphere=new FrontierAtmosphere(this.scene);
     this.camera = new THREE.PerspectiveCamera(
       settings.fov || 85,
@@ -583,7 +585,7 @@ export class View {
   }
   event(e, localId,state=null) {
     this.royaleView.event(e);
-    if (e.type === "hit" && e.player === localId && Number.isFinite(e.x)) {
+    if (["hit","vehicle-hit"].includes(e.type) && e.player === localId && Number.isFinite(e.x)) {
       const key=e.shotId!=null?e.player+':'+e.shotId+':'+e.target:null;
       const previous=key&&this.fx.find(f=>f.damageText&&f.shotKey===key&&f.life>0);
       const total=(previous?.amount||0)+e.amount,critical=!!(e.precision||previous?.critical),shield=(previous?.shield||0)+(e.shield?e.amount:0),health=total-shield;
@@ -1019,7 +1021,7 @@ export class View {
           };
           const [radius, length, trail] = profiles[b.weapon] || profiles.sprinter;
           if(bolt)mesh = this.renderPool.acquire('bolt:'+b.weapon,()=>new THREE.Mesh(new THREE.CapsuleGeometry(radius,length,3,6),new THREE.MeshStandardMaterial({color:0xe4bc78,roughness:.4,metalness:.55})));
-          else if(b.popper){mesh=this.royaleView.itemModel({id:'popper',count:1},false);mesh.scale.setScalar(.65);}
+          else if(b.popper){mesh=this.royaleView.itemModel({id:b.throwable==='smoke'?'smoke':'popper',count:1},false);mesh.scale.setScalar(.65);}
           else mesh=this.rocketModel();
           this.effects.add(mesh);
           this.projectiles.set(b.id, mesh);
@@ -1154,6 +1156,7 @@ export class View {
     }
     if(playing&&this.scopeActive&&gun(local).ads?.overlay&&this.aimBlend>.8)this.gunGroup.visible=false;
     this.royaleView.update(state,local,dt,playing);
+    this.throwablePreview.update(state,predicted||local,this.buildMap||this.map,playing,this.clock);
     this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
     if(this.needsMapCompile){
       this.needsMapCompile=false;
