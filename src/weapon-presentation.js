@@ -8,7 +8,7 @@ export const OPTICS = {
 export function adsFov(w,base){return w.ads?.fov??(w.ads?2*Math.atan(Math.tan(base*Math.PI/360)/w.ads.magnification)*180/Math.PI:w.zoom);}
 // Separate from the standardized world-space muzzle/shoulder transform. A fixed
 // viewmodel FOV keeps the gun readable when the world camera zooms for ADS.
-export const WEAPON_ART_REVISION=4;
+export const WEAPON_ART_REVISION=155;
 export const VIEWMODELS={
  sprinter:{scale:.48,x:.23,y:-.21,z:-.61,fov:68},
  scatter:{scale:.49,x:.23,y:-.22,z:-.65,fov:70},

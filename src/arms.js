@@ -1,8 +1,10 @@
 import {shopItem} from './shop-catalog.js';
 import * as THREE from 'three';
-import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {mergeGeometries,mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
 import {gun, clamp} from './data.js';
 import {patternedShell} from './cosmetics.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {modelMaterial,MODEL_ART_REVISION} from './model-surfaces.js';
 
 export function armAppearance(value={}) {
   const p=typeof value==='string'?{color:value}:value;
@@ -84,6 +86,10 @@ function handGeometry(side) {
   ],r);
   // Opposing thumb crosses the near side of the grip, with its own rounded tip.
   finger([[.065,-.018,.067],[.034,.068,.096],[-.029,.13,.073],[-.086,.113,.027]],.041);
+  // Shaped knuckle protectors and a fitted wrist band are part of the shared
+  // hand geometry, not a new draw call for every patch on the glove.
+  for(const y of [.091,.026,-.041,-.101]){const pad=mergeVertices(new RoundedBoxGeometry(.066,.047,.026,1,.009));pad.translate(side*.078,y,.085);pieces.push(pad);}
+  const strap=mergeVertices(new RoundedBoxGeometry(.171,.045,.10,1,.015));strap.translate(side*.027,.115,.027);pieces.push(strap);
   const geometry=mergeGeometries(pieces);pieces.forEach(g=>g.dispose());
   // Project one continuous pattern across the palm and fingers, rather than
   // restarting the texture separately on every sculpted piece.
@@ -113,17 +119,16 @@ function armGeometry() {
 }
 export function makeArms(id, profile={}, firstPerson=true) {
   const group=new THREE.Group();group.name='Operator arms';
-  const item=shopItem(profile.outfit),appearance=armAppearance(profile),material=new THREE.MeshStandardMaterial({color:item?.model==='wren'?item.skin:item?.color||profile.color||'#334952',roughness:.82});
+  const item=shopItem(profile.outfit),appearance=armAppearance(profile),material=modelMaterial(item?.model==='wren'?item.skin:item?.color||profile.color||'#334952',item?.model==='wren'?'skin':'cloth',{roughness:.94,metalness:0});
   const mesh=(geo)=>{const m=new THREE.Mesh(geo,material);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
   const limbs=[-1,1].map(side=>{
-    const hand=firstPerson?mesh(handGeometry(side)):new THREE.Group();if(!firstPerson)group.add(hand);hand.material=new THREE.MeshStandardMaterial({color:'#17262e',roughness:.9});hand.userData.ownedMaterial=true;hand.name=side<0?'Support hand':'Grip hand';
+    const hand=firstPerson?mesh(handGeometry(side)):new THREE.Group();if(!firstPerson)group.add(hand);hand.material=modelMaterial(item?.model==='wren'?'#48332b':'#17262e','leather',{roughness:.9,metalness:0});hand.name=side<0?'Support hand':'Grip hand';
     const arm=firstPerson?mesh(armGeometry()):new THREE.Group();arm.name='Smooth tapered arm';arm.frustumCulled=false;
-    if(firstPerson&&item?.model){const cuff=new THREE.Mesh(new THREE.BoxGeometry(.18,.11,.075),new THREE.MeshStandardMaterial({color:item.armor,roughness:.65,metalness:.2}));cuff.position.set(side*.035,.112,.045);cuff.userData.ownedMaterial=true;hand.add(cuff);const badge=new THREE.Mesh(new THREE.BoxGeometry(.11,.035,.012),new THREE.MeshStandardMaterial({color:item.accent,roughness:.55}));badge.position.set(side*.035,.12,.089);badge.userData.ownedMaterial=true;hand.add(badge);}
+    if(firstPerson&&item?.model){const cuff=new THREE.Mesh(new RoundedBoxGeometry(.18,.11,.075,1,.015),modelMaterial(item.model==='wren'?'#48332b':item.armor,item.model==='wren'?'leather':'polymer'));cuff.position.set(side*.035,.112,.045);hand.add(cuff);const badge=new THREE.Mesh(new RoundedBoxGeometry(.11,.035,.012,1,.004),modelMaterial(item.accent,'paint'));badge.position.set(side*.035,.12,.089);hand.add(badge);}
     const shoulder=new THREE.Vector3(side<0?-.72:.38,firstPerson?-.72:-.4,firstPerson?.42:.9);
     return {side,hand,arm,shoulder,lastWrist:new THREE.Vector3(Infinity,Infinity,Infinity)};
   });
-  limbs[0].arm.userData.ownedMaterial=true;
-  group.userData={id,limbs,appearance,progress:-1};
+  group.userData={id,limbs,appearance,progress:-1,artRevision:MODEL_ART_REVISION};
   group.userData.throwProp=makeThrowProp(limbs.find(l=>l.side>0).hand);
   updateArms(group,-1);
   return group;
@@ -212,12 +217,12 @@ export function throwArms(rig, progress) {
 }
 function makeThrowProp(hand) {
   const prop=new THREE.Group();prop.name='Held popper';
-  const shell=new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.16,10),new THREE.MeshStandardMaterial({color:0x435549,roughness:.48,metalness:.08}));
+  const shell=new THREE.Mesh(new THREE.LatheGeometry([[-.08,.038],[-.065,.064],[.035,.071],[.072,.04]].map(([y,r])=>new THREE.Vector2(r,y)),20),modelMaterial(0x435549,'paint'));
   shell.scale.set(1,1,1);shell.castShadow=true;prop.add(shell);
-  const band=new THREE.Mesh(new THREE.TorusGeometry(.071,.014,8,16),new THREE.MeshStandardMaterial({color:0xf5c45d,roughness:.42,metalness:.24}));
+  const band=new THREE.Mesh(new THREE.TorusGeometry(.071,.008,6,20),modelMaterial(0xf5c45d,'metal'));
   band.rotation.x=Math.PI/2;band.position.y=-.008;prop.add(band);
-  const cap=new THREE.Mesh(new THREE.SphereGeometry(.027,12,8),new THREE.MeshStandardMaterial({color:0x263536,roughness:.4}));
-  cap.position.y=.09;prop.add(cap);prop.position.set(.01,.03,-.105);prop.visible=false;hand.add(prop);
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(.026,.035,.025,16),modelMaterial(0x263536,'metal'));
+  cap.position.y=.09;prop.add(cap);const lever=new THREE.Mesh(new RoundedBoxGeometry(.025,.018,.11,1,.005),modelMaterial(0x99a49d,'metal'));lever.position.set(0,.10,.035);lever.rotation.x=-.2;prop.add(lever);const pin=new THREE.Mesh(new THREE.TorusGeometry(.025,.004,5,16),modelMaterial(0x9da7a2,'metal'));pin.position.set(.032,.09,-.016);pin.rotation.y=Math.PI/2;prop.add(pin);prop.position.set(.01,.03,-.105);prop.visible=false;hand.add(prop);
   return prop;
 }
 

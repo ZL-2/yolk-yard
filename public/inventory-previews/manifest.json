@@ -1,50 +1,149 @@
 {
-  "revision": 4,
-  "source": "817681cdbb416578c372befa41202d97ee0e6a88056086f05b94dba4e125318a",
+  "revision": 155,
+  "renderer": "WebGL PBR gameplay models",
+  "source": "4cd64af347c8230adb974dac22c109d305bfe9c186158a73ec0bf4616b181084",
   "weapons": {
     "sprinter": {
       "name": "R-41 Service Rifle",
-      "sha256": "0dd049f7e077f16b9ac7dc514b5aede45456c58a00bdac10e2415931b9f08f20"
+      "sha256": "fe836d38c53c98b9cdde09dd2d42a8b97ab7f9fb8675baafbb6eaef3fbc860ed"
     },
     "scatter": {
       "name": "M12 Combat Shotgun",
-      "sha256": "c64af796b6c4b5ace68462e043d9478258526efff5168a4924c2748a729d31a2"
+      "sha256": "23e338c7bf5af526fa4c0cc2f23d5a45bf810740c1386ddfe8ef6232bed89531"
     },
     "needle": {
       "name": "LR-9 Longshot",
-      "sha256": "fe8bb4fb4423249b903465e69638b226f9c59e66856ffa3dbbc9cbdde6c28283"
+      "sha256": "de0532c6e81469446c0dc9f25419a840e8cca59184a61e6b394fa69eaeb6d854"
     },
     "zipper": {
       "name": "VX-7 SMG",
-      "sha256": "5d6e7fcb45b08a13317b6496f228db64b1e26317fb9b70fd4501b19e95445ae7"
+      "sha256": "ff501f808684a9b020a739f33f91e383afecc2aaafe4a12c560872460add49a7"
     },
     "thumper": {
       "name": "AT-6 Rocket Launcher",
-      "sha256": "e89ea7c89cd0b8674304c4577c379a5374334136999c11c522d0c076ba024e54"
+      "sha256": "1ae9e842f6c1db88fb758f8eda9ea0edfa2d1af1ecdd8a54e2ab8e04a54cbfc3"
     },
     "anchor": {
       "name": "DMR-18 Sentinel",
-      "sha256": "321622ec560cccd8cbc3ba71fedb1b6ab6f86781afd5a6c958f4919971235ec4"
+      "sha256": "5e84008391d77aaf93c0f6989e90ea1020fd007af2667a34acac9acd403f6dd4"
     },
     "duet": {
       "name": "BR-3 Burst Rifle",
-      "sha256": "f8639789e4ec6517a27eab1680de0a7c940e19909975a53b24fd547bd3c0cf40"
+      "sha256": "13e014dda2afbcd7cbf13dde61ef01484b96f8fa3efc3aa615951b09bd08b0b5"
     },
     "pip": {
       "name": "P-9 Sidearm",
-      "sha256": "5a66a327e50911d95e4f9879d131f1f4e6e2210feff50134c9fb3c4ab2d07d50"
+      "sha256": "0c8e00266084e1487152fc1c7d1b5c77acee4341b15581dfc387837540b0f72f"
     },
     "peeper": {
       "name": "SR-25 Scout",
-      "sha256": "9774f887a71d0cdc79edf6305868e32067161ce5c8d1f269695d692ef23f3610"
+      "sha256": "ff15cf9e0d2a6e4ad64e9b780c3976c5f250d7fbb1de82ede70042e554040848"
     },
     "doubleyolk": {
       "name": "SG-2 Breacher",
-      "sha256": "4119ea5f69793aa3623075717138f1fcd0367dbd8c215ba64cd4dc9c98c28b86"
+      "sha256": "7c187080a9403bca828954673725a251d4d297d2e0e6cd1ec4077388b82736b8"
     },
     "comet": {
       "name": "ARC-5 Pulse Rifle",
-      "sha256": "71b39297465279f7b0e3b97e1cc64452322ef584604911f30bf2ec1b18716604"
+      "sha256": "2581154933b33f7b0b6b8b492e2c488d7e313b7ac335abc5ccb5840f73327247"
+    }
+  },
+  "items": {
+    "rookKeycard": {
+      "name": "Rook Vault Keycard",
+      "sha256": "041f629a3f48026e4badad67441a80fedb07f8d0193768bc186ff48f1412b263"
+    },
+    "nyxKeycard": {
+      "name": "Nyx Vault Keycard",
+      "sha256": "29d70549e06b91c98fba13d5383f45d221ce4536f27276ae05732293777a8204"
+    },
+    "anchorWinch": {
+      "name": "Rook’s Mythic Grappler",
+      "sha256": "00e22f09e6ebcf84c28f0272d74deca6d6ca4363fd072f8351786ccf6aaf4a0c"
+    },
+    "veilProjector": {
+      "name": "Veil Projector",
+      "sha256": "31c041a227f1ba562281055cb8723dfc53c4e29bbe2e9f9642f888666af2c4f4"
+    },
+    "shadowstep": {
+      "name": "Nyx’s Mythic Shadowstep",
+      "sha256": "fc1f1e6d171940837aa6e491cd93ae64cbfff535a577725ba1b5161dd1792ce4"
+    },
+    "victoryCrown": {
+      "name": "Victory Crown",
+      "sha256": "3bb41e346114a3a48a319a3233ce8dae2f376b78d9771927d7e41b6c6e7dc62a"
+    },
+    "asterKeycard": {
+      "name": "Voss Vault Keycard",
+      "sha256": "8094726682f3176fde0555fa8de5facdae30ef612bba250c0611d2a4cdd971bd"
+    },
+    "jumpRig": {
+      "name": "Kestrel Jump Rig",
+      "sha256": "d55f8e63a5eabf0cd2d82cfac536b5880103daf35d604cd28e91e0f92720a396"
+    },
+    "smoke": {
+      "name": "Smoke Canister",
+      "sha256": "e518656af74cb754fbee771e4c6ef5d32e70e9fe6ac78070fb97fc228522ab45"
+    },
+    "scanner": {
+      "name": "Recon Pulse",
+      "sha256": "8dcee7330ebe7c881623a5603bbcfc35695bb3322e4ad7065d9f0245bac5faa9"
+    },
+    "bandage": {
+      "name": "Field Dressing",
+      "sha256": "3be2b3939220b1c8c534eb03b6dc6264d81f1e68065988fe033a72eb6d127376"
+    },
+    "medkit": {
+      "name": "Trauma Kit",
+      "sha256": "7170d719f956d3e4d49dd3be95c8745c25630a0a5b8ed503e7627374da75bba4"
+    },
+    "mini": {
+      "name": "Mini Shield",
+      "sha256": "cb8b3838926ae0b11884b7233605289c62aec3ebff7fa3183be477dfa7f0e2a0"
+    },
+    "flask": {
+      "name": "Shield Flask",
+      "sha256": "3e8f0e4c8f10a41884c5659745c9e3e1192d46c17f8b229251287954f815b399"
+    },
+    "splash": {
+      "name": "Restoration Capsule",
+      "sha256": "9ec0a176c922b8f38672942882ad9f11cf219f90314cdc899bf0b6fe010b9f24"
+    },
+    "popper": {
+      "name": "Frag Grenade",
+      "sha256": "62a957c54e5c82cbd1a2cc5b61057015033db067b1adb95b55b52d5c422cd5a0"
+    },
+    "impulse": {
+      "name": "Impulse Charge",
+      "sha256": "460e01e6bf966a3bddb4d12f103cfa4b3097b77bea764600115f09f8f08f8f10"
+    },
+    "launchpad": {
+      "name": "Launch Pad",
+      "sha256": "ae0479d3691c57aa4c2d6344301b01009e5159720e951c42a781a91b4f32eeb8"
+    },
+    "light": {
+      "name": "light",
+      "sha256": "aaece1b0d40dff505693efb17ea8797e26b54d7159451c6a9af93e737e92ee26"
+    },
+    "medium": {
+      "name": "medium",
+      "sha256": "473d0b8440176d09f0ce045b5d49193829c561724c0c1704c951f2335d05e572"
+    },
+    "shells": {
+      "name": "shells",
+      "sha256": "c300881a44977c4acd35afd319d2ad877083fb0e1da9a46c7d175b6e60a5a4e4"
+    },
+    "heavy": {
+      "name": "heavy",
+      "sha256": "0d86953ff2f1bace61ffad29f154491a6ec051064f466cd6495aa4d840e803e0"
+    },
+    "rockets": {
+      "name": "rockets",
+      "sha256": "926e965410a33ec9664a9ec9d12bd9b86a2a6ba6dd724b85540263c89e628264"
+    },
+    "pickaxe": {
+      "name": "pickaxe",
+      "sha256": "aa2747bb6dc752aa24f9a8d86f604ff593538c131a4e48d05dc8991a3a3493d7"
     }
   }
 }
