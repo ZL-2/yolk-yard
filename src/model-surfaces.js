@@ -1,4 +1,5 @@
 import * as T from 'three';
+export {T as THREE};
 
 // Original, renderer-independent surfaces. All models share these small maps;
 // the same HDR sky is uploaded correctly in gameplay and portrait renderers.

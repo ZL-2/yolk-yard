@@ -9,7 +9,7 @@ const browser=await chromium.launch({headless:true,...(process.env.YOLK_TEST_CHR
 try{
  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&/WebGLProgram|Shader Error/.test(m.text()))errors.push(m.text());});await page.route('**/__previews.html',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><html><body></body></html>'}));await page.goto('http://127.0.0.1:5191/__previews.html');
  const items=await page.evaluate(async()=>{
-  const T=await import('three'),{worldKit}=await import('/src/view.js'),{makeBlaster}=await import('/src/weapons.js'),{lootModel}=await import('/src/royale-art.js'),{weapon}=await import('/src/data.js'),{ROYALE_GUN_IDS,ITEMS,AMMO_CAPS}=await import('/src/royale-data.js');
+  const {THREE:T}=await import('/src/model-surfaces.js'),{worldKit}=await import('/src/view.js'),{makeBlaster}=await import('/src/weapons.js'),{lootModel}=await import('/src/royale-art.js'),{weapon}=await import('/src/data.js'),{ROYALE_GUN_IDS,ITEMS,AMMO_CAPS}=await import('/src/royale-data.js');
   const renderer=new T.WebGLRenderer({canvas:document.createElement('canvas'),alpha:true,antialias:true});renderer.outputColorSpace=T.SRGBColorSpace;renderer.setPixelRatio(1);
   window.renderPreview=item=>{
    const w=item.weapon?600:192,h=item.weapon?334:144;renderer.setSize(w,h);const scene=new T.Scene();scene.add(new T.HemisphereLight(0xffffff,0x65766a,2));const key=new T.DirectionalLight(0xfff1dd,3);key.position.set(-3,5,-4);scene.add(key);const rim=new T.DirectionalLight(0xb8d9ee,1.1);rim.position.set(3,2,4);scene.add(rim);
