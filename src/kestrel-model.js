@@ -27,7 +27,7 @@ function weatheredSkin(){
 function serialTexture(){
  const font={K:['10001','10010','10100','11000','10100','10010','10001'],E:['11111','10000','10000','11110','10000','10000','11111'],S:['01111','10000','10000','01110','00001','00001','11110'],T:['11111','00100','00100','00100','00100','00100','00100'],R:['11110','10001','10001','11110','10100','10010','10001'],L:['10000','10000','10000','10000','10000','10000','11111'],'0':['01110','10001','10011','10101','11001','10001','01110'],'4':['00010','00110','01010','10010','11111','00010','00010'],'-':['00000','00000','00000','11111','00000','00000','00000']};
  const width=256,height=32,data=new Uint8Array(width*height*4),text='KESTREL R-04';
- for(let c=0;c<text.length;c++)for(let y=0;y<7;y++)for(let x=0;x<5;x++)if(font[text[c]]?.[y]?.[x]==='1')for(let dy=0;dy<3;dy++)for(let dx=0;dx<3;dx++){const i=((y*3+5+dy)*width+c*20+x*3+dx)*4;data.set([225,219,186,255],i);}
+ for(let c=0;c<text.length;c++)for(let y=0;y<7;y++)for(let x=0;x<5;x++)if(font[text[c]]?.[y]?.[x]==='1')for(let dy=0;dy<3;dy++)for(let dx=0;dx<3;dx++){const i=((height-1-(y*3+5+dy))*width+c*20+x*3+dx)*4;data.set([225,219,186,255],i);}
  const t=new T.DataTexture(data,width,height);t.colorSpace=T.SRGBColorSpace;t.magFilter=T.LinearFilter;t.needsUpdate=true;t.userData.shared=true;return t;
 }
 function palette(environment){
