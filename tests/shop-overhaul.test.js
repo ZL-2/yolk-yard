@@ -60,9 +60,9 @@ test('unique character geometry stays a single skinned mesh with shared bones an
  }
  assert.equal(signatures.size,6);
 });
-test('every new rigid equipment and trail model is distinct and merged to one draw call',()=>{
+test('every new equipment and trail model is distinct and batches opaque and glass surfaces',()=>{
  for(const [slot,factory]of Object.entries({pickaxe:makeShopPickaxe,backbling:makeShopBack,glider:makeShopGlider,trail:makeShopTrail})){
-  const hashes=new Set();for(const set of NEW_COLLECTIONS){const model=factory(slot+'-'+set.id);assert.equal(model.children.length,1,slot+' '+set.id);const geo=model.children[0].geometry;assert.ok(geo.attributes.position.array.every(Number.isFinite));hashes.add(hash(geo.attributes.position.array));geo.dispose();model.children[0].material.dispose();}assert.equal(hashes.size,6,slot);
+  const hashes=new Set();for(const set of NEW_COLLECTIONS){const model=factory(slot+'-'+set.id),parts=[];let count=0;model.traverse(m=>{if(!m.isMesh)return;count++;assert.ok(m.geometry.attributes.position.array.every(Number.isFinite));parts.push(hash(m.geometry.attributes.position.array));});assert.ok(count>=1&&count<=4,slot+' '+set.id);hashes.add(parts.join(':'));}assert.equal(hashes.size,6,slot);
  }
  const wraps=NEW_COLLECTIONS.map(s=>collectionWrapTexture(shopItem('wrap-'+s.id)));assert.equal(new Set(wraps.map(t=>hash(t.image.data))).size,6);wraps.forEach(t=>t.dispose());
 });

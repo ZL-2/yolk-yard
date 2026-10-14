@@ -79,5 +79,5 @@ test('human gloves and uniforms retain reset-safe appearance keys, with reset-sa
  assert.equal(armAppearance('#3d8ce8').color,'#3d8ce8');
  for(const [key,value] of Object.entries({color:'#3d8ce8',accent:'#00ff00',pattern:2,finish:3}))
   assert.notDeepEqual(armAppearance({[key]:value}),armAppearance({}));
- const plain=makeArms('sprinter',{});assert.equal(plain.userData.limbs[0].hand.material.map,null);
+ const plain=makeArms('sprinter',{});assert.equal(plain.userData.limbs[0].hand.material.userData.surfaceKind,'leather');assert.ok(plain.userData.limbs[0].hand.material.normalMap?.isDataTexture);
 });

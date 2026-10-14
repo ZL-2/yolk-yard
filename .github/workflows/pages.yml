@@ -16,6 +16,7 @@ jobs:
     outputs:
       atv_only: ${{ steps.scope.outputs.atv_only }}
       kestrel_only: ${{ steps.scope.outputs.kestrel_only }}
+      models_only: ${{ steps.scope.outputs.models_only }}
       visual_only: ${{ steps.scope.outputs.visual_only }}
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +45,27 @@ jobs:
               s=s.replace('  this.createTransport();\n','').replace('this.rotors.forEach(m=>m.rotation.y+=dt*(r.practice?.15:18));','').replace('animateKestrel(this.transport,{parked:r.practice,time:t,elapsed:r.elapsed},dt);','')
               return s
             aircraft=normalize(subprocess.check_output(['git','show','HEAD^:src/royale-view.js'],text=True))==normalize(Path('src/royale-view.js').read_text())
+          model_allowed={'src/model-surfaces.js','src/humanoid.js','src/operator-designs.js','src/weapons.js','src/arms.js','src/celebration-view.js','src/royale-art.js','src/shop-models.js','src/collection-gear.js','src/view.js','src/weapon-presentation.js','src/inventory-previews.js','scripts/generate-inventory-previews.mjs','scripts/field-detail-browser-check.mjs','tests/field-detail.test.js','tests/arms.test.js','tests/shop-overhaul.test.js','package.json','package-lock.json','src/releases.js','docs/UPDATE_155.md','.github/workflows/pages.yml'}
+          model_visual={'src/model-surfaces.js','src/humanoid.js','src/operator-designs.js','src/weapons.js','src/royale-art.js','src/shop-models.js','src/collection-gear.js','src/arms.js','src/celebration-view.js'}
+          def preview(p): return p.startswith('public/inventory-previews/') and (p.endswith('.svg') or p=='public/inventory-previews/manifest.json')
+          def model_paths(fs): return all(p in model_allowed or preview(p) for p in fs)
+          model_followup=model_paths(files) and not bool(files&model_visual) and model_paths(previous) and bool(previous&model_visual)
+          models=model_paths(files) and (bool(files&model_visual) or model_followup)
+          if models and 'src/view.js' in files:
+            def model_view(s):
+              s=s.replace("import {modelMaterial,MODEL_ART_REVISION} from './model-surfaces.js';\n",'')
+              s=re.sub(r'  rocketModel\(\)\{.*?(?=  itemPreview\()','',s,flags=re.S)
+              return s.replace('          !o.material.map.userData.shared &&\n','')
+            models=model_view(subprocess.check_output(['git','show','HEAD^:src/view.js'],text=True))==model_view(Path('src/view.js').read_text())
+          if models and 'src/royale-art.js' in files:
+            def world_art(s):
+              s=s.split('export function gliderModel')[0]
+              s=s.replace("import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';\n",'').replace("import {modelMaterial,surfaceUV,surfaceAtlasMaterial} from './model-surfaces.js';\n",'').replace('const itemAssemblies=new Map();\n','')
+              return re.sub(r'// Item surfaces deliberately.*?(?=export const DISTRICT_STYLES)','',s,flags=re.S)
+            models=world_art(subprocess.check_output(['git','show','HEAD^:src/royale-art.js'],text=True))==world_art(Path('src/royale-art.js').read_text())
+          if models and 'src/humanoid.js' in files:
+            def animation(s): return s[s.index('const identityQuaternion='):s.index('export function humanoidDiagnostics')]
+            models=animation(subprocess.check_output(['git','show','HEAD^:src/humanoid.js'],text=True))==animation(Path('src/humanoid.js').read_text())
           for path in ['package.json','package-lock.json']:
             if path not in files: continue
             old=json.loads(subprocess.check_output(['git','show','HEAD^:'+path],text=True));new=json.loads(Path(path).read_text())
@@ -52,9 +74,10 @@ jobs:
               if path=='package-lock.json': value.get('packages',{}).get('',{}).pop('version',None)
             scoped=scoped and old==new
             aircraft=aircraft and old==new
+            models=models and old==new
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('visual_only',scoped or aircraft)]: out.write(key+'='+str(value).lower()+'\n')
-          print('Focused visual release:',{'ATV':scoped,'Kestrel':aircraft})
+            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('visual_only',scoped or aircraft or models)]: out.write(key+'='+str(value).lower()+'\n')
+          print('Focused visual release:',{'ATV':scoped,'Kestrel':aircraft,'Models':models})
           PY
   build:
     needs: scope
@@ -73,6 +96,9 @@ jobs:
       - name: Kestrel geometry, animation, airfield support and guest flight look
         if: needs.scope.outputs.kestrel_only == 'true'
         run: node --test tests/kestrel-presentation.test.js tests/kestrel-fix.test.js
+      - name: All operators, weapons, items, gear, sockets, poses and shared surfaces
+        if: needs.scope.outputs.models_only == 'true'
+        run: node --test tests/field-detail.test.js tests/arms.test.js tests/weapon-presentation.test.js tests/hitbox.test.js tests/shop-overhaul.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.visual_only != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -109,6 +135,24 @@ jobs:
       - name: Actual Kestrel airfield, cockpit, cargo, flight, host and guest deployment
         if: needs.scope.outputs.kestrel_only == 'true'
         run: node scripts/kestrel-visual-browser-check.mjs
+      - name: Render all inventory thumbnails from the actual upgraded PBR models
+        if: needs.scope.outputs.models_only == 'true'
+        run: node scripts/generate-inventory-previews.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.models_only == 'true'
+        with:
+          name: field-detail-preview-assets
+          path: public/inventory-previews
+          retention-days: 14
+      - name: Actual lobby, boss shop portrait, first-person weapons and complete asset catalogs
+        if: needs.scope.outputs.models_only == 'true'
+        run: node scripts/field-detail-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.models_only == 'true'
+        with:
+          name: field-detail-browser-evidence
+          path: test-results/expansion/field-detail
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         if: always() && needs.scope.outputs.kestrel_only == 'true'
         with:
@@ -216,6 +260,11 @@ jobs:
           name: ravelfront-build
           path: dist
       - uses: actions/configure-pages@v5
+      - uses: actions/download-artifact@v4
+        if: needs.scope.outputs.models_only == 'true'
+        with:
+          name: field-detail-preview-assets
+          path: dist/inventory-previews
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

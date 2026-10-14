@@ -1,4 +1,5 @@
 import {weaponMotion} from './weapon-motion.js';
+import {modelMaterial,MODEL_ART_REVISION} from './model-surfaces.js';
 import {decorateBoss,updateCelebration} from './celebration-view.js';
 import {updateBossAlert} from './boss-alert-view.js';
 import {authoredBoxes} from './building.js';
@@ -285,6 +286,7 @@ export class View {
       if (o.userData.ownedMaterial) {
         if (
           o.material.map &&
+          !o.material.map.userData.shared &&
           o.material.map !== this.scopeTarget.texture &&
           o.material.map !== this.reticleTexture
         )
@@ -500,11 +502,12 @@ export class View {
     const result=this.portraitRenderer.domElement.toDataURL();this.disposeGroup(model);this.shopPortraits.set(key,result);return result;
   }
   rocketModel(){
-    const g=new THREE.Group(),body=new THREE.MeshStandardMaterial({color:0x587c6d,metalness:.55,roughness:.35}),trim=new THREE.MeshStandardMaterial({color:0xf3c45b,metalness:.45,roughness:.3});
-    const cylinder=new THREE.Mesh(new THREE.CylinderGeometry(.10,.10,.5,12),body);g.add(cylinder);
-    const nose=new THREE.Mesh(new THREE.ConeGeometry(.11,.23,12),trim);nose.position.y=.365;g.add(nose);
-    const collar=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.075,12),trim);collar.position.y=-.16;g.add(collar);
-    for(let i=0;i<4;i++){const fin=new THREE.Mesh(new THREE.BoxGeometry(.035,.2,.26),body.clone());fin.rotation.y=i*Math.PI/2;fin.position.set(Math.sin(i*Math.PI/2)*.09,-.23,Math.cos(i*Math.PI/2)*.09);g.add(fin);}
+    const g=new THREE.Group(),body=modelMaterial(0x587c6d,'paint'),trim=modelMaterial(0xf3c45b,'metal');g.name='Fin-stabilized rocket';g.userData.artRevision=MODEL_ART_REVISION;
+    const cylinder=new THREE.Mesh(new THREE.CylinderGeometry(.10,.10,.5,24),body);g.add(cylinder);
+    const nose=new THREE.Mesh(new THREE.LatheGeometry([[.108,0],[.103,.047],[.080,.126],[.046,.192],[.008,.23]].map(([r,y])=>new THREE.Vector2(r,y)),24),trim);nose.position.y=.25;g.add(nose);
+    for(const y of [-.16,.23]){const collar=new THREE.Mesh(new THREE.CylinderGeometry(.111,.111,.029,24),trim);collar.position.y=y;g.add(collar);}
+    const nozzle=new THREE.Mesh(new THREE.CylinderGeometry(.075,.063,.075,20,1,true),modelMaterial(0x35434a,'metal'));nozzle.position.y=-.276;g.add(nozzle);
+    for(let i=0;i<4;i++){const a=i*Math.PI/2,shape=new THREE.Shape();shape.moveTo(0,.06);shape.lineTo(.16,-.12);shape.lineTo(.16,-.20);shape.lineTo(0,-.18);const geometry=new THREE.ExtrudeGeometry(shape,{depth:.016,bevelEnabled:false});geometry.translate(0,0,-.008);const fin=new THREE.Mesh(geometry,body);fin.rotation.y=a;fin.position.set(Math.cos(a)*.079,-.08,-Math.sin(a)*.079);g.add(fin);}
     const flame=new THREE.Mesh(new THREE.ConeGeometry(.075,.6,10),new THREE.MeshBasicMaterial({color:0xffad45,transparent:true,opacity:.9,depthWrite:false,toneMapped:false}));flame.rotation.z=Math.PI;flame.position.y=-.54;g.add(flame);g.userData.flame=flame;
     const core=new THREE.Mesh(new THREE.ConeGeometry(.04,.4,10),new THREE.MeshBasicMaterial({color:0xfff1b0,transparent:true,opacity:.95,depthWrite:false,toneMapped:false}));core.rotation.z=Math.PI;core.position.y=-.40;g.add(core);
     return g;
