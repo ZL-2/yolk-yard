@@ -1,3 +1,4 @@
+import {createKestrel,animateKestrel} from './kestrel-model.js';
 import {updateOperationView} from './field-operations-view.js';
 import {updateGrapplers} from './grappler-view.js';
 import {updateVehicles} from './vehicle-view.js';
@@ -133,34 +134,9 @@ function canopy(kit,color=0xffcf64){const g=gliderModel(kit,color);bake(g,false,
 export class RoyaleView{
  constructor(view,kit){this.view=view;this.kit=kit;this.root=new THREE.Group();view.scene.add(this.root);this.chests=new Map();this.loot=new Map();this.gliders=new Map();this.pads=new Map();this.createTransport();this.createStorm();this.marker=null;this.fx=[];this.flightPoses=new Map();}
  createTransport(){
-  const {block,ball,cylinder,rounded,beam}=artKit(this.kit),g=this.transport=new THREE.Group();g.name='Kestrel tiltrotor';this.root.add(g);
-  // An original cargo tiltrotor: low graphite fuselage, swept wings and four
-  // independent rotor nacelles. No balloon or borrowed Battle Bus silhouette.
-  rounded(g,0,.1,-8.05,4.5,1.4,3.2,0x213946,.4);
-  const windscreen=rounded(g,0,2.9,-8.03,4.1,1.2,2.1,0x244b58,.2);windscreen.rotation.x=-.32;
-  for(const side of [-1,1]){beam(g,[side*1.7,1.6,-8.8],[side*1.2,3.4,-7.8],.1,0x172a35);rounded(g,side*2.8,.3,4.4,.2,1.9,2.2,0x4d686c,.06);block(g,side*2.92,.5,4.4,.04,.18,1.7,0xc4a66a);rounded(g,side*6.5,2.45,-3.6,1.8,1.4,2.65,0x25424d,.3);rounded(g,side*7.6,2.7,-1.2,.25,.16,.4,side<0?0xeb6558:0x69cfa8,.04);}
-  rounded(g,0,-.6,7.05,4.2,.3,2.5,0x243b43,.12);for(let j=0;j<6;j++)block(g,0,-.42,6.1+j*.27,3.7,.04,.045,0x7c9190);
-  rounded(g,0,1,0,5.8,3.8,13.6,0x334d58,.7);rounded(g,0,-.7,.4,4.7,.65,11.8,0x182d38,.22);
-  rounded(g,0,1.3,-6.9,4.5,3.1,3.5,0x3c606b,.7);rounded(g,0,2,-8.5,3.7,1.4,.18,0x79b8c4,.18);
-  block(g,0,2,-8.62,.12,1.4,.06,0x142e38);
-  for(const side of [-1,1]){
-   const wing=block(g,side*5.1,2.5,-.7,5.8,.3,4.1,0x425b63);wing.rotation.z=side*.04;wing.rotation.y=side*.14;
-   block(g,side*2.93,1.6,1,.08,1.7,7.2,0x21343f);block(g,side*2.99,2.55,1,.1,.18,7.4,0xe2aa50);
-   for(const z of [-2,0,2,4])rounded(g,side*2.97,2.04,z,.12,.6,1.3,0x81b1b6,.09);
-   beam(g,[side*2,-.4,-4],[side*2,-1.3,-4],.18,0x1d303b);beam(g,[side*2,-.4,4],[side*2,-1.3,4],.18,0x1d303b);
-   rounded(g,side*2,-1.35,0,.3,.24,11,0x182d38,.1);
-   const tail=block(g,side*2.6,3.5,6.2,.22,4,3,0x456a70);tail.rotation.z=-side*.24;
-   block(g,side*2.6,4.25,6.18,.28,.65,2.4,0xedae45);
-  }
-  block(g,0,2.5,6.3,7,.24,3.5,0x37545f);
-  for(const x of [-1.7,1.7])ball(g,x,.4,-8.52,.24,.15,.1,0xf5e4bd);
-  this.rotors=[];for(const x of [-6.5,6.5])for(const z of [-3.5,3.5]){
-   rounded(g,x,2.55,z,1.6,1.25,2.2,0x1c3543,.25);cylinder(g,x,3.35,z,.28,.55,0xc69448,12);
-   const rotor=new THREE.Group();rotor.position.set(x,3.7,z);
-   for(let i=0;i<3;i++){const a=i*Math.PI*2/3,m=rounded(rotor,Math.cos(a)*1.8,0,Math.sin(a)*1.8,3.7,.09,.32,0x192e3a,.035);m.rotation.y=-a;}
-   bake(rotor,false,true);g.add(rotor);this.rotors.push(rotor);
-  }
-  bake(g,false,true);
+  const detail=this.view.settings.quality==='low'?1:2;if(this.transport?.userData.detail===detail)return;
+  if(this.transport){this.transport.removeFromParent();this.view.disposeGroup(this.transport);}
+  this.transport=createKestrel(this.view.renderer,detail);this.root.add(this.transport);this.rotors=[0,1].map(i=>this.transport.getObjectByName('kestrel-rotor-'+i));
  }
  createStorm(){
   const material=new THREE.ShaderMaterial({
@@ -221,8 +197,9 @@ export class RoyaleView{
   this.view.lastStateTime=state.time;updateBuildingView(this,state,local);updateFrontierView(this,state,local);
   const roundKey=r.matchId+':'+state.round+':'+state.options.map;
   if(this.round!==roundKey){for(const group of [this.chests,this.loot,this.gliders,this.pads]){for(const mesh of group.values()){this.root.remove(mesh);this.view.disposeGroup(mesh);}group.clear();}this.round=roundKey;this.itemQuery=null;this.flightPoses.clear();for(const mesh of this.cacheMeshes.values()){mesh.removeFromParent();this.view.disposeGroup(mesh);}this.cacheMeshes.clear();}
+  this.createTransport();
   this.transport.visible=r.practice||r.elapsed<=r.route.duration+5;
-  const pos=r.practice?getMap(state.options.map).parkedTransport:transportAt(r.route,r.elapsed);if(pos){this.transport.position.set(pos.x,pos.y+(r.practice?0:Math.sin(t)*.18),pos.z);this.transport.rotation.y=pos.yaw;this.transport.rotation.z=r.practice?0:Math.sin(t*.4)*.015;}this.rotors.forEach(m=>m.rotation.y+=dt*(r.practice?.15:18));
+  const pos=r.practice?getMap(state.options.map).parkedTransport:transportAt(r.route,r.elapsed);if(pos){this.transport.position.set(pos.x,pos.y+(r.practice?0:Math.sin(t)*.18),pos.z);this.transport.rotation.y=pos.yaw;this.transport.rotation.z=r.practice?0:Math.sin(t*.4)*.015;}animateKestrel(this.transport,{parked:r.practice,time:t,elapsed:r.elapsed},dt);
   this.wall.visible=this.ring.visible=r.storm.active;this.wall.position.set(r.storm.x,110,r.storm.z);this.wall.scale.set(Math.max(.01,r.storm.radius),1,Math.max(.01,r.storm.radius));this.wall.material.uniforms.time.value=t;this.wall.material.uniforms.outside.value=local&&Math.hypot(local.x-r.storm.x,local.z-r.storm.z)>r.storm.radius?1:0;if(r.storm.active&&(!this.nextRingUpdate||t>this.nextRingUpdate)){const a=this.ring.geometry.attributes.position;for(let i=0;i<a.count;i++){const angle=i/a.count*Math.PI*2,x=r.storm.x+Math.cos(angle)*r.storm.radius,z=r.storm.z+Math.sin(angle)*r.storm.radius;a.setXYZ(i,x,groundAt(ROYALE_MAP,x,z)+.14,z);}a.needsUpdate=true;this.nextRingUpdate=t+.15;}
   const observer=local?.spectating?state.players.find(p=>p.id===this.view.spectateTarget)||local:local;
   const revision=this.view.world.userData.geometryRevision;this.view.world.userData.details?.update(observer,{quality:this.view.settings.quality,scoped:!!observer?.aim&&this.view.scopeActive,time:t});if(revision!==this.view.world.userData.geometryRevision)updateWorldDamage(this.view.world,r.worldDamage,r.matchId+':'+state.round+':'+r.buildVersion);
