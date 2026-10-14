@@ -34,6 +34,7 @@ function palette(environment){
  const key=environment?.uuid||'none';if(palettes.has(key))return palettes.get(key);
  const skin=weatheredSkin(),standard=(color,roughness,metalness=0)=>new T.MeshStandardMaterial({color,roughness,metalness,envMap:environment,envMapIntensity:.72});
  const p={skin:new T.MeshPhysicalMaterial({color:0xffffff,...skin,normalScale:new T.Vector2(.12,.12),roughness:.76,metalness:.38,clearcoat:.28,clearcoatRoughness:.35,envMap:environment,envMapIntensity:.8}),paint:standard(0x52645e,.53,.4),dark:standard(0x162326,.7,.2),alloy:standard(0x8f9c9b,.30,.88),rubber:standard(0x171b1c,.95),cabin:standard(0x273639,.83),gold:standard(0xc6a35c,.45,.5),glass:new T.MeshPhysicalMaterial({color:0x365662,roughness:.09,metalness:.24,clearcoat:1,clearcoatRoughness:.07,transparent:true,opacity:.84,depthWrite:false,envMap:environment,envMapIntensity:1.05}),serial:new T.MeshStandardMaterial({map:serialTexture(),roughness:.8,alphaTest:.5,polygonOffset:true,polygonOffsetFactor:-2}),white:new T.MeshStandardMaterial({color:0xfff1cc,emissive:0xffd994,emissiveIntensity:1.5}),amber:new T.MeshStandardMaterial({color:0x9b7128,emissive:0xffb743,emissiveIntensity:.65}),red:new T.MeshStandardMaterial({color:0x951a14,emissive:0xf53020,emissiveIntensity:1}),green:new T.MeshStandardMaterial({color:0x227951,emissive:0x3dc786,emissiveIntensity:1})};
+ p.skin.side=T.DoubleSide; // The open cargo aperture must show the opposite interior wall, not the sky.
  for(const m of Object.values(p))m.userData.shared=true;palettes.set(key,p);return p;
 }
 function batch(group){
