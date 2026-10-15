@@ -11,6 +11,8 @@ import {modelMaterial,surfaceUV,surfaceAtlasMaterial} from './model-surfaces.js'
 import {environmentTree} from './environment-trees.js';
 import {detailEnvironmentProp} from './environment-props.js';
 import {environmentKit} from './environment-surfaces.js';
+import {architectureKit} from './architecture-surfaces.js';
+import {detailBuilding} from './architecture-art.js';
 
 // Shared primitives stay inexpensive even in the island's dense groves.
 const geometry=new Map();
@@ -69,27 +71,27 @@ export const DISTRICT_STYLES={
 export function buildingStyle(b){const s=LOCATION_IDENTITIES[b.poi]||DISTRICT_STYLES[b.kind]||DISTRICT_STYLES.camp;return {...s,wall:s.walls[b.index%s.walls.length]};}
 export function dressBuilding(g,b,raw){
  if(b.floors)return dressIslandBuilding(g,b,raw);
- const k=artKit(raw),{block:box,cylinder,beam,rock}=k,s=buildingStyle(b),{x,z,w,d,h}=b;
+ const k=architectureKit(raw,b),{block:box,cylinder,beam,rock}=k,s=buildingStyle(b),{x,z,w,d,h}=b;
  // Structural corner posts, foundation courses and a broad, unobstructed entrance.
  for(const dx of [-w/2,w/2]){
-  box(g,x+dx,.22,z,.86,.44,d+.3,s.wood);
+  box(g,x+dx,.22,z,.86,.44,d+.3,s.wood,'concrete');
   for(const dz of [-d/2,d/2])box(g,x+dx,h/2,z+dz,.86,h,.86,s.trim);
  }
- box(g,x,.23,z-d/2,w,.46,.84,s.wood);
+ box(g,x,.23,z-d/2,w,.46,.84,s.wood,'concrete');
  box(g,x,h-1.16,z+d/2+.41,5.9,.2,.16,s.trim);
  for(const dx of [-2.85,2.85])box(g,x+dx,(h-1.2)/2,z+d/2+.4,.14,h-1.2,.16,s.trim);
  const window=(dx,dz,side)=>{
   const xx=x+dx,zz=z+dz,ww=side?.12:1.65,dd=side?1.65:.12,yy=Math.min(2.6,h*.52);
-  box(g,xx,yy,zz,ww,1.65,dd,s.trim);box(g,xx+(side?Math.sign(dx)*.08:0),yy,zz+(side?0:.08),side?.1:1.38,1.37,side?1.38:.1,0x406c7b);
+  box(g,xx,yy,zz,ww,1.65,dd,s.trim);box(g,xx+(side?Math.sign(dx)*.08:0),yy,zz+(side?0:.08),side?.1:1.38,1.37,side?1.38:.1,0x406c7b,'glass');
   box(g,xx+(side?Math.sign(dx)*.15:0),yy,zz+(side?0:.15),side?.08:1.4,.075,side?1.4:.08,s.trim);
   box(g,xx+(side?Math.sign(dx)*.16:0),yy,zz+(side?0:.16),.09,1.4,.09,s.trim);
-  box(g,xx,yy-.95,zz,side?.42:2,.18,side?2:.42,s.wood);
+  box(g,xx,yy-.95,zz,side?.42:2,.18,side?2:.42,s.wood,'timber');
   if(['town','resort','park'].includes(b.kind))for(const sign of [-1,1])box(g,xx+(side?0:sign*1.04),yy,zz+(side?sign*1.04:0),side?.18:.36,1.65,side?.36:.18,s.roof);
  };
  for(const side of [-1,1])for(const dz of [-d*.25,d*.2])window(side*(w/2+.4),dz,true);
  for(const dx of [-w/2+1.45,w/2-1.45])window(dx,d/2+.42,false);
  // Roof trim outlines the usable half-deck; opening remains clear for drops.
- if(b.roof==='terrace')box(g,x-w/4,h+.23,z,w/2+.7,.12,d+.65,s.roof);
+ if(b.roof==='terrace')box(g,x-w/4,h+.23,z,w/2+.7,.12,d+.65,s.roof,'roof');
  box(g,x-w/2-.22,h+.38,z,.15,.3,d+.7,s.trim);
  box(g,x-w/4,h+.38,z-d/2-.25,w/2+.7,.3,.15,s.trim);
  if(b.roof==='gable'){
@@ -102,13 +104,13 @@ export function dressBuilding(g,b,raw){
   for(let j=0;j<9;j++)for(const side of [-1,1])beam(g,[x-w/4,h+2.03,z-d/2+j*d/8],[x-w/4+side*(w/4+.3),h+.5,z-d/2+j*d/8],.035,s.wood);
  }
  // Interior shelves, entry mat and wall panels fit entirely within existing walls.
- box(g,x+1,.025,z+2.6,4.4,.05,2.5,b.kind==='resort'?0x629eaa:0xc4ae7f);
- box(g,x,2,z-d/2+.4,3.8,1.6,.1,s.wood);
+ box(g,x+1,.025,z+2.6,4.4,.05,2.5,b.kind==='resort'?0x629eaa:0xc4ae7f,'fabric');
+ box(g,x,2,z-d/2+.4,3.8,1.6,.1,s.wood,'timber');
  box(g,x,2,z-d/2+.47,3.3,1.18,.04,b.kind==='factory'?0xb6c3af:0x9aae8c);
  for(const sign of [-1,1])box(g,x+sign*1.6,2,z-d/2+.51,.09,1.2,.03,s.trim);
  if(b.kind==='farm'||b.kind==='camp'||b.kind==='park'){
   // Timber siding and diagonal braces make these read as cabins/barns, not houses.
-  for(let yy=.8;yy<h-.2;yy+=.62)for(const side of [-1,1])box(g,x+side*(w/2+.37),yy,z,.1,.11,d-.4,s.wood);
+  for(let yy=.8;yy<h-.2;yy+=.62)for(const side of [-1,1])box(g,x+side*(w/2+.37),yy,z,.1,.11,d-.4,s.wood,'timber');
   for(const side of [-1,1])beam(g,[x+side*(w/2-.65),h-1,z+d/2+.44],[x+side*3,h-2.5,z+d/2+.44],.065,s.trim);
   const canopy=box(g,x,h-.75,z+d/2+1.1,6.2,.18,2.1,s.roof);canopy.rotation.x=.12;
   for(const side of [-1,1])beam(g,[x+side*3,h-1.9,z+d/2+.5],[x+side*3,h-.7,z+d/2+2],.07,s.wood);
@@ -135,6 +137,7 @@ export function dressBuilding(g,b,raw){
  // Door-top district insignia uses geometry and is legible without textures.
  const badge=cylinder(g,x,h-.55,z+d/2+.6,.32,.08,s.trim,12);badge.rotation.x=Math.PI/2;
  rock(g,x,h-.55,z+d/2+.68,.16,.21,.04,s.roof,1);
+ detailBuilding(g,b,s,raw);
 }
 export function treeModel(g,t,raw,detail=true){return environmentTree(g,t,detail);}
 export function propModel(g,p,raw){

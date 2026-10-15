@@ -41,12 +41,20 @@ function endGrain(g,x,y,z,r,side){
  });const m=mesh(g,geo,0xffffff,'wood',x,y,z,r,r,1);if(side<0)m.rotation.y=Math.PI;return m;
 }
 function fracturedRock(seed,detail){
- return shared('strata:'+((seed|0)%16)+':'+detail,()=>{
-  const rng=random(seed%16),out={p:[],uv:[],c:[]},n=detail?11:7,levels=detail?[0,.11,.36,.60,.78,.96]:[0,.28,.70,.96],rings=[],radial=Array.from({length:n},()=>.82+rng()*.18);
-  for(let j=0;j<levels.length;j++)rings.push(Array.from({length:n},(_,i)=>{const a=i*Math.PI*2/n+Math.sin(j*2+i)*.055,r=radial[i]*(j===0?.8:j===levels.length-1?.56:.91+rng()*.09),yy=levels[j]+(j>0?(rng()-.5)*.045:0);return [Math.cos(a)*r*.5,yy,Math.sin(a)*r*.5];}));
-  for(let j=0;j<levels.length-1;j++)for(let i=0;i<n;i++){const tone=.79+rng()*.14+(j===3?.055:0);quad(out,rings[j][i],rings[j][(i+1)%n],rings[j+1][(i+1)%n],rings[j+1][i],[tone*.76,tone*.79,tone*.73]);}
-  for(let i=0;i<n;i++){for(const v of [rings.at(-1)[i],rings.at(-1)[(i+1)%n],[.025,1,-.03]]){out.p.push(...v);out.uv.push(v[0]+.5,v[2]+.5);out.c.push(.67,.70,.58);}for(const v of [rings[0][(i+1)%n],rings[0][i],[0,0,0]]){out.p.push(...v);out.uv.push(v[0]+.5,v[2]+.5);out.c.push(.42,.45,.41);}}
-  return geometry(out.p,out.uv,out.c);
+ return shared('rounded-boulder:'+((seed|0)%16)+':'+detail,()=>{
+  // The old ring shell was wound inward: back-face culling exposed its far
+  // interior and made rocks look sliced open. An outward closed geodesic shell
+  // gives every viewing direction a complete rounded silhouette, including its
+  // underside. Deformation depends on position so UV seams cannot split apart.
+  const g=new T.IcosahedronGeometry(1,detail?2:1),p=g.attributes.position,phase=((seed|0)%16)*.713;
+  for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=.91+.055*Math.sin(x*4+phase)*Math.cos(z*3-phase)+.035*Math.sin(y*5+z*2+phase);p.setXYZ(i,x*r,y*r,z*r);}
+  g.computeBoundingBox();const b=g.boundingBox,size=b.getSize(new T.Vector3()),center=b.getCenter(new T.Vector3());g.translate(-center.x,-b.min.y,-center.z);g.scale(.98/size.x,1/size.y,.98/size.z);
+  const colors=new Float32Array(p.count*3),normals=new Float32Array(p.count*3),sums=new Map(),keys=[],a=new T.Vector3(),v=new T.Vector3(),c=new T.Vector3(),normal=new T.Vector3();
+  const key=i=>[p.getX(i),p.getY(i),p.getZ(i)].map(v=>Math.round(v*1e6)).join(':');
+  for(let i=0;i<p.count;i++){keys[i]=key(i);if(!sums.has(keys[i]))sums.set(keys[i],new T.Vector3());const tone=.84+.07*p.getY(i)+.025*Math.sin(p.getY(i)*17+p.getX(i)*4+phase);colors.set([tone*.79,tone*.82,tone*.75],i*3);}
+  for(let i=0;i<p.count;i+=3){a.fromBufferAttribute(p,i);v.fromBufferAttribute(p,i+1);c.fromBufferAttribute(p,i+2);normal.crossVectors(v.sub(a),c.sub(a));for(let j=0;j<3;j++)sums.get(keys[i+j]).add(normal);}
+  for(let i=0;i<p.count;i++)normals.set(sums.get(keys[i]).clone().normalize().toArray(),i*3);
+  g.setAttribute('normal',new T.Float32BufferAttribute(normals,3));g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeBoundingBox();g.computeBoundingSphere();g.userData.roundedBoulder=true;g.userData.artRevision=160;return g;
  });
 }
 function foliage(seed,detail,crop=false){
@@ -62,8 +70,8 @@ function foliage(seed,detail,crop=false){
 }
 function foliageProp(g,p,k,detail){
  const {x,y,z,w,h,d,kind,seed}=p,{block:B,cylinder:C,beam}=k;
- if(kind==='rock'){const m=mesh(g,fracturedRock(seed,detail),0xffffff,'stone',x,y,z,w,h,d);m.rotation.y=(seed%8)*.29;
-  if(detail){const chip=mesh(g,fracturedRock(seed+3,false),0xa2a48e,'stone',x+w*.34,y,z-d*.28,w*.22,h*.19,d*.24);chip.rotation.y=1.1;}
+ if(kind==='rock'){mesh(g,fracturedRock(seed,detail),0xffffff,'stone',x,y,z,w,h,d);
+  if(detail)mesh(g,fracturedRock(seed+3,false),0xa2a48e,'stone',x+w*.34,y,z-d*.28,w*.22,h*.19,d*.24);
  }else if(kind==='bush'){
   mesh(g,foliage(seed,detail),0xffffff,'leaf',x,y,z,w*.90,h,d*.90);
   for(let j=0;j<(detail?4:2);j++){const a=j*2.4;beam(g,[x,y,z],[x+Math.cos(a)*w*.22,y+h*.65,z+Math.sin(a)*d*.22],.022,0x665641,'bark');}

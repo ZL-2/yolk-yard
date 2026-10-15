@@ -14,6 +14,7 @@ import {updateCombatAccuracy,firedAccuracy,pelletOffsets,falloffAt,structureDama
 import {arenaBonuses,resetBonuses,updateBonuses,awardBonus} from './streaks.js';
 import {botInput as tacticalBotInput} from './bots.js';
 import {scheduledBotInput} from './bot-runtime.js';
+import {availableBotName} from './bot-roster.js';
 import {botBurstGap,botCombatReady} from './bot-aim.js';
 import {skillFor} from './bot-config.js';
 import {beginEquip} from './equip.js';
@@ -41,15 +42,6 @@ import {
   dist,
   EYE,
 } from "./physics.js";
-const BOT_NAMES = [
-  "Relay",
-  "Sunny",
-  "Scout",
-  "Drift",
-  "Vanguard",
-  "Sable",
-  "Rook",
-];
 export class Simulation {
   constructor(options = {}) {
     this.options = matchOptions(options);
@@ -90,9 +82,11 @@ export class Simulation {
     if (spectator ? [...this.players.values()].filter(p=>p.lateSpectator).length>=MAX_SPECTATORS : [...this.players.values()].filter(p=>!p.lateSpectator).length >= (this.maxPlayers || 8)) return null;
     const count = [0, 0];
     for (const p of this.players.values()) if(!p.lateSpectator&&p.team>=0)count[p.team]++;
+    const approvedProfile=safeProfile(profile);
+    if(!bot)this.reserveHumanName(approvedProfile.name,id);
     const p = {
       id,
-      ...safeProfile(profile),
+      ...approvedProfile,
       bot,
       joinedOrder: ++this.joinOrder,
       botSeed:this.random()*100,
@@ -150,7 +144,7 @@ export class Simulation {
     if (!p) return;
     const safe = safeProfile(profile);if(this.options.weaponPool==='precision'&&!['anchor','peeper','needle'].includes(safe.weapon))safe.weapon='anchor';if(this.options.weaponPool==='close'&&!['scatter','doubleyolk','zipper','pip'].includes(safe.weapon))safe.weapon='zipper';
     if([...this.players.values()].some(other=>other.id!==id&&!other.bot&&nameKey(other.name)===nameKey(safe.name)))return false;
-    for(const other of this.players.values())if(other.id!==id&&other.bot&&nameKey(other.name)===nameKey(safe.name))other.name=this.uniqueBotName(other.name+' Bot');
+    this.reserveHumanName(safe.name,id);
     p.nextProfile = safe;
     p.name=safe.name;
     if (this.phase === "lobby" || p.health <= 0) Object.assign(p, safe);
@@ -219,7 +213,7 @@ export class Simulation {
       this.addPlayer(
         id,
         {
-          name: this.uniqueBotName(BOT_NAMES[(i - 1) % BOT_NAMES.length]),
+          name: this.uniqueBotName(id),
           weapon: WEAPONS[(i + this.round) % 7].id,
           ...randomAppearance(this.random),
         },
@@ -856,9 +850,14 @@ export class Simulation {
   botInput(p) {
     return scheduledBotInput(this,p,()=>tacticalBotInput(this,p));
   }
-  uniqueBotName(base) {
-    let name=base,i=2;while([...this.players.values()].some(p=>nameKey(p.name)===nameKey(name)))name=base+' '+i++;
-    return name;
+  uniqueBotName(identity,reserved=[]) {
+    return availableBotName(identity,this.players.values(),reserved);
+  }
+  reserveHumanName(name,exceptId) {
+    for(const p of this.players.values())if(p.id!==exceptId&&p.bot&&!p.boss&&!p.henchman&&nameKey(p.name)===nameKey(name)){
+      p.name=this.uniqueBotName(p.id,[name]);
+      if(p.nextProfile)p.nextProfile.name=p.name;
+    }
   }
   assignTeam(p,admission){
     if(!admission)return;p.partyId=admission.partyId;p.partySize=admission.partySize;
@@ -868,7 +867,6 @@ export class Simulation {
     if(this.players.has(id))return this.players.get(id);
     if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;
     if(admission?.spectator){const p=this.addPlayer(id,profile,false,true);if(p)Object.assign(p,{watchId:admission.watchId,partyId:admission.partyId,memberId:admission.memberId});return p;}
-    for(const p of this.players.values())if(p.bot&&nameKey(p.name)===nameKey(profile.name))p.name=this.uniqueBotName(p.name+' Bot');
     const capacity=this.options.capacity||8;
     if([...this.players.values()].filter(p=>!p.lateSpectator).length>=capacity){const bot=[...this.players.values()].find(p=>p.bot);if(!bot)return null;this.players.delete(bot.id);this.inputs.delete(bot.id);}
     const p=this.addPlayer(id,profile);if(p)this.assignTeam(p,admission);return p;

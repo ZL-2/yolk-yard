@@ -125,6 +125,9 @@ export class RealtimeRelay {
         if(entry.type==='data'&&this.authority.data(peer,other,entry))continue;
         if(entry.type==='data'&&entry.data?.type==='input')this.progression.input(peer,entry.data.input||entry.data);
         if(entry.type==='data'&&entry.data?.type==='hello'){
+          if(this.publicHost.enabled&&this.publicHost.members.has(other.id)&&!this.publicHost.isTarget(other)){
+            this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'The public match is reconnecting. Join the main match from Play.'}});continue;
+          }
           let admission=entry.data.ticket?this.parties.claim(entry.data.ticket,peer.id,other.id):null;
           if(this.publicHost.enabled&&(this.publicHost.isTarget(other)||this.publicHost.members.has(other.id))){admission??=this.publicHost.members.get(peer.id)?.admission;admission=this.publicHost.admission(peer,admission);if(!admission){this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'Join the public match from Play, or wait for host transfer.'}});continue;}}
           if(entry.data.ticket&&!admission){this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'Your party reservation expired. Return to the lobby and try again.'}});continue;}

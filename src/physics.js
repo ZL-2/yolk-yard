@@ -162,8 +162,16 @@ function pushAxis(p,map,axis,delta) {
   target=delta>0?Math.min(target,Math.max(start,edge)):Math.max(target,Math.min(start,edge));
  }
  // One stair rise per axis. Never stack multiple step corrections in one move.
- if(hit&&p.grounded&&top-base>0&&top-base<=.43&&canOccupy(map,{...point,y:top},height)) {
-  p[axis]=proposal;p.y=top;return;
+ if(hit&&p.grounded&&top-base>0&&top-base<=.43) {
+  const raised={...point,y:top};
+  if(canOccupy(map,raised,height)){p[axis]=proposal;p.y=top;return;}
+  // Anticipate overhead clearance at the next riser, before the player is
+  // trapped against it. Authority and prediction use the same fitting stance.
+  if(!p.downed&&!p.sliding&&!p.reviving)for(const clearance of [STANCE.crouching.height,STANCE.compact.height]){
+   if(clearance>=height||!canOccupy(map,raised,clearance))continue;
+   p.crouching=true;p.lowCrouch=clearance===STANCE.compact.height;p.sprinting=p.tacticalSprint=false;
+   p[axis]=proposal;p.y=top;return;
+  }
  }
  p[axis]=target;
 }

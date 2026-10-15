@@ -19,7 +19,7 @@ import './crowns-emotes.css';
 import {SoundVisuals} from './sound-visuals.js';
 import {inventoryDropTarget} from './inventory-drag.js';
 import {gateBuildFire} from './field-refinement.js';
-import {watchersFor,spectatorMessage,spectatorTargets} from './spectator-status.js';
+import {watchersFor,spectatorMessage,spectatorTargets,canSpectate} from './spectator-status.js';
 import {recordSeasonEvent,masteryRewards} from './season-progress.js';
 import {careerMarkup} from './career-ui.js';
 import {recordCareerReceipt} from './career.js';
@@ -60,7 +60,7 @@ import {SLIDERS, SLIDER_DEFAULTS, resetSliders, royalePanelAction} from './setti
 import {queueCandidates,ITEMS,itemInfo} from './royale-data.js';
 import { ChatPanel } from "./chat-ui.js";
 import { moderateText, safeName } from "./moderation.js";
-import {needsPlayerName} from './player-name.js';
+import {needsPlayerName,validatePlayerName} from './player-name.js';
 import {MatchEndUI} from './match-end-ui.js';
 import {preferredSpectator} from './match-presentation.js';
 import './match-end.css';
@@ -160,6 +160,7 @@ save("yolk-settings", settings);
 settings.sensitivity = clamp(Number(settings.sensitivity) || 1, 0.2, 3);
 settings.scopeSensitivity = clamp(Number(settings.scopeSensitivity) || 0.65, 0.1, 2);
 settings.fov = clamp(Number(settings.fov) || 85, 65, 110);
+settings.thirdPersonFov = clamp(Number(settings.thirdPersonFov) || 65, 65, 110);
 settings.volume = clamp(Number(settings.volume) || 0, 0, 1);
 let stats = read("yolk-stats", { matches: 0, kills: 0, wins: 0 }),
   options = matchOptions({map:"yard", mode:"ffa", fill:true});
@@ -332,8 +333,8 @@ function selectMenuSection(section,push=true){
 window.addEventListener('popstate',()=>{if(screen==='menu')selectMenuSection(location.hash.slice(1)||'play',false);});
 
 function profileMenu(){
-  modal('Player details',`<label for="player-name">YOUR NAME</label><input class="field" id="player-name" maxlength="18" value="${esc(profile.name)}" autocomplete="off"><p id="name-safety" role="status"></p><button class="primary" data-action="close">DONE</button>`,'profile');
-  $('#player-name').onchange=e=>{const checked=moderateText(e.target.value,{kind:'name'}),name=safeName(e.target.value);if(!checked.ok||needsPlayerName(name)){$('#name-safety').textContent='Choose a friendly nickname other than Player.';e.target.value=profile.name;return;}profile.name=name;$('#name-safety').textContent='';remember();renderMenu();};
+  modal('Player details',`<label for="player-name">YOUR NAME</label><input class="field" id="player-name" aria-describedby="name-safety" maxlength="128" value="${esc(profile.name)}" autocomplete="off"><p id="name-safety" role="alert"></p><button class="primary" data-action="close">DONE</button>`,'profile');
+  $('#player-name').onchange=e=>{const checked=validatePlayerName(e.target.value);if(!checked.ok){$('#name-safety').textContent=checked.message;e.target.setAttribute('aria-invalid','true');return;}e.target.removeAttribute('aria-invalid');profile.name=checked.name;$('#name-safety').textContent='';remember();renderMenu();};
 }
 function modal(title, body, type = "generic") {
   if(needsPlayerName(profile.name)&&type!=='name-required'){requiredNamePrompt();return;}
@@ -546,17 +547,17 @@ function joinMenu(code = "") {
 }
 function renamePrompt(){
   if(dialogType==='rename'&&dialog.open){
-    const button=dialog.querySelector('[data-action="save-room-name"]');button.disabled=false;button.textContent='USE THIS NAME';
+    const button=dialog.querySelector('[data-action="save-room-name"]');button.disabled=false;button.textContent='USE THIS NAME';$('#room-name-error').textContent='That name is already in this match. Choose a different name.';
     toast('That name is still taken. Choose another one.');return;
   }
-  modal('That name is already in this match',`<p>Choose an unused player name to continue.</p><label for="room-name">Player name</label><input id="room-name" class="field" maxlength="18" value="${esc(profile.name)}" autocomplete="off"><button class="primary" data-action="save-room-name">USE THIS NAME</button><button class="plain" data-action="leave">Leave match</button>`,'rename');
+  modal('That name is already in this match',`<p>Choose an unused player name to continue.</p><label for="room-name">Player name</label><input id="room-name" class="field" aria-describedby="room-name-error" maxlength="128" value="${esc(profile.name)}" autocomplete="off"><p id="room-name-error" role="alert">That name is already in this match. Choose a different name.</p><button class="primary" data-action="save-room-name">USE THIS NAME</button><button class="plain" data-action="leave">Leave match</button>`,'rename');
   $('#room-name').focus();$('#room-name').select();$('#room-name').onkeydown=e=>{if(e.key==='Enter')actions['save-room-name']();};
 }
 let nameChosen;
 function requiredNamePrompt(){
   if(!needsPlayerName(profile.name))return;
   if(dialogType==='name-required'&&dialog.open)return;
-  modal('CHOOSE YOUR PLAYER NAME',`<p>Your name appears in matches, parties, and the leaderboard. Choose a nickname to continue.</p><label for="required-name">PLAYER NAME</label><input id="required-name" class="field" maxlength="18" placeholder="Your nickname" autocomplete="nickname" spellcheck="false"><p id="required-name-error" role="alert"></p><button class="primary" data-action="save-player-name">LET’S PLAY</button>`,'name-required');
+  modal('CHOOSE YOUR PLAYER NAME',`<p>Your name appears in matches, parties, and the leaderboard. Choose a nickname to continue.</p><label for="required-name">PLAYER NAME</label><input id="required-name" class="field" aria-describedby="required-name-error" maxlength="128" placeholder="Your nickname" autocomplete="nickname" spellcheck="false"><p id="required-name-error" role="alert"></p><button class="primary" data-action="save-player-name">LET’S PLAY</button>`,'name-required');
   dialog.querySelector('.close-btn')?.remove();
   $('#required-name').focus();$('#required-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();actions['save-player-name']();}};
 }
@@ -844,7 +845,8 @@ async function resume(capture = true) {
 }
 let spectateTarget = null,watchSent=null,watchSentAt=0,watcherIds=[],watcherRound=null;
 function updateSpectatorStatus(me,now){
- const target=me?.spectating?spectateTarget:me?.health<=0?me.killerId:null;
+ const requested=me?.spectating?spectateTarget:me?.health<=0?me.killerId:null;
+ const target=state?.players?.some(p=>p.id===requested&&canSpectate(p,localId))?requested:null;
  if(me&&(target!==watchSent||now-watchSentAt>1500)){const action='watch:'+(target||'');if(sim&&!sim.remote)sim.playerAction(localId,action);else net?.send({type:'player-action',action});watchSent=target;watchSentAt=now;}
  let node=document.getElementById('spectator-status');if(!node){node=document.createElement('div');node.id='spectator-status';node.setAttribute('role','status');document.getElementById('hud').append(node);}
  const round=(state?.royale?.matchId||'')+':'+state?.round;if(watcherRound!==round){watcherRound=round;watcherIds=[];}
@@ -1227,6 +1229,13 @@ async function socialMenu(){
  const model=await partyRequest('social',{offset:socialOffset});socialFetching=false;if(!model)return;
  socialModel=model;modal('Social & Party',socialMarkup(party.party,party.id,model,socialTab),'social');
 }
+function friendNicknameMenu(id){
+ const friend=socialModel?.friends.find(p=>p.id===id);if(!friend)return;
+ modal('FRIEND NICKNAME',`<p>A private nickname for <strong>${esc(friend.name)}</strong>. Only you see it.</p><form id="friend-nickname-form"><label for="friend-nickname">NICKNAME</label><input id="friend-nickname" class="field" maxlength="128" value="${esc(friend.nickname||'')}" aria-describedby="friend-nickname-error" autocomplete="off"><p id="friend-nickname-error" role="alert"></p><div class="split-actions"><button class="primary" type="submit">SAVE NICKNAME</button><button type="button" id="friend-nickname-clear">REMOVE NICKNAME</button><button type="button" data-action="social">BACK</button></div></form>`,'friend-nickname');
+ const field=$('#friend-nickname'),form=$('#friend-nickname-form');
+ form.onsubmit=async e=>{e.preventDefault();const raw=field.value.trim(),checked=raw?validatePlayerName(raw,{nickname:true}):{ok:true,name:''};if(!checked.ok){$('#friend-nickname-error').textContent=checked.message;field.setAttribute('aria-invalid','true');field.focus();return;}const button=form.querySelector('[type=submit]');button.disabled=true;try{await party.request('friend-nickname',{id,nickname:checked.name});if(form.isConnected)await socialMenu();}catch(error){if(form.isConnected){$('#friend-nickname-error').textContent=error.message;button.disabled=false;}}};
+ $('#friend-nickname-clear').onclick=()=>{field.value='';form.requestSubmit();};field.focus();field.select();
+}
 function scheduleSocialRefresh(){clearTimeout(socialRefreshTimer);if(dialogType==='social')socialRefreshTimer=setTimeout(()=>{if(dialogType==='social')void socialMenu();},750);}
 function addFriendMenu(){modal('Add Friend',`<p>Enter another player’s public Friend Code. You can send a request even when they are offline.</p><form id="friend-find-form"><label for="friend-code">FRIEND CODE</label><input class="field" id="friend-code" placeholder="AB7KQ-4M2QX" maxlength="16" autocomplete="off" spellcheck="false"><button class="primary" type="submit">FIND PLAYER</button></form><div id="friend-lookup" role="status"></div>`,'add-friend');$('#friend-code').focus();$('#friend-find-form').onsubmit=async e=>{e.preventDefault();const node=$('#friend-lookup');node.textContent='Finding player…';try{const found=await party.request('lookup',{code:$('#friend-code').value});if(!node.isConnected)return;node.innerHTML=`<article class="social-person"><div><strong>${esc(found.name)}</strong><small>${esc(found.code)} · ${esc(found.presence.replaceAll('-',' '))}</small></div>${found.relationship==='none'?`<button class="primary" data-social-action="friend-send" data-player-id="${found.id}">SEND FRIEND REQUEST</button>`:found.relationship==='incoming'?`<button data-social-action="friend-accept" data-player-id="${found.id}">ACCEPT REQUEST</button>`:`<span class="social-pending">${found.relationship==='friends'?'Already friends':'Request already pending'}</span>`}</article>`;}catch(error){node.textContent=error.message;node.className='social-error';}};}
 function receiveInvite(invite){
@@ -1294,9 +1303,9 @@ const actions = {
  'field-orders':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('FIELD OPERATIONS',fieldOrdersHTML(p,state.royale.operations)+fieldStatsHTML(p)+'<button class="primary" data-action="resume">RETURN TO GAME</button>','field-orders');},
  'match-stats':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('MATCH STATS',`<p>${p?.place?'PLACEMENT #'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS</p><p>${esc(matchEarnings.status)} · ${matchEarnings.total||0} Marks</p>${fieldStatsHTML(p)}${scoresHTML()}<button class="primary" data-action="close">BACK TO MATCH</button>`,'royale-stats');},
  'save-player-name':()=>{
-  const raw=$('#required-name')?.value||'',name=safeName(raw),checked=moderateText(raw,{kind:'name'});
-  if(!checked.ok||needsPlayerName(name)){$('#required-name-error').textContent='Choose a nickname other than Player (up to 18 characters).';$('#required-name').focus();return;}
-  profile=safeProfile({...profile,name});save('yolk-profile',profile);dialog.close();dialogType='';paused=false;initializeParty();renderMenu();nameChosen?.();nameChosen=null;
+  const checked=validatePlayerName($('#required-name')?.value||'');
+  if(!checked.ok){$('#required-name-error').textContent=checked.message;$('#required-name').setAttribute('aria-invalid','true');$('#required-name').focus();return;}
+  profile=safeProfile({...profile,name:checked.name});save('yolk-profile',profile);dialog.close();dialogType='';paused=false;initializeParty();renderMenu();nameChosen?.();nameChosen=null;
  },
  'leaderboard-open':()=>{leaderboardOffset=0;leaderboardPageBoards=leaderboards;modal('FRONTIER LEADERS',`<section class="frontier-leaderboard frontier-leaderboard-expanded">${leaderboardMarkup({...menuModel(),expanded:true})}</section>`,'leaderboards');installLeaderboardScrollbars();void refreshLeaderboards(true);},
  'leaderboard-refresh':()=>{void refreshLeaderboards(true);},
@@ -1352,9 +1361,10 @@ const actions = {
   chat: () => chat.open(),
   'chat-controls':()=>{dialog.close();dialogType='';chat.showControls();},
   'save-room-name':()=>{
-    const raw=$('#room-name').value;const checked=moderateText(raw,{name:true});
-    if(!checked.ok||needsPlayerName(safeName(raw))){toast('Choose a nickname other than Player.');return;}
-    profile=safeProfile({...profile,name:raw});save('yolk-profile',profile);
+    const checked=validatePlayerName($('#room-name').value);
+    if(!checked.ok){$('#room-name-error').textContent=checked.message;$('#room-name').setAttribute('aria-invalid','true');$('#room-name').focus();return;}
+    $('#room-name-error').textContent='';$('#room-name').removeAttribute('aria-invalid');
+    profile=safeProfile({...profile,name:checked.name});save('yolk-profile',profile);
     if(net){const button=dialog.querySelector('[data-action="save-room-name"]');button.disabled=true;button.textContent='CHECKING NAME…';}
     if(net)net.submitName(profile);else if(sim?.setProfile(localId,profile)!==false){dialog.close();dialogType='';void resume();}else renamePrompt();
   },
@@ -1433,6 +1443,7 @@ document.addEventListener("click", (e) => {
   if(b.dataset.socialTab){socialTab=b.dataset.socialTab;void socialMenu();}
   if(b.dataset.socialPage!==undefined){socialOffset=Number(b.dataset.socialPage);void socialMenu();}
   if(b.dataset.spectateFriend){if(state){toast('Return to the lobby before spectating a friend.');return;}b.disabled=true;void partyRequest('spectate-friend',{id:b.dataset.spectateFriend}).then(()=>{b.disabled=false;});}
+  if(b.dataset.friendNickname){friendNicknameMenu(b.dataset.friendNickname);return;}
   if(b.dataset.socialAction){b.disabled=true;void partyRequest(b.dataset.socialAction,{id:b.dataset.playerId}).then(ok=>{b.disabled=false;if(ok){toast(b.dataset.socialAction==='friend-send'?(ok.status==='friends'?'Friend request accepted.':'Friend request sent.'):'Social list updated.');void socialMenu();}});}
   if(b.dataset.experience)void selectExperience(b.dataset.experience);
   for(const [key,type]of [['partyInvite','invite'],['partyAccept','accept'],['partyDecline','decline'],['partyKick','kick'],['partyJoin','join']])if(b.dataset[key]){
@@ -1938,7 +1949,7 @@ function loop(now) {
   const currentProgress=(state?.royale?.matchId||net?.code||'local')+':'+state?.round;
   if(currentProgress!==progressMatch){progressMatch=currentProgress;matchEarnings.total=0;matchEarnings.status=me?.friendSpectator?'Spectating · No Marks':net?.serverAuthority?'Match verification pending':net?'Private custom · No Marks':'Practice · No currency rewards';}
 
-  if (me?.spectating && !state.players.some(p => p.id === spectateTarget && p.health > 0 && !p.spectating))
+  if (me?.spectating && !state.players.some(p => p.id === spectateTarget && canSpectate(p,localId)))
     switchSpectator(1);
   view.spectateTarget = me?.spectating ? spectateTarget : null;
   updateSpectatorStatus(me,now);
