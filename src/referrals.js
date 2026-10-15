@@ -2,6 +2,29 @@ const HIDE='ravelfront-referrals-dismissed',PENDING='ravelfront-pending-referral
 export function pendingReferral(){try{const code=new URL(location.href).searchParams.get('ref');if(code&&/^[a-hj-np-z2-9-]{10,11}$/i.test(code)&&!localStorage.getItem(PENDING))localStorage.setItem(PENDING,code);return localStorage.getItem(PENDING)||'';}catch{return '';}}
 export function clearReferral(){try{localStorage.removeItem(PENDING);}catch{}}
 export function referralLink(code){const u=new URL(location.href);u.search='';u.hash='';u.searchParams.set('ref',code);return u.href;}
+// Called only after hello has consumed the incoming referral and returned the
+// player's own public code. Preserve room invites, navigation and other options.
+export function setOwnReferralURL(code,{location=globalThis.location,history=globalThis.history}={}){
+ if(!/^[a-hj-np-z2-9-]{10,11}$/i.test(code||''))return false;
+ try{const u=new URL(location.href);if(u.searchParams.get('ref')===code)return true;u.searchParams.set('ref',code);history.replaceState(history.state,'',u.href);return true;}catch{return false;}
+}
+export class ReferralRewards {
+ constructor({wallet,ready,identity}){Object.assign(this,{wallet,ready,identity});this.nextAt=0;}
+ update(now){
+  if(now<this.nextAt)return;this.nextAt=now+400;
+  const award=this.wallet.pendingReferralReward(this.identity());
+  if(!award){this.root?.remove();this.root=null;return;}
+  if(!this.root){
+   this.root=document.createElement('aside');this.root.className='referral-reward';this.root.setAttribute('role','status');this.root.setAttribute('aria-live','polite');
+   this.root.innerHTML='<span class="referral-reward-seal" aria-hidden="true">✓</span><div><small>CREW RECRUITED</small><strong></strong><p></p></div><button aria-label="Dismiss referral reward">GOT IT</button>';
+   this.root.querySelector('button').onclick=async()=>{const button=this.root.querySelector('button');button.disabled=true;try{await this.wallet.acknowledgeReferralReward(this.award.id,this.award.through);this.nextAt=0;this.update(performance.now());if(this.root)this.root.querySelector('button').disabled=false;}catch{button.disabled=false;}};
+   document.body.append(this.root);
+  }
+  this.award=award;this.root.hidden=!this.ready()||document.hidden;
+  this.root.querySelector('strong').textContent='Congratulations! +'+award.amount.toLocaleString()+' Marks';
+  const count=award.amount/1000;this.root.querySelector('p').textContent=(count===1?'A new player joined':count.toLocaleString()+' new players joined')+' through your invite. Your reward is in your wallet.';
+ }
+}
 export function showReferrals({party,force=false}={}){
  try{if(!force&&localStorage.getItem(HIDE)==='yes')return Promise.resolve();}catch{}
  if(document.querySelector('.referral-screen'))return Promise.resolve();

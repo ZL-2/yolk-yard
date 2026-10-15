@@ -200,7 +200,7 @@ export function buildingTick(sim,p,input){
 export function targetBuild(map,builds,p){
  const hit=aimedObject(map,p,EDIT_RANGE),sight=sightRay(map,p,EDIT_RANGE),o=sight.origin,d=sight.d;
  let best=null,limit=hit?.distance??sight.range;
- for(const b of builds){const grid=editRay(b,o,d,sight.range);if(grid&&(!sight.third||reachablePoint(map,p,grid.point,EDIT_RANGE))&&grid.distance<=limit+.2){best=b;limit=grid.distance;}}
+ for(const b of builds){const grid=editRay(b,o,d,sight.range);if(grid&&(!sight.third||reachablePoint(map,p,grid.point,EDIT_RANGE,b.id))&&grid.distance<=limit+.2){best=b;limit=grid.distance;}}
  return best||builds.find(b=>b.id===hit?.box.buildId)||null;
 }
 export function editBuilding(sim,p,action){
@@ -213,7 +213,7 @@ export function editBuilding(sim,p,action){
  const fail=reason=>{sim.emit('build-result',{player:p.id,buildId:cmd?.id,ok:false,reason});return false;};
  if(!b||!canEdit(b,p)||p.health<=0||p.flight!=='ground')return fail('You cannot edit this structure');
  // Retest line of sight against its original plane; holes remain targetable.
- const sight=sightRay(sim.map,p,EDIT_RANGE),candidate=editRay(b,sight.origin,sight.d,sight.range),ray=candidate&&(!sight.third||reachablePoint(sim.map,p,candidate.point,EDIT_RANGE))?candidate:null;
+ const sight=sightRay(sim.map,p,EDIT_RANGE),candidate=editRay(b,sight.origin,sight.d,sight.range),ray=candidate&&(!sight.third||reachablePoint(sim.map,p,candidate.point,EDIT_RANGE,b.id))?candidate:null;
  const hit=aimedObject(sim.map,p,EDIT_RANGE);
  if(!ray&&hit?.box.buildId!==b.id)return fail('Aim at the structure');
  if(hit&&hit.box.buildId!==b.id&&hit.distance+.2<(ray?.distance??Infinity))return fail('Structure is obstructed');

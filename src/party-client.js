@@ -1,4 +1,4 @@
-import {pendingReferral,clearReferral} from './referrals.js';
+import {pendingReferral,clearReferral,setOwnReferralURL} from './referrals.js';
 import {VERSION} from './data.js';
 import {relayURL} from './relay-peer.js';
 // A separate authenticated lobby session remains connected across room changes.
@@ -7,7 +7,7 @@ export class PartyClient {
  connect(){const endpoint=relayURL();if(!endpoint){this.handlers.status?.('Party service unavailable');return;}const url=new URL(endpoint);url.pathname='/social';this.ws=new WebSocket(url,globalThis.window?.RAVEL_OWNER_SESSION?['ravelfront',`owner.${window.RAVEL_OWNER_SESSION}`]:[]);const ws=this.ws;
   ws.onopen=()=>{let token;try{token=localStorage.getItem('ravelfront-social-identity')||sessionStorage.getItem('yolk-party-token');}catch{}this.helloToken=token;ws.send(JSON.stringify({type:'hello',version:VERSION,token,profile:this.profile,referral:pendingReferral(),visible:!globalThis.document?.hidden&&(globalThis.document?.hasFocus?.()??true)}));};
   ws.onmessage=e=>{if(ws!==this.ws)return;const m=JSON.parse(e.data);if(m.type==='identity-unavailable'){this.blockIdentity(m.message);}
-   else if(m.type==='hello'){if(m.identityReset||this.helloToken&&m.token!==this.helloToken){this.blockIdentity('Your saved Friend Code could not be restored. Your browser credential has been kept.');return;}this.id=m.id;this.code=m.code;this.ready=true;clearReferral();this.referrals=m.referrals;this.handlers.referrals?.(m.referrals);try{localStorage.setItem('ravelfront-social-identity',m.token);sessionStorage.removeItem('yolk-party-token');}catch{}this.handlers.status?.('Connected');}
+   else if(m.type==='hello'){if(m.identityReset||this.helloToken&&m.token!==this.helloToken){this.blockIdentity('Your saved Friend Code could not be restored. Your browser credential has been kept.');return;}this.id=m.id;this.code=m.code;this.ready=true;clearReferral();this.referrals=m.referrals;this.handlers.referrals?.(m.referrals);try{localStorage.setItem('ravelfront-social-identity',m.token);sessionStorage.removeItem('yolk-party-token');}catch{}setOwnReferralURL(this.code);this.handlers.status?.('Connected');}
    else if(m.type==='reply'){const pending=this.pending.get(m.request);if(pending){clearTimeout(pending.timer);this.pending.delete(m.request);m.error?pending.reject(Error(m.error)):pending.resolve(m.result);}}
    else if(m.type==='referrals'){this.referrals=m.referrals;this.handlers.referrals?.(m.referrals);}
    else if(m.type==='deployment')this.handlers.deployment?.(m.deployment);

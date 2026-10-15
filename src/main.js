@@ -29,7 +29,7 @@ import {installLeaderboardScrollbars} from './leaderboard-scroll.js';
 import './menu-hub.css';
 import {crosshairRadius} from './combat.js';
 import './referrals.css';
-import {showReferrals} from './referrals.js';
+import {showReferrals,ReferralRewards} from './referrals.js';
 import {showPerspectiveBriefing} from './perspective-briefing.js';
 import {perspectiveMode,thirdPersonActive} from './perspective.js';
 import {showWelcomeBack} from './welcome-back.js';
@@ -232,6 +232,8 @@ async function openOwnerMapEditor(overview){
  mapEditor=new MapEditor({owner:ownerConsole,overview,onClose:()=>{mapEditor=null;screen='menu';paused=false;view.mapId=null;renderMenu();void refreshPublishedMaps(true);void ownerConsole.refresh();}});
  try{await mapEditor.open();}catch(error){mapEditor?.close();toast('Map editor could not open: '+error.message);}
 }
+let briefingsComplete=false;
+const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerConsole=new OwnerConsole({onMapEditor:openOwnerMapEditor,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 startAnonymousVisits(()=>screen==='game'?(state?.royale?'royale':state?.options?.mode==='teams'?'teams':'ffa'):screen==='lobby'?'lobby':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
@@ -1091,7 +1093,7 @@ function hud() {
   afk.hidden=!(p.afkRemaining<=12&&p.health>0&&!p.spectating);afk.textContent=`You are about to be removed for inactivity. ${p.afkRemaining}s remaining.`;
   const m = mode(state.options.mode);
   const watched=p.spectating?state.players.find(k=>k.id===spectateTarget):null;
-  if(state?.royale){const me=state.players.find(p=>p.id===localId);if(me)buildUI.update(state,me,view.buildMap,controlLabel);}
+  if(state?.royale){const me=state.players.find(p=>p.id===localId);if(me)buildUI.update(state,localBuildPose(me),view.buildMap,controlLabel);}
   royaleUI.update(state,{...p,...localPerspective()},watched,controlLabel,paused);
   fieldUI.update(state,p,true,paused,point=>view.projectMarker(point));
   view.waypoint=royaleUI.waypoint;
@@ -1262,7 +1264,7 @@ function initializeParty(){
  if(needsPlayerName(profile.name))return;
  if(party){party.updateProfile(profile);return;}
  party=new PartyClient(profile,{
-  referrals:record=>{void eggWallet.syncReferrals(record).then(({amount})=>{if(amount)toast('CREW RECRUITED · +'+amount.toLocaleString()+' Marks');if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
+  referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
   status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
@@ -1524,7 +1526,7 @@ function pressControl(code) {
   if(settings.keybinds.startNow.includes(code)){startPrivateRoyale();return;}
   if(settings.keybinds.emotes.includes(code)){openEmotes();return;}
   if(code.startsWith('Wheel')&&state?.royale){
-    const p=state.players.find(p=>p.id===localId),pose=predicted?{...p,...predicted}:p;
+    const p=state.players.find(p=>p.id===localId),pose=localBuildPose(p);
     const eligible=!!p&&p.health>0&&p.flight==='ground'&&buildUI.eligible(state,pose,view.buildMap);
     const intent=wheelIntent(settings.keybinds,code,{royale:true,editing:!!buildUI.edit,eligible});
     if(intent!=='scroll'){
@@ -1558,7 +1560,7 @@ function pressControl(code) {
     if(settings.keybinds.pickaxe.includes(code)){input.slot=0;buildControls.buildMode=false;buildUI.cancel();}
     for(const [key,piece] of [['buildWall','wall'],['buildFloor','floor'],['buildStairs','stairs'],['buildRoof','roof']])if(settings.keybinds[key].includes(code)){buildUI.choose(piece);}
     for(const [key,action] of [['buildToggle','toggle'],['buildRotate','rotate'],['buildMaterial','material']])if(settings.keybinds[key].includes(code))buildUI.action(action);
-    if(settings.keybinds.buildEdit.includes(code)){if(buildUI.edit)buildUI.action('confirm');else{const p=state.players.find(p=>p.id===localId);buildUI.beginEdit(state,predicted?{...p,...predicted}:p,view.buildMap);}}
+    if(settings.keybinds.buildEdit.includes(code)){if(buildUI.edit)buildUI.action('confirm');else{const p=state.players.find(p=>p.id===localId);buildUI.beginEdit(state,localBuildPose(p),view.buildMap);}}
     if(settings.keybinds.buildRepair.includes(code)){if(sim)sim.playerAction(localId,'build-repair');else net?.send({type:'player-action',action:'build-repair'});}
     if(['primary','sidearm','slot3','slot4','slot5'].some(k=>settings.keybinds[k].includes(code))){buildControls.buildMode=false;buildUI.cancel();}
     for(let i=3;i<=5;i++)if(settings.keybinds['slot'+i].includes(code))input.slot=i;
@@ -1695,7 +1697,7 @@ document.addEventListener('click',e=>{
   const rect=e.target.getBoundingClientRect(),size=getMap(state.royale.practice?'sunnybreak':state.options.map).size;sendMarker('map',{x:(e.clientX-rect.left)/rect.width*size*2-size,z:(e.clientY-rect.top)/rect.height*size*2-size});
  }
  if(e.target.closest('[data-build-control="repair"]')){if(sim)sim.playerAction(localId,'build-repair');else net?.send({type:'player-action',action:'build-repair'});}
- if(e.target.closest('[data-build-control="edit"]')){const p=state?.players.find(p=>p.id===localId);if(p)buildUI.beginEdit(state,predicted?{...p,...predicted}:p,view.buildMap);}
+ if(e.target.closest('[data-build-control="edit"]')){const p=state?.players.find(p=>p.id===localId);if(p)buildUI.beginEdit(state,localBuildPose(p),view.buildMap);}
  const emote=e.target.closest('[data-emote]');if(emote)playEmote(emote.dataset.emote);
  if(e.target.closest('button')){sound.unlock();sound.cue('ui-select',null,.45);}
 });
@@ -1781,6 +1783,7 @@ document.addEventListener("graphics-lost", () => {
 });
 function perspectiveSettingsHTML(){return `<div class="setting-row"><label for="perspective" class="setting-label">Camera perspective</label><select id="perspective" data-setting="perspective"><option value="first" ${settings.perspective==='first'?'selected':''}>First person (default)</option><option value="third" ${settings.perspective==='third'?'selected':''}>Third person</option></select></div>`;}
 function localPerspective(){return {perspective:settings.perspective,viewBlend:view.thirdPersonState?.blend??0,viewBoom:view.thirdPersonState?.fraction??1};}
+function localBuildPose(p=state?.players.find(p=>p.id===localId)){return p?{...p,...predicted,...localPerspective(),yaw:input.yaw,pitch:input.pitch,building:!!buildControls.buildMode,editing:!!buildControls.editing}:null;}
 function startPrivateRoyale(){
  if(!net?.isHost||net?.visibility!=='private'||net?.officialPublic||!state?.royale?.practice||!sim||sim.remote)return false;
  const started=sim.beginBattle('host-start');state=sim.snapshot();net.broadcast(state);
@@ -1794,7 +1797,7 @@ function frameInput() {
   buildControls.yaw=input.yaw;buildControls.pitch=input.pitch;
   buildControls.buildFacing=snappedFacing(input.yaw,buildControls.buildMode?buildControls.buildFacing:undefined);
   if(!actionDown('fire')&&!touch.fire)buildControls.suppressBuildFire=false;
-  if(buildUI.edit&&active){const me=predicted||state.players.find(p=>p.id===localId);if(me)buildUI.sample({...me,...localPerspective(),yaw:input.yaw,pitch:input.pitch},actionDown('fire')||touch.fire,!!settings.confirmEditOnRelease);}
+  if(buildUI.edit&&active){const me=localBuildPose();if(me)buildUI.sample(me,actionDown('fire')||touch.fire,!!settings.confirmEditOnRelease);}
   if(buildUI.edit&&!active)buildUI.down=false;
 
   const nextInput = {
@@ -1980,6 +1983,7 @@ function loop(now) {
   $('#hud').classList.toggle('low-health',!!current&&current.health>0&&current.health<25);
   damageFlash = Math.max(0, damageFlash - dt * 1.5);
   $("#damage").style.opacity = damageFlash*(settings.reducedMotion?.25:1);
+  referralRewards.update(now);
   updateFrontMessage($("#notice"),now < noticeUntil);
   updateFrontMessage($("#toast"),now < toastUntil);
   for (const row of $("#feed").children)
@@ -1995,7 +1999,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return showWelcomeBack().then(()=>showReferrals({party})).then(()=>showPerspectiveBriefing());}).then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return showWelcomeBack().then(()=>showReferrals({party})).then(()=>showPerspectiveBriefing());}).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);

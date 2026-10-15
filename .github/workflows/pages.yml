@@ -20,6 +20,7 @@ jobs:
       visual_only: ${{ steps.scope.outputs.visual_only }}
       crew_update: ${{ steps.scope.outputs.crew_update }}
       perspective_update: ${{ steps.scope.outputs.perspective_update }}
+      referral_edit_fix: ${{ steps.scope.outputs.referral_edit_fix }}
       focused: ${{ steps.scope.outputs.focused }}
     steps:
       - uses: actions/checkout@v4
@@ -91,6 +92,10 @@ jobs:
           perspective_core={'src/perspective.js','src/perspective-briefing.js','tests/perspective.test.js'}
           perspective_followup=files<={'.github/workflows/pages.yml','scripts/perspective-browser-check.mjs','docs/UPDATE_157.md'} and perspective_paths(previous,'HEAD^^') and perspective_core<=previous
           perspective=perspective_paths(files) and (perspective_core<=files or perspective_followup)
+          referral_edit_allowed={'.github/workflows/pages.yml','docs/UPDATE_158.md','package.json','package-lock.json','scripts/referral-edit-browser-check.mjs','src/referrals.js','src/referrals.css','src/party-client.js','src/egg-wallet.js','src/main.js','src/perspective.js','src/building.js','src/building-ui.js','src/data.js','src/releases.js','tests/referral-edit-fixes.test.js'}
+          referral_edit_core={'src/referrals.js','src/egg-wallet.js','src/building-ui.js','tests/referral-edit-fixes.test.js'}
+          referral_edit_followup=files<={'.github/workflows/pages.yml','scripts/referral-edit-browser-check.mjs','docs/UPDATE_158.md'} and previous<=referral_edit_allowed and referral_edit_core<=previous
+          referral_edit=files<=referral_edit_allowed and (referral_edit_core<=files or referral_edit_followup)
           for path in ['package.json','package-lock.json']:
             if path not in files: continue
             old=json.loads(subprocess.check_output(['git','show','HEAD^:'+path],text=True));new=json.loads(Path(path).read_text())
@@ -102,9 +107,10 @@ jobs:
             models=models and old==new
             crew=crew and old==new
             perspective=perspective and old==new
+            referral_edit=referral_edit and old==new
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('visual_only',scoped or aircraft or models),('crew_update',crew),('perspective_update',perspective),('focused',scoped or aircraft or models or crew or perspective)]: out.write(key+'='+str(value).lower()+'\n')
-          print('Focused release:',{'ATV':scoped,'Kestrel':aircraft,'Models':models,'Crew':crew,'Perspective':perspective})
+            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('visual_only',scoped or aircraft or models),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('focused',scoped or aircraft or models or crew or perspective or referral_edit)]: out.write(key+'='+str(value).lower()+'\n')
+          print('Focused release:',{'ATV':scoped,'Kestrel':aircraft,'Models':models,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
   build:
     needs: scope
@@ -132,6 +138,9 @@ jobs:
       - name: Perspective, camera, combat, building, rig, controls and replication
         if: needs.scope.outputs.perspective_update == 'true'
         run: node --test tests/perspective.test.js tests/keybinds.test.js tests/comfort.test.js tests/building.test.js tests/building-overhaul.test.js tests/combat-overhaul.test.js tests/crew-update.test.js tests/hitbox.test.js tests/remote-input.test.js tests/field-detail.test.js
+      - name: Referral wallet, URL attribution and third-person wall editing
+        if: needs.scope.outputs.referral_edit_fix == 'true'
+        run: node --test tests/referral-edit-fixes.test.js tests/perspective.test.js tests/building-overhaul.test.js tests/crew-update.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -162,6 +171,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Address-bar referral, deferred reward and host/guest wall editing
+        if: needs.scope.outputs.referral_edit_fix == 'true'
+        run: node scripts/referral-edit-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.referral_edit_fix == 'true'
+        with:
+          name: referral-edit-evidence
+          path: test-results/referral-edit
+          retention-days: 14
       - name: Perspective settings, announcement, host and guest gameplay acceptance
         if: needs.scope.outputs.perspective_update == 'true'
         run: node scripts/perspective-browser-check.mjs

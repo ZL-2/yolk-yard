@@ -1,4 +1,5 @@
-import {direction,wallDistance,worldHit} from './physics.js';
+import {direction,wallDistance,worldHit,candidates,rayBox} from './physics.js';
+import {terrainHit} from './terrain.js';
 import {cameraDistance} from './camera-collision.js';
 import {eyeHeight} from './stance.js';
 import {gun} from './data.js';
@@ -26,10 +27,15 @@ export function sightRay(map,p,range=200){
  const pose=cameraPose(map,p);
  return {...pose,range:range+(pose.third?pose.length*pose.fraction:0)};
 }
-export function reachablePoint(map,p,point,range){
+export function reachablePoint(map,p,point,range,ignoreBuildId=null){
  const eye={x:p.x,y:p.y+eyeHeight(p),z:p.z},delta={x:point.x-eye.x,y:point.y-eye.y,z:point.z-eye.z},length=Math.hypot(delta.x,delta.y,delta.z);
  if(length>range+.12)return false;if(length<.001)return true;
- return wallDistance(map,eye,{x:delta.x/length,y:delta.y/length,z:delta.z/length},length)>=length-.08;
+ const d={x:delta.x/length,y:delta.y/length,z:delta.z/length};
+ if(!ignoreBuildId)return wallDistance(map,eye,d,length)>=length-.08;
+ // Edit controls lie on the original piece plane, inside its own solids.
+ // Exclude only that structure; intervening walls and terrain still block.
+ for(const box of candidates(map,eye,d,length))if(box.buildId!==ignoreBuildId&&rayBox(eye,d,box,length)<length-.08)return false;
+ const ground=terrainHit(map,eye,d,length);return !ground||ground.distance>=length-.08;
 }
 // Convert the camera reticle to a body-origin direction for thrown tools. The
 // simulation still sweeps every projectile from the player, including cover.

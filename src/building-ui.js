@@ -46,7 +46,7 @@ export class BuildingUI{
  renderEdit(){if(!this.edit)return;this.controls.editDraft=this.edit;const valid=validEdit(this.edit);this.controls.editValid=valid;this.root.querySelector('.build-edit').hidden=false;this.root.querySelector('.build-edit').classList.toggle('invalid',!valid||!!this.error);this.root.querySelector('.build-edit strong').textContent=this.edit.type.toUpperCase()+' · EDIT';this.root.querySelector('.edit-status').textContent=this.pending?'CONFIRMING…':this.error||(!valid?'INVALID SELECTION':this.edit.type==='stairs'?'DRAG A CONTINUOUS STAIR PATH':this.edit.type==='roof'?'SELECT CORNERS TO RAISE':'SELECT TILES');}
  sample(pose,held,confirmOnRelease){
   if(!this.edit||this.pending)return;
-  const sight=sightRay(this.map,pose,EDIT_RANGE),candidate=editRay(this.edit,sight.origin,sight.d,sight.range),hit=candidate&&(!sight.third||reachablePoint(this.map,pose,candidate.point,EDIT_RANGE))?candidate:null;
+  const sight=sightRay(this.map,pose,EDIT_RANGE),candidate=editRay(this.edit,sight.origin,sight.d,sight.range),hit=candidate&&(!sight.third||reachablePoint(this.map,pose,candidate.point,EDIT_RANGE,this.edit.id))?candidate:null;
   this.controls.editHover=hit?.cell??-1;
   if(held&&!this.down){this.visited=new Set();this.paint=null;this.previous=null;if(this.edit.type==='stairs')this.edit.path=[];}
   if(held&&hit){
