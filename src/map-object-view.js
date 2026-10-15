@@ -4,6 +4,7 @@ import {dressBuilding,buildingStyle,treeModel,propModel,chestModel} from './roya
 import {FrontierArt,FRONTIER_COLORS} from './frontier-art.js';
 import {prefab,prefabBoxes} from './map-layout.js';
 import {mapAssetUrl} from './map-service.js';
+import {environmentAtlasMaterial,environmentUV,packEnvironmentGeometry,unpackEnvironmentGeometry} from './environment-surfaces.js';
 
 const modelCache=new Map();
 export function normalizeModel(scene){
@@ -18,14 +19,15 @@ export function cachedModel(id){
  return modelCache.get(id);
 }
 export function registerModel(id,model){model.root.traverse(m=>{if(m.isMesh)m.geometry.userData.shared=true;});modelCache.set(id,Promise.resolve(model));}
-export function disposeMapGroup(group){group.userData.details?.close();group.userData.disposed=true;const geos=new Set(),mats=new Set();group.traverse(m=>{m.userData.disposed=true;if(m.geometry&&!m.geometry.userData.shared)geos.add(m.geometry);if(m.material&&(m.isLine||m.isSprite||m.userData.ownedMaterial))for(const mat of Array.isArray(m.material)?m.material:[m.material])mats.add(mat);});for(const g of geos)g.dispose();for(const m of mats){if(m.isSpriteMaterial)m.map?.dispose();m.dispose();}group.clear();}
+export function disposeMapGroup(group){group.userData.details?.close();group.userData.groundCover?.close();group.userData.disposed=true;const geos=new Set(),mats=new Set();group.traverse(m=>{m.userData.disposed=true;if(m.geometry&&!m.geometry.userData.shared)geos.add(m.geometry);if(m.material&&(m.isLine||m.isSprite||m.userData.ownedMaterial))for(const mat of Array.isArray(m.material)?m.material:[m.material])mats.add(mat);});for(const g of geos)g.dispose();for(const m of mats){if(m.isSpriteMaterial)m.map?.dispose();m.dispose();}group.clear();}
 export function bakeObject(group){
  group.updateMatrixWorld(true);const batches=new Map();
- for(const mesh of [...group.children])if(mesh.isMesh&&!mesh.material.map&&!mesh.userData.keepDynamic){
-  const g=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();g.applyMatrix4(mesh.matrix);g.deleteAttribute('uv');const c=mesh.material.color||new THREE.Color(0xffffff);if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3);for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}else if(mesh.material.vertexColors){const colors=g.attributes.color;for(let i=0;i<colors.count;i++)colors.setXYZ(i,colors.getX(i)*c.r,colors.getY(i)*c.g,colors.getZ(i)*c.b);}
-  const key=mesh.material.transparent?'transparent':'opaque';if(!batches.has(key))batches.set(key,{parts:[],ranges:[],vertices:0});const b=batches.get(key);b.parts.push(g);if(mesh.userData.objectId)b.ranges.push({id:mesh.userData.objectId,start:b.vertices,count:g.attributes.position.count});b.vertices+=g.attributes.position.count;group.remove(mesh);if(!mesh.geometry.userData.shared)mesh.geometry.dispose();
+ for(const mesh of [...group.children])if(mesh.isMesh&&(!mesh.material.map||mesh.material.userData.environmentSurface)&&!mesh.userData.keepDynamic){
+  const surface=mesh.material.userData.environmentSurface,foliage=!!mesh.material.userData.environmentFoliage;
+  const g=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();unpackEnvironmentGeometry(g);g.applyMatrix4(mesh.matrix);if(surface)environmentUV(g,surface);else g.deleteAttribute('uv');const c=mesh.material.color||new THREE.Color(0xffffff);if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3);for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}else if(mesh.material.vertexColors||surface){const colors=g.attributes.color;for(let i=0;i<colors.count;i++)colors.setXYZ(i,colors.getX(i)*c.r,colors.getY(i)*c.g,colors.getZ(i)*c.b);}
+  const key=surface?'environment:'+foliage:mesh.material.transparent?'transparent':'opaque';if(!batches.has(key))batches.set(key,{parts:[],ranges:[],vertices:0,material:surface?environmentAtlasMaterial(foliage):null});const b=batches.get(key);b.parts.push(g);if(mesh.userData.objectId)b.ranges.push({id:mesh.userData.objectId,start:b.vertices,count:g.attributes.position.count});b.vertices+=g.attributes.position.count;group.remove(mesh);if(!mesh.geometry.userData.shared)mesh.geometry.dispose();if(mesh.userData.ownedMaterial)mesh.material.dispose();
  }
- for(const b of batches.values()){const geometry=mergeGeometries(b.parts);for(const p of b.parts)p.dispose();geometry.computeBoundingSphere();const material=new THREE.MeshLambertMaterial({vertexColors:true}),mesh=new THREE.Mesh(geometry,material);mesh.userData.ownedMaterial=true;mesh.userData.objectRanges=b.ranges;mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);}
+ for(const b of batches.values()){const geometry=mergeGeometries(b.parts);for(const p of b.parts)p.dispose();geometry.userData.environmentAtlas=!!b.material;packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const material=b.material||new THREE.MeshLambertMaterial({vertexColors:true}),mesh=new THREE.Mesh(geometry,material);mesh.userData.ownedMaterial=!b.material;mesh.userData.objectRanges=b.ranges;mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);}
 }
 export function makeMapObject(record,kit,{base,markers=false,loadModels=true,editorPreview=false,previewDoorIds=null}={}){
  const root=new THREE.Group(),content=new THREE.Group();root.add(content);root.name=record.name||record.kind||record.source;root.userData.editorId=record.id;

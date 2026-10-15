@@ -2,6 +2,8 @@ import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay} from './perspective.
 import {ThrowablePreview} from './throwable-view.js';
 import {weaponMotion} from './weapon-motion.js';
 import {modelMaterial,MODEL_ART_REVISION} from './model-surfaces.js';
+import {updateEnvironmentSurfaces,environmentSurfaceDiagnostics} from './environment-surfaces.js';
+import {updateTerrainEnvironment,terrainDetailDiagnostics} from './terrain-detail.js';
 import {decorateBoss,updateCelebration} from './celebration-view.js';
 import {updateBossAlert} from './boss-alert-view.js';
 import {authoredBoxes} from './building.js';
@@ -271,6 +273,7 @@ export class View {
   }
   disposeGroup(group) {
     group.userData.details?.close();
+    group.userData.groundCover?.close();
     group.traverse((o) => {
       if (o.isSkinnedMesh) o.skeleton?.dispose();
       if (o.isLine) { o.geometry.dispose(); o.material.dispose(); }
@@ -325,7 +328,7 @@ export class View {
     this.mapId = id;
     this.needsMapCompile=true;
     const map = getMap(id);
-    this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;
+    this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;delete this.world.userData.groundCover;delete this.world.userData.terrainEnvironment;
     this.scene.background = new THREE.Color(map.sky);
     this.scene.fog = new THREE.Fog(map.theme==='royale'?0xc1e6f0:map.sky, map.theme==='royale'?280:72, map.theme==='royale'?1050:175);
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;
@@ -335,7 +338,7 @@ export class View {
       const pending=this.preparedBattle;
       // A full-human early departure may arrive before preparation finishes.
       if(!pending.done)for(const _ of pending.steps){}
-      this.world.add(...pending.group.children.slice());if(pending.group.userData.details)pending.group.userData.details.attach(this.world);this.preparedBattle=null;
+      this.world.add(...pending.group.children.slice());if(pending.group.userData.details)pending.group.userData.details.attach(this.world);if(pending.group.userData.groundCover)pending.group.userData.groundCover.attach(this.world);this.world.userData.terrainEnvironment=pending.group.userData.terrainEnvironment;this.preparedBattle=null;
     }else (map.theme==='royale'?buildIsland:buildArena)(this.world, map.authored?{...map,boxes:map.authored}:map, { block, ball, cylinder, mat, palette });
     for (let i = 0; i < 2; i++) {
       const [x, z] = map.bases[i];
@@ -431,6 +434,7 @@ export class View {
     }
     return {
       streaming:this.world.userData.details?.diagnostics()||null,
+      environment:{terrain:terrainDetailDiagnostics(this.world),surfaces:environmentSurfaceDiagnostics(),groundCover:this.world.userData.groundCover?.diagnostics()||null},
       renderPool:this.renderPool?.diagnostics(),
       geometryBytes:(()=>{const seen=new Set();let bytes=0;this.world.traverse(m=>{if(m.geometry&&!seen.has(m.geometry)){seen.add(m.geometry);for(const a of Object.values(m.geometry.attributes))bytes+=a.array.byteLength;}});return bytes;})(),
       lobbyBounds,
@@ -772,6 +776,8 @@ export class View {
     if(playing)this.loadMap(state?.options.map || "yard");
     if(playing&&state?.royale?.practice&&!state.options.training)this.prepareBattleMap();
     this.world.visible=playing;
+    updateEnvironmentSurfaces(this.clock);
+    if(playing){const detailQuality=this.frameAverage>1/48?'low':this.settings.quality;updateTerrainEnvironment(this.world,this.clock,detailQuality);this.world.userData.groundCover?.update(predicted||local,{quality:detailQuality,time:this.clock});}
     if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x6f9295;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(playing&&map.theme==='royale'?0xc1e6f0:sky,playing?(map.theme==='royale'?280:72):35,playing?(map.theme==='royale'?1050:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
     if(this.lobbyStage)this.lobbyStage.visible=!playing;
