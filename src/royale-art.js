@@ -8,6 +8,9 @@ import {makeBlaster,makeGroundBlaster} from './weapons.js';
 import {ITEMS,RARITIES} from './royale-data.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {modelMaterial,surfaceUV,surfaceAtlasMaterial} from './model-surfaces.js';
+import {environmentTree} from './environment-trees.js';
+import {detailEnvironmentProp} from './environment-props.js';
+import {environmentKit} from './environment-surfaces.js';
 
 // Shared primitives stay inexpensive even in the island's dense groves.
 const geometry=new Map();
@@ -133,29 +136,12 @@ export function dressBuilding(g,b,raw){
  const badge=cylinder(g,x,h-.55,z+d/2+.6,.32,.08,s.trim,12);badge.rotation.x=Math.PI/2;
  rock(g,x,h-.55,z+d/2+.68,.16,.21,.04,s.roof,1);
 }
-export function treeModel(g,t,raw){
- const {cone,beam,rock,torus}=artKit(raw),{x,y,z,h,kind,seed}=t;
- cone(g,x,y+h*.3,z,.44,h*.6,kind==='palm'?0xad8d60:0x80604c,.55);
- if(kind==='palm'){
-  for(let j=0;j<6;j++)cone(g,x,y+.7+j*h*.075,z,.38-j*.012,.07,0xc6a877,.95);
-  for(let i=0;i<7;i++){const a=i*Math.PI*2/7+seed,dx=Math.cos(a),dz=Math.sin(a);beam(g,[x,y+h*.68,z],[x+dx*3.7,y+h*.63,z+dz*3.7],.1,0x628c4a);
-   const leaf=rock(g,x+dx*2,y+h*.76,z+dz*2,.64,.32,2.7,i%2?0x709d50:0x87b25b);leaf.rotation.y=Math.PI/2-a;leaf.rotation.z=dx*.15;
-  }
-  for(let i=0;i<3;i++)rock(g,x+Math.cos(i*2)*.4,y+h*.65,z+Math.sin(i*2)*.4,.25,.3,.25,0x876141,1);
- }else if(kind==='pine'){
-  for(let j=0;j<4;j++)cone(g,x,y+h*(.42+j*.15),z,2.8-j*.48,h*.39,[0x3d7868,0x4b8d70,0x629b72,0x84ae7d][j]);
- }else{
-  const colors=kind==='autumn'?[0xd89356,0xe4ae61,0xc97950]:kind==='orchard'?[0x668b49,0x7d9e52,0x95b85f]:[0x518563,0x66986b,0x8ab579];
-  for(let i=0;i<5;i++){const a=i*2.4+seed,dx=Math.cos(a)*1.5,dz=Math.sin(a)*1.5;
-   beam(g,[x,y+h*.38,z],[x+dx,y+h*.67,z+dz],.14,0x80604c);
-   const leaf=rock(g,x+dx,y+h*(.67+(i%2)*.12),z+dz,2.4,2.1,2.3,colors[i%3],1);leaf.rotation.y=a;
-   if(kind==='orchard')for(let j=0;j<3;j++)rock(g,x+dx+Math.cos(j*2)*1.9,y+h*.65,z+dz+Math.sin(j*2)*1.9,.19,.21,.19,0xe2a24d,1);
-  }
- }
-}
+export function treeModel(g,t,raw,detail=true){return environmentTree(g,t,detail);}
 export function propModel(g,p,raw){
- if(islandProp(g,p,raw))return;
- const {block:box,cone,rock,cylinder,torus,beam}=artKit(raw),{x,y=0,z,w,d,h,kind}=p;
+ if(detailEnvironmentProp(g,p,raw))return;
+ const enhanced=environmentKit(raw,['logs','crate','bench','fence'].includes(p.kind)?'wood':'paint');
+ if(islandProp(g,p,enhanced))return;
+ const {block:box,cone,rock,cylinder,torus,beam}=artKit(enhanced),{x,y=0,z,w,d,h,kind}=p;
  if(kind==='target'){
   cylinder(g,x,y+.75,z,.08,1.5,0x6b7961,8);box(g,x,y+.12,z,1.1,.24,.65,0x9c8061);
   rock(g,x,y+1.65,z,.58,.77,.14,0xfff3d2,2);

@@ -12,7 +12,10 @@ import {glidePose} from './glide-pose.js';
 import {lootHeight} from './loot-motion.js';
 import {nearbyItems,itemById} from './nearby-items.js';
 import {ROYALE_MAP} from './royale-map.js';
-import {groundAt,terrainColor} from './terrain.js';
+import {groundAt} from './terrain.js';
+import {buildDetailedTerrain,createDetailedOcean} from './terrain-detail.js';
+import {environmentAtlasMaterial,environmentUV,packEnvironmentGeometry,unpackEnvironmentGeometry} from './environment-surfaces.js';
+import {EnvironmentGroundCover} from './environment-groundcover.js';
 import {updateBuildingView} from './building-view.js';
 import {shopItem} from './shop-catalog.js';
 import {makeShopGlider,makeShopTrail} from './shop-models.js';
@@ -35,41 +38,15 @@ export function bake(group,chunked=false,colored=chunked){for(const _ of bakeSte
 function* bakeSteps(group,chunked=false,colored=chunked){
  group.updateMatrixWorld(true);const batches=new Map();
  for(const o of [...group.children])if(o.isMesh&&!o.userData.ownedMaterial&&!o.userData.keepDynamic){
-  const key=(colored?'color':o.material.uuid)+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');if(!batches.has(key))batches.set(key,{mat:colored?bakedMaterial:o.material,parts:[],ranges:[],vertices:0});
-  const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrix);
-  if(colored){g.deleteAttribute('uv');if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3),c=o.material.color;for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}}
+  const surface=o.material.userData.environmentSurface,foliage=!!o.material.userData.environmentFoliage;
+  const key=(colored?(surface?'environment:'+foliage:'color'):o.material.uuid)+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');if(!batches.has(key))batches.set(key,{mat:colored?(surface?environmentAtlasMaterial(foliage):bakedMaterial):o.material,parts:[],ranges:[],vertices:0});
+  const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();unpackEnvironmentGeometry(g);g.applyMatrix4(o.matrix);
+  if(colored){if(surface)environmentUV(g,surface);else g.deleteAttribute('uv');if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3),c=o.material.color;for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}else if(surface){const a=g.attributes.color,c=o.material.color;for(let i=0;i<a.count;i++)a.setXYZ(i,a.getX(i)*c.r,a.getY(i)*c.g,a.getZ(i)*c.b);}}
   const batch=batches.get(key);if(o.userData.objectId)batch.ranges.push({id:o.userData.objectId,start:batch.vertices,count:g.attributes.position.count});batch.vertices+=g.attributes.position.count;batch.parts.push(g);group.remove(o);
   if(o.geometry.type==='CylinderGeometry'&&!o.geometry.userData.shared)o.geometry.dispose();
   yield;
  }
- for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;mesh.updateMatrix();mesh.matrixAutoUpdate=false;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);yield;}
-}
-// Roads are the terrain's own triangles, not floating intersecting ribbons.
-// One surface also makes intersections a union instead of duplicate road meshes.
-function roadColor(map,x,z){
- if(map.buildings.some(b=>Math.abs(x-b.x)<b.w/2+.4&&Math.abs(z-b.z)<b.d/2+.4))return null;
- for(const road of map.roads)for(let i=1;i<road.points.length;i++){
-  const [ax,az]=road.points[i-1],[bx,bz]=road.points[i],dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));
-  if(Math.hypot(x-ax-t*dx,z-az-t*dz)<=road.width/2)return road.kind==='runway'?0x34424a:road.kind==='taxiway'?0x56646b:road.kind==='path'?0x9d9275:0x687473;
- }
- return null;
-}
-function* buildTerrain(world,map){
- const t=map.terrain,material=new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true});
- for(let cz=0;cz<t.n-1;cz+=32)for(let cx=0;cx<t.n-1;cx+=32){
-  const positions=[],colors=[];
-  for(let z=cz;z<Math.min(cz+32,t.n-1);z++){for(let x=cx;x<Math.min(cx+32,t.n-1);x++){
-   const points=[[x,z],[x,z+1],[x+1,z],[x+1,z+1]].map(([ix,iz])=>[ix*t.cell-t.size,t.heights[iz*t.n+ix],iz*t.cell-t.size]);
-   for(const triangle of [[0,1,2],[2,1,3]]){
-    const wx=triangle.reduce((n,i)=>n+points[i][0],0)/3,wz=triangle.reduce((n,i)=>n+points[i][2],0)/3;
-    const road=roadColor(map,wx,wz),c=new THREE.Color(road??terrainColor(map,wx,wz));
-    if(road==null)c.multiplyScalar(1+Math.sin(wx*.07)*Math.sin(wz*.09)*.045);
-    for(const i of triangle){positions.push(...points[i]);colors.push(c.r,c.g,c.b);}
-   }
-  }yield;}
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.computeVertexNormals();geometry.computeBoundingSphere();
-  const m=new THREE.Mesh(geometry,material);m.receiveShadow=true;m.userData.ownedMaterial=true;world.add(m);yield;
- }
+ for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.userData.environmentAtlas=!!b.mat.userData.environmentAtlas;packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;mesh.updateMatrix();mesh.matrixAutoUpdate=false;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);yield;}
 }
 export function islandLabel(text,size=1){
  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=96;
@@ -81,8 +58,8 @@ export function buildIsland(world,map,kit){for(const _ of buildIslandSteps(world
 export function* buildIslandSteps(world,map,kit){
  if(map.id==='sunnybreak'){yield* streamedIslandSteps(world,map,kit);buildMapObjects(world,map,kit);return;}
  const {block,palette}=kit;
- const ocean=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800),new THREE.MeshLambertMaterial({color:0x4195ad,transparent:true,opacity:.87}));ocean.rotation.x=-Math.PI/2;ocean.position.y=.5;ocean.userData.ownedMaterial=true;world.add(ocean);
- yield* buildTerrain(world,map);
+ world.add(createDetailedOcean(map));
+ yield* buildDetailedTerrain(world,map);
  const byBuilding=map.buildings.map(()=>[]),treeBoxes=new Map(),propBoxes=new Map();
  for(const b of map.boxes){
   if(b.editorObject)continue;
@@ -100,36 +77,37 @@ export function* buildIslandSteps(world,map,kit){
  }
  for(const [i,t]of map.trees.entries()){if(t.editorHidden)continue;const start=world.children.length;treeModel(world,t,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=treeBoxes.get(i)?.objectId;yield;}
  for(const [i,p]of map.props.entries()){if(p.editorHidden)continue;const start=world.children.length;propModel(world,p,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=propBoxes.get(i)?.objectId;yield;}
- yield* bakeSteps(world,true);buildMapObjects(world,map,kit);
+ yield* bakeSteps(world,true);buildMapObjects(world,map,kit);new EnvironmentGroundCover(world,map);
  // Landmark names remain on the map; the world has no floating signs.
 }
 function* streamedIslandSteps(world,map,kit){
- const ocean=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800),new THREE.MeshLambertMaterial({color:0x4195ad}));ocean.rotation.x=-Math.PI/2;ocean.position.y=.5;ocean.userData.ownedMaterial=true;world.add(ocean);
- yield* buildTerrain(world,map);
+ world.add(createDetailedOcean(map));
+ yield* buildDetailedTerrain(world,map);
  const cells=new Map(),cellFor=(x,z)=>{const ix=Math.floor(x/64),iz=Math.floor(z/64),key=ix+':'+iz;if(!cells.has(key))cells.set(key,{key,x:(ix+.5)*64,z:(iz+.5)*64,radius:48,boxes:[],buildings:[],trees:[],props:[],coarse:new THREE.Group()});return cells.get(key);};
  for(const b of map.boxes){if(b.editorObject)continue;const parent=b.building===undefined?b:map.buildings[b.building];cellFor(parent.x,parent.z).boxes.push(b);}
  for(const b of map.buildings)if(!b.editorHidden)cellFor(b.x,b.z).buildings.push(b);
  for(const t of map.trees)if(!t.editorHidden)cellFor(t.x,t.z).trees.push(t);
  for(const p of map.props)if(!p.editorHidden)cellFor(p.x,p.z).props.push(p);
+ const treeIds=new Map(),propIds=new Map(),buildingBoxes=new Map();for(const b of map.boxes){if(b.tree!==undefined)treeIds.set(map.trees[b.tree],b.objectId);if(b.prop!==undefined)propIds.set(map.props[b.prop],b.objectId);if(b.building!==undefined){const owner=map.buildings[b.building];if(!buildingBoxes.has(owner))buildingBoxes.set(owner,[]);buildingBoxes.get(owner).push(b);}}
  const color=b=>{const s=b.building===undefined?null:buildingStyle(map.buildings[b.building]);return s?(b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:b.color==='foundation'?0x8e988a:s.wall):typeof b.color==='number'?b.color:kit.palette[b.color]||0x9cb7aa;};
  function* draw(cell,group,detail){
   for(const b of cell.boxes){if(['tree','prop','roof-collider','door','parked-aircraft'].includes(b.kind))continue;const m=kit.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b));m.userData.objectId=b.objectId;yield;}
   for(const b of cell.buildings){
-   if(detail){const start=group.children.length;dressBuilding(group,b,kit);const boxes=cell.boxes.filter(o=>o.building!==undefined&&map.buildings[o.building]===b);for(const mesh of group.children.slice(start)){let best=null,d=Infinity;for(const o of boxes){const distance=(o.x-mesh.position.x)**2+(o.y+o.h/2-mesh.position.y)**2+(o.z-mesh.position.z)**2;if(distance<d){d=distance;best=o;}}if(best)mesh.userData.objectId=best.objectId;}}
+   if(detail){const start=group.children.length;dressBuilding(group,b,kit);const boxes=buildingBoxes.get(b)||[];for(const mesh of group.children.slice(start)){let best=null,d=Infinity;for(const o of boxes){const distance=(o.x-mesh.position.x)**2+(o.y+o.h/2-mesh.position.y)**2+(o.z-mesh.position.z)**2;if(distance<d){d=distance;best=o;}}if(best)mesh.userData.objectId=best.objectId;}}
    else if(b.roof==='gable'){const m=artKit(kit).cone(group,b.x,(b.baseY||0)+b.h+.8,b.z,Math.min(b.w,b.d)*.55,1.6,buildingStyle(b).roof);m.scale.z=b.d/Math.max(1,b.w);m.userData.objectId=cell.boxes.find(o=>o.building!==undefined&&map.buildings[o.building]===b&&o.color==='roof')?.objectId;}
    yield;
   }
-  for(const t of cell.trees){const start=group.children.length;if(detail)treeModel(group,t,kit);else {kit.cylinder(group,t.x,t.y+t.h*.3,t.z,.22,t.h*.6,0x6b5946);artKit(kit).cone(group,t.x,t.y+t.h*.68,t.z,2.4,t.h*.6,t.kind==='autumn'?0xae8856:0x52775c);}
-   const id=cell.boxes.find(b=>b.tree!==undefined&&map.trees[b.tree]===t)?.objectId;for(const m of group.children.slice(start))m.userData.objectId=id;yield;
+  for(const t of cell.trees){const start=group.children.length;treeModel(group,t,kit,detail);
+   const id=treeIds.get(t);for(const m of group.children.slice(start))m.userData.objectId=id;yield;
   }
   for(const p of cell.props){const start=group.children.length;if(detail)repeatedProp(group,p,kit);else if(['dome','bio-dome','beacon','crane','drill','waterwheel','telescope','radar','dish','antenna'].includes(p.kind))propModel(group,p,kit);else{const b=cell.boxes.find(b=>b.prop!==undefined&&map.props[b.prop]===p);if(b&&Math.max(b.w,b.d,b.h)>2)kit.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b));}
-   const id=cell.boxes.find(b=>b.prop!==undefined&&map.props[b.prop]===p)?.objectId;for(const m of group.children.slice(start))m.userData.objectId=id;yield;
+   const id=propIds.get(p);for(const m of group.children.slice(start))m.userData.objectId=id;yield;
   }
   yield* bakeSteps(group,false,true);
  }
  for(const cell of cells.values()){yield* draw(cell,cell.coarse,false);world.add(cell.coarse);yield;}
  const dispose=group=>{group.traverse(m=>{if(m.geometry&&!m.geometry.userData.shared)m.geometry.dispose();if(m.userData.ownedMaterial)m.material?.dispose();});group.clear();};
- const details=new WorldDetails(world,[...cells.values()],cell=>{const group=new THREE.Group();return {group,steps:draw(cell,group,true)};},dispose);world.userData.details=details;
+ const details=new WorldDetails(world,[...cells.values()],cell=>{const group=new THREE.Group();return {group,steps:draw(cell,group,true)};},dispose);world.userData.details=details;new EnvironmentGroundCover(world,map);
 }
 function canopy(kit,color=0xffcf64){const g=gliderModel(kit,color);bake(g,false,true);return g;}
 export class RoyaleView{
