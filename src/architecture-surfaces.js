@@ -112,3 +112,6 @@ export function architectureKit(raw={},building={}){
  return k;
 }
 export function architectureSurfaceDiagnostics(){return {revision:ARCHITECTURE_REVISION,surfaceKinds:ARCHITECTURE_SURFACES.length,atlas:[width,height],materials:materials.size,geometryTemplates:geometries.size,textureBytes:width*height*4*4+kindMaps.size*tile*tile*4*4};}
+
+let architectureWarmed=false;
+export function warmArchitectureSurfaces(){if(architectureWarmed)return;for(const kind of ARCHITECTURE_SURFACES)architectureMaterial(0xffffff,kind);architectureAtlasMaterial();architectureWarmed=true;}

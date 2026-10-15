@@ -1,0 +1,15 @@
+# Update 161 — Field Control
+
+Version 5.14.0, gameplay protocol 56, Ravel Coast layout revision 11.
+
+- Video settings offer 30, 60 (default), 90, 120, 144 FPS and Unlimited. The saved render cap is independent of the fixed simulation/input clock. Fractional deadlines support display refresh rates that are not integer multiples of the cap. Adaptive detail thresholds account for an intentional 30 FPS cap.
+- Analytic scenery shapes replace broad bounding boxes for rocks, tree trunks, lamps, bollards, barrels and tanks. Bushes/crops are traversable foliage. Rays, body movement, curved support, navigation, loot and vehicle support use the same shape data. Destruction ownership and quarter-turn editor transforms are preserved without extra broadphase records.
+- Airborne supply canopies take 100 damage before cutting loose. Hitscan, swept projectiles and exposed explosion damage respect nearer cover/targets. The crate accelerates continuously, lands once on actual support and retains its contents. Health, cut timing and landing survive snapshots and host recovery. A positional fabric/pop cue and parachute/crate map markers communicate the change.
+- Northfield Overwatch, Aster Perimeter Post, Coastwatch Outpost and Breakwater Overwatch add four elevated decks, four wrapping stair flights, railings, top cover, radio/light equipment, eight loot positions and two guaranteed chests per tower. Small pads blend into open terrain. Distant shells and nearby atlas batches keep them inexpensive.
+- Vault doors use a stable broadphase record and an animated oriented leaf matching the visible hinge. Available gaps become passable during opening; the actual leaf remains solid. Host and guest use the same time and geometry.
+- Local elimination confirmations move to the lower center. Crouching from rest cannot initiate a slide, and downhill terrain forces apply only on real terrain contact rather than through elevated ramps.
+- Operator IK updates only required ancestor transforms instead of entire rig subtrees. Empty muzzle-effect queues skip actor matrix traversal. Shared architecture surfaces warm during loading before detail streaming.
+
+Focused verification covers every FPS/display cadence, toggle crouch on elevated ramps, actual scenery factory/ray agreement, editor transforms and destruction, supply damage/occlusion/projectiles/landing/replication, every stair and floor at all four tower rotations, moving vault gaps, real public host migration and browser settings/rendering. A 48-operator CPU comparison against Update 160 matched final matrices over 300 varied poses and measured about 42% less animation work. Idle muzzle traversal fell from about 0.42 ms to below 0.001 ms per pass. Nearby scenery geometry memory grew about 1.6%, distant shells about 3.4%, including all four towers. These are workload measurements, not promised device FPS or network latency reductions.
+
+Publication is authorized without waiting for matches to empty. Deployment retains the existing matching website/relay release and live private host/guest verification.

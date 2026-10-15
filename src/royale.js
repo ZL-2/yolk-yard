@@ -1,3 +1,4 @@
+import {supplyHit,damageSupply,tickSupplyDrops,blastSupply} from './supply-drops.js';
 import {SMOKE_RULES} from './throwables.js';
 import {recordCombatDamage} from './combat-feedback.js';
 import {henchmanAwake} from './henchmen.js';
@@ -328,6 +329,8 @@ export class RoyaleSimulation extends Simulation {
   this.emit('royale-cue',{player:p.id,cue:'complete-'+use.id,x:p.x,y:p.y,z:p.z});
  }
  cancelUse(p,reason='action'){cleanHealingUse(p);if(p.use)this.emit('royale-cue',{player:p.id,cue:'use-cancel',reason:Object.hasOwn(USE_CANCEL_REASONS,reason)?reason:'action'});p.use=null;}
+ supplyHit(o,d,max,radius=0){return supplyHit(this,o,d,max,radius);}
+ damageSupply(c,amount,attacker){return damageSupply(this,c,amount,attacker);}
  reload(p){if(!canFight(p)||!p.inventory[p.slot]?.weapon)return false;this.syncInventory(p);const accepted=super.reload(p);if(accepted&&(p.boss||p.henchman))requestBossVoice(this,p,'reload');return accepted;}
  fire(p,burst=false){
   if(p.vehicleId&&p.vehicleSeat===0)return false;
@@ -545,7 +548,7 @@ export class RoyaleSimulation extends Simulation {
    if(!warmup&&this.storm.active&&(this.storm.radius<=.01||Math.hypot(p.x-this.storm.x,p.z-this.storm.z)>this.storm.radius)){if(this.alive>1)this.damage(p,null,this.storm.dps*actorDt,'Storm');}
 
   }
-  for(const chest of this.chests)if(chest.landAt&&this.time>=chest.landAt&&!chest.landed){chest.landed=true;this.emit('royale-cue',{cue:'supply-land',x:chest.x,y:chest.y,z:chest.z});}
+  tickSupplyDrops(this);
   this.pads=this.pads.filter(p=>p.until>this.time);
   constructionTick(this);
   this.updateProjectiles(dt);
@@ -592,7 +595,7 @@ export class RoyaleSimulation extends Simulation {
  explode(b){
   if(b.throwable==='smoke'){this.smokes??=[];if(this.smokes.length>=12)this.smokes.shift();this.smokes.push({id:++this.lootId,x:b.x,y:b.y+1.1,z:b.z,radius:SMOKE_RULES.radius,born:this.time,until:this.time+SMOKE_RULES.duration});this.emit('royale-cue',{cue:'complete-smoke',player:b.owner,x:b.x,y:b.y,z:b.z});return;}
   const config=b.popper?UTILITY_WEAPONS.popper:weapon(b.weapon);
-  if(!b.popper&&(b.travelled||0)<config.minRange)return;super.explode(b);
+  if(!b.popper&&(b.travelled||0)<config.minRange)return;super.explode(b);blastSupply(this,b,this.players.get(b.owner),config);
   for(const v of this.vehicles||[]){const distance=Math.hypot(v.x-b.x,v.y+.65-b.y,v.z-b.z);if(distance<config.splashRadius)this.damageVehicle(v,(b.buildDamage??config.buildDamage)*(v.id===b.directVehicle?1:1-distance/config.splashRadius),this.players.get(b.owner));}
   const radius=config.splashRadius,seen=new Set();
   for(const box of [...this.map.boxes]){const id=box.buildId||box.objectId;if(seen.has(id))continue;
@@ -609,7 +612,7 @@ export class RoyaleSimulation extends Simulation {
  snapshot({includeLoot=true,includeBuilds=true}={}){
   const state=super.snapshot();state.options={...state.options,map:this.map.id};
   state.players=state.players.map(p=>{const source=this.players.get(p.id);return Object.assign(p,{fieldOrders:source.fieldOrders?.map(o=>({...o})),tutorial:source.tutorial?{...source.tutorial}:null,training:!!this.options.training,grapple:source.grapple?structuredClone(source.grapple):null,shadowstep:source.shadowstep?{...source.shadowstep}:null,aimBreakUntil:source.aimBreakUntil,traversal:source.traversal?structuredClone(source.traversal):null,traversalLock:source.traversalLock,swapUid:source.swapUid,swapProgress:source.swapProgress||0,emote:source.emote?{...source.emote}:null,crown:!!source.crown,crownWins:source.crownWins||0,crownEmoteUnlocked:!!source.crownEmoteUnlocked,crownedVictory:!!source.crownedVictory,crownPulseAt:source.crownPulseAt,henchman:!!source.henchman,bossId:source.bossId,bossAlert:source.bossAlert,bossSuspicion:source.bossSuspicion,bossAlertAt:source.bossAlertAt,bossWindup:source.bossWindup?{...source.bossWindup}:null,bossVeil:source.bossVeil?{...source.bossVeil,goal:{...source.bossVeil.goal}}:null,cacheProgress:source.cacheProgress||0,vaultProgress:source.vaultProgress,boss:source.boss,maxHealth:source.maxHealth,maxShield:source.maxShield,contestant:source.contestant,lateSpectator:source.lateSpectator,fall:source.fall?{...source.fall}:null,redeploy:source.redeploy,forceGlider:source.forceGlider,launchVelocity:source.launchVelocity?{...source.launchVelocity}:null,lastHarvest:source.lastHarvest,materials:{...source.materials},building:source.building,editing:source.editing,buildType:source.buildType,buildMaterial:source.buildMaterial,buildRotation:source.buildRotation,buildFacing:source.buildFacing,swingAt:source.swingAt,inventory:source.inventory?.map(i=>i?{...i}:null),bank:{...source.bank},shield:source.shield,stamina:source.stamina,sprinting:source.sprinting,exhausted:source.exhausted,sprintRest:source.sprintRest,flight:source.flight,flightLatch:source.flightLatch,eliminated:source.eliminated,eliminatedAt:source.eliminatedAt,place:source.place,use:source.use?{...source.use}:null,chestId:source.chestId,chestProgress:source.chestProgress||0});});
-  state.publicRestartAt=this.publicRestartAt;state.royale={operations:this.operations?structuredClone(this.operations):null,vehicles:(this.vehicles||[]).map(v=>({...v,seats:[...v.seats]})),matchEnd:this.stormSteps.at(-1)?.end||600,bossCaches:structuredClone(this.bossCaches||[]),doors:structuredClone(this.doors||{}),vault:this.vault?{...this.vault}:null,vaults:structuredClone(this.vaults||[]),relays:structuredClone(this.relays||[]),smokes:structuredClone(this.smokes||[]),markers:(this.markers||[]).filter(m=>m.until>this.time).map(m=>({...m})),stage:this.stage,accepting:acceptsContestants(this.stage),practice:isWarmup(this.stage),contestants:[...this.players.values()].filter(p=>p.contestant).length,round:this.round,...(includeBuilds?{builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage)}:{}),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,...(includeLoot?{loot:snapshotLoot(this).loot,chests:snapshotLoot(this).chests}:{}),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds,countdownStarted:!!this.queueEnds,humanContestants:this.humanContestants().length,botContestants:[...this.players.values()].filter(p=>p.bot&&p.contestant).length,humanLimit:Math.min(this.options.capacity,MAX_HUMANS),startReason:this.startReason};
+  state.publicRestartAt=this.publicRestartAt;state.royale={time:this.time,operations:this.operations?structuredClone(this.operations):null,vehicles:(this.vehicles||[]).map(v=>({...v,seats:[...v.seats]})),matchEnd:this.stormSteps.at(-1)?.end||600,bossCaches:structuredClone(this.bossCaches||[]),doors:structuredClone(this.doors||{}),vault:this.vault?{...this.vault}:null,vaults:structuredClone(this.vaults||[]),relays:structuredClone(this.relays||[]),smokes:structuredClone(this.smokes||[]),markers:(this.markers||[]).filter(m=>m.until>this.time).map(m=>({...m})),stage:this.stage,accepting:acceptsContestants(this.stage),practice:isWarmup(this.stage),contestants:[...this.players.values()].filter(p=>p.contestant).length,round:this.round,...(includeBuilds?{builds:this.builds.map(b=>({...b})),worldDamage:structuredClone(this.worldDamage)}:{}),buildVersion:this.buildVersion,matchId:this.matchId,elapsed:this.elapsed,alive:this.alive,route:this.route,storm:this.storm,lootVersion:this.lootVersion,...(includeLoot?{loot:snapshotLoot(this).loot,chests:snapshotLoot(this).chests}:{}),pads:this.pads.map(p=>({...p})),winnerId:this.winnerId,placements:this.placements.map(p=>({...p})),queueEnds:this.queueEnds,countdownStarted:!!this.queueEnds,humanContestants:this.humanContestants().length,botContestants:[...this.players.values()].filter(p=>p.bot&&p.contestant).length,humanLimit:Math.min(this.options.capacity,MAX_HUMANS),startReason:this.startReason};
   state.royale.teams=Object.values(this.matchTeams||{}).filter(t=>t.members.length).map(t=>({...t,members:[...t.members]}));state.royale.winnerTeam=this.winnerTeam??-1;state.royale.teamsAlive=livingTeams(this.options,this.players.values()).size;
   return state;
  }

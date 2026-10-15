@@ -2,7 +2,7 @@ import {mapVaults,vaultState,vaultOpen,VAULT_DOOR_SECONDS} from './vaults.js';
 import {canFight,bodyHeight} from './stance.js';
 import {dist,direction,wallDistance,worldHit,canStand,RADIUS} from './physics.js';
 import {rebuildMap} from './building.js';
-import {WORLD_RULES} from './world-rules.js';
+import {WORLD_RULES,updateDoorCollisions} from './world-rules.js';
 export {WORLD_RULES};
 export function initializeFrontier(sim,{rebuild=true}={}){sim.doors=Object.fromEntries((sim.map.doors||[]).map(d=>[d.id,{open:false,changedAt:-100}]));sim.vaults=mapVaults(sim.map).map(v=>({id:v.id,open:false,openedAt:0}));sim.vault=sim.vaults[0]||null;if(rebuild)rebuildMap(sim);}
 export function doorNear(map,p,range=WORLD_RULES.doorRange){const d=direction(p.yaw);let best,bestDistance=Infinity;for(const o of map.doors||[]){const x=o.x-p.x,z=o.z-p.z,r=x*x+z*z,score=r+(p.y-o.y)**2;if(Math.abs(p.y-o.y)<2&&r<range*range&&score<bestDistance&&x*d.x+z*d.z>-.1){best=o;bestDistance=score;}}
@@ -15,7 +15,7 @@ export function setDoor(sim,door,open,p=null){
  if(!open)for(const p of sim.players.values())if(p.health>0&&!p.spectating&&p.y<door.y+door.h&&p.y+bodyHeight(p)>door.y&&Math.abs(p.x-door.x)<door.w/2+RADIUS+.03&&Math.abs(p.z-door.z)<(door.d||.18)/2+RADIUS+.03)return false;
  state.open=open;state.changedAt=sim.time;state.passable=!(door.vault&&open);state.openAt=door.vault&&open?sim.time+VAULT_DOOR_SECONDS:0;sim.buildVersion++;rebuildMap(sim,{navigationChanged:!!door.vault});sim.emit('royale-cue',{cue:door.vault&&open?'vault-opening':open?'door-open':'door-close',player:p?.id,x:door.x,y:door.y,z:door.z});return true;
 }
-export function tickVaultDoors(sim){let changed=false;for(const d of sim.map.doors||[]){const s=sim.doors?.[d.id];if(d.vault&&s?.open&&s.passable===false&&sim.time>=s.openAt){s.passable=true;changed=true;}}if(changed){sim.buildVersion++;rebuildMap(sim,{navigationChanged:true});}}
+export function tickVaultDoors(sim){updateDoorCollisions(sim.map,sim.doors,sim.time);let changed=false;for(const d of sim.map.doors||[]){const s=sim.doors?.[d.id];if(d.vault&&s?.open&&s.passable===false&&sim.time>=s.openAt){s.passable=true;changed=true;}}if(changed){sim.buildVersion++;rebuildMap(sim,{navigationChanged:true});}}
 export function frontierPrompt(map,state,p){
  if(!canFight(p)||p.flight!=='ground')return null;
  if(p.traversal)return {kind:'ride',text:'JUMP TO RELEASE'};

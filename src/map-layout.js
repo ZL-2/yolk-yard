@@ -1,3 +1,4 @@
+import {environmentCollision,transformCollisionShape} from './environment-collision.js';
 // The editor and both match authorities compile the same bounded layout format.
 // Layouts contain data only; uploaded models never supply executable scene code.
 export const MAP_LAYOUT_VERSION=1;
@@ -61,7 +62,8 @@ export function transformPoint(point,origin,record){
 }
 export function transformBox(box,origin,record){
  const p=transformPoint(box,origin,record),a=record.rotation*Math.PI/180,c=Math.abs(Math.cos(a)),s=Math.abs(Math.sin(a));
- return {...box,...p,w:Math.max(.02,box.w*record.scale[0]*c+box.d*record.scale[2]*s),d:Math.max(.02,box.w*record.scale[0]*s+box.d*record.scale[2]*c),h:Math.max(.02,box.h*record.scale[1])};
+ const collision=box.collisionShape;
+ return {...box,...p,...(collision?{collisionShape:transformCollisionShape(collision,origin,record)}:{}),w:Math.max(.02,box.w*record.scale[0]*c+box.d*record.scale[2]*s),d:Math.max(.02,box.w*record.scale[0]*s+box.d*record.scale[2]*c),h:Math.max(.02,box.h*record.scale[1])};
 }
 export function transformDoor(door,origin,record){
  return {...transformBox(door,origin,record),yaw:(door.yaw||0)+record.rotation*Math.PI/180,editorObject:record.id};
@@ -69,11 +71,11 @@ export function transformDoor(door,origin,record){
 export function prefabBoxes(kind){
  const p=prefab(kind);if(!p||['spawn','chest'].includes(kind))return [];
  const [w,h,d]=p.size,b=(x,y,z,w,h,d)=>({x,y,z,w,h,d,kind:'editor',material:p.material,color:p.color?Number.parseInt(p.color.slice(1),16):0x647983});
- if(['pine','oak','palm'].includes(kind))return [b(0,0,0,.65,h*.65,.65)];
+ if(['pine','oak','palm'].includes(kind)){const trunk=b(0,0,0,.65,h*.65,.65);trunk.collisionShape=environmentCollision({...trunk,kind:'tree'});return [trunk];}
  if(kind==='stairs')return Array.from({length:12},(_,i)=>b(0,0,-d/2+(i+.5)*d/12,w,(i+1)*h/12,d/12+.01));
  if(kind==='bunker')return [b(0,0,-d/2,w,h,.4),b(-w/2,0,0,.4,h,d),b(w/2,0,0,.4,h,d),b(0,h,0,w+.5,.3,d+.5),b(0,0,0,w,.2,d)];
  if(kind==='tower')return [b(0,7,0,8,.35,8),...[-1,1].flatMap(x=>[-1,1].map(z=>b(x*3.5,0,z*3.5,.5,7,.5))),...Array.from({length:20},(_,i)=>b(0,i*.35,-7+(i+.5)*.6,2.5,.35,.61))];
- return [b(0,0,0,w,h,d)];
+ const result=b(0,0,0,w,h,d),collision=environmentCollision({...result,harvestType:kind});if(collision)result.collisionShape=collision;return [result];
 }
 const baseCatalogs=new WeakMap();
 export function baseObjects(map){
@@ -132,7 +134,7 @@ export function compileLayout(base,input){
    }else if(src.type==='spawn'){map.spawns[Number(src.id.split('-')[1])]=r.removed?null:[r.position[0],r.position[2]];}
    if(src.type==='box'&&src.spec.doorId)moveDoors((base.doors||[]).filter(d=>d.id===src.spec.doorId),r,origin);
   }else if(!r.removed){
-   const solids=src?src.boxes:r.kind==='model'?[{x:0,y:0,z:0,w:r.dimensions[0],h:r.dimensions[1],d:r.dimensions[2],kind:'editor',material:'metal'}]:prefabBoxes(r.kind);
+   const solids=src?src.boxes.map(b=>{const collision=b.collisionShape||environmentCollision(b,base);return collision?{...b,collisionShape:collision}:b;}):r.kind==='model'?[{x:0,y:0,z:0,w:r.dimensions[0],h:r.dimensions[1],d:r.dimensions[2],kind:'editor',material:'metal'}]:prefabBoxes(r.kind);
    addedSolids+=solids.filter(b=>!b.doorId).length;if(addedSolids>4000)throw Error('Reduce duplicated structures: at most 4,000 added structural pieces per map.');
    if(r.collision)for(const [i,b]of solids.entries())if(!b.doorId)map.boxes.push({...transformBox(b,origin,r),objectId:'editor-'+r.id+'-'+i,editorObject:r.id,building:undefined,tree:undefined,prop:undefined,...(r.kind==='shield-barrel'?{health:150,harvestType:'shieldBarrel'}:{})});
    if(src?.type==='building'){

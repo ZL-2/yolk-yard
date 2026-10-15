@@ -1,4 +1,4 @@
-import {canOccupy,candidates,rayBox,dist,direction} from './physics.js';
+import {canOccupy,candidates,rayBox,dist,direction,boxTop} from './physics.js';
 import {groundAt} from './terrain.js';
 import {clamp} from './data.js';
 import {teammates} from './teams.js';
@@ -12,7 +12,7 @@ export const ATV_SITES=Object.freeze([
  {id:'works',x:-125,z:60,yaw:0,name:'Ironwake service road'},
 ]);
 function fits(map,v){const d=direction(v.yaw);for(const offset of [-.72,0,.72])if(!canOccupy(map,{x:v.x+d.x*offset,y:v.y+.38,z:v.z+d.z*offset},1.05,.66))return false;return true;}
-function floorAt(map,v){let y=groundAt(map,v.x,v.z);for(const b of candidates(map,v))if(b.y+b.h<=v.y+.52&&Math.abs(v.x-b.x)<b.w/2+.5&&Math.abs(v.z-b.z)<b.d/2+.5)y=Math.max(y,b.y+b.h);return y;}
+function floorAt(map,v){let y=groundAt(map,v.x,v.z);for(const b of candidates(map,v)){const top=boxTop(b,v.x,v.z,.5);if(top<=v.y+.52)y=Math.max(y,top);}return y;}
 export function initializeVehicles(sim){
  sim.vehicles=[];for(const p of sim.players.values()){p.vehicleId=null;p.vehicleSeat=null;p.vehicleLock=0;}
  if(sim.map.id!=='sunnybreak')return;

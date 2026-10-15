@@ -148,12 +148,12 @@ const scratchA=V(),scratchB=V(),scratchC=V(),scratchQ=new T.Quaternion();
 // Analytic two-bone IK. Targets are in character coordinates. Elbow/knee poles
 // remain on the anatomical side; fixed limb lengths prevent stretching.
 function solveChain(h,upper,lower,end,target,pole,blend=1){
- const a=h.bones[upper],b=h.bones[lower],c=h.bones[end];h.mesh.updateMatrixWorld(true);
+ const a=h.bones[upper],b=h.bones[lower],c=h.bones[end];h.mesh.updateWorldMatrix(true,false);
  const inverse=h.mesh.matrixWorld.clone().invert(),start=a.getWorldPosition(V()).applyMatrix4(inverse),L1=b.userData.rest.length(),L2=c.userData.rest.length();
  const dir=target.clone().sub(start),len=T.MathUtils.clamp(dir.length(),.02,L1+L2-.002);dir.normalize();
  const normal=pole.clone().sub(start).addScaledVector(dir,-pole.clone().sub(start).dot(dir)).normalize();
  const along=(L1*L1-L2*L2+len*len)/(2*len),height=Math.sqrt(Math.max(0,L1*L1-along*along)),elbow=start.clone().addScaledVector(dir,along).addScaledVector(normal,height);
- function aim(bone,rest,dest){const parentQ=bone.parent.getWorldQuaternion(new T.Quaternion()),modelQ=h.mesh.getWorldQuaternion(new T.Quaternion());const local=dest.applyQuaternion(modelQ).applyQuaternion(parentQ.invert()).normalize();const q=new T.Quaternion().setFromUnitVectors(rest.clone().normalize(),local);bone.quaternion.slerp(q,blend);bone.updateMatrixWorld(true);}
+ function aim(bone,rest,dest){const parentQ=bone.parent.getWorldQuaternion(new T.Quaternion()),modelQ=h.mesh.getWorldQuaternion(new T.Quaternion());const local=dest.applyQuaternion(modelQ).applyQuaternion(parentQ.invert()).normalize();const q=new T.Quaternion().setFromUnitVectors(rest.clone().normalize(),local);bone.quaternion.slerp(q,blend);bone.updateWorldMatrix(true,false);}
  aim(a,b.userData.rest,elbow.clone().sub(start));aim(b,c.userData.rest,start.clone().addScaledVector(dir,len).sub(elbow));
 }
 export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0}={}){
@@ -231,7 +231,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  }
  if(emote){const pose=emotePose(emote.id,emote.t,1);b.hips.position.x+=pose.sway;b.hips.position.y+=pose.bob;b.chest.rotation.z=pose.sway*.5;}
  const held=model.userData.held,arms=model.userData.arms;
- if(held&&arms){held.updateMatrixWorld(true);h.mesh.updateMatrixWorld(true);}
+ if(held&&arms){held.updateWorldMatrix(true,false);h.mesh.updateWorldMatrix(true,false);}
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R';let target;
   if(emote)target=V(...emotePose(emote.id,emote.t,sideSign).hand);
   else if(throwing){const t=p.throwProgress,wind=Math.sin(Math.min(1,t/.4)*Math.PI*.5),release=Math.min(1,Math.max(0,(t-.35)/.3));target=sideSign>0?V(.28,1.35+wind*.35-lower,.25*wind-release*.9):V(-.3,1.05-lower,-.25);}
@@ -253,7 +253,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   hand.quaternion.copy(hand.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(handQ));hand.rotateX(-.12);
 
  }
- if(model.userData.utility){h.mesh.updateMatrixWorld(true);const position=b.handR.getWorldPosition(V());model.worldToLocal(position);model.userData.utility.position.copy(position);model.userData.utility.rotation.set(p.use?-.35:0,0,0);}
+ if(model.userData.utility){h.mesh.updateWorldMatrix(true,false);const position=b.handR.getWorldPosition(V());model.worldToLocal(position);model.userData.utility.position.copy(position);model.userData.utility.rotation.set(p.use?-.35:0,0,0);}
  model.userData.animationState=h.pose;
 }
 export function humanoidDiagnostics(model){const h=model.userData.human;return h?{revision:model.userData.artRevision,bones:h.mesh.skeleton.bones.length,vertices:h.mesh.geometry.attributes.position.count,triangles:h.mesh.geometry.index.count/3,surfaces:h.mesh.geometry.userData.surfaceKinds,state:h.pose,transition:h.transition,lower:h.lowerState,upper:h.upperState}:null;}

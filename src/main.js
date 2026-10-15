@@ -68,6 +68,7 @@ import {matchOptions, targetLabel} from "./match-options.js";
 import "./style.css";
 import "./lobby.css";
 import './settings-layout.css';
+import {FramePacer,fpsLimit,fpsLimitHTML} from './frame-pacing.js';
 import {PerformanceHUD,PERFORMANCE_DEFAULTS} from './performance-hud.js';
 import './performance-hud.css';
 import {LobbyStatus} from './lobby-status.js';
@@ -138,6 +139,7 @@ const settings = {
   ...COMFORT_DEFAULTS,
   ...SLIDER_DEFAULTS,
   ...PERFORMANCE_DEFAULTS,
+  fpsLimit:60,
   quality: "high",
   perspective:"first",
   invert: false,
@@ -159,6 +161,7 @@ delete settings.dragLook;
 save("yolk-settings", settings);
 settings.sensitivity = clamp(Number(settings.sensitivity) || 1, 0.2, 3);
 settings.scopeSensitivity = clamp(Number(settings.scopeSensitivity) || 0.65, 0.1, 2);
+settings.fpsLimit=fpsLimit(settings.fpsLimit)||'unlimited';
 settings.fov = clamp(Number(settings.fov) || 85, 65, 110);
 settings.thirdPersonFov = clamp(Number(settings.thirdPersonFov) || 65, 65, 110);
 settings.volume = clamp(Number(settings.volume) || 0, 0, 1);
@@ -189,7 +192,7 @@ let view,
   roundSaved = -1,
   busy = false,
   scoreHeld = false,
-  noticeUntil = 0,
+  noticeUntil = 0,eliminationUntil=0,
   toastUntil = 0,
   damageFlash = 0;
 const sound = new Sound();
@@ -223,7 +226,7 @@ const touch = {
   popper: false,
 };
 $("#app").innerHTML =
-  `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><i id="scope-spread" aria-hidden="true"></i><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">OPERATOR ELIMINATED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div id="arena-stamina" hidden><span>TACTICAL SPRINT</span><progress id="arena-stamina-fill" max="100" value="100"></progress></div><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Field ready</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="crouch">CROUCH / SLIDE</button><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
+  `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><i id="scope-spread" aria-hidden="true"></i><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="notice elimination-notice" id="elimination-notice" role="status"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">OPERATOR ELIMINATED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div id="arena-stamina" hidden><span>TACTICAL SPRINT</span><progress id="arena-stamina-fill" max="100" value="100"></progress></div><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Field ready</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="crouch">CROUCH / SLIDE</button><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
 const dialog = $("#dialog");
 let mapEditor=null;
 async function openOwnerMapEditor(overview){
@@ -389,7 +392,7 @@ function settingsMenu() {
       )
       .join(
         "",
-      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["visualSoundEffects", "Visualize Sound Effects"], ["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}${perspectiveSettingsHTML()}${inventoryPreferencesHTML(settings)}${comfortHTML(settings)}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
+      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div>${fpsLimitHTML(settings.fpsLimit)}<div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["visualSoundEffects", "Visualize Sound Effects"], ["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}${perspectiveSettingsHTML()}${inventoryPreferencesHTML(settings)}${comfortHTML(settings)}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
     "settings",
   );
   bindingEditor=new KeybindEditor(dialog.querySelector(".keybind-list"),settings.keybinds,bindings=>{settings.keybinds=bindings;keys.clear();queuedActions.clear();input.fire=input.aim=false;save("yolk-settings",settings);});
@@ -1063,9 +1066,7 @@ function processEvents() {
       while ($("#feed").children.length > 4) $("#feed").lastChild.remove();
       if (e.player === localId && e.target !== localId) {
         sound.eliminate();
-        notice(
-          eliminationNotice(e,!!state.royale),
-        );
+        showFrontMessage($('#elimination-notice'),eliminationNotice(e,!!state.royale));eliminationUntil=performance.now()+2600;
       }
       if (e.target === localId)
         $("#respawn-by").textContent = `Tagged by ${e.name} · ${e.weapon}`;
@@ -1893,16 +1894,16 @@ const soundVisuals=new SoundVisuals(document.getElementById('hud'));
 const triggerGuard={};
 const performanceHUD=new PerformanceHUD(document.body);
 const lobbyStatus=new LobbyStatus();
-const snapshotTimes=new WeakMap();
+const snapshotTimes=new WeakMap(),framePacer=new FramePacer();
 function loop(now) {
   if(screen==='editor'){lastTime=now;requestAnimationFrame(loop);return;}
   lobbyStatus.update(now,now-lastTime,net,screen);
-  performanceHUD.update(now,now-lastTime,net,settings,screen==='game'&&!document.hidden);
+
   matchConnectionUI.update(net,screen==='game',now);
   publicArrivalUI.update(party?.publicMatch,screen==='menu'&&!dialog.open&&!document.hidden,party?.party,party?.id,now);
   pumpNetworkInput(now);
   if(state?.royale){view.buildMap=getMap(state.options.map);applyBuildState(view.buildMap,state.royale);}
-  if(screen==='game'&&!document.hidden)connectionReport.performance.frame(now-lastTime,net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');
+
   const elapsedFrame=Math.max(0,(now-lastTime)/1000),dt=Math.min(0.1,elapsedFrame);
   const simulate=!(paused&&!net&&screen==='game'&&!['royale-inventory','royale-map'].includes(dialogType));
   if(simulate)sim?.advanceWarmupClock?.(elapsedFrame-dt);
@@ -1940,6 +1941,10 @@ function loop(now) {
     renderLobby();
     lobbyClock = 0;
   }
+  if(!framePacer.shouldRender(now,settings.fpsLimit)){requestAnimationFrame(loop);return;}
+  const renderDt=Math.min(.1,framePacer.elapsedMs/1000);
+  performanceHUD.update(now,framePacer.elapsedMs,net,settings,screen==='game'&&!document.hidden);
+  if(screen==='game'&&!document.hidden)connectionReport.performance.frame(Math.min(framePacer.elapsedMs,framePacer.elapsedMs*fpsLimit(settings.fpsLimit)/60||framePacer.elapsedMs),net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
   view.cinematic=matchEndUI.update(state,localId,screen==='game',now);
@@ -1960,9 +1965,9 @@ function loop(now) {
   view.spectateTarget = me?.spectating ? spectateTarget : null;
   updateSpectatorStatus(me,now);
   soundVisuals.update(state,me?.spectating?state?.players.find(p=>p.id===spectateTarget):me,{enabled:settings.visualSoundEffects,categories:settings,playing:screen==='game'&&!paused&&!document.hidden},now);
-  sound.updateLobby(screen!=='game',dt,document.hidden);
+  sound.updateLobby(screen!=='game',renderDt,document.hidden);
   sound.collisionMap=view.buildMap;
-  sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,dt,screen==='game'&&!document.hidden&&(state?.phase==='results'||!(!net&&paused)));
+  sound.update(state,me?.spectating?state.players.find(p=>p.id===spectateTarget)||me:me,renderDt,screen==='game'&&!document.hidden&&(state?.phase==='results'||!(!net&&paused)));
   let renderPlayer = predicted;
   if (sim && !sim.remote && me) {
     renderPlayer = {
@@ -1977,12 +1982,12 @@ function loop(now) {
   }
   if(renderPlayer)Object.assign(renderPlayer,localPerspective(),{building:!!buildControls.buildMode||!!buildControls.editing,editing:!!buildControls.editing});
   view.lobbyCrown=!!crownStatus.owned;
-  const presentation=(!sim||sim.remote)&&state?guestPresentation.frame(state,renderPlayer,now,dt):{state,player:renderPlayer};
+  const presentation=(!sim||sim.remote)&&state?guestPresentation.frame(state,renderPlayer,now,renderDt):{state,player:renderPlayer};
   view.update(
     presentation.state,
     (!sim||sim.remote)&&presentation.player?.health>0?presentation.player:me,
     presentation.player,
-    view.cinematic?.slowMotion?dt*.25:dt,
+    view.cinematic?.slowMotion?renderDt*.25:renderDt,
     screen === "game",
     !paused && !chat.opened && !buildControls.editing && (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim),
     profile,
@@ -1998,10 +2003,11 @@ function loop(now) {
   const current=state?.players.find(p=>p.id===localId);
   damageDirections.update(current,input.yaw,now,screen==='game'&&!paused&&current?.health>0);
   $('#hud').classList.toggle('low-health',!!current&&current.health>0&&current.health<25);
-  damageFlash = Math.max(0, damageFlash - dt * 1.5);
+  damageFlash = Math.max(0, damageFlash - renderDt * 1.5);
   $("#damage").style.opacity = damageFlash*(settings.reducedMotion?.25:1);
   referralRewards.update(now);
   updateFrontMessage($("#notice"),now < noticeUntil);
+  updateFrontMessage($("#elimination-notice"),screen==='game'&&now<eliminationUntil);
   updateFrontMessage($("#toast"),now < toastUntil);
   for (const row of $("#feed").children)
     if (Number(row.dataset.expire) < now) row.remove();
@@ -2026,6 +2032,7 @@ try {
 // Development-only diagnostics. Vite removes this branch from the published bundle.
 if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
+    framePacing:()=>({limit:framePacer.limit,frames:framePacer.frames,elapsedMs:framePacer.elapsedMs}),
     perspective:()=>({mode:settings.perspective,active:view.thirdPersonEnabled,blend:view.thirdPersonState,position:view.camera.position.toArray(),body:!!view.models.get(localId)?.visible,pose:view.models.get(localId)?.userData.animationState,opacity:view.models.get(localId)?.userData.cameraFade,firstPersonWeapon:view.gunGroup.visible,coverBlocked:view.coverBlocked,utility:view.models.get(localId)?.userData.utilityKey}),
     editor:()=>mapEditor,
     grappler:()=>({held:view.heldItemKey,model:view.heldItem?.name,ropes:[...(view.royaleView.grappleMeshes||[])].map(([id,m])=>({id,visible:m.visible,uuid:m.uuid,points:m.children[0].geometry.attributes.position.count})),doorMeshes:view.royaleView.doorMeshes?.size||0}),

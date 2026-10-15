@@ -1,3 +1,4 @@
+import {rayShape,shapeNormal,shapeOverlap,shapeAxisInterval,shapeVerticalInterval} from './environment-collision.js';
 import {TACTICAL_SPRINT} from './world-rules.js';
 import {beginMantle,stepMantle} from './mantle.js';
 import {stepGrapple} from './grappler.js';
@@ -22,6 +23,7 @@ export function direction(yaw, pitch = 0) {
   };
 }
 export function rayBox(o, d, b, max = Infinity, radius = 0) {
+  if(b.collisionShape)return rayShape(o,d,b.collisionShape,max,radius);
   // Slab intersection without per-box arrays, iterators or dynamic property lookups.
   // This runs for every sight line, navigation probe and projectile collision.
   let lo=0,hi=max,a,c,min=b.x-b.w/2-radius,upper=b.x+b.w/2+radius;
@@ -127,6 +129,7 @@ export function humanHit(o,d,p,radius=0){
 export const rayEgg=(o,d,p)=>humanHit(o,d,p).distance;
 export const rayHuman=rayEgg;
 export function playerBoxOverlap(p, b) {
+  if(b.collisionShape)return shapeOverlap(b.collisionShape,p,bodyHeight(p),RADIUS);
   return (
     p.y < b.y + b.h - 0.015 &&
     p.y + bodyHeight(p) > b.y + 0.02 &&
@@ -140,12 +143,18 @@ export function pruneBuildPhases(p,map){
  const near=candidates(map,p,null,0,RADIUS+.04);
  p.phasedBuilds=p.phasedBuilds.filter(id=>near.some(b=>b.buildId===id&&p.y<b.y+b.h+.04&&p.y+bodyHeight(p)>b.y-.04&&Math.abs(p.x-b.x)<b.w/2+RADIUS+.04&&Math.abs(p.z-b.z)<b.d/2+RADIUS+.04));
 }
+const shapeScratch={};
+export function boxVertical(b,x,z,radius=0,out={}){
+ if(b.collisionShape)return shapeVerticalInterval(b.collisionShape,x,z,radius,out);
+ if(Math.abs(x-b.x)>=b.w/2+radius||Math.abs(z-b.z)>=b.d/2+radius)return null;out.min=b.y;out.max=b.y+b.h;return out;
+}
+export function boxTop(b,x,z,radius=0){return boxVertical(b,x,z,radius,shapeScratch)?.max??-Infinity;}
 export function canStand(map,p,margin=RADIUS) {
  return canOccupy(map,p,HEIGHT,margin);
 }
 export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS,phases=p.phasedBuilds) {
  if(Math.abs(p.x)>map.size-margin||Math.abs(p.z)>map.size-margin)return false;
- for(const b of candidates(map,p,null,0,margin))if(movementBoxSolid(p,b,phases)&&p.y+.035<b.y+b.h&&p.y+height>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin)return false;
+ for(const b of candidates(map,p,null,0,margin))if(movementBoxSolid(p,b,phases)&&(b.collisionShape?shapeOverlap(b.collisionShape,p,height,margin):p.y+.035<b.y+b.h&&p.y+height>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin))return false;
  return true;
 }
 function pushAxis(p,map,axis,delta) {
@@ -156,9 +165,10 @@ function pushAxis(p,map,axis,delta) {
  let hit=false,top=base;
  // All overlaps are tested against the proposed endpoint, not the clamped
  // endpoint. Accumulate the same entry-face clamps without a temporary array.
- for(const b of candidates(map,point))if(movementBoxSolid(p,b)&&p.y<b.y+b.h-.015&&p.y+height>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(proposal-b[axis])<b[size]/2+RADIUS){
-  hit=true;top=Math.max(top,b.y+b.h);
-  const edge=b[axis]-Math.sign(delta)*(b[size]/2+RADIUS+.001);
+ for(const b of candidates(map,point)){
+  if(!movementBoxSolid(p,b))continue;let edge;
+  if(b.collisionShape){const interval=shapeAxisInterval(b.collisionShape,axis,point,height,RADIUS,shapeScratch);if(!interval||proposal<=interval.min||proposal>=interval.max)continue;hit=true;top=Math.max(top,interval.top);edge=delta>0?interval.min-.001:interval.max+.001;}
+  else{if(!(p.y<b.y+b.h-.015&&p.y+height>b.y+.02&&Math.abs(p[other]-b[other])<(other==='x'?b.w:b.d)/2+RADIUS&&Math.abs(proposal-b[axis])<b[size]/2+RADIUS))continue;hit=true;top=Math.max(top,b.y+b.h);edge=b[axis]-Math.sign(delta)*(b[size]/2+RADIUS+.001);}
   target=delta>0?Math.min(target,Math.max(start,edge)):Math.max(target,Math.min(start,edge));
  }
  // One stair rise per axis. Never stack multiple step corrections in one move.
@@ -236,7 +246,7 @@ function movePlayerStep(p, input, map, dt, time) {
     pushAxis(p,map,'x',(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)/length*speed*dt);
     pushAxis(p,map,'z',(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)/length*speed*dt);
     p.x=clamp(p.x,-map.size+.5,map.size-.5);p.z=clamp(p.z,-map.size+.5,map.size-.5);
-    let floor=groundAt(map,p.x,p.z);for(const b of candidates(map,p))if(movementBoxSolid(p,b)&&b.y+b.h<=p.y+.045&&Math.abs(p.x-b.x)<b.w/2+RADIUS-.015&&Math.abs(p.z-b.z)<b.d/2+RADIUS-.015)floor=Math.max(floor,b.y+b.h);
+    let floor=groundAt(map,p.x,p.z);for(const b of candidates(map,p))if(movementBoxSolid(p,b)){const top=boxTop(b,p.x,p.z,RADIUS-.015);if(top<=p.y+.045)floor=Math.max(floor,top);}
     if(!p.fall)p.fall={apex:p.y,immune:true,source:'bus'};
     if(toggle){if(p.flight==='dive')p.flight='glide';else if(p.flight==='glide'&&p.y-floor>32)p.flight='dive';}
     if(p.flight==='launch'){
@@ -270,9 +280,11 @@ function movePlayerStep(p, input, map, dt, time) {
   // bounded by server freshness, so crouch edges can initiate slides under jitter.
   const momentumX=p.motionFresh?p.motionVX:p.vx,momentumZ=p.motionFresh?p.motionVZ:p.vz;
   const speedBefore=Math.sqrt((momentumX||0)**2+(momentumZ||0)**2);
-  const gx=p.grounded&&input.crouch?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=p.grounded&&input.crouch?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0,slope=Math.sqrt(gx*gx+gz*gz);
+  const terrainContact=p.grounded&&Math.abs(p.y-groundAt(map,p.x,p.z))<.08;
+  const gx=terrainContact&&input.crouch?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=terrainContact&&input.crouch?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0,slope=Math.sqrt(gx*gx+gz*gz);
   const intentX=-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s,intentZ=-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s,uphillIntent=intentX*gx+intentZ*gz>0;
-  if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&speedBefore<SEASON.slide.startSpeed&&slope>=SEASON.slide.slope&&p.slideCooldown===0&&!uphillIntent){p.sliding=true;p.slideAge=0;p.slideVX=-gx/slope*3;p.slideVZ=-gz/slope*3;p.slideUphill=false;}
+  // Crouching never creates momentum from rest, including toggle crouch on
+  // elevated ramps. Only existing movement can initiate a slide.
   // Holding crouch can queue a slide through a jump or mobility-item landing.
   // Actual momentum, not the sprint button or terrain slope, admits the slide.
   if(!p.downed&&!p.reviving&&input.crouch&&p.grounded&&!p.sliding&&speedBefore>=SEASON.slide.startSpeed&&p.slideCooldown===0){
@@ -296,7 +308,7 @@ function movePlayerStep(p, input, map, dt, time) {
   if(p.sliding){
     let vx=p.slideVX||0,vz=p.slideVZ||0,v=Math.sqrt(vx*vx+vz*vz);
     if(p.grounded){
-      const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;
+      const gx=terrainContact?(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6:0,gz=terrainContact?(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6:0;
       vx-=gx*SEASON.slide.gravity*dt;vz-=gz*SEASON.slide.gravity*dt;
       const loss=Math.max(0,1-(slope>=SEASON.slide.slope?2.4:3.8)*dt/Math.max(v,.01));vx*=loss;vz*=loss;
     }
@@ -327,7 +339,7 @@ function movePlayerStep(p, input, map, dt, time) {
   // Follow short descents without falling and landing on every individual tread.
   if(wasGrounded){
     let support=ground;
-    for(const b of verticalBoxes)if(movementBoxSolid(p,b)&&b.y+b.h<=p.y+.001&&Math.abs(p.x-b.x)<b.w/2+RADIUS&&Math.abs(p.z-b.z)<b.d/2+RADIUS)support=Math.max(support,b.y+b.h);
+    for(const b of verticalBoxes)if(movementBoxSolid(p,b)){const top=boxTop(b,p.x,p.z,RADIUS);if(top<=p.y+.001)support=Math.max(support,top);}
     if(p.y-support<=.43&&(support===p.y&&p.vy===0||canOccupy(map,{x:p.x,y:support,z:p.z},bodyHeight(p),RADIUS,p.phasedBuilds))){p.y=support;p.vy=0;}
   }
   const oldY = p.y;
@@ -336,17 +348,14 @@ function movePlayerStep(p, input, map, dt, time) {
   p.grounded = false;
   for (const b of verticalBoxes) {
     if(!movementBoxSolid(p,b))continue;
-    if (
-      Math.abs(p.x - b.x) >= b.w / 2 + RADIUS ||
-      Math.abs(p.z - b.z) >= b.d / 2 + RADIUS
-    )
-      continue;
-    if (p.vy <= 0 && oldY >= b.y + b.h - 0.045 && p.y <= b.y + b.h) {
-      p.y = b.y + b.h;
+    const interval=boxVertical(b,p.x,p.z,RADIUS,shapeScratch);if(!interval)continue;
+    const bottom=interval.min,top=interval.max;
+    if (p.vy <= 0 && oldY >= top - 0.045 && p.y <= top) {
+      p.y = top;
       p.vy = 0;
       p.grounded = true;
-    } else if (p.vy > 0 && oldY + bodyHeight(p) <= b.y + 0.03 && p.y + bodyHeight(p) >= b.y) {
-      p.y = b.y - bodyHeight(p);
+    } else if (p.vy > 0 && oldY + bodyHeight(p) <= bottom + 0.03 && p.y + bodyHeight(p) >= bottom) {
+      p.y = bottom - bodyHeight(p);
       p.vy = 0;
     }
   }
@@ -417,7 +426,7 @@ export function worldHit(map, o, d, max = 200, radius = 0) {
     delta=Math.abs(hit.z-(b.z+b.d/2+radius));if(delta<face){axis='z';sign=1;}
     const normal = { x: 0, y: 0, z: 0 };normal[axis]=sign;
     best = t;
-    result = { distance: t, point: hit, normal, box: source };
+    result = { distance: t, point: hit, normal:b.collisionShape?shapeNormal(b.collisionShape,hit,radius):normal, box: source };
   }
   const ground=terrainHit(map,o,d,best,radius);if(ground)result=ground;
   return result;

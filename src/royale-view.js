@@ -16,6 +16,8 @@ import {groundAt} from './terrain.js';
 import {buildDetailedTerrain,createDetailedOcean} from './terrain-detail.js';
 import {environmentAtlasMaterial,environmentUV,packEnvironmentGeometry,unpackEnvironmentGeometry} from './environment-surfaces.js';
 import {architectureAtlasMaterial,architectureUV,architectureKit,buildingSurface} from './architecture-surfaces.js';
+import {dressWatchtower} from './watchtowers.js';
+import {supplyHeight} from './supply-drops.js';
 import {EnvironmentGroundCover} from './environment-groundcover.js';
 import {updateBuildingView} from './building-view.js';
 import {shopItem} from './shop-catalog.js';
@@ -70,7 +72,7 @@ export function* buildIslandSteps(world,map,kit){
   if(['tree','prop','roof-collider','door','parked-aircraft'].includes(b.kind))continue;
   const s=b.building===undefined?null:buildingStyle(map.buildings[b.building]);
   const color=s?(b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:b.color==='foundation'?0x8e988a:s.wall):typeof b.color==='number'?b.color:palette[b.color]||0x9cb7aa;
-  const m=architecture.block(world,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color,buildingSurface(b,map.buildings[b.building]));m.userData.objectId=b.objectId;yield;
+  const m=architecture.block(world,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color,b.surface||buildingSurface(b,map.buildings[b.building]));m.userData.objectId=b.objectId;yield;
  }
  for(const [i,b] of map.buildings.entries()){if(b.editorHidden)continue;
   const start=world.children.length;dressBuilding(world,b,kit);
@@ -85,20 +87,23 @@ function* streamedIslandSteps(world,map,kit){
  const architecture=architectureKit(kit);
  world.add(createDetailedOcean(map));
  yield* buildDetailedTerrain(world,map);
- const cells=new Map(),cellFor=(x,z)=>{const ix=Math.floor(x/64),iz=Math.floor(z/64),key=ix+':'+iz;if(!cells.has(key))cells.set(key,{key,x:(ix+.5)*64,z:(iz+.5)*64,radius:48,boxes:[],buildings:[],trees:[],props:[],coarse:new THREE.Group()});return cells.get(key);};
- for(const b of map.boxes){if(b.editorObject)continue;const parent=b.building===undefined?b:map.buildings[b.building];cellFor(parent.x,parent.z).boxes.push(b);}
+ const towers=new Map((map.watchtowers||[]).map(t=>[t.id,t]));
+ const cells=new Map(),cellFor=(x,z)=>{const ix=Math.floor(x/64),iz=Math.floor(z/64),key=ix+':'+iz;if(!cells.has(key))cells.set(key,{key,x:(ix+.5)*64,z:(iz+.5)*64,radius:48,boxes:[],buildings:[],watchtowers:[],trees:[],props:[],coarse:new THREE.Group()});return cells.get(key);};
+ for(const b of map.boxes){if(b.editorObject)continue;const parent=b.watchtowerId?towers.get(b.watchtowerId):b.building===undefined?b:map.buildings[b.building];cellFor(parent.x,parent.z).boxes.push(b);}
+ for(const tower of map.watchtowers||[])cellFor(tower.x,tower.z).watchtowers.push(tower);
  for(const b of map.buildings)if(!b.editorHidden)cellFor(b.x,b.z).buildings.push(b);
  for(const t of map.trees)if(!t.editorHidden)cellFor(t.x,t.z).trees.push(t);
  for(const p of map.props)if(!p.editorHidden)cellFor(p.x,p.z).props.push(p);
  const treeIds=new Map(),propIds=new Map(),buildingBoxes=new Map();for(const b of map.boxes){if(b.tree!==undefined)treeIds.set(map.trees[b.tree],b.objectId);if(b.prop!==undefined)propIds.set(map.props[b.prop],b.objectId);if(b.building!==undefined){const owner=map.buildings[b.building];if(!buildingBoxes.has(owner))buildingBoxes.set(owner,[]);buildingBoxes.get(owner).push(b);}}
  const color=b=>{const s=b.building===undefined?null:buildingStyle(map.buildings[b.building]);return s?(b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:b.color==='foundation'?0x8e988a:s.wall):typeof b.color==='number'?b.color:kit.palette[b.color]||0x9cb7aa;};
  function* draw(cell,group,detail){
-  for(const b of cell.boxes){if(['tree','prop','roof-collider','door','parked-aircraft'].includes(b.kind))continue;const m=detail?architecture.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b),buildingSurface(b,map.buildings[b.building])):kit.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b));m.userData.objectId=b.objectId;yield;}
+  for(const b of cell.boxes){if(['tree','prop','roof-collider','door','parked-aircraft'].includes(b.kind))continue;const m=detail?architecture.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b),b.surface||buildingSurface(b,map.buildings[b.building])):kit.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b));m.userData.objectId=b.objectId;yield;}
   for(const b of cell.buildings){
    if(detail){const start=group.children.length;dressBuilding(group,b,kit);const boxes=buildingBoxes.get(b)||[];for(const mesh of group.children.slice(start)){let best=null,d=Infinity;for(const o of boxes){const distance=(o.x-mesh.position.x)**2+(o.y+o.h/2-mesh.position.y)**2+(o.z-mesh.position.z)**2;if(distance<d){d=distance;best=o;}}if(best)mesh.userData.objectId=best.objectId;}}
    else if(b.roof==='gable'){const m=artKit(kit).cone(group,b.x,(b.baseY||0)+b.h+.8,b.z,Math.min(b.w,b.d)*.55,1.6,buildingStyle(b).roof);m.scale.z=b.d/Math.max(1,b.w);m.userData.objectId=cell.boxes.find(o=>o.building!==undefined&&map.buildings[o.building]===b&&o.color==='roof')?.objectId;}
    yield;
   }
+  if(detail)for(const tower of cell.watchtowers){const start=group.children.length;dressWatchtower(group,tower,architecture);const owner=cell.boxes.find(b=>b.watchtowerId===tower.id&&b.towerPart==='column');for(const m of group.children.slice(start))m.userData.objectId=owner?.objectId;yield;}
   for(const t of cell.trees){const start=group.children.length;treeModel(group,t,kit,detail);
    const id=treeIds.get(t);for(const m of group.children.slice(start))m.userData.objectId=id;yield;
   }
@@ -162,7 +167,7 @@ export class RoyaleView{
    const chest=itemById(r,'chests',id),distance=chest?Math.hypot(chest.x-observer.x,chest.z-observer.z):Infinity;
    if(!chest||!chest.supply&&distance>180){mesh.removeFromParent();this.view.disposeGroup(mesh);this.chests.delete(id);continue;}
    mesh.visible=distance<chestRadius||!!chest.supply;if(!mesh.visible)continue;
-   const fall=chest.landAt?Math.max(0,(chest.landAt-time)*4):0;mesh.position.set(chest.x,lootHeight(chest,time)+fall,chest.z);if(mesh.userData.canopy)mesh.userData.canopy.visible=fall>0;
+   const height=supplyHeight(chest,time);mesh.position.set(chest.x,height,chest.z);if(mesh.userData.canopy)mesh.userData.canopy.visible=chest.landAt>time&&!Number.isFinite(chest.cutAt);
    mesh.userData.lid.rotation.x+=((chest.opened?-1.7:0)-mesh.userData.lid.rotation.x)*Math.min(1,dt*8);
   }
  }
@@ -183,7 +188,7 @@ export class RoyaleView{
   const pos=r.practice?getMap(state.options.map).parkedTransport:transportAt(r.route,r.elapsed);if(pos){this.transport.position.set(pos.x,pos.y+(r.practice?0:Math.sin(t)*.18),pos.z);this.transport.rotation.y=pos.yaw;this.transport.rotation.z=r.practice?0:Math.sin(t*.4)*.015;}animateKestrel(this.transport,{parked:r.practice,time:t,elapsed:r.elapsed},dt);
   this.wall.visible=this.ring.visible=r.storm.active;this.wall.position.set(r.storm.x,110,r.storm.z);this.wall.scale.set(Math.max(.01,r.storm.radius),1,Math.max(.01,r.storm.radius));this.wall.material.uniforms.time.value=t;this.wall.material.uniforms.outside.value=local&&Math.hypot(local.x-r.storm.x,local.z-r.storm.z)>r.storm.radius?1:0;if(r.storm.active&&(!this.nextRingUpdate||t>this.nextRingUpdate)){const a=this.ring.geometry.attributes.position;for(let i=0;i<a.count;i++){const angle=i/a.count*Math.PI*2,x=r.storm.x+Math.cos(angle)*r.storm.radius,z=r.storm.z+Math.sin(angle)*r.storm.radius;a.setXYZ(i,x,groundAt(ROYALE_MAP,x,z)+.14,z);}a.needsUpdate=true;this.nextRingUpdate=t+.15;}
   const observer=local?.spectating?state.players.find(p=>p.id===this.view.spectateTarget)||local:local;
-  const revision=this.view.world.userData.geometryRevision;this.view.world.userData.details?.update(observer,{quality:this.view.frameAverage>1/48?'low':this.view.settings.quality,scoped:!!observer?.aim&&this.view.scopeActive,time:t});if(revision!==this.view.world.userData.geometryRevision)updateWorldDamage(this.view.world,r.worldDamage,r.matchId+':'+state.round+':'+r.buildVersion);
+  const revision=this.view.world.userData.geometryRevision;this.view.world.userData.details?.update(observer,{quality:this.view.detailPressure?'low':this.view.settings.quality,scoped:!!observer?.aim&&this.view.scopeActive,time:t});if(revision!==this.view.world.userData.geometryRevision)updateWorldDamage(this.view.world,r.worldDamage,r.matchId+':'+state.round+':'+r.buildVersion);
   this.updateCollectibles(r,observer,dt,t,state.time);
   for(const p of state.players){
    let mesh=this.gliders.get(p.id);const style=(p.glider||'')+':'+(p.trail||'');
