@@ -80,15 +80,17 @@ jobs:
             return True
           crew=crew_paths(files,'HEAD^') and ({'src/throwables.js','src/referrals.js'}<=files or crew_paths(previous,'HEAD^^') and {'src/throwables.js','src/referrals.js'}<=previous)
           perspective_allowed=set(['.github/workflows/pages.yml', 'docs/UPDATE_157.md', 'package-lock.json', 'package.json', 'public/season/perspective-157.webp', 'scripts/perspective-browser-check.mjs', 'src/building-ui.js', 'src/building.js', 'src/comfort-settings.js', 'src/data.js', 'src/field-operations.js', 'src/grappler.js', 'src/humanoid.js', 'src/inventory-policy.js', 'src/keybinds.js', 'src/lobby-ui.js', 'src/main.js', 'src/perspective-briefing.css', 'src/perspective-briefing.js', 'src/perspective.js', 'src/physics.js', 'src/releases.js', 'src/royale-ui.js', 'src/royale-view.js', 'src/royale.js', 'src/settings-layout.js', 'src/simulation.js', 'src/team-markers.js', 'src/throwables.js', 'src/view.js', 'tests/comfort.test.js', 'tests/perspective.test.js'])
-          def perspective_paths(fs):
+          def perspective_paths(fs,base='HEAD^'):
             for path in fs:
               if path in perspective_allowed: continue
               if not path.startswith('scripts/') or not path.endswith('.mjs'): return False
-              old=subprocess.check_output(['git','show','HEAD^:'+path],text=True)
-              new=Path(path).read_text()
+              old=subprocess.check_output(['git','show',base+':'+path],text=True)
+              new=Path(path).read_text() if base=='HEAD^' else subprocess.check_output(['git','show','HEAD^:'+path],text=True)
               if new.replace("localStorage.setItem('ravelfront-perspective-157-dismissed','yes');",'')!=old: return False
             return True
-          perspective=perspective_paths(files) and {'src/perspective.js','src/perspective-briefing.js','tests/perspective.test.js'}<=files
+          perspective_core={'src/perspective.js','src/perspective-briefing.js','tests/perspective.test.js'}
+          perspective_followup=files<={'.github/workflows/pages.yml','scripts/perspective-browser-check.mjs','docs/UPDATE_157.md'} and perspective_paths(previous,'HEAD^^') and perspective_core<=previous
+          perspective=perspective_paths(files) and (perspective_core<=files or perspective_followup)
           for path in ['package.json','package-lock.json']:
             if path not in files: continue
             old=json.loads(subprocess.check_output(['git','show','HEAD^:'+path],text=True));new=json.loads(Path(path).read_text())

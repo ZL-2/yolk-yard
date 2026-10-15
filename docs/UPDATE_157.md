@@ -27,4 +27,6 @@ Original default shoulder tuning is 3.15 m back / 0.62 m right, aiming at 1.65 m
 
 Targeted tests cover camera collision at extreme pitch and under ceilings, default/special view transitions, close and distant reticle convergence, blocked shots behind shoulder-visible cover, build/edit reach, throwable preview parity, grappling, prediction/snapshots/checkpoints, control migration and route-based Hot Drops. Existing relevant combat, building, rig, keybind and remote-input checks run with them. Browser acceptance covers the three-screen introduction and its persistence, saved settings, host and guest third person, shoulder aim, crouch/sprint, scope transitions, building/utility presentation, keyboard host start and restoration of first person.
 
+Browser briefings are captured at 1440 × 900; simultaneous gameplay clients use the established 960 × 540 CI viewport so software-rendered scope screenshots do not starve connection heartbeats. The first CI run reached the scoped-view check after both clients disconnected and entered their victory cameras; the corrected harness preserves every gameplay assertion.
+
 Publication is authorized while players are in matches. The release uses focused checks and verifies matching published website and relay versions after deployment.
