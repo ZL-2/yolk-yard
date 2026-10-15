@@ -52,7 +52,7 @@ test('swept sniper projectiles collide with the supply canopy instead of crossin
 
 test('thrown poppers bounce safely off a canopy before their fuse expires',()=>{
  const {s,p,chest,canopyY}=fixture();
- s.projectiles=[{id:2,owner:p.id,popper:true,x:0,y:canopyY,z:2,vx:0,vy:0,vz:-30,gravity:0,born:s.time,fuse:2,bounces:0}];
+ s.projectiles=[{id:2,owner:p.id,popper:true,x:0,y:canopyY,z:2,vx:0,vy:0,vz:-30,gravity:0,hitRadius:.14,travelled:0,born:s.time,fuse:2,bounces:0}];
  for(let i=0;i<8&&!s.projectiles[0]?.bounces;i++)s.updateProjectiles(1/60);
  const b=s.projectiles[0];assert.equal(b.bounces,1);assert.ok(b.vz>0);assert.ok([b.x,b.y,b.z,b.vx,b.vy,b.vz].every(Number.isFinite));assert.equal(chest.canopyHealth,100);
 });

@@ -624,7 +624,7 @@ export class Simulation {
         this.projectiles.splice(i, 1);
         continue;
       }
-      if(b.popper){const hit=stepThrowable(b,this.map,dt,(o,d,r)=>this.vehicleHit?.(o,d,r,this.players.get(b.owner)));if(hit)this.emit('bounce',{x:b.x,y:b.y,z:b.z,normal:hit.normal});continue;}
+      if(b.popper){const hit=stepThrowable(b,this.map,dt,(o,d,r)=>{const vehicle=this.vehicleHit?.(o,d,r,this.players.get(b.owner));return this.supplyHit?.(o,d,vehicle?.distance??r,b.hitRadius??UTILITY_WEAPONS.popper.hitRadius)||vehicle;});if(hit)this.emit('bounce',{x:b.x,y:b.y,z:b.z,normal:hit.normal});continue;}
       if (b.resting) continue;
       const dy = b.vy * dt - 0.5 * b.gravity * dt * dt;
       b.vy -= b.gravity * dt;
