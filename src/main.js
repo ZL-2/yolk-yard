@@ -333,8 +333,9 @@ function selectMenuSection(section,push=true){
 window.addEventListener('popstate',()=>{if(screen==='menu')selectMenuSection(location.hash.slice(1)||'play',false);});
 
 function profileMenu(){
-  modal('Player details',`<label for="player-name">YOUR NAME</label><input class="field" id="player-name" aria-describedby="name-safety" maxlength="128" value="${esc(profile.name)}" autocomplete="off"><p id="name-safety" role="alert"></p><button class="primary" data-action="close">DONE</button>`,'profile');
-  $('#player-name').onchange=e=>{const checked=validatePlayerName(e.target.value);if(!checked.ok){$('#name-safety').textContent=checked.message;e.target.setAttribute('aria-invalid','true');return;}e.target.removeAttribute('aria-invalid');profile.name=checked.name;$('#name-safety').textContent='';remember();renderMenu();};
+  modal('Player details',`<label for="player-name">YOUR NAME</label><input class="field" id="player-name" aria-describedby="name-safety" maxlength="128" value="${esc(profile.name)}" autocomplete="off"><p id="name-safety" role="alert"></p><button class="primary" data-action="save-profile-name">SAVE NAME</button>`,'profile');
+  $('#player-name').oninput=e=>{const checked=validatePlayerName(e.target.value);$('#name-safety').textContent=checked.message;e.target.setAttribute('aria-invalid',String(!checked.ok));};
+  $('#player-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();actions['save-profile-name']();}};
 }
 function modal(title, body, type = "generic") {
   if(needsPlayerName(profile.name)&&type!=='name-required'){requiredNamePrompt();return;}
@@ -1302,6 +1303,11 @@ const actions = {
  'end-spectate':()=>{matchEndUI.watch();paused=false;},
  'field-orders':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('FIELD OPERATIONS',fieldOrdersHTML(p,state.royale.operations)+fieldStatsHTML(p)+'<button class="primary" data-action="resume">RETURN TO GAME</button>','field-orders');},
  'match-stats':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('MATCH STATS',`<p>${p?.place?'PLACEMENT #'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS</p><p>${esc(matchEarnings.status)} · ${matchEarnings.total||0} Marks</p>${fieldStatsHTML(p)}${scoresHTML()}<button class="primary" data-action="close">BACK TO MATCH</button>`,'royale-stats');},
+ 'save-profile-name':()=>{
+  const field=$('#player-name'),checked=validatePlayerName(field?.value||'');
+  if(!checked.ok){$('#name-safety').textContent=checked.message;field.setAttribute('aria-invalid','true');field.focus();return;}
+  profile.name=checked.name;remember();if(dialogType==='profile')closeDialog();renderMenu();
+ },
  'save-player-name':()=>{
   const checked=validatePlayerName($('#required-name')?.value||'');
   if(!checked.ok){$('#required-name-error').textContent=checked.message;$('#required-name').setAttribute('aria-invalid','true');$('#required-name').focus();return;}
