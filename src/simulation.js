@@ -653,7 +653,7 @@ export class Simulation {
         victim = null,region=null;
       const attacker = this.players.get(b.owner);
       let vehicle=this.vehicleHit?.(b,d,distance,attacker);if(vehicle)distance=vehicle.distance;
-      const supply=this.supplyHit?.(b,d,distance,b.hitRadius??weapon(b.weapon).hitRadius);if(supply){distance=supply.distance;vehicle=null;}
+      const supply=this.supplyHit?.(b,d,distance,b.hitRadius??(b.popper?UTILITY_WEAPONS.popper.hitRadius:weapon(b.weapon).hitRadius));if(supply){distance=supply.distance;vehicle=null;}
       if (!b.popper)
         for (const p of this.players.values()) {
           if (
@@ -698,7 +698,7 @@ export class Simulation {
           });
           this.projectiles.splice(i, 1);
         } else if (b.popper) {
-          const n = vehicle?.normal||hit.normal,
+          const n = supply?.normal||vehicle?.normal||hit.normal,
             dot = b.vx * n.x + b.vy * n.y + b.vz * n.z;
           b.vx = (b.vx - 1.58 * dot * n.x) * 0.82;
           b.vy = (b.vy - 1.58 * dot * n.y) * 0.82;
