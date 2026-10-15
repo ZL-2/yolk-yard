@@ -13,28 +13,30 @@ const relay=await startRealtimeServer({port:0,host:'127.0.0.1',origins:[origin]}
 const vite=await createServer({plugins:[{name:'environment-local-relay',configureServer(server){server.middlewares.use((req,res,next)=>{if(req.url?.split('?')[0]!=='/network-config.js')return next();res.setHeader('Content-Type','text/javascript');res.end(`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${relay.server.address().port}/game'};`);});}}],server:{host:'127.0.0.1',port:5257,strictPort:true,watch:null}});
 await vite.listen();
 let browser,page,gallery;const errors=[],checks={},views={};
+const deadline=setTimeout(()=>{console.error('Environment render check exceeded its bounded runtime');process.exit(1);},240000);
+async function checkpoint(stage){console.log('ENVIRONMENT',stage);await writeFile(out+'/progress.json',JSON.stringify({stage,checks,errors,views},null,2));}
 function watch(p){p.setDefaultTimeout(90000);p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error'&&/WebGLProgram|Shader Error|INVALID_OPERATION/.test(m.text()))errors.push(m.text());});}
 const frames=(p,count=4)=>p.evaluate(count=>new Promise(resolve=>{function tick(){if(--count<=0)resolve();else requestAnimationFrame(tick);}requestAnimationFrame(tick);}),count);
 const shot=(p,name)=>p.screenshot({path:out+'/'+name+'.png',animations:'disabled'});
 async function resume(){const b=page.locator('#dialog [data-action=resume]');if(await b.isVisible())await b.evaluate(e=>e.click());}
 try{
  browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
- page=await browser.newPage({bypassCSP:true,viewport:{width:1440,height:900}});watch(page);
+ page=await browser.newPage({bypassCSP:true,viewport:{width:1100,height:700}});watch(page);await checkpoint('launch');
  await page.addInitScript(()=>{for(const key of ['ravelfront-season-1-update-150-dismissed','ravelfront-referrals-dismissed','ravelfront-perspective-157-dismissed'])localStorage.setItem(key,'yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'high',volume:0,musicVolume:0,fov:72}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Environment Scout',outfit:'outfit-wren'}));});
- await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest);await page.locator('#loading-screen').waitFor({state:'hidden'});await frames(page);await shot(page,'actual-lobby');checks.lobby=true;
+ await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest);await page.locator('#loading-screen').waitFor({state:'hidden'});await frames(page,2);await shot(page,'actual-lobby');checks.lobby=true;await checkpoint('lobby');
  await page.locator('[data-action=training]').first().click();await page.locator('[data-action=start-training]').click();await page.waitForFunction(()=>window.__yolkTest.read().screen==='game');await page.locator('#loading-screen').waitFor({state:'hidden'});await resume();await frames(page,8);
- const spawn=await page.evaluate(()=>window.__yolkTest.read().presentation.environment);assert.equal(spawn.terrain.revision,159);await shot(page,'actual-training-airfield');checks.spawnTerrain=true;
+ const spawn=await page.evaluate(()=>window.__yolkTest.read().presentation.environment);assert.equal(spawn.terrain.revision,159);await shot(page,'actual-training-airfield');checks.spawnTerrain=true;await checkpoint('airfield');
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.options.training=false;s.beginBattle();}));await page.waitForFunction(()=>window.__yolkTest.read().state?.options.map==='sunnybreak');await page.locator('#loading-screen').waitFor({state:'hidden'});await resume();
- await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.stage='active';s.options.training=true;for(const p of [...s.players.values()])if(p.bot)s.players.delete(p.id);const p=s.players.get(window.__yolkTest.read().localId);p.shieldUntil=Infinity;p.health=100;p.shield=100;}));
+ await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.stage='active';s.options.training=true;s.finish=()=>{};for(const p of [...s.players.values()])if(p.bot)s.players.delete(p.id);const p=s.players.get(window.__yolkTest.read().localId);p.shieldUntil=Infinity;p.health=100;p.shield=100;}));
  for(const [name,x,z,yaw,pitch]of [['forest',-53,-30,-.75,-.07],['quarry',-158,92,.1,-.12],['coast',194,135,-1.1,-.12]]){
   await page.evaluate(async({x,z,yaw,pitch})=>{const {groundAt}=await import('/src/terrain.js');window.__yolkTest.fixture(s=>{const p=s.players.get(window.__yolkTest.read().localId);Object.assign(p,{x,z,y:groundAt(s.map,x,z),flight:'ground',grounded:true,vx:0,vy:0,vz:0,shieldUntil:Infinity});});window.__yolkTest.pose({yaw,pitch});},{x,z,yaw,pitch});
-  await frames(page,24);await shot(page,'actual-'+name);views[name]=await page.evaluate(()=>{const r=window.__yolkTest.read();return {drawCalls:r.drawCalls,triangles:r.triangles,streaming:r.presentation.streaming,environment:r.presentation.environment};});
+  await frames(page,8);await shot(page,'actual-'+name);views[name]=await page.evaluate(()=>{const r=window.__yolkTest.read();return {drawCalls:r.drawCalls,triangles:r.triangles,streaming:r.presentation.streaming,environment:r.presentation.environment};});await checkpoint(name);
   assert.equal(views[name].environment.terrain.revision,159);assert.ok(views[name].drawCalls<1200,'Bounded gameplay draws');assert.ok(views[name].environment.groundCover.cells<=16);assert.ok(views[name].environment.groundCover.draws<=32);
  }
  assert.ok(views.coast.streaming.resident<views.coast.streaming.cells);checks.mainTerrainAndStreaming=true;
  await page.setViewportSize({width:800,height:600});await frames(page,8);await shot(page,'actual-compact-viewport');checks.compactViewport=true;
  // Use the exact factories and bake path used by gameplay, not illustrations.
- gallery=await browser.newPage({viewport:{width:1440,height:1000}});watch(gallery);await gallery.route('**/__environment-gallery.html',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><html><body></body></html>'}));await gallery.goto(origin+'/__environment-gallery.html');
+ await checkpoint('gallery');gallery=await browser.newPage({viewport:{width:1440,height:1000}});watch(gallery);await gallery.route('**/__environment-gallery.html',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><html><body></body></html>'}));await gallery.goto(origin+'/__environment-gallery.html');
  const catalogs=await gallery.evaluate(async()=>{
   const {THREE:T,updateEnvironmentSurfaces}=await import('/src/environment-surfaces.js'),{environmentTree}=await import('/src/environment-trees.js'),{detailEnvironmentProp,ENVIRONMENT_PROP_KINDS}=await import('/src/environment-props.js'),{bake}=await import('/src/royale-view.js');
   const renderer=new T.WebGLRenderer({canvas:document.createElement('canvas'),alpha:true,antialias:true});renderer.outputColorSpace=T.SRGBColorSpace;renderer.setSize(400,360);updateEnvironmentSurfaces(0);const layouts={};
@@ -45,5 +47,5 @@ try{
  });
  assert.deepEqual(catalogs,{trees:5,props:48});for(const key of Object.keys(catalogs)){await gallery.evaluate(key=>window.showCatalog(key),key);await gallery.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));await gallery.screenshot({path:out+'/'+key+'.png',fullPage:true});}checks.allSceneryFactories=true;
  assert.deepEqual(errors,[]);await writeFile(out+'/result.json',JSON.stringify({checks,errors,views,catalogs},null,2));console.log('PASS living terrain',checks);
-}catch(error){await page?.screenshot({path:out+'/failure-game.png'}).catch(()=>{});await gallery?.screenshot({path:out+'/failure-gallery.png',fullPage:true}).catch(()=>{});await writeFile(out+'/result.json',JSON.stringify({checks,errors,views,error:String(error)},null,2));throw error;}
-finally{await browser?.close();await vite.close();await relay.close();await rm(temp,{recursive:true,force:true});}
+}catch(error){await page?.screenshot({path:out+'/failure-game.png'}).catch(()=>{});await gallery?.screenshot({path:out+'/failure-gallery.png',fullPage:true}).catch(()=>{});const state=await page?.evaluate(()=>{const r=window.__yolkTest?.read();return {screen:r?.screen,phase:r?.state?.phase,map:r?.state?.options.map,stage:r?.state?.royale?.stage,body:document.body.innerText.slice(-1800)};}).catch(()=>null);await writeFile(out+'/result.json',JSON.stringify({checks,errors,views,error:String(error),state},null,2));throw error;}
+finally{clearTimeout(deadline);await browser?.close();await vite.close();await relay.close();await rm(temp,{recursive:true,force:true});}
