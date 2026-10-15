@@ -1,3 +1,4 @@
+import {cameraPose} from './perspective.js';
 import {gun} from './data.js';
 import {ITEMS,ammoType} from './royale-data.js';
 export const SLOT_GROUPS=Object.freeze(['shotgun','rifle','healing','mobility']);
@@ -26,12 +27,13 @@ export function canAutoStack(p,item){
 }
 // Exact same scoring is used by authority and UI; callers supply reachability.
 // No sort/allocation of a temporary candidate list for every interaction tick.
-export function targetLoot(items,p,allowed=()=>true){
+export function targetLoot(items,p,allowed=()=>true,map=null){
+ const view=p.perspective==='third'?cameraPose(map,p):null;
  const cp=Math.cos(p.pitch||0),fx=-Math.sin(p.yaw||0)*cp,fy=Math.sin(p.pitch||0),fz=-Math.cos(p.yaw||0)*cp;
  let best=null,score=-Infinity;
  for(const item of items){
   if(!allowed(item))continue;
-  const dx=item.x-p.x,dy=item.y+.6-(p.y+.9),dz=item.z-p.z,d=Math.hypot(dx,dy,dz)||.001;
+  const dx=item.x-(view?.origin.x??p.x),dy=item.y+.6-(view?.origin.y??p.y+.9),dz=item.z-(view?.origin.z??p.z),d=Math.hypot(dx,dy,dz)||.001;
   const value=(dx*fx+dy*fy+dz*fz)/d*2-d*.2;
   if(value>score+1e-9||(Math.abs(value-score)<1e-9&&String(item.uid??item.id)<String(best?.uid??best?.id))){best=item;score=value;}
  }return best;

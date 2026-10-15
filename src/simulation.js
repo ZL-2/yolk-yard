@@ -7,6 +7,7 @@ import {watcherAction} from './spectator-status.js';
 import {COMBAT_LIMITS,UTILITY_WEAPONS} from './weapon-balance.js';
 import {arenaSpawnPoints} from './arena-spawns.js';
 import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
+import {sightRay,thirdPersonActive} from './perspective.js';
 import {RemoteInputBuffer} from './remote-input.js';
 import {resetStance,eyeHeight,canFight} from './stance.js';
 import {updateCombatAccuracy,firedAccuracy,pelletOffsets,falloffAt,structureDamage,weaponReadyAt,rememberShot,triggerRequested} from './combat.js';
@@ -479,9 +480,9 @@ export class Simulation {
     p.recoilPitch=a.recoilPitch;p.recoilYaw=a.recoilYaw;
   }
   shotPath(p, w, directionOverride = null) {
-    const eye = { x: p.x, y: p.y + eyeHeight(p), z: p.z },
+    const ray=sightRay(this.map,p,w.flightRange??w.range),eye=ray.origin,bodyEye=ray.eye,
       aim = directionOverride || direction(p.yaw, p.pitch);
-    let distance = wallDistance(this.map, eye, aim, (w.flightRange??w.range));
+    let distance = wallDistance(this.map, eye, aim, ray.range);
     for (const target of this.players.values())
       if (
         target !== p &&
@@ -496,20 +497,27 @@ export class Simulation {
     };
     let origin = muzzleOrigin(p, w);
     const offset = {
-        x: origin.x - eye.x,
-        y: origin.y - eye.y,
-        z: origin.z - eye.z,
+        x: origin.x - bodyEye.x,
+        y: origin.y - bodyEye.y,
+        z: origin.z - bodyEye.z,
       },
       length = Math.hypot(offset.x, offset.y, offset.z);
     const blocked = worldHit(
       this.map,
-      eye,
+      bodyEye,
       { x: offset.x / length, y: offset.y / length, z: offset.z / length },
       length,
     );
     // Retract to the eye when a ledge obstructs the muzzle or the target is
     // closer than the barrel. The eye ray still collides with actual cover.
-    if (blocked || distance <= length) origin = eye;
+    if (blocked || distance <= length) origin = bodyEye;
+    if(ray.third){
+      const dx=target.x-bodyEye.x,dy=target.y-bodyEye.y,dz=target.z-bodyEye.z,reach=Math.hypot(dx,dy,dz);
+      if(dx*aim.x+dy*aim.y+dz*aim.z<=.05)return {origin:bodyEye,d:aim,blocked:worldHit(this.map,bodyEye,aim,1)};
+      const cover=worldHit(this.map,bodyEye,{x:dx/reach,y:dy/reach,z:dz/reach},reach);
+      // A shoulder camera may see around cover; the weapon cannot shoot through it.
+      if(cover&&cover.distance<reach-.08)return {origin:bodyEye,d:aim,blocked:cover};
+    }
     const delta = {
         x: target.x - origin.x,
         y: target.y - origin.y,
@@ -563,7 +571,7 @@ export class Simulation {
     this.emit('shot',{player:p.id,weapon:w.id,shotId:p.shotGroup,origin,shots,blocked});return true;
   }
   launch(p, popper, spread = 0, recoil = {}) {
-    if(popper){const b={...thrownProjectile(p,recoil.throwable||'popper'),id:++this.projectileId,shotId:++this.shotId,born:this.time};this.projectiles.push(b);this.emit('launch',{player:p.id,popper:true,weapon:b.weapon,shotId:b.shotId,origin:{x:b.x,y:b.y,z:b.z}});return;}
+    if(popper){const b={...thrownProjectile(p,recoil.throwable||'popper',this.map),id:++this.projectileId,shotId:++this.shotId,born:this.time};this.projectiles.push(b);this.emit('launch',{player:p.id,popper:true,weapon:b.weapon,shotId:b.shotId,origin:{x:b.x,y:b.y,z:b.z}});return;}
     const w = gun(p),
       aim = direction(p.yaw + (recoil.yaw||0) + (this.random() - 0.5) * spread, p.pitch + (recoil.pitch||0) + (this.random() - 0.5) * spread),
       path = this.shotPath(p, w, aim),
@@ -894,7 +902,7 @@ export class Simulation {
   }
   snapshot() {
     const keys = [
-      'phasedBuilds','friendSpectator','lateSpectator','watchId','sprinting','tacticalSprint','sprintBlend','sprintRecovery','stamina','sprintRest','exhausted',
+      'perspective','viewBlend','viewBoom','cameraEye','phasedBuilds','friendSpectator','lateSpectator','watchId','sprinting','tacticalSprint','sprintBlend','sprintRecovery','stamina','sprintRest','exhausted',
       'crouching','lowCrouch','sliding','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','slideUphill','slideStartX','slideStartZ','mobilityJumpWindow','mobilitySerial','mobilityKind','vehicleId','vehicleSeat','vehicleLock','downed','lifeState','downedAt','revivedAt','downCount','reviving','reviverId','reviveProgress','revives','connected','teamSlot',
       "afkRemaining", "afkRemoved", "lastDamage", "assists", "quickstep", "focus",
       "id", "joinedOrder", "vx", "vz", "place",

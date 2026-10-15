@@ -1,7 +1,13 @@
+import {sightRay,reachablePoint,thirdPersonActive} from './perspective.js';
 // Unlimited plunger shots; successful pulls protect the following landing, not gunfire.
 // Range/projectile/cadence references are kept separate from pull-motion tuning.
 export const GRAPPLER=Object.freeze({range:75,minRange:2,projectileSpeed:75,cooldown:1/.65,returnTime:1.26,pullSpeed:26,latchHop:4.8,releaseHop:4.8});
 export function grappleAim(map,p,ray){
+ if(thirdPersonActive(p)){
+  const sight=sightRay(map,p,GRAPPLER.range),distance=ray(map,sight.origin,sight.d,sight.range),anchor={x:sight.origin.x+sight.d.x*distance,y:sight.origin.y+sight.d.y*distance,z:sight.origin.z+sight.d.z*distance};
+  const origin=sight.eye,length=Math.hypot(anchor.x-origin.x,anchor.y-origin.y,anchor.z-origin.z);
+  return {origin,anchor,length,valid:distance<sight.range-.001&&length>=GRAPPLER.minRange&&length<=GRAPPLER.range&&reachablePoint(map,p,anchor,GRAPPLER.range)};
+ }
  const cp=Math.cos(p.pitch||0),d={x:-Math.sin(p.yaw||0)*cp,y:Math.sin(p.pitch||0),z:-Math.cos(p.yaw||0)*cp};
  const origin={x:p.x,y:p.y+(p.crouching?1.05:1.7),z:p.z},length=ray(map,origin,d,GRAPPLER.range);
  return {origin,anchor:{x:origin.x+d.x*length,y:origin.y+d.y*length,z:origin.z+d.z*length},length,valid:length>=GRAPPLER.minRange&&length<GRAPPLER.range-.001};

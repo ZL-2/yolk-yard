@@ -12,7 +12,7 @@ const vite=await createServer({plugins:[{name:'kestrel-local-relay',configureSer
 let browser;const pages=[],errors=[],checks={};
 async function player(name,quality){
  const p=await browser.newPage({bypassCSP:true,viewport:{width:1440,height:900}});pages.push(p);p.setDefaultTimeout(60000);p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error'&&/WebGLProgram|Shader Error/i.test(m.text()))errors.push(m.text());});
- await p.addInitScript(({name,quality})=>{localStorage.setItem('ravelfront-season-1-update-150-dismissed','yes');localStorage.setItem('ravelfront-referrals-dismissed','yes');localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality,volume:0,musicVolume:0,fov:65}));},{name,quality});await p.goto(origin+'/?qa');await p.waitForFunction(()=>window.__yolkTest);await p.locator('#loading-screen').waitFor({state:'hidden'});return p;
+ await p.addInitScript(({name,quality})=>{localStorage.setItem('ravelfront-season-1-update-150-dismissed','yes');localStorage.setItem('ravelfront-referrals-dismissed','yes');localStorage.setItem('ravelfront-perspective-157-dismissed','yes');localStorage.setItem('yolk-profile',JSON.stringify({name}));localStorage.setItem('yolk-settings',JSON.stringify({quality,volume:0,musicVolume:0,fov:65}));},{name,quality});await p.goto(origin+'/?qa');await p.waitForFunction(()=>window.__yolkTest);await p.locator('#loading-screen').waitFor({state:'hidden'});return p;
 }
 const shot=(p,name)=>p.screenshot({path:out+'/'+name+'.png',animations:'disabled'});
 const diagnostic=p=>p.evaluate(async()=>{const {kestrelDiagnostics}=await import('/src/kestrel-model.js');return kestrelDiagnostics();});

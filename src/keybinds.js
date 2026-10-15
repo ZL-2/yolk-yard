@@ -4,11 +4,11 @@ export const CONTROLS = [
   ['left', 'Move left', 'KeyA', 'ArrowLeft'],
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
   ['jump', 'Jump', 'Space', null],
-  ['crouch', 'Crouch / slide', 'ControlLeft', null],
+  ['crouch', 'Crouch / slide', 'AltLeft', null],
   ['marker', 'Duo world marker', 'Mouse1', null],
   ['danger', 'Duo danger marker', 'KeyY', null],
   ['fire', 'Fire', 'Mouse0', null],
-  ['aim', 'Aim / scope', 'Mouse2', null],
+  ['aim', 'Aim / scope', 'ShiftLeft', 'Mouse2'],
   ['reload', 'Reload', 'KeyR', null],
   ['popper', 'Throw popper', 'KeyE', 'KeyG'],
   ['primary', 'Primary weapon / Royale slot 1', 'Digit1', null],
@@ -17,7 +17,8 @@ export const CONTROLS = [
   ['nextSlot', 'Next item', 'WheelDown', null],
   ['previousSlot', 'Previous item', 'WheelUp', null],
   ['scores', 'Scoreboard', 'Tab', null],
-  ['sprint','Tactical sprint','ShiftLeft',null],
+  ['sprint','Tactical sprint','ControlLeft',null],
+  ['startNow','Start private Royale (host)','KeyU',null],
   ['interact','Search / pick up / revive (Royale)','KeyF',null],
   ['map','Island map (Royale)','KeyM',null],
   ['inventory','Inventory (Royale)','KeyI',null],
@@ -65,6 +66,13 @@ export function assignBinding(bindings,action,slot,code){
  if(code)for(const [id,label] of CONTROLS)next[id]=next[id].map((key,i)=>{if(key===code&&(id!==action||i!==slot)&&!shareBinding(id,action,code)){removed.push(label);return null;}return key;});
  next[action][slot]=code;
  return {bindings:next,removed};
+}
+export function migratePerspectiveBindings(settings){
+ if(settings.perspectiveBindings157)return settings;
+ const b=settings.keybinds,old=(id,key)=>!b?.[id]||b[id][0]===key&&!b[id][1];
+ // Only migrate the previous default trio. Intentional custom bindings survive.
+ if(b&&old('aim','Mouse2')&&old('sprint','ShiftLeft')&&old('crouch','ControlLeft')&&!Object.entries(b).some(([id,codes])=>!['aim','sprint','crouch'].includes(id)&&codes?.includes('AltLeft'))){b.aim=['ShiftLeft','Mouse2'];b.sprint=['ControlLeft',null];b.crouch=['AltLeft',null];}
+ settings.perspectiveBindings157=true;return settings;
 }
 export function normalizeBindings(saved) {
   if(saved?.pickaxe?.[0]==='Digit6'&&!saved.slot6)saved={...saved,pickaxe:['KeyP',saved.pickaxe[1]]};

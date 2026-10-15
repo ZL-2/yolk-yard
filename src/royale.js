@@ -12,7 +12,7 @@ import {initializeFrontier,frontierInteract,tickVaultDoors} from './frontier-wor
 import {SEASON,rigCharges} from './season-one.js';
 import {initializeSeason,bossInput,damageBoss,useSeasonItem,seasonInteract,seasonTick} from './season-world.js';
 import {requestBossVoice,bossCombatVoice} from './boss-voice.js';
-import {initializeOperations,operationsEvent,tickOperations,spawnSupply} from './field-operations.js';
+import {routeHotDrop,initializeOperations,operationsEvent,tickOperations,spawnSupply} from './field-operations.js';
 import {tickHealing,cleanHealingUse} from './progressive-healing.js';
 import {SHOP_SETS} from './shop-catalog.js';
 import {COMBAT_LIMITS,UTILITY_WEAPONS} from './weapon-balance.js';
@@ -153,7 +153,7 @@ export class RoyaleSimulation extends Simulation {
   this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.round++;this.phase='playing';this.stage=RP.ISLAND;this.queueEnds=this.time+(this.options.recurring?(this.humanContestants().length?PUBLIC_ROYALE.warmupSeconds:-this.time):this.options.session==='offline'?OFFLINE_WARMUP_SECONDS:WARMUP_SECONDS);this.lastCountdown=null;this.startedAt=0;this.elapsed=0;this.winner='';this.winnerId=null;this.winnerTeam=-1;this.placements=[];this.projectiles=[];this.events=[];this.inputs.clear();this.remoteInputs.clear();this.loot=[];this.chests=[];this.lootId=0;this.lootVersion++;this.pads=[];this.alive=0;this.remaining=0;
   this.map=this.islandMap();resetBuilding(this);this.nav=navigation(getMap('hatchery-atoll',this.mapLayouts));this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
   for(const p of this.players.values()){if(p.contestant)this.spawnWarmup(p);else Object.assign(p,{health:0,contestant:false,lateSpectator:true,spectating:true,flight:'out'});}
-  const hot=this.battleMap().districts[Math.floor(this.random()*this.battleMap().districts.length)];
+  const hot=routeHotDrop(this.battleMap().districts,this.route);
   this.operations={hotspot:hot?{id:hot.id,name:hot.name,x:hot.x,z:hot.z}:null,uplink:null};
   this.departureMs=null;
   this.battleLootSeed=Math.floor(this.random()*2147483647);battlePreparation.delete(this);
@@ -277,13 +277,13 @@ export class RoyaleSimulation extends Simulation {
   if(input.editing)return;if(frontierInteract(this,p,input,dt))return;if(seasonInteract(this,p,input,dt))return;
   if(input.interact&&!p.interactLatch&&toggleDoor(this,p)){p.interactLatch=true;return;}
   let chest=null;
-  if(input.interact){const nearbyChests=nearbyItems(this,'chests',p,3.3),available=c=>!c.opened&&vaultOpen(this,c.vaultId)&&this.accessible(p,c,3.3);chest=nearbyChests.find(c=>c.id===p.chestId&&available(c))||targetLoot(nearbyChests,p,available);}
+  if(input.interact){const nearbyChests=nearbyItems(this,'chests',p,3.3),available=c=>!c.opened&&vaultOpen(this,c.vaultId)&&this.accessible(p,c,3.3);chest=nearbyChests.find(c=>c.id===p.chestId&&available(c))||targetLoot(nearbyChests,p,available,this.map);}
   if(input.interact&&chest){
    if(p.chestId!==chest.id){p.chestId=chest.id;p.chestProgress=0;this.emit('royale-cue',{player:p.id,cue:'chest-search'});}
    p.chestProgress+=dt;
    if(p.chestProgress>=.8){this.openChest(p,chest);p.chestProgress=0;p.chestId=null;}
   }else{p.chestProgress=0;p.chestId=null;}
-  const item=input.interact&&!p.swapDoneHeld&&!chest?targetLoot(nearbyItems(this,'loot',p,3),p,i=>!i.ammoType&&!i.resource&&!i.crown&&!(i.droppedBy===p.id&&i.pickupAfter>this.time)&&vaultOpen(this,i.vaultId)&&this.accessible(p,i,3)):null;
+  const item=input.interact&&!p.swapDoneHeld&&!chest?targetLoot(nearbyItems(this,'loot',p,3),p,i=>!i.ammoType&&!i.resource&&!i.crown&&!(i.droppedBy===p.id&&i.pickupAfter>this.time)&&vaultOpen(this,i.vaultId)&&this.accessible(p,i,3),this.map):null;
   // One press takes/swaps once. Holding still searches chests, but cannot
   // cycle a full inventory back onto the gun just dropped at the player's feet.
   p.swapUid=null;p.swapProgress=0;

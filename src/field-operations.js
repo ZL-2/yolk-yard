@@ -16,9 +16,14 @@ const active=p=>p.contestant&&p.health>0&&!p.downed&&!p.spectating&&!p.afkRemove
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const timing=sim=>sim.options.storm==='quick'?.65:1;
 
+export function routeHotDrop(districts,route){
+ if(!districts?.length)return null;
+ const x=route?.fromX??0,z=route?.fromZ??0;
+ return districts.reduce((best,d)=>!best||Math.hypot(d.x-x,d.z-z)<Math.hypot(best.x-x,best.z-z)?d:best,null);
+}
 export function initializeOperations(sim) {
-  const districts=sim.map.districts||[],available=districts.filter(d=>sim.chests.some(c=>c.poi===d.id&&!c.vaultId));
-  const hot=available.find(d=>d.id===sim.operations?.hotspot?.id)||available[Math.floor(sim.random()*available.length)];
+  const districts=sim.map.districts||[];
+  const hot=routeHotDrop(districts,sim.route);
   sim.operations={hotspot:hot?{id:hot.id,name:hot.name,x:hot.x,z:hot.z}:null,uplink:null,sequence:0,nextAt:OPERATIONS.first*timing(sim),scanAt:sim.time};
   sim.fieldFirstElim=null;
   for(const p of sim.players.values()) {

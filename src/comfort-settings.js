@@ -18,7 +18,7 @@ export function applyComfort(root,settings){
  root.classList.toggle('reduced-motion',!!settings.reducedMotion);root.classList.toggle('high-contrast-hud',!!settings.highContrast);root.classList.toggle('hide-minimap',settings.showMinimap===false);root.classList.toggle('hide-compass',settings.showCompass===false);root.classList.toggle('left-minimap',settings.mapSide==='left');
 }
 export function sensitivityFor(settings,{editing=false,building=false,thirdPerson=false,aiming=false,scoped=false,scopeScale=1}={}){
- if(editing)return settings.editSensitivity??1;if(building)return settings.buildSensitivity??1;if(thirdPerson)return settings.thirdPersonSensitivity??1;return aiming?(scoped?(settings.scopeSensitivity??.65):(settings.adsSensitivity??.65))*scopeScale:1;
+ if(editing)return settings.editSensitivity??1;if(building)return settings.buildSensitivity??1;if(thirdPerson&&!aiming)return settings.thirdPersonSensitivity??1;return aiming?(scoped?(settings.scopeSensitivity??.65):(settings.adsSensitivity??.65))*scopeScale:1;
 }
 export function visualSoundCategoryEnabled(kind,settings){
  const key=kind==='footsteps'?'visualFootsteps':kind==='gunfire'||kind==='explosion'?'visualGunfire':kind==='boss'?'visualBosses':'visualOther';return settings[key]!==false;

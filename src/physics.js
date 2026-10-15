@@ -173,6 +173,10 @@ export function movePlayer(p, input, map, dt, time=0) {
   const steps=Math.max(1,Math.ceil(Math.min(dt,.1)/(1/60)));
   for(let i=0;i<steps;i++){
     const before=beginFallStep(p);movePlayerStep(p,input,map,Math.min(dt,.1)/steps,time);
+    // Predicted and authoritative stance easing share a clock and never alter
+    // the physical eye used for weapon obstruction or interaction reach.
+    const targetEye=eyeHeight(p);
+    p.cameraEye=Number.isFinite(p.cameraEye)?p.cameraEye+(targetEye-p.cameraEye)*(1-Math.exp(-17*Math.min(dt,.1)/steps)):targetEye;
     let normalY=1;
     if(p.fall&&p.grounded&&map.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.05){const gx=(groundAt(map,p.x+.3,p.z)-groundAt(map,p.x-.3,p.z))/.6,gz=(groundAt(map,p.x,p.z+.3)-groundAt(map,p.x,p.z-.3))/.6;normalY=1/Math.sqrt(1+gx*gx+gz*gz);}
     if(p.flight!=='transport')finishFallStep(p,before,normalY);
@@ -191,6 +195,9 @@ function movePlayerStep(p, input, map, dt, time) {
     p.lastJumpPress = input.jumpPress;
     p.jumpLatch = p.flightLatch = false;
   }
+  p.perspective=input.perspective==='third'?'third':'first';
+  p.viewBlend=Number.isFinite(input.viewBlend)?clamp(input.viewBlend,0,1):Number(!!input.aim);
+  p.viewBoom=Number.isFinite(input.viewBoom)?clamp(input.viewBoom,0,1):1;
   p.yaw = Number.isFinite(input.yaw) ? input.yaw : p.yaw;
   p.pitch = clamp(
     Number.isFinite(input.pitch) ? input.pitch : p.pitch,
@@ -349,6 +356,8 @@ export function sanitizeInput(i = {}) {
     seq: Math.floor(num(i.seq, 0, 1e10)),
     yaw: num(i.yaw, -1e6, 1e6),
     pitch: num(i.pitch, -1.48, 1.48),
+    perspective:i.perspective==='third'?'third':'first',
+    viewBlend:num(i.viewBlend,0,1),viewBoom:Number.isFinite(i.viewBoom)?num(i.viewBoom,0,1):1,
     forward: num(i.forward, -1, 1),
     strafe: num(i.strafe, -1, 1),
     jump: !!i.jump,

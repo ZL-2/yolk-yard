@@ -1,3 +1,4 @@
+import {sightRay,reachablePoint,thirdPersonActive} from './perspective.js';
 import {SHIELD_BARREL} from './field-refinement.js';
 import {worldDoorBox} from './world-rules.js';
 import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates,playerBoxOverlap,canOccupy,pruneBuildPhases} from './physics.js';
@@ -51,8 +52,8 @@ const cellKey=p=>[p.x,p.y,p.z,p.rotation].join(',');
 // One deterministic solver for host and preview. Enumerate local grid attachments,
 // rank intent before validation, and never search behind a major solid wall.
 export function solvePlacement(p,type,rotation,material,map,builds=[],players=[],preferred=null){
- const base=placement(p,type,rotation,material),forward=direction(p.yaw,0),ray=direction(p.yaw,p.pitch),eye={x:p.x,y:p.y+eyeHeight(p),z:p.z};
- const hit=worldHit(map,eye,ray,9),aim=hit?.point||{x:p.x+ray.x*5,y:eye.y+ray.y*5,z:p.z+ray.z*5};
+ const base=placement(p,type,rotation,material),forward=direction(p.yaw,0),sight=sightRay(map,p,9),ray=sight.d,eye=sight.eye;
+ const hit=worldHit(map,sight.origin,ray,sight.range),aim=hit?.point||{x:sight.origin.x+ray.x*(5+sight.length*sight.fraction),y:sight.origin.y+ray.y*(5+sight.length*sight.fraction),z:sight.origin.z+ray.z*(5+sight.length*sight.fraction)};
  const aimed=builds.find(b=>b.id===hit?.box?.buildId&&b.type===type);
  if(aimed&&!(type==='stairs'&&Math.abs(p.x-aimed.x)<2.6&&Math.abs(p.z-aimed.z)<2.6&&p.y>aimed.y+.7&&p.pitch>-.45)){
   const point=hit.point,inside=type==='wall'?(Math.abs((aimed.rotation%2?point.z-aimed.z:point.x-aimed.x))<1.65&&point.y>aimed.y+.25&&point.y<aimed.y+3.7):(Math.abs(point.x-aimed.x)<1.65&&Math.abs(point.z-aimed.z)<1.65);
@@ -102,8 +103,8 @@ export function solvePlacement(p,type,rotation,material,map,builds=[],players=[]
  return {piece:best?.piece||ranked[0]?.piece||base,reason:best?'':firstReason||'Blocked'};
 }
 export function aimedObject(map,p,range=5){
- const hit=worldHit(map,{x:p.x,y:p.y+eyeHeight(p),z:p.z},direction(p.yaw,p.pitch),range);
- return hit?.box?hit:null;
+ const sight=sightRay(map,p,range),hit=worldHit(map,sight.origin,sight.d,sight.range);
+ return hit?.box&&(!sight.third||reachablePoint(map,p,hit.point,range))?hit:null;
 }
 export function rebuildMap(sim,{navigationChanged=true}={}){
  sim.map.boxes=[...sim.worldBoxes.filter(b=>!sim.worldDamage[b.objectId]?.destroyed).flatMap(b=>worldDoorBox(b,sim.doors)||[]),...sim.builds.flatMap(pieceBoxes)];invalidateCollision(sim.map);sim.lootSupportDirty=true;if(navigationChanged)sim.navigationRevision=(sim.navigationRevision||0)+1;
@@ -164,8 +165,8 @@ export function swingPickaxe(sim,p){
  if(!canFight(p))return;
  if(sim.time<(p.nextHarvest||0))return;p.nextHarvest=sim.time+PICKAXE.interval;p.swingAt=sim.time;
  sim.emit('royale-cue',{cue:'pickaxe-swing',player:p.id,x:p.x,y:p.y,z:p.z});
- const hit=aimedObject(sim.map,p,PICKAXE.range),o={...p,y:p.y+eyeHeight(p)},d=direction(p.yaw,p.pitch);let target=null,range=hit?.distance??PICKAXE.range;
- for(const other of sim.players.values())if(other!==p&&other.health>0){const t=rayEgg(o,d,other);if(t<range){target=other;range=t;}}
+ const sight=sightRay(sim.map,p,PICKAXE.range),hit=aimedObject(sim.map,p,PICKAXE.range),o=sight.origin,d=sight.d;let target=null,range=hit?.distance??sight.range;
+ for(const other of sim.players.values())if(other!==p&&other.health>0){const t=rayEgg(o,d,other);if(t<range&&(!sight.third||reachablePoint(sim.map,p,{x:o.x+d.x*t,y:o.y+d.y*t,z:o.z+d.z*t},PICKAXE.range))){target=other;range=t;}}
  if(target)sim.damage(target,p,PICKAXE.player,'Pickaxe');else if(hit){const entry=sim.worldDamage[hit.box.objectId],weak=entry?.weakpoint,bonus=weak&&Math.hypot(hit.point.x-weak.x,hit.point.y-weak.y,hit.point.z-weak.z)<.4;damageObject(sim,hit.box,(hit.box.buildId?PICKAXE.structure:PICKAXE.environment)*(bonus?PICKAXE.weakMultiplier:1),p);const object=sim.worldDamage[hit.box.objectId];if(object&&!object.destroyed){const offset=Math.sin(sim.time*7)*.35;object.weakpoint={x:Math.max(hit.box.x-hit.box.w/2+.03,Math.min(hit.box.x+hit.box.w/2-.03,hit.point.x+(Math.abs(d.z)>.7?offset:0))),y:Math.max(hit.box.y+.3,Math.min(hit.box.y+hit.box.h-.2,hit.point.y+.25)),z:Math.max(hit.box.z-hit.box.d/2+.03,Math.min(hit.box.z+hit.box.d/2-.03,hit.point.z+(Math.abs(d.x)>.7?offset:0)))};}sim.emit('royale-cue',{cue:'harvest-hit',player:p.id,x:hit.point.x,y:hit.point.y,z:hit.point.z});}
 }
 export function buildingTick(sim,p,input){
@@ -197,9 +198,9 @@ export function buildingTick(sim,p,input){
  return false;
 }
 export function targetBuild(map,builds,p){
- const hit=aimedObject(map,p,EDIT_RANGE),o={x:p.x,y:p.y+eyeHeight(p),z:p.z},d=direction(p.yaw,p.pitch);
- let best=null,limit=hit?.distance??EDIT_RANGE;
- for(const b of builds){const grid=editRay(b,o,d,EDIT_RANGE);if(grid&&grid.distance<=limit+.2){best=b;limit=grid.distance;}}
+ const hit=aimedObject(map,p,EDIT_RANGE),sight=sightRay(map,p,EDIT_RANGE),o=sight.origin,d=sight.d;
+ let best=null,limit=hit?.distance??sight.range;
+ for(const b of builds){const grid=editRay(b,o,d,sight.range);if(grid&&(!sight.third||reachablePoint(map,p,grid.point,EDIT_RANGE))&&grid.distance<=limit+.2){best=b;limit=grid.distance;}}
  return best||builds.find(b=>b.id===hit?.box.buildId)||null;
 }
 export function editBuilding(sim,p,action){
@@ -212,7 +213,7 @@ export function editBuilding(sim,p,action){
  const fail=reason=>{sim.emit('build-result',{player:p.id,buildId:cmd?.id,ok:false,reason});return false;};
  if(!b||!canEdit(b,p)||p.health<=0||p.flight!=='ground')return fail('You cannot edit this structure');
  // Retest line of sight against its original plane; holes remain targetable.
- const ray=editRay(b,{x:p.x,y:p.y+eyeHeight(p),z:p.z},direction(p.yaw,p.pitch),EDIT_RANGE);
+ const sight=sightRay(sim.map,p,EDIT_RANGE),candidate=editRay(b,sight.origin,sight.d,sight.range),ray=candidate&&(!sight.third||reachablePoint(sim.map,p,candidate.point,EDIT_RANGE))?candidate:null;
  const hit=aimedObject(sim.map,p,EDIT_RANGE);
  if(!ray&&hit?.box.buildId!==b.id)return fail('Aim at the structure');
  if(hit&&hit.box.buildId!==b.id&&hit.distance+.2<(ray?.distance??Infinity))return fail('Structure is obstructed');

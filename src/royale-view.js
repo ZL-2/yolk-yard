@@ -232,7 +232,7 @@ export class RoyaleView{
   this.poseDt=dt;const pose=this.flightPose(p,t,dt);
   const flying=p.flight==='dive'||p.flight==='glide'||p.flight==='launch';
   const bossGrappling=!!(p.boss&&(p.bossWindup||p.grapple));
-  if(model.userData.held)model.userData.held.visible=p.health>0&&!p.downed&&!p.reviving&&model.userData.draw?.visible!==false&&!p.emote&&!p.building&&!p.traversal&&!flying&&!bossGrappling&&!!p.inventory?.[p.slot]&&(!!p.inventory[p.slot].weapon||!!p.inventory[p.slot].pickaxe);
+  if(model.userData.held)model.userData.held.visible=p.health>0&&!p.downed&&!p.reviving&&model.userData.draw?.visible!==false&&!p.emote&&!p.building&&!p.traversal&&!p.mantle&&!flying&&!bossGrappling&&!!p.inventory?.[p.slot]&&(!!p.inventory[p.slot].weapon||!!p.inventory[p.slot].pickaxe);
   if(model.userData.blaster)model.userData.blaster.visible=!p.building&&!flying&&!bossGrappling&&!!p.inventory?.[p.slot]?.weapon;
   const item=bossGrappling?{id:'anchorWinch'}:p.building?{id:'blueprint'}:p.inventory?.[p.slot];
   const itemKey=p.health>0&&!p.downed&&!p.reviving&&!p.emote&&!flying&&item&&!item.weapon&&!item.pickaxe?item.id:null;

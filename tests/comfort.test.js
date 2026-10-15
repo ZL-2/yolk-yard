@@ -18,7 +18,7 @@ test('hold/toggle inputs are independent, remain held after keyup and clear toge
 });
 test('building, editing, third person, unscoped aiming and scopes have separate sensitivity',()=>{
  const s={...COMFORT_DEFAULTS,editSensitivity:.2,buildSensitivity:.3,thirdPersonSensitivity:.4,adsSensitivity:.5,scopeSensitivity:.6};
- assert.equal(sensitivityFor(s),1);assert.equal(sensitivityFor(s,{editing:true,building:true,aiming:true}),.2);assert.equal(sensitivityFor(s,{building:true,aiming:true}),.3);assert.equal(sensitivityFor(s,{thirdPerson:true,aiming:true}),.4);assert.equal(sensitivityFor(s,{aiming:true}),.5);assert.equal(sensitivityFor(s,{aiming:true,scoped:true,scopeScale:.8}),.48);
+ assert.equal(sensitivityFor(s,{thirdPerson:true}),.4);assert.equal(sensitivityFor(s,{thirdPerson:true,aiming:true,scoped:true,scopeScale:.8}),.48);assert.equal(sensitivityFor(s),1);assert.equal(sensitivityFor(s,{editing:true,building:true,aiming:true}),.2);assert.equal(sensitivityFor(s,{building:true,aiming:true}),.3);assert.equal(sensitivityFor(s,{thirdPerson:true,aiming:true}),.5);assert.equal(sensitivityFor(s,{aiming:true}),.5);assert.equal(sensitivityFor(s,{aiming:true,scoped:true,scopeScale:.8}),.48);
 });
 test('visual sound categories can be disabled separately without muting other threats',()=>{
  for(const [key,kinds]of [['visualFootsteps',['footsteps']],['visualGunfire',['gunfire','explosion']],['visualBosses',['boss']],['visualOther',['glider','chest','activity','rareChest']]]){

@@ -1,3 +1,4 @@
+import {sightRay,reachablePoint} from './perspective.js';
 import {MATERIALS,PIECES,aimedObject,targetBuild} from './building.js';
 import {canEdit,harvestDefinition,EDIT_RANGE,selectMaterial} from './building-rules.js';
 import {editRay,validEdit,wallPattern} from './building-shapes.js';
@@ -39,13 +40,13 @@ export class BuildingUI{
   }
   this.action('reset');this.action('confirm');
  }
- beginEdit(state,p,map){if(!p||p.health<=0||p.flight!=='ground')return false;const pose={...p,yaw:this.controls.yaw??p.yaw,pitch:this.controls.pitch??p.pitch},b=targetBuild(map,state.royale.builds,pose);if(!canEdit(b,p))return false;
+ beginEdit(state,p,map){this.map=map;if(!p||p.health<=0||p.flight!=='ground')return false;const pose={...p,yaw:this.controls.yaw??p.yaw,pitch:this.controls.pitch??p.pitch},b=targetBuild(map,state.royale.builds,pose);if(!canEdit(b,p))return false;
   this.edit={...b,path:[...(b.path||[])]};this.pending=false;this.error='';this.down=false;this.root.classList.add('manual-editing');this.controls.editing=true;this.controls.editTarget=b.id;this.renderEdit();return true;
  }
  renderEdit(){if(!this.edit)return;this.controls.editDraft=this.edit;const valid=validEdit(this.edit);this.controls.editValid=valid;this.root.querySelector('.build-edit').hidden=false;this.root.querySelector('.build-edit').classList.toggle('invalid',!valid||!!this.error);this.root.querySelector('.build-edit strong').textContent=this.edit.type.toUpperCase()+' · EDIT';this.root.querySelector('.edit-status').textContent=this.pending?'CONFIRMING…':this.error||(!valid?'INVALID SELECTION':this.edit.type==='stairs'?'DRAG A CONTINUOUS STAIR PATH':this.edit.type==='roof'?'SELECT CORNERS TO RAISE':'SELECT TILES');}
  sample(pose,held,confirmOnRelease){
   if(!this.edit||this.pending)return;
-  const hit=editRay(this.edit,{x:pose.x,y:pose.y+EYE,z:pose.z},direction(pose.yaw,pose.pitch),EDIT_RANGE);
+  const sight=sightRay(this.map,pose,EDIT_RANGE),candidate=editRay(this.edit,sight.origin,sight.d,sight.range),hit=candidate&&(!sight.third||reachablePoint(this.map,pose,candidate.point,EDIT_RANGE))?candidate:null;
   this.controls.editHover=hit?.cell??-1;
   if(held&&!this.down){this.visited=new Set();this.paint=null;this.previous=null;if(this.edit.type==='stairs')this.edit.path=[];}
   if(held&&hit){

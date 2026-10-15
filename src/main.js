@@ -30,6 +30,8 @@ import './menu-hub.css';
 import {crosshairRadius} from './combat.js';
 import './referrals.css';
 import {showReferrals} from './referrals.js';
+import {showPerspectiveBriefing} from './perspective-briefing.js';
+import {perspectiveMode,thirdPersonActive} from './perspective.js';
 import {showWelcomeBack} from './welcome-back.js';
 import {loadingMarkup,showLoading,hideLoading,waitForLoading,waitUntilLoadingHidden} from './loading-screen.js';
 import {predictionCorrection} from './network-stats.js';
@@ -82,7 +84,7 @@ import './field-stability.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
-import { CONTROLS, normalizeBindings, bindingDown, bindingLabel, wheelIntent } from "./keybinds.js";
+import { CONTROLS, migratePerspectiveBindings, normalizeBindings, bindingDown, bindingLabel, wheelIntent } from "./keybinds.js";
 import { RELEASES, RELEASE } from "./releases.js";
 import { UpdateWatcher } from "./updates.js";
 import {
@@ -137,6 +139,7 @@ const settings = {
   ...SLIDER_DEFAULTS,
   ...PERFORMANCE_DEFAULTS,
   quality: "high",
+  perspective:"first",
   invert: false,
   visualSoundEffects: true,
   centerDot: true,
@@ -147,6 +150,8 @@ const settings = {
 applyComfort(document.documentElement,settings);
 // Migrate the former alternate aim key to dedicated sprint exactly once.
 if(!settings.royaleBindings){if(settings.keybinds?.aim)settings.keybinds.aim=settings.keybinds.aim.map(k=>k==='ShiftLeft'?null:k);settings.royaleBindings=true;}
+migratePerspectiveBindings(settings);
+settings.perspective=perspectiveMode(settings.perspective);
 settings.keybinds = normalizeBindings(settings.keybinds);
 settings.chatMode = ["all", "quick", "off"].includes(settings.chatMode) ? settings.chatMode : "all";
 save("yolk-profile", profile);
@@ -380,7 +385,7 @@ function settingsMenu() {
       )
       .join(
         "",
-      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["visualSoundEffects", "Visualize Sound Effects"], ["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}${inventoryPreferencesHTML(settings)}${comfortHTML(settings)}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
+      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div><div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["visualSoundEffects", "Visualize Sound Effects"], ["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}${perspectiveSettingsHTML()}${inventoryPreferencesHTML(settings)}${comfortHTML(settings)}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
     "settings",
   );
   bindingEditor=new KeybindEditor(dialog.querySelector(".keybind-list"),settings.keybinds,bindings=>{settings.keybinds=bindings;keys.clear();queuedActions.clear();input.fire=input.aim=false;save("yolk-settings",settings);});
@@ -1087,7 +1092,7 @@ function hud() {
   const m = mode(state.options.mode);
   const watched=p.spectating?state.players.find(k=>k.id===spectateTarget):null;
   if(state?.royale){const me=state.players.find(p=>p.id===localId);if(me)buildUI.update(state,me,view.buildMap,controlLabel);}
-  royaleUI.update(state,p,watched,controlLabel,paused);
+  royaleUI.update(state,{...p,...localPerspective()},watched,controlLabel,paused);
   fieldUI.update(state,p,true,paused,point=>view.projectMarker(point));
   view.waypoint=royaleUI.waypoint;
   $("#hud-mode").textContent = m.name.toUpperCase();
@@ -1159,13 +1164,14 @@ function hud() {
     document.exitPointerLock();
   const grappling=canFight(p)&&p.inventory?.[p.slot]?.id==='anchorWinch',armed=canFight(p)&&(!state.royale||p.flight==='ground'&&!!p.inventory?.[p.slot]?.weapon);
   const aiming = armed &&
-    (actionDown("aim") || touch.aim) &&
+    (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim) && !buildControls.editing && !buildControls.buildMode &&
     p.health > 0 &&
     !paused &&
     p.reloadEnd <= state.time;
   $("#crosshair").style.display =
-    p.health > 0 && (armed||grappling) && !paused && !(aiming&&['scope','prism'].includes(gun(p).optic)) ? "block" : "none";
+    p.health > 0 && !p.downed && (armed||grappling||state.royale&&p.flight==='ground') && !paused && !(aiming&&['scope','prism'].includes(gun(p).optic)) ? "block" : "none";
   // Convert the host's current angular shot spread to a screen-space radius.
+  $('#crosshair').classList.toggle('cover-blocked',!!view.coverBlocked);
   $('#crosshair').classList.toggle('weapon-lowered',!!(p.tacticalSprint||p.sprintRecovery>0||p.traversal));
   const spread = (!sim||sim.remote?predicted?.shotSpread:null)??p.shotSpread??gun(p).spread;
   const radius=crosshairRadius(spread,$('#world').clientHeight,view.camera.projectionMatrix.elements[5]);
@@ -1308,6 +1314,7 @@ const actions = {
  'social-confirm-new-identity':()=>{party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
  referrals:()=>showReferrals({party,force:true}),
+ 'perspective-briefing':()=>showPerspectiveBriefing({force:true}),
  'quick-rematch':()=>{if(net?.officialPublic)return toast('The next public round starts automatically.');if(sim&&!sim.remote&&state?.phase==='results'&&(!net||net.isHost)){closeDialog();launchRound();}},
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
  'start-training':()=>{if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
@@ -1332,7 +1339,7 @@ const actions = {
  'royale-clear-marker':()=>{sendMarker('clear');royaleUI.waypoint=null;},
  'duo-marker':()=>sendMarker('normal'), 'duo-danger':()=>sendMarker('danger'),
  'royale-close-flight':()=>royaleUI.dismissFlight(),
- 'royale-start-now':()=>{if(!net?.isHost||net?.visibility!=='private'||net?.officialPublic||!state?.royale?.practice||!sim||sim.remote)return;sim.beginBattle('host-start');state=sim.snapshot();net.broadcast(state);if(paused)void resume();},
+ 'royale-start-now':startPrivateRoyale,
  'royale-jump':()=>{if(paused)resume(false);queuedActions.add('jump');sound.unlock();},
  'royale-drop':()=>inventoryAction('drop'),
  'royale-drop-one':()=>inventoryAction('drop-one'),
@@ -1514,6 +1521,7 @@ document.addEventListener("pointerlockchange", () => {
     pauseMenu();
 });
 function pressControl(code) {
+  if(settings.keybinds.startNow.includes(code)){startPrivateRoyale();return;}
   if(settings.keybinds.emotes.includes(code)){openEmotes();return;}
   if(code.startsWith('Wheel')&&state?.royale){
     const p=state.players.find(p=>p.id===localId),pose=predicted?{...p,...predicted}:p;
@@ -1656,7 +1664,7 @@ document.addEventListener("mouseup", (e) => {
 function aimSensitivity() {
   const p=state?.players.find(p=>p.id===localId);
   const aiming = !buildControls.editing && (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim)&&(!p?.inventory||!!p.inventory[p.slot]?.weapon);
-  return sensitivityFor(settings,{editing:buildControls.editing,building:buildControls.buildMode,thirdPerson:!!p?.emote||p?.spectating||!!p?.flight&&p.flight!=='ground',aiming,scoped:!!p&&!!gun(p).ads,scopeScale:p?gun(p).ads?.sensitivity||1:1});
+  return sensitivityFor(settings,{editing:buildControls.editing,building:buildControls.buildMode,thirdPerson:settings.perspective==='third'||!!p?.emote||p?.spectating||!!p?.flight&&p.flight!=='ground',aiming,scoped:!!p&&!!gun(p).ads,scopeScale:p?gun(p).ads?.sensitivity||1:1});
 }
 document.addEventListener("mousemove", (e) => {
   if (
@@ -1771,6 +1779,13 @@ document.addEventListener("graphics-lost", () => {
     "error",
   );
 });
+function perspectiveSettingsHTML(){return `<div class="setting-row"><label for="perspective" class="setting-label">Camera perspective</label><select id="perspective" data-setting="perspective"><option value="first" ${settings.perspective==='first'?'selected':''}>First person (default)</option><option value="third" ${settings.perspective==='third'?'selected':''}>Third person</option></select></div>`;}
+function localPerspective(){return {perspective:settings.perspective,viewBlend:view.thirdPersonState?.blend??0,viewBoom:view.thirdPersonState?.fraction??1};}
+function startPrivateRoyale(){
+ if(!net?.isHost||net?.visibility!=='private'||net?.officialPublic||!state?.royale?.practice||!sim||sim.remote)return false;
+ const started=sim.beginBattle('host-start');state=sim.snapshot();net.broadcast(state);
+ if(started&&paused)void resume();else if(!started)toast('At least two opposing contestants are needed to start.');return started;
+}
 function frameInput() {
   const active = !document.hidden && !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && state?.players.find(p => p.id === localId)?.health > 0;
   if(!active)actionToggles.reset();
@@ -1779,11 +1794,12 @@ function frameInput() {
   buildControls.yaw=input.yaw;buildControls.pitch=input.pitch;
   buildControls.buildFacing=snappedFacing(input.yaw,buildControls.buildMode?buildControls.buildFacing:undefined);
   if(!actionDown('fire')&&!touch.fire)buildControls.suppressBuildFire=false;
-  if(buildUI.edit&&active){const me=predicted||state.players.find(p=>p.id===localId);if(me)buildUI.sample({...me,yaw:input.yaw,pitch:input.pitch},actionDown('fire')||touch.fire,!!settings.confirmEditOnRelease);}
+  if(buildUI.edit&&active){const me=predicted||state.players.find(p=>p.id===localId);if(me)buildUI.sample({...me,...localPerspective(),yaw:input.yaw,pitch:input.pitch},actionDown('fire')||touch.fire,!!settings.confirmEditOnRelease);}
   if(buildUI.edit&&!active)buildUI.down=false;
 
   const nextInput = {
     seq: ++seq,
+    ...localPerspective(),
     shotTime:sim?state?.time:guestPresentation.poses.targetTime(guestPresentation.time),
     yaw: input.yaw,
     pitch: input.pitch,
@@ -1907,7 +1923,7 @@ function loop(now) {
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
   view.cinematic=matchEndUI.update(state,localId,screen==='game',now);
-  const startNow=document.getElementById('royale-start-now');if(startNow)startNow.hidden=!(screen==='game'&&state?.royale?.practice&&net?.isHost&&net?.visibility==='private'&&!net?.officialPublic);
+  const startNow=document.getElementById('royale-start-now');if(startNow)startNow.textContent=controlLabel('startNow')+' · START NOW';if(startNow)startNow.hidden=!(screen==='game'&&state?.royale?.practice&&net?.isHost&&net?.visibility==='private'&&!net?.officialPublic);
   syncSocialActivity(me);
   document.body.classList.toggle('is-emoting',screen==='game'&&!!me?.emote);
   emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game';
@@ -1939,6 +1955,7 @@ function loop(now) {
     renderPlayer.yaw = input.yaw;
     renderPlayer.pitch = input.pitch;
   }
+  if(renderPlayer)Object.assign(renderPlayer,localPerspective(),{building:!!buildControls.buildMode||!!buildControls.editing,editing:!!buildControls.editing});
   view.lobbyCrown=!!crownStatus.owned;
   const presentation=(!sim||sim.remote)&&state?guestPresentation.frame(state,renderPlayer,now,dt):{state,player:renderPlayer};
   view.update(
@@ -1978,7 +1995,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return showWelcomeBack().then(()=>showReferrals({party}));}).then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return showWelcomeBack().then(()=>showReferrals({party})).then(()=>showPerspectiveBriefing());}).then(()=>{if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);
@@ -1988,6 +2005,7 @@ try {
 // Development-only diagnostics. Vite removes this branch from the published bundle.
 if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
+    perspective:()=>({mode:settings.perspective,active:view.thirdPersonEnabled,blend:view.thirdPersonState,position:view.camera.position.toArray(),body:!!view.models.get(localId)?.visible,pose:view.models.get(localId)?.userData.animationState,opacity:view.models.get(localId)?.userData.cameraFade,firstPersonWeapon:view.gunGroup.visible,coverBlocked:view.coverBlocked,utility:view.models.get(localId)?.userData.utilityKey}),
     editor:()=>mapEditor,
     grappler:()=>({held:view.heldItemKey,model:view.heldItem?.name,ropes:[...(view.royaleView.grappleMeshes||[])].map(([id,m])=>({id,visible:m.visible,uuid:m.uuid,points:m.children[0].geometry.attributes.position.count})),doorMeshes:view.royaleView.doorMeshes?.size||0}),
     notify:text=>toast(text),

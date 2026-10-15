@@ -1,5 +1,6 @@
 import {isTeamRoyale,teammates} from './teams.js';
 import {direction,worldHit,humanHit,dist} from './physics.js';
+import {sightRay} from './perspective.js';
 import {eyeHeight} from './stance.js';
 import {surfaceAt,getMap} from './maps.js';
 import {isWarmup} from './royale-phases.js';
@@ -21,7 +22,7 @@ export function markerAction(sim,p,action){
   if(!Number.isFinite(payload.x)||!Number.isFinite(payload.z)||Math.abs(payload.x)>map.size||Math.abs(payload.z)>map.size)return true;
   point={x:payload.x,z:payload.z,y:surfaceAt(map,payload.x,payload.z),planning:isWarmup(sim.stage)};
  }else{
-  const origin={x:p.x,y:p.y+eyeHeight(p),z:p.z},ray=direction(p.yaw,p.pitch),hit=worldHit(sim.map,origin,ray,250);
+  const sight=sightRay(sim.map,p,250),origin=sight.origin,ray=sight.d,hit=worldHit(sim.map,origin,ray,sight.range);
   let range=hit?.distance??180;point=hit?.point||{x:origin.x+ray.x*range,y:origin.y+ray.y*range,z:origin.z+ray.z*range};
   for(const other of sim.players.values())if(other!==p&&other.health>0&&!other.spectating&&!teammates(sim.options,p,other)){
    const t=humanHit(origin,ray,other).distance;if(t<range){range=t;point={x:other.x,y:other.y+eyeHeight(other),z:other.z};kind='danger';}
