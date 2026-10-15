@@ -1,5 +1,5 @@
 const categories=[
- ['video','▣','Video',['quality','fov','thirdPersonFov','showFps']],
+ ['video','▣','Video',['quality','fpsLimit','fov','thirdPersonFov','showFps']],
  ['audio','♫','Audio',['volume','effectsVolume','ambienceVolume','musicVolume','visualSoundEffects','visualFootsteps','visualGunfire','visualBosses','visualOther']],
  ['mouse','↗','Mouse',['sensitivity','adsSensitivity','scopeSensitivity','buildSensitivity','editSensitivity','thirdPersonSensitivity','invert']],
  ['hud','⊕','HUD',['centerDot','hitMarkers','netDebugStats','connectionWarnings','hudScale','textScale','highContrast','showMinimap','showCompass','mapSide']],
@@ -16,6 +16,7 @@ const descriptions={
  netDebugStats:'Show ping, incoming and outgoing traffic, message rates and a latency graph. Packet loss is unavailable in this browser transport.',
  connectionWarnings:'Show a yellow connection arrow when updates are delayed and a red X when the connection is interrupted or severely delayed.',
  quality:'High enables shadows and richer graphics. Low reduces rendering work for smoother play on slower devices.',
+ fpsLimit:'Choose 30, 60, 90, 120, 144 FPS or Unlimited. Defaults to 60. Higher limits need a capable computer and display. Simulation, controls and multiplayer timing stay consistent.',
  fov:'First-person field of view. Your existing setting is preserved. Scoped optics use this value for their zoom.',
  thirdPersonFov:'Third-person field of view. Defaults to 65°. Adjust independently from first person; changes apply immediately.',
  volume:'Controls the overall game volume. Individual sound channels are multiplied by this level.',

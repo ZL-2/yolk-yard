@@ -1,6 +1,7 @@
+import {environmentCollision} from './environment-collision.js';
 import {sightRay,reachablePoint,thirdPersonActive} from './perspective.js';
 import {SHIELD_BARREL} from './field-refinement.js';
-import {worldDoorBox} from './world-rules.js';
+import {worldDoorBox,cacheDoorCollisions,updateDoorCollisions} from './world-rules.js';
 import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates,playerBoxOverlap,canOccupy,pruneBuildPhases} from './physics.js';
 import {bodyHeight,eyeHeight,canFight} from './stance.js';
 import {groundAt} from './terrain.js';
@@ -16,7 +17,7 @@ export function materialFor(b,map){
  if(['farm','camp','park'].includes(map?.buildings?.[b.building]?.kind))return 'wood';
  return b.color==='crate'?'wood':'brick';
 }
-export function authoredBoxes(map){return (map.authored||map.boxes).filter(b=>!b.buildId).map((b,i)=>{const box={...b,objectId:b.objectId||'world-'+i,material:b.material||materialFor(b,map)};box.harvestType=b.harvestType||harvestDefinition(box,map).type;return box;});}
+export function authoredBoxes(map){return (map.authored||map.boxes).filter(b=>!b.buildId).map((b,i)=>{const box={...b,objectId:b.objectId||'world-'+i,material:b.material||materialFor(b,map)};box.harvestType=b.harvestType||harvestDefinition(box,map).type;const collision=environmentCollision(box,map);if(collision)box.collisionShape=collision;return box;});}
 export function placement(p,type,rotation=0,material='wood'){
  const d=direction(p.yaw,0),reach=4.3;
  let x=Math.round((p.x+d.x*reach)/4)*4,z=Math.round((p.z+d.z*reach)/4)*4,y=Math.max(0,Math.round((p.y+(p.pitch>.45?2:p.pitch<-.5?-1:0))/4)*4);
@@ -107,7 +108,7 @@ export function aimedObject(map,p,range=5){
  return hit?.box&&(!sight.third||reachablePoint(map,p,hit.point,range))?hit:null;
 }
 export function rebuildMap(sim,{navigationChanged=true}={}){
- sim.map.boxes=[...sim.worldBoxes.filter(b=>!sim.worldDamage[b.objectId]?.destroyed).flatMap(b=>worldDoorBox(b,sim.doors)||[]),...sim.builds.flatMap(pieceBoxes)];invalidateCollision(sim.map);sim.lootSupportDirty=true;if(navigationChanged)sim.navigationRevision=(sim.navigationRevision||0)+1;
+ sim.map.boxes=[...sim.worldBoxes.filter(b=>!sim.worldDamage[b.objectId]?.destroyed).flatMap(b=>worldDoorBox(b,sim.doors,sim.map.doors,sim.time)||[]),...sim.builds.flatMap(pieceBoxes)];cacheDoorCollisions(sim.map);invalidateCollision(sim.map);sim.lootSupportDirty=true;if(navigationChanged)sim.navigationRevision=(sim.navigationRevision||0)+1;
 }
 export function resetBuilding(sim){
  for(const p of sim.players?.values()||[])p.phasedBuilds=[];
@@ -254,11 +255,12 @@ export function constructionTick(sim){
 }
 // Remote prediction and rendering use their own map; simulation maps never mutate the authored island.
 export function applyBuildState(map,r){
+ updateDoorCollisions(map,r.doors,r.time??0);
  const revision=Number.isFinite(r.buildVersion)?r.matchId+':'+r.round+':'+r.buildVersion:null;
  if(revision!==null&&map.appliedBuildRevision===revision)return;
  // Sparse packets may arrive before the first full world. Do not cache them.
  if(revision!==null&&r.builds&&r.worldDamage)map.appliedBuildRevision=revision;
 
  const key=r.matchId+':'+r.round+':'+(r.builds||[]).map(b=>[b.id,b.mask,b.path,b.doorOpen,b.rotation,b.material,b.x,b.y,b.z].join(',')).join(';')+':'+Object.keys(r.worldDamage||{}).filter(k=>r.worldDamage[k].destroyed).join(',')+':'+Object.keys(r.doors||{}).filter(k=>r.doors[k].open).join(',');if(map.buildKey===key)return;
- map.authored??=authoredBoxes(map);map.boxes=[...map.authored.filter(b=>!r.worldDamage?.[b.objectId]?.destroyed).flatMap(b=>worldDoorBox(b,r.doors)||[]),...(r.builds||[]).flatMap(pieceBoxes)];map.buildKey=key;invalidateCollision(map);
+ map.authored??=authoredBoxes(map);map.boxes=[...map.authored.filter(b=>!r.worldDamage?.[b.objectId]?.destroyed).flatMap(b=>worldDoorBox(b,r.doors,map.doors,r.time??0)||[]),...(r.builds||[]).flatMap(pieceBoxes)];cacheDoorCollisions(map);map.buildKey=key;invalidateCollision(map);
 }

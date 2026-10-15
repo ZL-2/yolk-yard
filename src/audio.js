@@ -80,6 +80,7 @@ export const SOUND_CUES={
  'impulse':[note(100,.4,.17,'sine',550),noise(850,.38,.12)],
  launch:[noise(320,.3,.16),note(120,.5,.12,'triangle',700)],
  'supply-incoming':[note(740,.18,.06),note(980,.23,.07,'sine',0,.22),noise(550,.7,.03)],
+ 'supply-cut':[noise(1100,.12,.12),note(220,.16,.07,'triangle',70),noise(420,.45,.035)],
  'supply-land':[noise(200,.35,.18),note(80,.2,.1,'triangle',40)],
  'storm-reveal':[note(330,.25,.07),note(277,.3,.07,'sine',0,.22),note(220,.5,.07,'sine',0,.44)],
  'storm-closing':[note(240,.32,.1,'triangle',160),note(190,.4,.08,'triangle',120,.32),noise(600,.65,.04)],
@@ -141,7 +142,7 @@ export class Sound {
   const category=id==='victory'||id==='defeat'?'music':id.startsWith('ambient')?'ambience':'effects';
   const key=id+(position?Math.round(position.x/5)+':'+Math.round(position.z/5):'');
   if((this.cooldowns.get(key)||0)>this.clock)return;this.cooldowns.set(key,this.clock+.05);
-  const radius=id.startsWith('step-')?26:id.includes('chest')?16:id.includes('impact')||id.includes('hit')||id==='ricochet'?30:id==='supply-land'?110:id==='ambient-bell'?95:id.includes('glider')?24:id==='land'||id==='jump'?20:45;
+  const radius=id.startsWith('step-')?26:id.includes('chest')?16:id.includes('impact')||id.includes('hit')||id==='ricochet'?30:(id==='supply-land'||id==='supply-cut')?110:id==='ambient-bell'?95:id.includes('glider')?24:id==='land'||id==='jump'?20:45;
   preset.forEach(p=>this.layer(p,position?{...position,radius}:null,category,scale));
  }
  tone(freq,duration=.09,type='sine',volume=.15,end=0){this.layer(note(freq,duration,volume,type,end));}

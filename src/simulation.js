@@ -484,6 +484,7 @@ export class Simulation {
         !teammates(this.options,p,target)
       )
         distance = Math.min(distance, rayEgg(eye, aim, this.shotPose(target,p,w)));
+    const supply=this.supplyHit?.(eye,aim,distance);if(supply)distance=supply.distance;
     const target = {
       x: eye.x + aim.x * distance,
       y: eye.y + aim.y * distance,
@@ -545,7 +546,8 @@ export class Simulation {
       if(w.hitscan){
         const hit=worldHit(this.map,origin,path.d,w.range);
         let distance=hit?.distance??w.range,victim=null,pose=null,region=null;
-        const vehicle=this.vehicleHit?.(origin,path.d,distance,p);if(vehicle)distance=vehicle.distance;
+        let vehicle=this.vehicleHit?.(origin,path.d,distance,p);if(vehicle)distance=vehicle.distance;
+        const supply=this.supplyHit?.(origin,path.d,distance);if(supply){distance=supply.distance;vehicle=null;}
         for(const target of this.players.values()){
           if(target===p||target.health<=0||target.spectating||target.flight==='transport'||teammates(this.options,p,target))continue;
           const candidate=this.shotPose(target,p,w),contact=humanHit(origin,path.d,candidate),d=contact.distance;
@@ -553,10 +555,11 @@ export class Simulation {
         }
         const point={x:origin.x+path.d.x*distance,y:origin.y+path.d.y*distance,z:origin.z+path.d.z*distance};
         if(victim){const critical=w.critical>1&&region==='head';this.damage(victim,p,w.damage*falloffAt(w,distance)*(critical?w.critical:1),w.name,critical,p.shotGroup);}
+        else if(supply)this.damageSupply?.(supply.chest,structureDamage(w,distance),p);
         else if(vehicle)this.damageVehicle?.(vehicle.vehicle,structureDamage(w,distance),p);
         else if(hit?.box)this.damageWorld?.(hit.box,structureDamage(w,distance));
         shots.push({id:++this.projectileId,vx:path.d.x*w.tracerSpeed,vy:path.d.y*w.tracerSpeed,vz:path.d.z*w.tracerSpeed,end:point});
-        if(victim||hit||vehicle)this.emit('impact',{...point,normal:victim?{x:-path.d.x,y:-path.d.y,z:-path.d.z}:vehicle?.normal||hit.normal,weapon:w.id,surface:vehicle?'metal':hit?.box?.material||'stone',tag:!!victim});
+        if(victim||hit||vehicle||supply)this.emit('impact',{...point,normal:victim?{x:-path.d.x,y:-path.d.y,z:-path.d.z}:supply?.normal||vehicle?.normal||hit.normal,weapon:w.id,surface:supply?'fabric':vehicle?'metal':hit?.box?.material||'stone',tag:!!victim});
       }else{
         const b={id:++this.projectileId,owner:p.id,shotId:p.shotGroup,weapon:w.id,kind:'bolt',...origin,vx:path.d.x*w.boltSpeed,vy:path.d.y*w.boltSpeed,vz:path.d.z*w.boltSpeed,gravity:w.gravity,hitRadius:w.hitRadius,buildFalloff:w.buildFalloff,damage:w.damage,critical:w.critical,buildDamage:w.buildDamage,range:w.flightRange,born:this.time,fuse:w.flightRange/w.boltSpeed,travelled:0,popper:false};
         this.projectiles.push(b);shots.push({id:b.id,vx:b.vx,vy:b.vy,vz:b.vz});
@@ -649,7 +652,8 @@ export class Simulation {
       let distance = hit?.distance ?? length,
         victim = null,region=null;
       const attacker = this.players.get(b.owner);
-      const vehicle=this.vehicleHit?.(b,d,distance,attacker);if(vehicle)distance=vehicle.distance;
+      let vehicle=this.vehicleHit?.(b,d,distance,attacker);if(vehicle)distance=vehicle.distance;
+      const supply=this.supplyHit?.(b,d,distance,b.hitRadius??weapon(b.weapon).hitRadius);if(supply){distance=supply.distance;vehicle=null;}
       if (!b.popper)
         for (const p of this.players.values()) {
           if (
@@ -668,7 +672,7 @@ export class Simulation {
       b.y += d.y * distance;
       b.z += d.z * distance;
       b.travelled = (b.travelled || 0) + distance;
-      if (victim || hit || vehicle) {
+      if (victim || hit || vehicle || supply) {
         if (b.kind === "bolt") {
           if (victim) {
             const w=weapon(b.weapon),precision=(b.critical??w.critical)>1&&region==='head',hitFactor=falloffAt(w,b.travelled)*(precision?(b.critical??w.critical):1);
@@ -680,15 +684,16 @@ export class Simulation {
               precision, b.shotId,
             );
           }
-          if(!victim&&vehicle)this.damageVehicle?.(vehicle.vehicle,b.buildDamage??b.damage,attacker);
+          if(!victim&&supply)this.damageSupply?.(supply.chest,b.buildDamage??b.damage,attacker);
+          else if(!victim&&vehicle)this.damageVehicle?.(vehicle.vehicle,b.buildDamage??b.damage,attacker);
           else if(!victim&&hit?.box)this.damageWorld?.(hit.box,(b.buildDamage??weapon(b.weapon).buildDamage)*((b.buildFalloff??weapon(b.weapon).buildFalloff)?falloffAt(weapon(b.weapon),b.travelled):1));
           this.emit("impact", {
             x: b.x,
             y: b.y,
             z: b.z,
-            normal: victim ? { x: -d.x, y: -d.y, z: -d.z } : vehicle?.normal||hit.normal,
+            normal: victim ? { x: -d.x, y: -d.y, z: -d.z } : supply?.normal||vehicle?.normal||hit.normal,
             weapon: b.weapon,
-            surface:hit?.box?.material||'stone',
+            surface:supply?'fabric':hit?.box?.material||'stone',
             tag: !!victim,
           });
           this.projectiles.splice(i, 1);
@@ -708,7 +713,7 @@ export class Simulation {
           }
           this.emit("bounce", { x: b.x, y: b.y, z: b.z, normal: n });
         } else {
-          b.directTarget=victim?.id;b.directVehicle=victim?null:vehicle?.vehicle.id;b.impactNormal=victim?{x:-d.x,y:-d.y,z:-d.z}:vehicle?.normal||hit.normal;
+          b.directTarget=victim?.id;b.directVehicle=victim?null:vehicle?.vehicle.id;b.directSupply=victim?null:supply?.chest.id;b.impactNormal=victim?{x:-d.x,y:-d.y,z:-d.z}:supply?.normal||vehicle?.normal||hit.normal;
           this.explode(b);
           this.projectiles.splice(i, 1);
         }

@@ -1,3 +1,5 @@
+import {environmentCollision} from './environment-collision.js';
+import {authorWatchtowers} from './watchtowers.js';
 import {authorFrontierWorld} from './world-locations.js';
 import {naturalHeight,createTerrain,groundAt,riverX} from './terrain.js';
 // Ravel Coast: a coastal communications frontier fractured by a relay-network collapse.
@@ -148,6 +150,7 @@ for(const [i,b]of buildings.entries()){
 }
 const frontier=authorFrontierWorld({districts:DISTRICTS,terrain,buildings,boxes,props,landmarks,roads,signs,chests,floorLoot,navLinks,prop,box});
 // Seeded, spatially varied vegetation; no loot is sprinkled through random forest coordinates.
+const outposts=authorWatchtowers({terrain,boxes,floorLoot,chests,navLinks,landmarks,signs});
 for(let i=0;i<3700&&trees.length<640;i++){
  const x=((i*193.371)%480)-240,z=((i*317.719+i*i*.019)%480)-240;
  if(yAt(x,z)<2||roadDistance(x,z)<2.5||!clear(x,z,2.8))continue;
@@ -166,4 +169,5 @@ for(const [x,z,kind] of [[116,-173,'crate'],[122,-172,'barrels'],[145,-127,'crat
 // Material assignments and stable IDs are shared by harvesting, destruction and rendering.
 for(const [i,b]of boxes.entries())b.objectId=b.doorId?'world-door-'+b.doorId:'world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
-export const ROYALE_MAP={id:'sunnybreak',revision:10,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[80,80]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,material:'brick'};
+for(const b of boxes){const shape=environmentCollision(b,{props,trees});if(shape)b.collisionShape=shape;}
+export const ROYALE_MAP={id:'sunnybreak',revision:11,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[80,80]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,...outposts,material:'brick'};

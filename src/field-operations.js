@@ -81,7 +81,7 @@ export function safeSupplyPoint(sim,lead=35) {
 }
 export function spawnSupply(sim) {
   const spot=safeSupplyPoint(sim);if(!spot)return false;
-  const chest={id:'supply-'+sim.lootId++,...spot,opened:false,supply:true,landAt:sim.time+18,contents:[...rollChest(sim.random,'epic'),{id:'flask',count:1,rarity:2}]};
+  const chest={id:'supply-'+sim.lootId++,...spot,opened:false,supply:true,canopyHealth:100,landAt:sim.time+18,contents:[...rollChest(sim.random,'epic'),{id:'flask',count:1,rarity:2}]};
   sim.chests.push(chest);itemsChanged(sim,'chests',chest);sim.lootVersion++;
   sim.emit('royale-cue',{cue:'supply-incoming'});return true;
 }

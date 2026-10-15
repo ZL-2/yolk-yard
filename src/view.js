@@ -1,4 +1,6 @@
 import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay} from './perspective.js';
+import {warmArchitectureSurfaces} from './architecture-surfaces.js';
+import {fpsLimit} from './frame-pacing.js';
 import {perspectiveFov} from './settings.js';
 import {canSpectate} from './spectator-status.js';
 import {ThrowablePreview} from './throwable-view.js';
@@ -269,6 +271,7 @@ export class View {
     if(this.viewmodelCamera){this.viewmodelCamera.aspect=this.camera.aspect;this.viewmodelCamera.updateProjectionMatrix();}
   }
   setQuality() {
+    warmArchitectureSurfaces();
     this.renderScale=1;this.frameAverage=1/60;
     this.renderer.shadowMap.enabled = this.settings.quality !== "low";
     this.resize();
@@ -715,6 +718,7 @@ export class View {
     });
   }
   muzzleEffects() {
+    if(!this.pendingShots.length)return;
     this.camera.updateMatrixWorld(true);
     this.actors.updateMatrixWorld(true);
     for (const { event: e, local } of this.pendingShots) {
@@ -765,11 +769,13 @@ export class View {
     if(!playing&&this.eliminations.active.length)this.eliminations.clear();
     // Reduce GPU work when rendering itself delays input and socket processing.
     this.frameAverage=(this.frameAverage||1/60)*.9+dt*.1;
+    const frameBudget=1/Math.min(60,fpsLimit(this.settings.fpsLimit)||60);
+    this.detailPressure=this.frameAverage>frameBudget*1.25;
     this.budgetClock=(this.budgetClock||0)+dt;
     if(this.budgetClock>1){
       this.budgetClock=0;const previous=this.renderScale||1;
-      if(this.frameAverage>1/55){this.renderScale=playing?Math.max(.85,previous-.05):1;this.renderer.shadowMap.enabled=false;}
-      else if(this.frameAverage<1/59)this.renderScale=Math.min(1,previous+.025);
+      if(this.frameAverage>frameBudget*60/55){this.renderScale=playing?Math.max(.85,previous-.05):1;this.renderer.shadowMap.enabled=false;}
+      else if(this.frameAverage<frameBudget*60/59)this.renderScale=Math.min(1,previous+.025);
       this.renderScale=playing?Math.max(.85,this.renderScale||1):1;
       if(this.renderScale!==previous)this.resize();
     }
@@ -779,7 +785,7 @@ export class View {
     if(playing&&state?.royale?.practice&&!state.options.training)this.prepareBattleMap();
     this.world.visible=playing;
     updateEnvironmentSurfaces(this.clock);
-    if(playing){const detailQuality=this.frameAverage>1/48?'low':this.settings.quality;updateTerrainEnvironment(this.world,this.clock,detailQuality);this.world.userData.groundCover?.update(predicted||local,{quality:detailQuality,time:this.clock});}
+    if(playing){const detailQuality=this.detailPressure?'low':this.settings.quality;updateTerrainEnvironment(this.world,this.clock,detailQuality);this.world.userData.groundCover?.update(predicted||local,{quality:detailQuality,time:this.clock});}
     if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x6f9295;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(playing&&map.theme==='royale'?0xc1e6f0:sky,playing?(map.theme==='royale'?280:72):35,playing?(map.theme==='royale'?1050:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
     if(this.lobbyStage)this.lobbyStage.visible=!playing;
