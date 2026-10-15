@@ -3,13 +3,18 @@ export const SLIDERS = [
   ...COMFORT_SLIDERS,
   ['sensitivity', 'Mouse sensitivity', .2, 3, .1, 1],
   ['scopeSensitivity', 'Scope sensitivity', .1, 2, .05, .65],
-  ['fov', 'Field of view', 65, 110, 1, 85],
+  ['fov', 'First-person field of view', 65, 110, 1, 85],
+  ['thirdPersonFov', 'Third-person field of view', 65, 110, 1, 65],
   ['volume', 'Master volume', 0, 1, .05, .45],
   ['effectsVolume', 'Effects & gameplay', 0, 1, .05, .85],
   ['ambienceVolume', 'Ambience & wind', 0, 1, .05, .5],
   ['musicVolume', 'Music & fanfares', 0, 1, .05, .3],
 ];
 export const SLIDER_DEFAULTS = Object.fromEntries(SLIDERS.map(([id,,,,,value]) => [id,value]));
+export function perspectiveFov(settings,third=false){
+  const value=Number(third?settings.thirdPersonFov:settings.fov),fallback=third?65:85;
+  return Math.max(65,Math.min(110,Number.isFinite(value)&&value>0?value:fallback));
+}
 export function resetSliders(settings, id = 'all') {
   for (const [key,value] of Object.entries(SLIDER_DEFAULTS))
     if (id === 'all' || id === key) settings[key] = value;

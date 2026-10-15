@@ -4,21 +4,23 @@ import * as THREE from 'three';
 import {MATERIALS,pieceBoxes,solvePlacement,aimedObject} from './building.js';
 import {selectMaterial} from './building-rules.js';
 import {editPlanePoint} from './building-shapes.js';
+import {architectureMaterial,architectureUV} from './architecture-surfaces.js';
 export function buildMesh(piece,kit,preview=false){
  const g=new THREE.Group(),color=preview?0x57caff:MATERIALS[piece.material].color;
+ const surface=piece.material==='wood'?'timber':piece.material==='brick'?'brick':'metal';
  const previewMaterial=preview?new THREE.MeshBasicMaterial({color,transparent:true,opacity:.24,depthWrite:false}):null;
  for(const b of pieceBoxes({...piece,x:0,y:0,z:0})){
   const mesh=kit.block(g,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,b.door&&!preview?(piece.material==='wood'?0x89643f:piece.material==='brick'?0x915445:0x456570):color);
-  if(preview){mesh.material=previewMaterial;mesh.userData.ownedMaterial=true;}
+  if(preview){mesh.material=previewMaterial;mesh.userData.ownedMaterial=true;}else mesh.material=architectureMaterial(mesh.material.color.getHex(),surface);
  }
  if(!preview){
   // Visible framing distinguishes timber, masonry and sheet metal at a glance.
   const m=piece.material,dark=m==='wood'?0x694b31:m==='brick'?0xe8cbb5:0x3e5e6d;
-  if(piece.type==='wall'&&!piece.mask){for(let i=0;i<9;i++){let mesh;if(m==='wood')mesh=kit.block(g,-1.9+i*.475,2,0,.065,4,.22,dark);else mesh=kit.block(g,0,i*.48,0,4,.025,.19,dark);if(piece.rotation%2){mesh.position.z=mesh.position.x;mesh.position.x=0;mesh.rotation.y=Math.PI/2;}}
+  if(piece.type==='wall'&&!piece.mask){for(let i=0;i<9;i++){let mesh;if(m==='wood')mesh=kit.block(g,-1.9+i*.475,2,0,.065,4,.22,dark);else mesh=kit.block(g,0,i*.48,0,4,.025,.19,dark);mesh.material=architectureMaterial(dark,m==='wood'?'timber':m==='brick'?'concrete':'metal');if(piece.rotation%2){mesh.position.z=mesh.position.x;mesh.position.x=0;mesh.rotation.y=Math.PI/2;}}
   }
  }
- const batches=new Map();g.updateMatrixWorld(true);for(const mesh of [...g.children]){const key=mesh.material.uuid;if(!batches.has(key))batches.set(key,{material:mesh.material,parts:[],owned:preview});const geo=mesh.geometry.clone();geo.applyMatrix4(mesh.matrix);batches.get(key).parts.push(geo);g.remove(mesh);}
- for(const batch of batches.values()){const geo=mergeGeometries(batch.parts);batch.parts.forEach(g=>g.dispose());const mesh=new THREE.Mesh(geo,batch.material.clone());mesh.userData.ownedMaterial=true;g.add(mesh);}
+ const batches=new Map();g.updateMatrixWorld(true);for(const mesh of [...g.children]){const key=mesh.material.uuid;if(!batches.has(key))batches.set(key,{material:mesh.material,parts:[],owned:preview});const geo=mesh.geometry.clone();geo.applyMatrix4(mesh.matrix);if(!preview)architectureUV(geo,mesh.material.userData.architectureSurface);batches.get(key).parts.push(geo);g.remove(mesh);}
+ for(const batch of batches.values()){const geo=mergeGeometries(batch.parts);batch.parts.forEach(g=>g.dispose());const material=batch.material.clone();material.userData={...material.userData,shared:false};const mesh=new THREE.Mesh(geo,material);mesh.castShadow=mesh.receiveShadow=!preview;mesh.userData.ownedMaterial=true;mesh.userData.buildBaseColor=batch.material.color.getHex();mesh.userData.artRevision=preview?undefined:160;g.add(mesh);}
  previewMaterial?.dispose();g.position.set(piece.x,piece.y,piece.z);return g;
 }
 export function updateBuildingView(rv,state,p){
@@ -27,7 +29,7 @@ export function updateBuildingView(rv,state,p){
   if(cached&&cached.key!==key){rv.root.remove(cached.mesh);rv.view.disposeGroup(cached.mesh);rv.buildMeshes.delete(b.id);cached=null;}
   if(!cached){const mesh=buildMesh(b,rv.kit);rv.root.add(mesh);cached={mesh,key};rv.buildMeshes.set(b.id,cached);}
   cached.mesh.visible=(!p||Math.hypot(b.x-p.x,b.z-p.z)<180)&&rv.view.buildControls?.editDraft?.id!==b.id;
-  const visualKey=[b.health,b.maxHealth,b.lastDamage>b.created,state.time-b.lastDamage<.16].join(':');if(cached.visualKey!==visualKey){cached.visualKey=visualKey;cached.mesh.traverse(m=>{if(!m.isMesh)return;if(m.material.color)m.material.color.setHex(MATERIALS[b.material].color).multiplyScalar(1-(b.lastDamage>b.created?Math.max(0,1-b.health/b.maxHealth)*.4:0));m.material.emissive?.setHex(state.time-b.lastDamage<.16?MATERIALS[b.material].damageColor:0x000000);if(m.material.emissive)m.material.emissiveIntensity=.28;});}
+  const visualKey=[b.health,b.maxHealth,b.lastDamage>b.created,state.time-b.lastDamage<.16].join(':');if(cached.visualKey!==visualKey){cached.visualKey=visualKey;cached.mesh.traverse(m=>{if(!m.isMesh)return;if(m.material.color)m.material.color.setHex(m.userData.buildBaseColor??MATERIALS[b.material].color).multiplyScalar(1-(b.lastDamage>b.created?Math.max(0,1-b.health/b.maxHealth)*.4:0));m.material.emissive?.setHex(state.time-b.lastDamage<.16?MATERIALS[b.material].damageColor:0x000000);if(m.material.emissive)m.material.emissiveIntensity=.28;});}
  }
  for(const [id,c] of rv.buildMeshes)if(!seen.has(id)){rv.root.remove(c.mesh);rv.view.disposeGroup(c.mesh);rv.buildMeshes.delete(id);}
  if(!rv.weakpoint){rv.weakpoint=new THREE.Mesh(new THREE.RingGeometry(.18,.25,32),new THREE.MeshBasicMaterial({color:0x50cfff,depthTest:false,transparent:true,opacity:.95,side:THREE.DoubleSide}));rv.weakpoint.userData.ownedMaterial=true;rv.root.add(rv.weakpoint);}

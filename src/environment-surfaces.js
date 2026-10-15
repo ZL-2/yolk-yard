@@ -62,7 +62,7 @@ export function environmentUV(g,kind='paint'){
  let minU=Infinity,maxU=-Infinity,minV=Infinity,maxV=-Infinity;for(let i=0;i<uv.count;i++){minU=Math.min(minU,uv.getX(i));maxU=Math.max(maxU,uv.getX(i));minV=Math.min(minV,uv.getY(i));maxV=Math.max(maxV,uv.getY(i));}
  const bx=(index%columns)*tile+2,by=Math.floor(index/columns)*tile+2;
  for(let i=0;i<uv.count;i++)uv.setXY(i,(bx+(uv.getX(i)-minU)/Math.max(1e-6,maxU-minU)*(tile-4))/width,(by+(uv.getY(i)-minV)/Math.max(1e-6,maxV-minV)*(tile-4))/height);
- g.userData.environmentAtlas=true;uv.needsUpdate=true;return g;
+ g.userData={...g.userData,environmentAtlas:true};uv.needsUpdate=true;return g;
 }
 export function updateEnvironmentSurfaces(time){wind.value=Number.isFinite(time)?time:0;}
 export function unpackEnvironmentGeometry(g){for(const name of ['normal','color','uv']){const a=g.attributes[name];if(!a||a.array instanceof Float32Array&&!a.normalized)continue;const data=new Float32Array(a.count*a.itemSize);for(let i=0;i<a.count;i++)for(let k=0;k<a.itemSize;k++)data[i*a.itemSize+k]=a.getComponent(i,k);g.setAttribute(name,new T.BufferAttribute(data,a.itemSize));}return g;}

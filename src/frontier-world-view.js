@@ -5,12 +5,15 @@ import {getMap} from './maps.js';
 import {keycardRoute} from './frontier-world.js';
 import {doorFrame} from './world-rules.js';
 import {artKit} from './royale-art.js';
+import {architectureKit,architectureUV} from './architecture-surfaces.js';
 
 export function updateFrontierView(rv,state,p){
- const map=getMap(state.options.map),r=state.royale,k=artKit(rv.kit);rv.doorMeshes??=new Map();
+ const map=getMap(state.options.map),r=state.royale,k=architectureKit(artKit(rv.kit));rv.doorMeshes??=new Map();
  const key=r.matchId+':'+state.round+':'+map.id;
  if(rv.frontierKey!==key){for(const m of rv.doorMeshes.values()){m.userData.reader?.removeFromParent();if(m.userData.reader)rv.view.disposeGroup(m.userData.reader);m.removeFromParent();rv.view.disposeGroup(m);}rv.doorMeshes.clear();if(rv.traversalMesh){rv.traversalMesh.removeFromParent();rv.view.disposeGroup(rv.traversalMesh);}rv.traversalMesh=null;rv.frontierKey=key;}
- for(const d of map.doors||[]){const destroyed=r.worldDamage?.['world-door-'+d.id]?.destroyed,close=p&&Math.hypot(d.x-p.x,d.z-p.z)<75;let m=rv.doorMeshes.get(d.id);if(!m&&close&&!destroyed){const frame=doorFrame(d),w=frame.width;m=new THREE.Group();m.position.set(frame.x,frame.y,frame.z);const color=d.vault?0x526c7c:d.material==='metal'?0x607c81:0x796547;const panel=k.block(m,w/2,d.h/2,0,w,d.h,frame.depth,color);panel.material=panel.material.clone();panel.userData.ownedMaterial=true;m.userData.panel=panel;
+ for(const d of map.doors||[]){const destroyed=r.worldDamage?.['world-door-'+d.id]?.destroyed,close=p&&Math.hypot(d.x-p.x,d.z-p.z)<75;let m=rv.doorMeshes.get(d.id);if(!m&&close&&!destroyed){const frame=doorFrame(d),w=frame.width;m=new THREE.Group();m.position.set(frame.x,frame.y,frame.z);const color=d.vault?0x526c7c:d.material==='metal'?0x607c81:0x796547;const kind=d.vault||d.material==='metal'?'metal':'timber';const panel=k.block(m,w/2,d.h/2,0,w,d.h,frame.depth,color,kind);panel.geometry=panel.geometry.clone();panel.geometry.userData={};panel.geometry.scale(w,d.h,frame.depth);panel.scale.setScalar(1);architectureUV(panel.geometry,kind);panel.material=panel.material.clone();panel.material.userData={...panel.material.userData,shared:false};panel.userData.ownedMaterial=true;m.userData.panel=panel;
+   for(const y of [d.h*.2,d.h*.5,d.h*.8])k.cylinder(m,.075,y,frame.depth/2+.035,.035,.16,0x6a777b,8,'metal');
+   if(!d.vault)for(const y of [d.h*.26,d.h*.7])for(const side of [-1,1])k.block(m,w/2,y,side*(frame.depth/2+.012),w*.72,d.h*.28,.022,color,kind);
    for(const y of [.18,d.h-.18])k.block(m,w/2,y,frame.depth/2+.03,w,.13,.13,d.vault?0xd3b45e:0x2d444c);
    k.block(m,Math.max(w*.5,w-.25),d.h*.48,frame.depth/2+.09,Math.min(.25,w*.3),.09,.12,0xdbc79d);
    if(d.vault){const vault=mapVaults(map).find(v=>v.doorId===d.id);for(const x of [.3,w-.3])k.block(m,x,d.h/2,.15,.18,d.h,.18,0x203844);if(vault){const reader=new THREE.Group();reader.position.set(vault.reader.x,vault.reader.y+1.25,vault.reader.z-.35);k.block(reader,0,0,0,.65,.85,.25,0x19313e);k.block(reader,0,.12,.15,.43,.28,.04,0x72d8d7);bake(reader,false,true);rv.root.add(reader);m.userData.reader=reader;}}

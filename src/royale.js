@@ -104,7 +104,7 @@ export class RoyaleSimulation extends Simulation {
  addBots(){
   const humans=[...this.players.values()].filter(p=>!p.bot&&p.contestant).length,target=Math.max(0,Math.min(this.options.capacity-humans,this.options.fill?this.options.capacity:this.options.bots,this.botLimit??Infinity));
   let count=[...this.players.values()].filter(p=>p.bot).length,index=0;
-  while(count<target){const id='bot-'+index++;if(this.players.has(id))continue;const p=this.addPlayer(id,{name:this.uniqueBotName(['Relay','Sunny','Scout','Drift','Sable'][count%5]),...randomAppearance(this.random)},true);if(!p)break;count++;}
+  while(count<target){const id='bot-'+index++;if(this.players.has(id))continue;const p=this.addPlayer(id,{name:this.uniqueBotName(id),...randomAppearance(this.random)},true);if(!p)break;count++;}
  }
  fillBotTeammates(){
   if(!isTeamRoyale(this.options))return;
@@ -114,7 +114,8 @@ export class RoyaleSimulation extends Simulation {
   const needed=[...groups.values()].reduce((n,team)=>n+(team.every(p=>p.teamFill!==false)?this.options.teamSize-team.length:0),0);
   if(!needed)return;
   while(bots.length<needed&&bots.length<(this.botLimit??Infinity)&&humans.length+bots.length<this.options.capacity){
-   const p=this.addPlayer('bot-teammate-'+this.joinOrder++,{name:this.uniqueBotName('Vanguard'),...randomAppearance(this.random)},true);if(!p)break;bots.push(p);
+   const id='bot-teammate-'+this.joinOrder++;
+   const p=this.addPlayer(id,{name:this.uniqueBotName(id),...randomAppearance(this.random)},true);if(!p)break;bots.push(p);
   }
   for(const team of Object.values(this.matchTeams||{}))team.members=team.members.filter(id=>!this.players.get(id)?.bot);
   for(const p of bots){p.team=-1;delete p.teamSlot;}
@@ -398,7 +399,7 @@ export class RoyaleSimulation extends Simulation {
    cancelEmote(p);dropCrown(this,p);p.crownProgress=null;p.crownIdentity=null;p.crownWins=0;p.crownEmoteUnlocked=false;
    this.players.delete(id);this.inputs.delete(id);
    let botId='bot-fill-'+this.joinOrder++;while(this.players.has(botId))botId+='x';
-   Object.assign(p,randomAppearance(this.random),{id:botId,bot:true,name:this.uniqueBotName('Sunny'),brain:null,ack:0,botThink:0,botPath:[],botLand:p.botLand||this.map.floorLoot[0],botDrop:this.elapsed+2});
+   Object.assign(p,randomAppearance(this.random),{id:botId,bot:true,name:this.uniqueBotName(botId),brain:null,ack:0,botThink:0,botPath:[],botLand:p.botLand||this.map.floorLoot[0],botDrop:this.elapsed+2});
    for(const b of this.projectiles)if(b.owner===id)b.owner=botId;for(const b of this.builds)if(b.owner===id)b.owner=botId;
    this.players.set(botId,p);this.emit('leave',departed);
   }else this.removePlayer(id);

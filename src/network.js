@@ -518,19 +518,28 @@ export class Network {
   beginMigration(){
     if(this.serverAuthority)return;
     if(this.closed||this.isHost||this.migrating)return;
-    if(!this.lastCheckpoint?.simulation){this.callbacks.onError?.('The host left before the room could synchronize. Please join another room.');return;}
+    if(!this.lastCheckpoint?.simulation&&!this.officialPublic){this.callbacks.onError?.('The host left before the room could synchronize. Please join another room.');return;}
     this.migrating=true;this.failedHosts.add(this.hostId);
-    this.hostConnection?.close();this.callbacks.onStatus?.('Host disconnected. Transferring the match…');
+    this.hostConnection?.close();this.callbacks.onStatus?.('Match reconnecting. Restoring the host connection…');
     this.electHost();
   }
   electHost(){
     if(this.closed||!this.migrating)return;
+    if(this.officialPublic){this.recoverPublicHost();return;}
     const next=this.members.filter(m=>!m.spectator&&!this.failedHosts.has(m.id)).sort((a,b)=>a.order-b.order)[0];
     if(!next){this.callbacks.onError?.('No connected players remain in this room.');return;}
     if(next.id===this.id){this.promote();return;}
+    this.connectMigration(next);
+  }
+  recoverPublicHost(){
+    if(this.closed||!this.migrating||this.isHost)return;
+    // The relay lease, rather than a stale local roster, owns the public room.
+    this.connectMigration({peerId:PREFIX+this.code},true);
+  }
+  connectMigration(next,publicRecovery=false){
     const attempt=this.peer.connect(next.peerId,{reliable:true,serialization:'binary'});
     let welcomed=false,failed=false;this.hostConnection=attempt;
-    const retry=()=>{if(failed||welcomed||this.closed||!this.migrating||this.hostConnection!==attempt)return;failed=true;clearTimeout(timer);this.timers.delete(timer);attempt.close();this.failedHosts.add(next.id);this.electHost();};
+    const retry=()=>{if(failed||welcomed||this.closed||!this.migrating||this.hostConnection!==attempt)return;failed=true;clearTimeout(timer);this.timers.delete(timer);attempt.close();if(publicRecovery){if(this.lastCheckpoint?.simulation)this.claimRoomAddress(true);else this.later(()=>this.recoverPublicHost(),800);}else{this.failedHosts.add(next.id);this.electHost();}};
     const timer=this.later(retry,5000);
     attempt.on('open',()=>attempt.send({type:'hello',version:VERSION,profile:this.joinProfile||safeProfile(this.snapshot?.players.find(p=>p.id===this.id))}));
     attempt.on('data',msg=>{
@@ -538,9 +547,11 @@ export class Network {
       if(msg.type==='welcome'&&msg.version===VERSION){
         if(msg.checkpoint)this.lastCheckpoint=msg.checkpoint;
         welcomed=true;clearTimeout(timer);this.timers.delete(timer);this.migrating=false;this.hostId=msg.hostId;this.members=msg.members;this.lastState=performance.now();
+        this.failedHosts.delete(this.hostId);
         this.hostHeartbeat=new HostHeartbeat(this.lastState);
         this.callbacks.onStatus?.('New host connected. Match continues.');
-      }else if(msg.type==='state'&&welcomed){
+      }else if(msg.type==='reject'&&!welcomed){retry();}
+      else if(msg.type==='state'&&welcomed){
         const s=msg.state;if(s?.version!==VERSION||!Array.isArray(s.players)||s.players.length>MAX_SNAPSHOT_ACTORS)return;
         s.players=s.players.map(p=>({...p,...safeProfile(p)}));s.options=matchOptions(s.options);if(s.royale)s.options.map=isWarmup(s.royale.stage)?'hatchery-atoll':'sunnybreak';s.winner=safeSystemText(s.winner,'Round complete');
         s.events=(s.events||[]).slice(-120).map(e=>{const next={...e};for(const key of ['name','targetName'])if(key in next)next[key]=safeName(next[key]);for(const key of ['text','winner','weapon'])if(key in next)next[key]=safeSystemText(next[key]);return next;});
@@ -560,6 +571,7 @@ export class Network {
     attempt.on('error',()=>{if(!welcomed)retry();else if(this.hostConnection===attempt&&!this.closed)this.beginMigration();});
   }
   promote(){
+    if(this.officialPublic&&!this.publicLeaseAuthorized)return;
     this.isHost=true;this.migrating=false;this.hostId=this.id;
     this.members=this.members.filter(m=>!this.failedHosts.has(m.id));
     this.memberOrder=Math.max(0,...this.members.map(m=>m.order));
@@ -572,14 +584,15 @@ export class Network {
     this.callbacks.onStatus?.('You are now the host. The match continues.');
     this.later(()=>{for(const member of [...this.members])if(member.id!==this.id&&!this.connections.has(member.id)){this.members=this.members.filter(m=>m.id!==member.id);this.callbacks.onLeave?.(member.id);}},10000);
   }
-  claimRoomAddress(){
-    if(this.closed||!this.isHost)return;
+  claimRoomAddress(recovering=false){
+    if(this.closed||!this.isHost&&!(recovering&&this.officialPublic&&this.migrating))return;
     if(this.peer.id===PREFIX+this.code)return;
+    if(this.aliasPeer&&!this.aliasPeer.destroyed)return;
     const config=window.YOLK_NETWORK||{};
     const alias=relayURL()?new RelayPeer(PREFIX+this.code,this.officialPublic?{publicHostProof:{id:this.peer.id,token:this.peer.resume?.resume}}:{}):new Peer(PREFIX+this.code,{debug:0,...config.peer,config:{iceServers:config.iceServers||[{urls:'stun:stun.l.google.com:19302'}]}});this.aliasPeer=alias;
-    alias.on('open',()=>this.publishRoom());for(const type of ['reward','afk','afk-enforce'])alias.on(type,event=>this.callbacks.onProgress?.(type,event));
+    alias.on('open',()=>{if(this.closed)return;if(recovering&&this.migrating){this.publicLeaseAuthorized=true;this.promote();}this.publishRoom();});for(const type of ['reward','afk','afk-enforce'])alias.on(type,event=>this.callbacks.onProgress?.(type,event));
     alias.on('connection',conn=>this.accept(conn));
-    alias.on('error',()=>{alias.destroy();this.later(()=>this.claimRoomAddress(),2500);});
+    alias.on('error',()=>{alias.destroy();this.later(()=>this.isHost?this.claimRoomAddress():recovering&&this.recoverPublicHost(),recovering?800:2500);});
     alias.on('disconnected',()=>{if(!alias.destroyed&&!this.closed){if(relayURL()){alias.destroy();this.later(()=>this.claimRoomAddress(),2500);}else alias.reconnect();}});
   }
   kick(id) {

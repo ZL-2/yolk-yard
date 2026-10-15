@@ -2,27 +2,29 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {environmentTree} from './environment-trees.js';
 import {detailEnvironmentProp} from './environment-props.js';
-import {environmentAtlasMaterial,environmentMaterial,environmentKit,environmentUV} from './environment-surfaces.js';
+import {environmentAtlasMaterial,environmentMaterial,environmentKit,environmentUV,packEnvironmentGeometry,unpackEnvironmentGeometry} from './environment-surfaces.js';
+import {architectureUV,architectureAtlasMaterial} from './architecture-surfaces.js';
 export const FRONTIER_COLORS={concrete:0x82928f,slate:0x344c59,canvas:0xada68b,steel:0x475e68,teal:0x397a7f,rust:0x9b6951,olive:0x6b775b,equipment:0x4b5e60,light:0xa9d4c5,amber:0xd6b57b,dark:0x203642};
 const boxGeo=new THREE.BoxGeometry(1,1,1),cylinderGeo=new THREE.CylinderGeometry(1,1,1,10),coneGeo=new THREE.ConeGeometry(1,1,7);
 const groundMaterials=new Map(),environment=environmentKit();
 const tint=c=>typeof c==='string'?FRONTIER_COLORS[c]:c;
+const surfaceFor=color=>({concrete:'concrete',slate:'plaster',canvas:'plaster',steel:'metal',teal:'paint',rust:'metal',olive:'paint',equipment:'metal',light:'glass',amber:'paint',dark:'metal'}[color]||'concrete');
 function groundMaterial(kind){if(!groundMaterials.has(kind)){const m=environmentMaterial(0xffffff,kind).clone();m.vertexColors=true;m.userData={shared:true,environmentGround:true,artRevision:159};groundMaterials.set(kind,m);}return groundMaterials.get(kind);}
 function colorsFor(g,value){const color=new THREE.Color(tint(value)),existing=g.attributes.color;if(existing){for(let i=0;i<existing.count;i++)existing.setXYZ(i,existing.getX(i)*color.r,existing.getY(i)*color.g,existing.getZ(i)*color.b);}else{const values=new Float32Array(g.attributes.position.count*3);for(let i=0;i<values.length;i+=3){values[i]=color.r;values[i+1]=color.g;values[i+2]=color.b;}g.setAttribute('color',new THREE.Float32BufferAttribute(values,3));}}
-// Architecture stays on its existing opaque batch. The non-building scenery
-// gets just two extra atlas batches, with no transparent foliage or live rebuilds.
+// Architecture, opaque scenery and foliage stay in their three existing static
+// batches. Their shared material atlases add relief without per-window draws.
 function bakeScenery(group,parent){
  group.updateMatrixWorld(true);const batches=new Map();
- group.traverse(m=>{if(!m.isMesh)return;const foliage=!!m.material.userData.environmentFoliage,g=m.geometry.index?m.geometry.toNonIndexed():m.geometry.clone();g.applyMatrix4(m.matrixWorld);environmentUV(g,m.material.userData.environmentSurface);colorsFor(g,m.material.color.getHex());if(!batches.has(foliage))batches.set(foliage,[]);batches.get(foliage).push(g);if(!m.geometry.userData.shared)m.geometry.dispose();});
- const result=[];for(const [foliage,parts]of batches){const g=mergeGeometries(parts);for(const p of parts)p.dispose();g.computeBoundingSphere();const m=new THREE.Mesh(g,environmentAtlasMaterial(foliage));m.name='Frontier '+(foliage?'foliage':'environment')+' batch';m.castShadow=m.receiveShadow=true;m.userData.frontierEnvironment=true;m.userData.artRevision=159;parent.add(m);result.push(m);}group.clear();return result;
+ group.traverse(m=>{if(!m.isMesh)return;const foliage=!!m.material.userData.environmentFoliage,g=m.geometry.index?m.geometry.toNonIndexed():m.geometry.clone();unpackEnvironmentGeometry(g);g.applyMatrix4(m.matrixWorld);environmentUV(g,m.material.userData.environmentSurface);colorsFor(g,m.material.color.getHex());if(!batches.has(foliage))batches.set(foliage,[]);batches.get(foliage).push(g);if(!m.geometry.userData.shared)m.geometry.dispose();});
+ const result=[];for(const [foliage,parts]of batches){const g=mergeGeometries(parts);for(const p of parts)p.dispose();g.userData.environmentAtlas=true;packEnvironmentGeometry(g);g.computeBoundingSphere();const m=new THREE.Mesh(g,environmentAtlasMaterial(foliage));m.name='Frontier '+(foliage?'foliage':'environment')+' batch';m.castShadow=m.receiveShadow=true;m.userData.frontierEnvironment=true;m.userData.artRevision=160;parent.add(m);result.push(m);}group.clear();return result;
 }
 export class FrontierArt{
  constructor(){this.parts=[];this.scenery=new THREE.Group();this.groundParts=new Map();this.features=0;}
- add(geometry,color,x,y,z,sx,sy,sz,rotation=null){
-  const g=geometry.index?geometry.toNonIndexed():geometry.clone(),matrix=new THREE.Matrix4(),q=new THREE.Quaternion();if(rotation)q.setFromEuler(new THREE.Euler(...rotation));matrix.compose(new THREE.Vector3(x,y,z),q,new THREE.Vector3(sx,sy,sz));g.applyMatrix4(matrix);g.deleteAttribute('uv');
+ add(geometry,color,x,y,z,sx,sy,sz,rotation=null,kind=surfaceFor(color)){
+  const g=geometry.index?geometry.toNonIndexed():geometry.clone(),matrix=new THREE.Matrix4(),q=new THREE.Quaternion();if(rotation)q.setFromEuler(new THREE.Euler(...rotation));matrix.compose(new THREE.Vector3(x,y,z),q,new THREE.Vector3(sx,sy,sz));g.applyMatrix4(matrix);architectureUV(g,kind);
   const c=new THREE.Color(typeof color==='string'?FRONTIER_COLORS[color]:color),count=g.attributes.position.count,colors=new Float32Array(count*3);for(let i=0;i<count;i++){colors[i*3]=c.r;colors[i*3+1]=c.g;colors[i*3+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));this.parts.push(g);this.features++;
  }
- box(x,y,z,w,h,d,color='concrete',rotation){this.add(boxGeo,color,x,y,z,w,h,d,rotation);}
+ box(x,y,z,w,h,d,color='concrete',rotation,kind){this.add(boxGeo,color,x,y,z,w,h,d,rotation,kind);}
  groundBox(x,y,z,w,h,d,color,kind='stone'){
   const g=boxGeo.toNonIndexed();g.scale(w,h,d);g.translate(x,y,z);const p=g.attributes.position,n=g.attributes.normal,uv=g.attributes.uv;
   // Per-kind repeating maps stay in metre-scale UVs; an 80m arena no longer
@@ -51,6 +53,13 @@ export class FrontierArt{
   for(const sign of [-1,1])this.box(x+sign*w*.25,h+.5,z,w*.53,.16,d+.6,'steel',[0,0,-sign*.08]);
   this.box(x-w*.25,h+.65,z+d*.2,w*.25,.7,d*.25,'equipment');for(let i=0;i<5;i++)this.box(x-w*.25,h+1.01,z+d*.2+(i-2)*.17,w*.21,.035,.045,'dark');
   this.cylinder(x+w*.32,h+.8,z-d*.27,.06,1.6);this.box(x+w*.32,h+1.61,z-d*.27,.8,.05,.12,'amber');
+  // Flashings, drain pipes and small utility panels add facade depth without
+  // suggesting new traversable doors in these closed background structures.
+  for(const side of [-1,1]){
+   this.box(x+side*(w/2-.12),h*.48,z-d/2-.13,.09,h*.94,.09,'steel');
+   this.box(x,h-.05,z+side*(d/2+.16),w+.18,.11,.20,'steel');
+   const px=x+w*.30,face=z+side*(d/2+.05);this.box(px,.85,face,1.04,1.0,.07,'dark');this.box(px,.85,face+side*.045,.88,.84,.035,'teal');this.box(px+.27,.85,face+side*.075,.07,.18,.04,'steel');
+  }
  }
  wallDetail(b){
   const {x,z,w,d,h,y=0}=b,color=(typeof b.color==='number'?b.color:FRONTIER_COLORS[b.color])||FRONTIER_COLORS.concrete;
@@ -66,6 +75,8 @@ export class FrontierArt{
     this.box(px,y+h*.58,pz,ww,1.5,dd,'dark');this.box(px+(longX?0:sign*.055),y+h*.58,pz+(longX?sign*.055:0),longX?1.06:.025,1.15,longX?.025:1.06,'light');
    }
    this.box(x,y+h-.3,z,w+.04,.12,d+.04,'amber');
+   for(const sx of [-1,1])for(const sz of [-1,1])this.box(x+sx*(w/2-.07),y+h/2,z+sz*(d/2+.045),.14,h,.09,'concrete');
+   this.box(x,y+.15,z,w+.05,.3,d+.05,'concrete');
   }
   if(b.kind==='roof'){this.box(x,y+h+.09,z,w+.2,.18,d+.2,'steel');for(let t=-w/2+.5;t<w/2;t+=1.5)this.box(x+t,y+h+.19,z,.045,.035,d,0x819494);}
   if(['platform','bridge'].includes(b.kind))for(let t=-w/2+.5;t<w/2;t+=2)this.box(x+t,y+h+.01,z,.04,.02,d,0x566b6e);
@@ -73,14 +84,14 @@ export class FrontierArt{
  }
  containerDetails(x,z,w,d,h,y=0){const long=w>d;for(let at=-Math.max(w,d)/2+.35;at<Math.max(w,d)/2;at+=.75)for(const side of [-1,1])this.box(x+(long?at:side*(w/2+.025)),y+h/2,z+(long?side*(d/2+.025):at),long?.065:.055,h-.15,long?.055:.065,'steel');for(const yy of [.08,h+.02])this.box(x,y+yy,z,w+.08,.16,d+.08,'steel');for(const side of [-1,1])for(const bar of [-.65,.65])this.box(x+(long?side*(w/2+.05):bar),y+h/2,z+(long?bar:side*(d/2+.05)),long?.06:.08,h-.45,long?.08:.06,'canvas');this.box(x,y+h*.63,z+d/2+.06,Math.min(2.8,w*.7),.22,.035,'amber');}
  container(x,z,w,d,h,color='teal',y=0){this.sceneryProp('container',{x,z,w,d,h,color,y});}
- radar(x,z,y=0){this.box(x,y+.8,z,4,1.6,4,'equipment');this.cylinder(x,y+4,z,.16,6.5);for(const side of [-1,1])this.beam([x+side*2,y,z],[x,y+6,z],.12);this.box(x,y+6.3,z,6.5,2.3,.2,'light',[.35,.3,0]);for(let i=-2;i<=2;i++)this.box(x+i,y+6.3,z+.17,.07,2.2,.06,'steel',[.35,.3,0]);this.box(x,y+6.3,z+.22,6.4,.06,.06,'steel');this.box(x,y+8,z,.06,1,.06,'amber');}
+ radar(x,z,y=0){this.box(x,y+.8,z,4,1.6,4,'equipment');this.cylinder(x,y+4,z,.16,6.5);for(const side of [-1,1])this.beam([x+side*2,y,z],[x,y+6,z],.12);this.box(x,y+6.3,z,6.5,2.3,.2,'light',[.35,.3,0]);for(let i=-2;i<=2;i++)this.box(x+i,y+6.3,z+.17,.07,2.2,.06,'steel',[.35,.3,0]);this.box(x,y+6.3,z+.22,6.4,.06,.06,'steel');this.box(x,y+8,z,.06,1,.06,'amber');for(const side of [-1,1]){this.box(x+side*1.3,y+.9,z+2.03,.8,.8,.04,'dark');for(let j=0;j<5;j++)this.box(x+side*1.3,y+.62+j*.14,z+2.06,.73,.04,.05,'steel');}this.cylinder(x,y+5.9,z,.48,.28,'steel');}
  crane(x,z){for(const side of [-1,1]){this.box(x+side*3.3,7,z,.5,14,.8,'amber');this.beam([x+side*3.3,0,z],[x,13,z],.2,'steel');}this.box(x,14,z,22,.7,1.2,'amber');for(let t=-10;t<10;t+=3)this.beam([x+t,14,z],[x+t+2,16,z],.14,'steel');this.box(x,16,z,22,.2,.7,'steel');this.cylinder(x+7,10,z,.06,10);this.box(x+7,5,z,.8,.6,.8,'dark');this.box(x-5,14.7,z,3.4,2.2,2,'slate');this.box(x-5,14.8,z+1.04,2.5,1.2,.04,'light');}
  lamp(x,z){this.sceneryProp('lamp',{x,z,w:.6,d:.6,h:5.8});}
  pine(x,z,height=7){const start=this.scenery.children.length;environmentTree(this.scenery,{x,y:0,z,h:height,kind:'pine',seed:Math.abs(Math.round(x*31+z*17))},true);for(const m of this.scenery.children.slice(start))m.scale.x=m.scale.z=height/10;this.features+=2;}
  truck(x,z){this.sceneryProp('truck',{x,z,w:2.8,h:2.8,d:6.4},Math.PI);}
  bake(parent){
   let primary;
-  if(this.parts.length){const geometry=mergeGeometries(this.parts);for(const p of this.parts)p.dispose();this.parts=[];const material=new THREE.MeshLambertMaterial({vertexColors:true}),mesh=new THREE.Mesh(geometry,material);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.ownedMaterial=true;parent.add(mesh);primary=mesh;}
+  if(this.parts.length){const geometry=mergeGeometries(this.parts);for(const p of this.parts)p.dispose();this.parts=[];packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,architectureAtlasMaterial());mesh.name='Frontier architecture batch';mesh.castShadow=mesh.receiveShadow=true;mesh.userData.frontierArchitecture=true;mesh.userData.artRevision=160;parent.add(mesh);primary=mesh;}
   const scenery=bakeScenery(this.scenery,parent);primary??=scenery[0];
   for(const [kind,parts]of this.groundParts){const g=mergeGeometries(parts);for(const p of parts)p.dispose();g.computeBoundingSphere();const m=new THREE.Mesh(g,groundMaterial(kind));m.name='Frontier '+kind+' ground';m.receiveShadow=true;m.userData.environmentGround=true;m.userData.keepDynamic=true;m.userData.artRevision=159;parent.add(m);primary??=m;}this.groundParts.clear();return primary;
  }

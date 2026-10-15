@@ -2,51 +2,52 @@ import {frontierProp} from './world-art.js';
 import * as THREE from 'three';
 import {artKit,buildingStyle} from './royale-art.js';
 import {groundAt,terrainColor} from './terrain.js';
+import {architectureKit} from './architecture-surfaces.js';
+import {architectureWindow,detailBuilding} from './architecture-art.js';
 export function dressIslandBuilding(g,b,raw){
- const {block:box,beam,cone,rock,cylinder,torus}=artKit(raw),s=buildingStyle(b),{x,z,w,d,h,baseY:y,floors,type}=b;
+ const {block:box,beam,cone,rock,cylinder,torus}=architectureKit(raw,b),s=buildingStyle(b),{x,z,w,d,h,baseY:y,floors,type}=b;
  for(const dx of [-w/2,w/2])for(const dz of [-d/2,d/2])box(g,x+dx,y+h/2,z+dz,.43,h,.43,s.trim);
  for(let f=0;f<floors;f++){
   const fy=y+f*4.2;
   for(const dz of [-d/2,d/2]){
-   if(f===0){box(g,x,fy+3.05,z+dz,3.3,.12,.5,s.trim);for(const dx of [-1.66,1.66])box(g,x+dx,fy+1.5,z+dz,.13,3,.5,s.wood);}
+   if(f===0){box(g,x,fy+3.05,z+dz,3.3,.12,.5,s.trim);for(const dx of [-1.66,1.66])box(g,x+dx,fy+1.5,z+dz,.13,3,.5,s.wood,'timber');}
    for(const side of [-1,1]){const span=(w-3.2)/2,xx=x+side*(1.6+span/2),ww=Math.min(1.1,span-1);
-    box(g,xx,fy+1.35,z+dz,ww+.25,.08,.5,s.trim);box(g,xx,fy+2.4,z+dz,ww+.25,.08,.5,s.trim);
-    for(const edge of [-1,1])box(g,xx+edge*ww/2,fy+1.875,z+dz,.06,1.05,.43,s.trim);
+    architectureWindow(g,{x:xx,y:fy+1.875,z:z+dz,w:ww,sign:Math.sign(dz),trim:s.trim,wood:s.wood});
    }
   }
   for(const dx of [-w/2,w/2]){
    box(g,x+dx,fy+4.15,z,.44,.15,d+.25,s.trim);
-   box(g,x+dx,fy+1.35,z,.5,.08,1.3,s.trim);box(g,x+dx,fy+2.4,z,.5,.08,1.3,s.trim);for(const side of [-1,1])box(g,x+dx,fy+1.875,z+side*.55,.43,1.05,.06,s.trim);
+   architectureWindow(g,{x:x+dx,y:fy+1.875,z,w:1.1,axis:'x',sign:Math.sign(dx),trim:s.trim,wood:s.wood});
   }
   // A narrow central rug and floor bands give each level a readable orientation.
-  box(g,x+.2,fy+.015,z,2.5,.025,d-3,b.kind==='hatchery'?0x69aeba:b.kind==='farm'?0xbda56b:0xc29578);
+  box(g,x+.2,fy+.015,z,2.5,.025,d-3,b.kind==='hatchery'?0x69aeba:b.kind==='farm'?0xbda56b:0xc29578,'fabric');
   if(['shop','bakery','hotel','station'].includes(type)&&f===0){
-   for(let j=0;j<8;j++){const awning=box(g,x-3.1+j*.87,fy+3.3,z+d/2+1.1,.86,.14,2.2,j%2?s.trim:s.roof);awning.rotation.x=.1;box(g,x-3.1+j*.87,fy+3.1,z+d/2+2.13,.86,.35,.1,j%2?s.trim:s.roof);}
+   for(let j=0;j<8;j++){const awning=box(g,x-3.1+j*.87,fy+3.3,z+d/2+1.1,.86,.14,2.2,j%2?s.trim:s.roof,'fabric');awning.rotation.x=.1;box(g,x-3.1+j*.87,fy+3.1,z+d/2+2.13,.86,.35,.1,j%2?s.trim:s.roof,'fabric');}
   }
  }
  if(b.roof==='gable'){
   // A half-width attic canopy shelters the upper loot deck without sealing its stairwell.
   const cx=x+w*.18,r=w*.29;
-  for(const side of [-1,1]){const roof=box(g,cx+side*r/2,y+h+2.1+r/2*Math.tan(.42),z,r/Math.cos(.42),.18,d+.6,s.roof);roof.rotation.z=-side*.42;}
-  for(const zz of [-d/2,d/2]){beam(g,[cx-r,y+h+2.1,z+zz],[cx,y+h+2.1+r*Math.tan(.42),z+zz],.1,s.trim);beam(g,[cx,y+h+2.1+r*Math.tan(.42),z+zz],[cx+r,y+h+2.1,z+zz],.1,s.trim);for(const side of [-1,1])beam(g,[cx+side*r,y+h,z+zz],[cx+side*r,y+h+2.1,z+zz],.1,s.wood);}
+  for(const side of [-1,1]){const roof=box(g,cx+side*r/2,y+h+2.1+r/2*Math.tan(.42),z,r/Math.cos(.42),.18,d+.6,s.roof,'roof');roof.rotation.z=-side*.42;}
+  for(const zz of [-d/2,d/2]){beam(g,[cx-r,y+h+2.1,z+zz],[cx,y+h+2.1+r*Math.tan(.42),z+zz],.1,s.trim,'paint');beam(g,[cx,y+h+2.1+r*Math.tan(.42),z+zz],[cx+r,y+h+2.1,z+zz],.1,s.trim,'paint');for(const side of [-1,1])beam(g,[cx+side*r,y+h,z+zz],[cx+side*r,y+h+2.1,z+zz],.1,s.wood,'timber');}
  }else if(['greenhouse','hatchery','hangar'].includes(type)){
   for(const zz of [-d*.35,0,d*.35])for(let j=0;j<8;j++){const a=j*Math.PI/8,aa=(j+1)*Math.PI/8;beam(g,[x+Math.cos(a)*w*.42,y+h+Math.sin(a)*2.8,z+zz],[x+Math.cos(aa)*w*.42,y+h+Math.sin(aa)*2.8,z+zz],.08,s.trim);}
   for(const xx of [-w*.38,0,w*.38])box(g,x+xx,y+h+1.4,z,.09,.1,d*.8,s.roof);
   // Broad segmented ribs retain open routes across the roof deck.
   for(let j=0;j<10;j++){const a=(j+.5)*Math.PI/10,rr=w*.4;const panel=box(g,x+Math.cos(a)*rr,y+h+2.2+Math.sin(a)*2.6,z,.12,.26,d*.85,s.roof);panel.rotation.z=a;}
  }else if(type==='refinery'){
-  for(let j=0;j<4;j++){const zz=z-d*.3+j*d*.2,cap=box(g,x+w*.16,y+h+2.9,zz,w*.6,.13,d*.22,s.roof);cap.rotation.x=-.36;box(g,x+w*.16,y+h+2.6,zz-d*.105,w*.6,.6,.06,0x8baeb5);}
+  for(let j=0;j<4;j++){const zz=z-d*.3+j*d*.2,cap=box(g,x+w*.16,y+h+2.9,zz,w*.6,.13,d*.22,s.roof,'metal');cap.rotation.x=-.36;box(g,x+w*.16,y+h+2.6,zz-d*.105,w*.6,.6,.06,0x8baeb5,'glass');}
   for(const zz of [-d*.4,d*.4])cylinder(g,x+w*.38,y+h+2.8,z+zz,.48,5.6,0xa0b6b4,12);
  }else{
   for(const side of [-1,1])box(g,x+side*w/2,y+h+.71,z,.35,.12,d+.2,s.trim);
-  if(['lab','office','apartment','refinery'].includes(type)){box(g,x+w*.3,y+h+.6,z-d*.33,2,1.2,1.6,0x758e94);for(let i=0;i<5;i++)box(g,x+w*.3,y+h+.3+i*.14,z-d*.33+.82,1.7,.045,.02,0x384e5a);}
+  if(['lab','office','apartment','refinery'].includes(type)){box(g,x+w*.3,y+h+.6,z-d*.33,2,1.2,1.6,0x758e94,'metal');for(let i=0;i<5;i++)box(g,x+w*.3,y+h+.3+i*.14,z-d*.33+.82,1.7,.045,.02,0x384e5a,'metal');}
  }
  if(type==='bakery'){
   rock(g,x,y+h+1.7,z+d*.32,1.4,1.8,.45,0xf2d79a,1);rock(g,x,y+h+1.7,z+d*.32+.4,.65,.7,.1,0xf1b840,1);
  }
- if(type==='villa'||type==='hotel')for(const zz of [-d*.32,0,d*.32]){for(const side of [-1,1])beam(g,[x+side*w*.32,y+h,z+zz],[x+side*w*.32,y+h+2.4,z+zz],.12,s.trim);beam(g,[x-w*.35,y+h+2.4,z+zz],[x+w*.35,y+h+2.4,z+zz],.13,s.wood);}
+ if(type==='villa'||type==='hotel')for(const zz of [-d*.32,0,d*.32]){for(const side of [-1,1])beam(g,[x+side*w*.32,y+h,z+zz],[x+side*w*.32,y+h+2.4,z+zz],.12,s.trim,'paint');beam(g,[x-w*.35,y+h+2.4,z+zz],[x+w*.35,y+h+2.4,z+zz],.13,s.wood,'timber');}
  if(['barn','cabin','lodge','stable'].includes(type)){
-  for(let yy=.5;yy<h;yy+=.8)for(const side of [-1,1])box(g,x+side*(w/2+.19),y+yy,z,.05,.08,d,s.wood);
+  for(let yy=.5;yy<h;yy+=.8)for(const side of [-1,1])box(g,x+side*(w/2+.19),y+yy,z,.05,.08,d,s.wood,'timber');
  }else if(['warehouse','refinery','hangar','garage'].includes(type)){
   for(const side of [-1,1])for(let j=0;j<6;j++)box(g,x+side*(w/2+.2),y+h-.5,z-d/2+.5+j*(d-1)/5,.05,.5,.1,s.roof);
   beam(g,[x+w/2+.3,y+.3,z-d/2+.4],[x+w/2+.3,y+h+.8,z-d/2+.4],.12,s.roof);
@@ -54,6 +55,7 @@ export function dressIslandBuilding(g,b,raw){
  if(b.type==='command'){for(const side of [-1,1]){box(g,x+side*w*.42,y+h/2,z,w*.08,h,d+.4,0x304653);box(g,x+side*7,y+3,z+d/2+.38,2.1,4,.12,0x873f3b);box(g,x+side*7,y+3.8,z+d/2+.46,.2,1.5,.06,0xd8b777);}}
  // Angular relay insignia over each entry, shared across the island's industries.
  box(g,x,y+3.5,z+d/2+.3,.34,.09,.055,0x50c8bd);box(g,x-.12,y+3.6,z+d/2+.3,.09,.28,.055,0xe8ae4c);
+ detailBuilding(g,b,s,raw);
 }
 export function islandProp(g,p,raw){
  const k=artKit(raw),{block:box,cylinder,cone,rounded,rock,torus,beam}=k,{x,y,z,w,d,h,kind}=p;

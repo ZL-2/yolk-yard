@@ -1,5 +1,5 @@
 const categories=[
- ['video','▣','Video',['quality','fov','showFps']],
+ ['video','▣','Video',['quality','fov','thirdPersonFov','showFps']],
  ['audio','♫','Audio',['volume','effectsVolume','ambienceVolume','musicVolume','visualSoundEffects','visualFootsteps','visualGunfire','visualBosses','visualOther']],
  ['mouse','↗','Mouse',['sensitivity','adsSensitivity','scopeSensitivity','buildSensitivity','editSensitivity','thirdPersonSensitivity','invert']],
  ['hud','⊕','HUD',['centerDot','hitMarkers','netDebugStats','connectionWarnings','hudScale','textScale','highContrast','showMinimap','showCompass','mapSide']],
@@ -16,7 +16,8 @@ const descriptions={
  netDebugStats:'Show ping, incoming and outgoing traffic, message rates and a latency graph. Packet loss is unavailable in this browser transport.',
  connectionWarnings:'Show a yellow connection arrow when updates are delayed and a red X when the connection is interrupted or severely delayed.',
  quality:'High enables shadows and richer graphics. Low reduces rendering work for smoother play on slower devices.',
- fov:'Adjust how much of the world is visible. A wider field of view shows more of your surroundings.',
+ fov:'First-person field of view. Your existing setting is preserved. Scoped optics use this value for their zoom.',
+ thirdPersonFov:'Third-person field of view. Defaults to 65°. Adjust independently from first person; changes apply immediately.',
  volume:'Controls the overall game volume. Individual sound channels are multiplied by this level.',
  effectsVolume:'Weapon effects, impacts and gameplay cues.',ambienceVolume:'Environmental sound and wind.',musicVolume:'Menu music and match fanfares.',
  sensitivity:'How quickly the camera turns when you move the mouse.',adsSensitivity:'Adjust unscoped aiming independently from magnified optics.',scopeSensitivity:'Adjust aiming sensitivity while looking through a scope.',invert:'Reverse the direction of vertical mouse movement.',

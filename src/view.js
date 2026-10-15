@@ -1,4 +1,6 @@
 import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay} from './perspective.js';
+import {perspectiveFov} from './settings.js';
+import {canSpectate} from './spectator-status.js';
 import {ThrowablePreview} from './throwable-view.js';
 import {weaponMotion} from './weapon-motion.js';
 import {modelMaterial,MODEL_ART_REVISION} from './model-surfaces.js';
@@ -801,7 +803,7 @@ export class View {
       this.camera.updateProjectionMatrix();
     } else if (local) {
       const hold=!!this.cinematic?.hold,victory=!!this.cinematic?.victory;
-      const killer = !hold&&local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && p.health > 0);
+      const killer = !hold&&local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && canSpectate(p,local.id));
       const p = {...(killer || (local.health <= 0 ? local : predicted || local))};
       if(!killer)p.perspective=this.settings.perspective;
       this.renderLocalActor=p;
@@ -848,7 +850,8 @@ export class View {
         if(this.clock>=(this.coverCheckAt||0)){this.coverCheckAt=this.clock+.08;const ray=sightRay(map,p,80),hit=worldHit(map,ray.origin,ray.d,ray.range),distance=hit?.distance??ray.range,point=hit?.point||{x:ray.origin.x+ray.d.x*distance,y:ray.origin.y+ray.d.y*distance,z:ray.origin.z+ray.d.z*distance},dx=point.x-ray.eye.x,dy=point.y-ray.eye.y,dz=point.z-ray.eye.z,len=Math.hypot(dx,dy,dz)||1;this.coverCheck=wallDistance(map,ray.eye,{x:dx/len,y:dy/len,z:dz/len},len)<len-.12;}
         this.coverBlocked=!!this.coverCheck;
       }else this.thirdPersonState=null;
-      const fov=victory?Math.min(65,this.settings.fov):aiming?adsFov(w,this.settings.fov):this.settings.fov;
+      const baseFov=perspectiveFov(this.settings,this.thirdPersonEnabled);
+      const fov=victory?65:aiming?adsFov(w,baseFov):baseFov;
       this.camera.fov+=(fov-this.camera.fov)*(1-Math.exp(-Math.log(20)*dt/w.adsTime));
       this.camera.updateProjectionMatrix();
       const motion=weaponMotion(this.weaponMotionState??={},p,dt,this.clock,this.aimBlend,this.settings,`${state.round}:${p.id}`);

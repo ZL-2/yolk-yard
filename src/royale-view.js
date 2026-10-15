@@ -15,6 +15,7 @@ import {ROYALE_MAP} from './royale-map.js';
 import {groundAt} from './terrain.js';
 import {buildDetailedTerrain,createDetailedOcean} from './terrain-detail.js';
 import {environmentAtlasMaterial,environmentUV,packEnvironmentGeometry,unpackEnvironmentGeometry} from './environment-surfaces.js';
+import {architectureAtlasMaterial,architectureUV,architectureKit,buildingSurface} from './architecture-surfaces.js';
 import {EnvironmentGroundCover} from './environment-groundcover.js';
 import {updateBuildingView} from './building-view.js';
 import {shopItem} from './shop-catalog.js';
@@ -38,15 +39,15 @@ export function bake(group,chunked=false,colored=chunked){for(const _ of bakeSte
 function* bakeSteps(group,chunked=false,colored=chunked){
  group.updateMatrixWorld(true);const batches=new Map();
  for(const o of [...group.children])if(o.isMesh&&!o.userData.ownedMaterial&&!o.userData.keepDynamic){
-  const surface=o.material.userData.environmentSurface,foliage=!!o.material.userData.environmentFoliage;
-  const key=(colored?(surface?'environment:'+foliage:'color'):o.material.uuid)+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');if(!batches.has(key))batches.set(key,{mat:colored?(surface?environmentAtlasMaterial(foliage):bakedMaterial):o.material,parts:[],ranges:[],vertices:0});
+  const architecture=o.material.userData.architectureSurface,surface=o.material.userData.environmentSurface,foliage=!!o.material.userData.environmentFoliage;
+  const key=(colored?(architecture?'architecture':surface?'environment:'+foliage:'color'):o.material.uuid)+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');if(!batches.has(key))batches.set(key,{mat:colored?(architecture?architectureAtlasMaterial():surface?environmentAtlasMaterial(foliage):bakedMaterial):o.material,parts:[],ranges:[],vertices:0});
   const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();unpackEnvironmentGeometry(g);g.applyMatrix4(o.matrix);
-  if(colored){if(surface)environmentUV(g,surface);else g.deleteAttribute('uv');if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3),c=o.material.color;for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}else if(surface){const a=g.attributes.color,c=o.material.color;for(let i=0;i<a.count;i++)a.setXYZ(i,a.getX(i)*c.r,a.getY(i)*c.g,a.getZ(i)*c.b);}}
+  if(colored){if(architecture)architectureUV(g,architecture);else if(surface)environmentUV(g,surface);else g.deleteAttribute('uv');if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3),c=o.material.color;for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}else if(surface||architecture){const a=g.attributes.color,c=o.material.color;for(let i=0;i<a.count;i++)a.setXYZ(i,a.getX(i)*c.r,a.getY(i)*c.g,a.getZ(i)*c.b);}}
   const batch=batches.get(key);if(o.userData.objectId)batch.ranges.push({id:o.userData.objectId,start:batch.vertices,count:g.attributes.position.count});batch.vertices+=g.attributes.position.count;batch.parts.push(g);group.remove(o);
   if(o.geometry.type==='CylinderGeometry'&&!o.geometry.userData.shared)o.geometry.dispose();
   yield;
  }
- for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.userData.environmentAtlas=!!b.mat.userData.environmentAtlas;packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;mesh.updateMatrix();mesh.matrixAutoUpdate=false;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);yield;}
+ for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.userData.environmentAtlas=!!b.mat.userData.environmentAtlas;geometry.userData.architectureAtlas=!!b.mat.userData.architectureAtlas;packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;mesh.updateMatrix();mesh.matrixAutoUpdate=false;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);yield;}
 }
 export function islandLabel(text,size=1){
  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=96;
@@ -57,7 +58,7 @@ export function buildIsland(world,map,kit){for(const _ of buildIslandSteps(world
 // Resumable construction lets warmup frames keep servicing input and sockets.
 export function* buildIslandSteps(world,map,kit){
  if(map.id==='sunnybreak'){yield* streamedIslandSteps(world,map,kit);buildMapObjects(world,map,kit);return;}
- const {block,palette}=kit;
+ const {palette}=kit,architecture=architectureKit(kit);
  world.add(createDetailedOcean(map));
  yield* buildDetailedTerrain(world,map);
  const byBuilding=map.buildings.map(()=>[]),treeBoxes=new Map(),propBoxes=new Map();
@@ -69,7 +70,7 @@ export function* buildIslandSteps(world,map,kit){
   if(['tree','prop','roof-collider','door','parked-aircraft'].includes(b.kind))continue;
   const s=b.building===undefined?null:buildingStyle(map.buildings[b.building]);
   const color=s?(b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:b.color==='foundation'?0x8e988a:s.wall):typeof b.color==='number'?b.color:palette[b.color]||0x9cb7aa;
-  const m=block(world,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color);m.userData.objectId=b.objectId;yield;
+  const m=architecture.block(world,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color,buildingSurface(b,map.buildings[b.building]));m.userData.objectId=b.objectId;yield;
  }
  for(const [i,b] of map.buildings.entries()){if(b.editorHidden)continue;
   const start=world.children.length;dressBuilding(world,b,kit);
@@ -81,6 +82,7 @@ export function* buildIslandSteps(world,map,kit){
  // Landmark names remain on the map; the world has no floating signs.
 }
 function* streamedIslandSteps(world,map,kit){
+ const architecture=architectureKit(kit);
  world.add(createDetailedOcean(map));
  yield* buildDetailedTerrain(world,map);
  const cells=new Map(),cellFor=(x,z)=>{const ix=Math.floor(x/64),iz=Math.floor(z/64),key=ix+':'+iz;if(!cells.has(key))cells.set(key,{key,x:(ix+.5)*64,z:(iz+.5)*64,radius:48,boxes:[],buildings:[],trees:[],props:[],coarse:new THREE.Group()});return cells.get(key);};
@@ -91,7 +93,7 @@ function* streamedIslandSteps(world,map,kit){
  const treeIds=new Map(),propIds=new Map(),buildingBoxes=new Map();for(const b of map.boxes){if(b.tree!==undefined)treeIds.set(map.trees[b.tree],b.objectId);if(b.prop!==undefined)propIds.set(map.props[b.prop],b.objectId);if(b.building!==undefined){const owner=map.buildings[b.building];if(!buildingBoxes.has(owner))buildingBoxes.set(owner,[]);buildingBoxes.get(owner).push(b);}}
  const color=b=>{const s=b.building===undefined?null:buildingStyle(map.buildings[b.building]);return s?(b.color==='floor'||b.color==='stair'?s.wood:b.color==='rail'||b.color==='lintel'?s.trim:b.color==='foundation'?0x8e988a:s.wall):typeof b.color==='number'?b.color:kit.palette[b.color]||0x9cb7aa;};
  function* draw(cell,group,detail){
-  for(const b of cell.boxes){if(['tree','prop','roof-collider','door','parked-aircraft'].includes(b.kind))continue;const m=kit.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b));m.userData.objectId=b.objectId;yield;}
+  for(const b of cell.boxes){if(['tree','prop','roof-collider','door','parked-aircraft'].includes(b.kind))continue;const m=detail?architecture.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b),buildingSurface(b,map.buildings[b.building])):kit.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b));m.userData.objectId=b.objectId;yield;}
   for(const b of cell.buildings){
    if(detail){const start=group.children.length;dressBuilding(group,b,kit);const boxes=buildingBoxes.get(b)||[];for(const mesh of group.children.slice(start)){let best=null,d=Infinity;for(const o of boxes){const distance=(o.x-mesh.position.x)**2+(o.y+o.h/2-mesh.position.y)**2+(o.z-mesh.position.z)**2;if(distance<d){d=distance;best=o;}}if(best)mesh.userData.objectId=best.objectId;}}
    else if(b.roof==='gable'){const m=artKit(kit).cone(group,b.x,(b.baseY||0)+b.h+.8,b.z,Math.min(b.w,b.d)*.55,1.6,buildingStyle(b).roof);m.scale.z=b.d/Math.max(1,b.w);m.userData.objectId=cell.boxes.find(o=>o.building!==undefined&&map.buildings[o.building]===b&&o.color==='roof')?.objectId;}

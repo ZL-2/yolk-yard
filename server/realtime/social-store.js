@@ -2,6 +2,7 @@ import {randomUUID,randomBytes,randomInt,createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {mkdir,open,rename} from 'node:fs/promises';
 import {dirname} from 'node:path';
+import {validatePlayerName} from '../../src/player-name.js';
 import {socialDataPath,persistentMount} from './data-path.js';
 export const normalizeFriendCode=value=>String(value||'').toUpperCase().replace(/[\s-]/g,'');
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -16,14 +17,15 @@ function validate(data){
  for(const r of data.requests)if(!r||typeof r.id!=='string'||!ids.has(r.from)||!ids.has(r.to)||r.from===r.to)throw Error('Invalid friend request');
  if(data.featureRequests!==undefined&&(!Array.isArray(data.featureRequests)||data.featureRequests.length>1000||data.featureRequests.some(r=>!r||typeof r.id!=='string'||!ids.has(r.player)||typeof r.text!=='string'||r.text.length>1000||!['open','read','completed','dismissed'].includes(r.status)||!Number.isFinite(r.created))))throw Error('Invalid feature inbox');
  for(const key of ['friends','blocks']){const seen=new Set();for(const row of data[key]){if(!Array.isArray(row)||row.length!==2||!ids.has(row[0])||seen.has(row[0])||!Array.isArray(row[1])||row[1].some(id=>!ids.has(id)||id===row[0]))throw Error('Invalid social relationship');seen.add(row[0]);}}
+ if(data.nicknames!==undefined&&(!Array.isArray(data.nicknames)||data.nicknames.some(row=>!Array.isArray(row)||row.length!==2||!ids.has(row[0])||!Array.isArray(row[1])||row[1].some(entry=>!Array.isArray(entry)||entry.length!==2||!ids.has(entry[0])||typeof entry[1]!=='string'||!validatePlayerName(entry[1],{nickname:true}).ok))))throw Error('Invalid friend nicknames');
  return data;
 }
 // Durable identity/relationships, separate from WebSocket sessions and parties.
 export class SocialStore{
  constructor(path=socialDataPath()){
-  this.path=path;this.tempPath=path+'.'+randomUUID()+'.tmp';this.identities=new Map();this.tokens=new Map();this.codes=new Map();this.requests=new Map();this.featureRequests=[];this.friends=new Map();this.blocks=new Map();this.chain=Promise.resolve();
+  this.path=path;this.tempPath=path+'.'+randomUUID()+'.tmp';this.identities=new Map();this.tokens=new Map();this.codes=new Map();this.requests=new Map();this.featureRequests=[];this.friends=new Map();this.blocks=new Map();this.nicknames=new Map();this.chain=Promise.resolve();
   if(path){let data,failed=false;for(const file of [path,path+'.bak'])try{data=validate(JSON.parse(readFileSync(file,'utf8')));this.recoveredBackup=file!==path;break;}catch(e){if(e.code!=='ENOENT')failed=true;if(e.code==='social-schema'){this.loadError=e;break;}}
-   if(data){for(const u of data.identities)this.install(u);for(const r of data.requests)this.requests.set(r.id,r);this.featureRequests=data.featureRequests||[];for(const [id,list]of data.friends)this.friends.set(id,new Set(list));for(const [id,list]of data.blocks)this.blocks.set(id,new Set(list));}
+   if(data){for(const u of data.identities)this.install(u);for(const r of data.requests)this.requests.set(r.id,r);this.featureRequests=data.featureRequests||[];for(const [id,list]of data.friends)this.friends.set(id,new Set(list));for(const [id,list]of data.blocks)this.blocks.set(id,new Set(list));for(const [id,list]of data.nicknames||[])this.nicknames.set(id,new Map(list));}
    else if(failed)this.loadError=Error('Social storage needs recovery. Existing data has not been replaced.');
   }
  }
@@ -54,10 +56,20 @@ export class SocialStore{
    else if(type==='friend-send'){if(status==='outgoing')throw Error('A friend request is already pending.');if([...this.requests.values()].filter(r=>r.from===a||r.to===b).length>=100)throw Error('Too many pending requests.');const r={id:randomUUID(),from:a,to:b,created:Date.now()};this.requests.set(r.id,r);}
    else throw Error('Unknown friend action.');
   }
+  if(type==='friend-remove'||type==='block'){this.nicknames.get(a)?.delete(b);this.nicknames.get(b)?.delete(a);}
   this.save();return {status:this.status(a,b)};
  }
+ nickname(viewer,id){return this.friends.get(viewer)?.has(id)?this.nicknames.get(viewer)?.get(id)||'':'';}
+ setNickname(viewer,id,value){
+  this.available();if(this.status(viewer,id)!=='friends')throw Error('Add this player as a friend first.');
+  if(typeof value!=='string')throw Error('Enter a nickname.');
+  const checked=value.trim()?validatePlayerName(value,{nickname:true}):{ok:true,name:''};if(!checked.ok)throw Error(checked.message);
+  if(!this.nicknames.has(viewer))this.nicknames.set(viewer,new Map());
+  if(checked.name)this.nicknames.get(viewer).set(id,checked.name);else this.nicknames.get(viewer).delete(id);
+  this.save();return {nickname:checked.name};
+ }
  save(){if(!this.path)return;this.available();clearTimeout(this.timer);this.timer=setTimeout(()=>{this.flush().catch(()=>console.error('Social persistence failed; credentials and relationships were kept in memory.'));},100);this.timer.unref?.();}
- snapshot(){this.available();return {schema,identities:[...this.identities.values()],requests:[...this.requests.values()],featureRequests:this.featureRequests,friends:[...this.friends].map(([id,s])=>[id,[...s]]),blocks:[...this.blocks].map(([id,s])=>[id,[...s]])};}
+ snapshot(){this.available();return {schema,nicknames:[...this.nicknames].map(([id,names])=>[id,[...names]]),identities:[...this.identities.values()],requests:[...this.requests.values()],featureRequests:this.featureRequests,friends:[...this.friends].map(([id,s])=>[id,[...s]]),blocks:[...this.blocks].map(([id,s])=>[id,[...s]])};}
  featureRequest(player,text){
   this.available();text=typeof text==='string'?text.normalize('NFKC').trim().replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,''):'';
   if(text.length<5||text.length>1000)throw Error('Describe your feature in 5 to 1,000 characters.');
