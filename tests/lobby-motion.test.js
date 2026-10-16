@@ -33,16 +33,16 @@ test('patrol keeps checking both sectors instead of pausing for several seconds'
 });
 test('wide lobby scans retain weapon grips and planted boots for every firearm',()=>{
  for(const id of new Set([...WEAPONS,...ROYALE_WEAPONS].map(w=>w.id))){
-  const model=makeEgg({weapon:id}),motion=new LobbyMotion();let previous;
+  const model=makeEgg({weapon:id}),motion=new LobbyMotion();let previous,previousPlants;
   for(let frame=0;frame<750;frame++){
    View.prototype.animateLobbyCharacter.call({},model,motion,1/30);model.updateMatrixWorld(true);
    const h=model.userData.human,feet=['footL','footR'].map(k=>h.bones[k].getWorldPosition(new Vector3()));
    if(frame>30){
     assert.ok(feet.some(p=>p.y>=.089&&p.y<.116),id+' lost ground contact');
     for(const limb of model.userData.arms.userData.limbs){const hand=h.bones[limb.side<0?'handL':'handR'].getWorldPosition(new Vector3());assert.ok(hand.distanceTo(limb.hand.getWorldPosition(new Vector3()))<.055,id+' hand lost its grip');}
-    for(let i=0;i<feet.length;i++)if(feet[i].y>=.089&&feet[i].y<.095&&previous[i].y>=.089&&previous[i].y<.095){assert.ok(Math.abs(feet[i].x-previous[i].x)<.001);assert.ok(Math.abs(feet[i].z-previous[i].z+PATROL_SPEED/30)<.001,'stance foot slipped relative to road');}
+    for(let i=0;i<feet.length;i++)if(h['plant'+(i?'R':'L')]&&previousPlants?.[i]){assert.ok(Math.abs(feet[i].x-previous[i].x)<.001);assert.ok(Math.abs(feet[i].z-previous[i].z+PATROL_SPEED/30)<.001,'stance foot slipped relative to road');}
    }
-   previous=feet;
+   previous=feet;previousPlants=[!!h.plantL,!!h.plantR];
   }
  }
 });

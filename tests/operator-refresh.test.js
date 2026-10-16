@@ -44,7 +44,7 @@ test('moving rigs plant in world space without accumulated spine twist at 30, 60
   for(let frame=0;frame<fps*5;frame++){model.position.x=frame*dt*2;const before=h.plantL&&{...h.plantL};animateHumanoid(model,{health:100,grounded:true,vx:2,vz:0,yaw:0},dt,frame*dt);model.updateMatrixWorld(true);assert.ok(Math.abs(h.bones.spine.rotation.y)<.7);assert.ok(h.bones.hips.rotation.y<=.001);if(frame>fps&&before&&h.plantL){assert.ok(Math.hypot(h.plantL.x-before.x,h.plantL.z-before.z)<1e-6);samples++;}for(const bone of Object.values(h.bones))assert.ok(bone.matrixWorld.elements.every(Number.isFinite));}
   assert.ok(samples>fps/2);assert.ok(h.bones.hips.position.y>.77);
  }
- const model=makeHumanoid();for(let f=0;f<120;f++)animateHumanoid(model,{health:100,grounded:true,vz:-1.12},1/60,f/60);const hips=model.userData.human.bones.hips;assert.ok(hips.position.y>.83,'walking no longer stays in a deep squat');
+ const model=makeHumanoid();for(let f=0;f<120;f++)animateHumanoid(model,{health:100,grounded:true,vz:-1.12},1/60,f/60);const hips=model.userData.human.bones.hips;assert.ok(hips.position.y>.72,'motion-captured walking keeps the pelvis above a collapsed crouch');
 });
 
 test('rifles and long tools draw from the back; sidearms and utilities draw from the hip, with exact settle',()=>{

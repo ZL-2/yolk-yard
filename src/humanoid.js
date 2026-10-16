@@ -7,6 +7,7 @@ import {addOperatorDesign} from './operator-designs.js';
 import {surfaceUV,surfaceAtlasMaterial} from './model-surfaces.js';
 import {strideProfile,strideFoot,pelvisTurn} from './operator-motion.js';
 import {equipPose} from './equip.js';
+import {animateCharacterMotion} from './character-motion.js';
 
 // One anatomical bind pose and skeleton contract for every cosmetic. Distances
 // are metres. Rigid gear and clothing are cosmetic; physics never reads this mesh.
@@ -193,8 +194,10 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const forward=-vx*Math.sin(p.yaw||0)-vz*Math.cos(p.yaw||0),side=vx*Math.cos(p.yaw||0)-vz*Math.sin(p.yaw||0),moving=gait.moving;
  const blend=1-Math.exp(-dt*14);for(const [key,on]of [['crouch',p.crouching&&!p.sliding],['compact',p.lowCrouch],['slide',p.sliding],['down',p.downed],['revive',p.reviving]])h[key]=(h[key]||0)+(Number(!!on)-(h[key]||0))*blend;
  h.forward=(h.forward||0)+(forward-(h.forward||0))*blend;h.side=(h.side||0)+(side-(h.side||0))*blend;
+ const motion=animateCharacterMotion(h,p,dt,time,{menu});
  const acceleration=T.MathUtils.clamp((forward-h.forward)*.017,-.045,.045);
  const lower=Math.max(h.crouch*.53+h.compact*.29,h.slide*.87,h.down*.65,h.revive*.53);
+ if(!motion){
  b.hips.position.y-=lower+.025*moving*(1-Math.max(h.slide,h.down,h.crouch))+h.land*.075+h.death*.58;
  b.hips.rotation.x=-.06*moving-acceleration-(p.tacticalSprint?.18:p.sprinting?.08:0)-h.crouch*.12+h.slide*.27-h.down*1.14-h.revive*.12+h.death*.85;
  const turn=Math.atan2(Math.sin((p.yaw||0)-(h.lastYaw??p.yaw??0)),Math.cos((p.yaw||0)-(h.lastYaw??p.yaw??0)))/Math.max(.016,dt);h.lastYaw=p.yaw||0;h.turn=(h.turn||0)+(turn-(h.turn||0))*blend;b.spine.rotation.z=T.MathUtils.clamp(-h.side*.008-h.turn*.005,-.07,.07);b.hips.rotation.y=T.MathUtils.clamp(h.turn*.008,-.07,.07);b.chest.rotation.y=Math.sin(h.phase)*.025*moving;b.chest.rotation.x=Math.sin(time*1.8)*.008+(p.lastDamage&&time-p.lastDamage<.18?-.09*(1-(time-p.lastDamage)/.18):0)+(p.shotRecoil||0)*.018;
@@ -256,9 +259,33 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,pole);const footBone=b['foot'+S];footBone.quaternion.copy(footBone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(h.mesh.getWorldQuaternion(new T.Quaternion())));footBone.rotateY(patrol?Math.PI-(p.yaw||Math.PI):yaw*.8);footBone.rotateX(bootRoll);
  }
  if(emote){const pose=emotePose(emote.id,emote.t,1);b.hips.position.x+=pose.sway;b.hips.position.y+=pose.bob;b.chest.rotation.z=pose.sway*.5;}
+ }
+ if(motion&&['locomotion','land'].includes(motion.id)){
+  h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert();
+  const ankles=['L','R'].map(S=>b['foot'+S].getWorldPosition(V()).applyMatrix4(inverse));
+  const minimum=Math.min(...ankles.map(v=>v.y)),correction=T.MathUtils.clamp(.09-minimum,-.10,.10);
+  b.hips.position.y+=correction;
+  for(let i=0;i<2;i++){
+   const S=i?'R':'L',foot=ankles[i];foot.y+=correction;let contact=foot.y<.14&&speed>.3;
+   if(menu){const heading=(p.yaw||Math.PI)-Math.PI,x=foot.x,z=foot.z;foot.x=Math.cos(heading)*x-Math.sin(heading)*z;foot.z=Math.sin(heading)*x+Math.cos(heading)*z;}
+   const originalFoot=foot.clone(),yaw=model.rotation.y,cs=Math.cos(yaw),sn=Math.sin(yaw),old=h['plant'+S];
+   if(contact&&old){if(menu)old.z-=(p.lobbyPatrol?.speed||speed)*dt;const dx=old.x-model.position.x,dz=old.z-model.position.z,x=cs*dx-sn*dz,z=sn*dx+cs*dz;if(Math.hypot(x-foot.x,z-foot.z)<.16){foot.x=x;foot.z=z;}else contact=false;}
+   if(contact){const hip=b['thigh'+S].getWorldPosition(V()).applyMatrix4(inverse),reach=b['shin'+S].userData.rest.length()+b['foot'+S].userData.rest.length()-.004;if(hip.distanceTo(foot)>reach){contact=false;foot.copy(originalFoot);}}
+   h['plant'+S]=contact?{x:model.position.x+cs*foot.x+sn*foot.z,z:model.position.z-sn*foot.x+cs*foot.z}:null;
+   const pole=b['shin'+S].getWorldPosition(V()).applyMatrix4(inverse),footQ=b['foot'+S].getWorldQuaternion(new T.Quaternion());
+   solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,pole);
+   b['foot'+S].quaternion.copy(b['foot'+S].parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(footQ));
+  }
+ }else if(motion){h.plantL=h.plantR=null;}
  const held=model.userData.held,arms=model.userData.arms,draw=model.userData.draw;
  if(held&&arms){held.updateWorldMatrix(true,false);h.mesh.updateWorldMatrix(true,false);}
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R';let target;
+  if(motion?.id==='salute'&&S==='R'){
+   h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert(),head=b.head.getWorldPosition(V()).applyMatrix4(inverse),hand=b.handR.getWorldPosition(V()).applyMatrix4(inverse),pole=b.forearmR.getWorldPosition(V()).applyMatrix4(inverse),orientation=b.handR.getWorldQuaternion(new T.Quaternion());
+   const weight=T.MathUtils.smoothstep(hand.y-head.y,-.35,-.15);hand.lerp(head.add(V(.115,.045,-.08)),weight);
+   solveChain(h,'armR','forearmR','handR',hand,pole);b.handR.quaternion.copy(b.forearmR.getWorldQuaternion(new T.Quaternion()).invert().multiply(orientation));
+  }
+  if(motion?.freeHands||motion&&!held?.visible&&!model.userData.utility&&!airborne&&!p.traversal&&!p.mantle&&!p.vehicleId&&!p.building&&!p.use&&!throwing)continue;
   if(emote)target=V(...emotePose(emote.id,emote.t,sideSign).hand);
   else if(throwing){const t=p.throwProgress,wind=Math.sin(Math.min(1,t/.4)*Math.PI*.5),release=Math.min(1,Math.max(0,(t-.35)/.3));target=sideSign>0?V(.28,1.35+wind*.35-lower,.25*wind-release*.9):V(-.3,1.05-lower,-.25);}
   else if(p.vehicleId&&p.vehicleSeat===0)target=V(sideSign*.36,1.2,-.58);

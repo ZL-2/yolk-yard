@@ -20,6 +20,7 @@ jobs:
       field_control_update: ${{ steps.scope.outputs.field_control_update }}
       public_match_fix: ${{ steps.scope.outputs.public_match_fix }}
       operator_refresh: ${{ steps.scope.outputs.operator_refresh }}
+      mixamo_update: ${{ steps.scope.outputs.mixamo_update }}
       built_world_update: ${{ steps.scope.outputs.built_world_update }}
       environment_only: ${{ steps.scope.outputs.environment_only }}
       visual_only: ${{ steps.scope.outputs.visual_only }}
@@ -128,6 +129,8 @@ jobs:
           operator_allowed=set([".github/workflows/pages.yml","docs/UPDATE_166.md","package.json","package-lock.json","server/realtime/parties.js","src/equip.js","src/frontier-ui.css","src/humanoid.js","src/lobby-deploy.css","src/lobby-motion.js","src/lobby-ui.js","src/main.js","src/mode-activity.js","src/operator-motion.js","src/party-client.js","src/presence-ui.js","src/releases.js","src/royale-view.js","src/view.js","tests/equip.test.js","tests/field-detail.test.js","tests/hitbox.test.js","tests/lobby-motion.test.js","tests/operator-refresh.test.js","tests/operator-refresh-preview.html","scripts/operator-refresh-browser-check.mjs","scripts/public-match-browser-check.mjs"])
           operator_allowed.add('tests/leaderboards.test.js')
           operator_refresh=files<=operator_allowed and json.loads(Path('package.json').read_text()).get('version')=='5.16.0' and Path('tests/operator-refresh.test.js').exists()
+          mixamo_allowed=set(['.github/workflows/pages.yml', 'docs/UPDATE_168.md', 'docs/MIXAMO_ANIMATIONS.md', 'package.json', 'package-lock.json', 'src/releases.js', 'src/humanoid.js', 'src/character-motion.js', 'src/mixamo-clips.js', 'scripts/bake-mixamo.mjs', 'scripts/mixamo-manifest.json', 'scripts/character-motion-browser-check.mjs', 'tests/character-motion.test.js', 'tests/character-motion-preview.html', 'tests/operator-refresh.test.js', 'tests/lobby-motion.test.js'])
+          mixamo_update=files<=mixamo_allowed and {'src/character-motion.js','src/mixamo-clips.js','tests/character-motion.test.js'}<=files
           for path in ['package.json','package-lock.json']:
             if path not in files: continue
             old=json.loads(subprocess.check_output(['git','show','HEAD^:'+path],text=True));new=json.loads(Path(path).read_text())
@@ -146,7 +149,7 @@ jobs:
             public_match=public_match and old==new
             operator_refresh=operator_refresh and old==new
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('focused',scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh)]: out.write(key+'='+str(value).lower()+'\n')
+            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('mixamo_update',mixamo_update),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('focused',scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh or mixamo_update)]: out.write(key+'='+str(value).lower()+'\n')
           print('Focused release:',{'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
   build:
@@ -242,6 +245,9 @@ jobs:
       - name: Operator motion, draw clocks, live counts, party presence and rig budgets
         if: needs.scope.outputs.operator_refresh == 'true'
         run: node --test --test-concurrency=2 tests/operator-refresh.test.js tests/lobby-motion.test.js tests/arms.test.js tests/equip.test.js tests/field-detail.test.js tests/hitbox.test.js tests/private-social.test.js tests/crew-update.test.js tests/public-pools.test.js tests/leaderboards.test.js tests/deployment.test.js
+      - name: Mixamo anatomy, state coverage, clock independence, weapon grips and camera safety
+        if: needs.scope.outputs.mixamo_update == 'true'
+        run: node --test --test-concurrency=2 tests/character-motion.test.js tests/operator-refresh.test.js tests/arms.test.js tests/equip.test.js tests/field-detail.test.js tests/hitbox.test.js tests/perspective.test.js tests/lobby-motion.test.js tests/deployment.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -272,6 +278,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Desktop Mixamo character rendering
+        if: needs.scope.outputs.mixamo_update == 'true'
+        run: node scripts/character-motion-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.mixamo_update == 'true'
+        with:
+          name: mixamo-browser-evidence
+          path: test-results/character-motion
+          retention-days: 14
       - name: Lobby discovery, options, readiness, room pools and browser host reconnect
         if: needs.scope.outputs.public_match_fix == 'true' || needs.scope.outputs.operator_refresh == 'true'
         run: node scripts/public-match-browser-check.mjs

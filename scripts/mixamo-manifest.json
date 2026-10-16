@@ -1,0 +1,264 @@
+{
+  "walk-forward": {
+    "file": "pro-rifle/walk forward.fbx",
+    "loop": true
+  },
+  "walk-forward-right": {
+    "file": "pro-rifle/walk forward right.fbx",
+    "loop": true
+  },
+  "walk-right": {
+    "file": "pro-rifle/walk right.fbx",
+    "loop": true
+  },
+  "walk-backward-right": {
+    "file": "pro-rifle/walk backward right.fbx",
+    "loop": true
+  },
+  "walk-backward": {
+    "file": "pro-rifle/walk backward.fbx",
+    "loop": true
+  },
+  "walk-backward-left": {
+    "file": "pro-rifle/walk backward left.fbx",
+    "loop": true
+  },
+  "walk-left": {
+    "file": "pro-rifle/walk left.fbx",
+    "loop": true
+  },
+  "walk-forward-left": {
+    "file": "pro-rifle/walk forward left.fbx",
+    "loop": true
+  },
+  "run-forward": {
+    "file": "pro-rifle/run forward.fbx",
+    "loop": true
+  },
+  "run-forward-right": {
+    "file": "pro-rifle/run forward right.fbx",
+    "loop": true
+  },
+  "run-right": {
+    "file": "pro-rifle/run right.fbx",
+    "loop": true
+  },
+  "run-backward-right": {
+    "file": "pro-rifle/run backward right.fbx",
+    "loop": true
+  },
+  "run-backward": {
+    "file": "pro-rifle/run backward.fbx",
+    "loop": true
+  },
+  "run-backward-left": {
+    "file": "pro-rifle/run backward left.fbx",
+    "loop": true
+  },
+  "run-left": {
+    "file": "pro-rifle/run left.fbx",
+    "loop": true
+  },
+  "run-forward-left": {
+    "file": "pro-rifle/run forward left.fbx",
+    "loop": true
+  },
+  "sprint-forward": {
+    "file": "pro-rifle/sprint forward.fbx",
+    "loop": true
+  },
+  "sprint-forward-right": {
+    "file": "pro-rifle/sprint forward right.fbx",
+    "loop": true
+  },
+  "sprint-right": {
+    "file": "pro-rifle/sprint right.fbx",
+    "loop": true
+  },
+  "sprint-backward-right": {
+    "file": "pro-rifle/sprint backward right.fbx",
+    "loop": true
+  },
+  "sprint-backward": {
+    "file": "pro-rifle/sprint backward.fbx",
+    "loop": true
+  },
+  "sprint-backward-left": {
+    "file": "pro-rifle/sprint backward left.fbx",
+    "loop": true
+  },
+  "sprint-left": {
+    "file": "pro-rifle/sprint left.fbx",
+    "loop": true
+  },
+  "sprint-forward-left": {
+    "file": "pro-rifle/sprint forward left.fbx",
+    "loop": true
+  },
+  "crouch-forward": {
+    "file": "pro-rifle/walk crouching forward.fbx",
+    "loop": true
+  },
+  "crouch-forward-right": {
+    "file": "pro-rifle/walk crouching forward right.fbx",
+    "loop": true
+  },
+  "crouch-right": {
+    "file": "pro-rifle/walk crouching right.fbx",
+    "loop": true
+  },
+  "crouch-backward-right": {
+    "file": "pro-rifle/walk crouching backward right.fbx",
+    "loop": true
+  },
+  "crouch-backward": {
+    "file": "pro-rifle/walk crouching backward.fbx",
+    "loop": true
+  },
+  "crouch-backward-left": {
+    "file": "pro-rifle/walk crouching backward left.fbx",
+    "loop": true
+  },
+  "crouch-left": {
+    "file": "pro-rifle/walk crouching left.fbx",
+    "loop": true
+  },
+  "crouch-forward-left": {
+    "file": "pro-rifle/walk crouching forward left.fbx",
+    "loop": true
+  },
+  "idle": {
+    "file": "pro-rifle/idle.fbx",
+    "loop": true
+  },
+  "aim": {
+    "file": "pro-rifle/idle aiming.fbx",
+    "loop": true
+  },
+  "crouch-idle": {
+    "file": "pro-rifle/idle crouching.fbx",
+    "loop": true
+  },
+  "crouch-aim": {
+    "file": "pro-rifle/idle crouching aiming.fbx",
+    "loop": true
+  },
+  "jump": {
+    "file": "pro-rifle/jump up.fbx",
+    "loop": false
+  },
+  "fall": {
+    "file": "pro-rifle/jump loop.fbx",
+    "loop": true
+  },
+  "land": {
+    "file": "pro-rifle/jump down.fbx",
+    "loop": false
+  },
+  "death": {
+    "file": "pro-rifle/death from the front.fbx",
+    "loop": false
+  },
+  "crouch-death": {
+    "file": "pro-rifle/death crouching headshot front.fbx",
+    "loop": false
+  },
+  "salute": {
+    "file": "actions/salute.fbx",
+    "loop": false
+  },
+  "shuffle": {
+    "file": "actions/shuffle.fbx",
+    "loop": true
+  },
+  "cheer": {
+    "file": "actions/cheer.fbx",
+    "loop": false
+  },
+  "crawl": {
+    "file": "actions/crawl.fbx",
+    "loop": true
+  },
+  "mantle": {
+    "file": "actions/mantle.fbx",
+    "loop": false
+  },
+  "slide": {
+    "file": "actions/slide.fbx",
+    "loop": false
+  },
+  "reload": {
+    "file": "actions/reload.fbx",
+    "loop": false
+  },
+  "airborne": {
+    "file": "adventure/falling idle.fbx",
+    "loop": true
+  },
+  "crown": {
+    "file": "gestures/being cocky.fbx",
+    "loop": false
+  },
+  "drink": {
+    "file": "actions/drink.fbx",
+    "loop": false
+  },
+  "revive": {
+    "file": "actions/revive.fbx",
+    "loop": true
+  },
+  "hang": {
+    "file": "actions/hang.fbx",
+    "loop": true
+  },
+  "sit": {
+    "file": "actions/sit.fbx",
+    "loop": true
+  },
+  "heal": {
+    "file": "actions/drink.fbx",
+    "loop": false,
+    "label": "Drinking torso, adapted with medical hand placement"
+  },
+  "build": {
+    "file": "gestures/thoughtful head shake.fbx",
+    "loop": true,
+    "label": "Thoughtful Head Shake torso, adapted with blueprint hand placement"
+  },
+  "throw": {
+    "file": "actions/throw.fbx",
+    "loop": false
+  },
+  "melee": {
+    "file": "axe/standing melee attack downward.fbx",
+    "loop": false
+  },
+  "draw": {
+    "file": "axe/unarmed equip over shoulder.fbx",
+    "loop": false
+  },
+  "draw-hip": {
+    "file": "axe/unarmed equip underarm.fbx",
+    "loop": false
+  },
+  "holster": {
+    "file": "axe/standing disarm over shoulder.fbx",
+    "loop": false
+  },
+  "holster-hip": {
+    "file": "axe/standing disarm underarm.fbx",
+    "loop": false
+  },
+  "unarmed-idle": {
+    "file": "axe/unarmed idle.fbx",
+    "loop": true
+  },
+  "unarmed-walk": {
+    "file": "axe/unarmed walk forward.fbx",
+    "loop": true
+  },
+  "unarmed-run": {
+    "file": "axe/unarmed run forward.fbx",
+    "loop": true
+  }
+}
