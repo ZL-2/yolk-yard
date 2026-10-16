@@ -180,7 +180,7 @@ test('an active public guest keeps its contestant and inventory across a brief c
   host.sim.beginBattle();const player=host.sim.players.get(guest.net.id);player.materials.wood=123;
   host.net.broadcast(host.sim.snapshot());
   await until(()=>guest.state?.royale.stage==='battle-bus','Guest entered battle');
-  const states=guest.states;host.net.connections.get(guest.net.id).close();
+  const states=guest.states;guest.net.hostConnection.close();
   await until(()=>!guest.net.migrating&&guest.states>states&&host.net.connections.has(guest.net.id),'Guest reconnected');
   assert.equal(host.sim.players.get(guest.net.id),player,'Reconnect retains the existing contestant');
   assert.equal(player.materials.wood,123);assert.equal(player.lateSpectator,false);
