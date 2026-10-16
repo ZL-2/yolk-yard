@@ -1,6 +1,9 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>Mixamo motion review</title><style>body{margin:24px;background:#102330;color:#eff6f6;font:14px system-ui}h1{font-size:25px}p{color:#bdd2db}main{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}article{background:#213e4b;border:1px solid #577884;border-radius:8px;overflow:hidden}img{display:block;width:100%}strong{display:block;padding:12px}</style></head><body><h1>RAVELFRONT / OPERATOR MOTION</h1><p>Adobe Mixamo clips · Ravelfront character rigs · Gameplay-aligned hand placement</p><main></main><script type="module">
 import * as T from 'three';
-import {makeEgg} from '../src/view.js';
+import {makeEgg,View} from '../src/view.js';
+import {LobbyMotion} from '../src/lobby-motion.js';
+import {makeShopPickaxe} from '../src/shop-models.js';
+import {animatePickaxe} from '../src/pickaxe-animation.js';
 import {animateHumanoid,humanoidDiagnostics} from '../src/humanoid.js';
 import {equipPose} from '../src/equip.js';
 import {updateArms} from '../src/arms.js';
@@ -9,6 +12,7 @@ import {eyeHeight} from '../src/stance.js';
 const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(320,390);renderer.outputColorSpace=T.SRGBColorSpace;
 const scene=new T.Scene();scene.background=new T.Color('#8fa7b0');scene.add(new T.HemisphereLight(0xffffff,0x354652,2.4));const light=new T.DirectionalLight(0xffecd6,2.7);light.position.set(-3,5,-4);scene.add(light);
 const camera=new T.PerspectiveCamera(32,320/390,.01,40);
+const floor=new T.GridHelper(5,20,0x395665,0x6c8792);scene.add(floor);
 const shots=[['Rifle idle',{},.4],['Walking',{vz:-2},.3],['Right strafe',{vx:3},.2],['Sprint',{vz:-9,sprinting:true},.2],['Crouch',{crouching:true,vz:-2},.2],['Slide',{sliding:true,slideAge:.45},.2],['Jump',{grounded:false,vy:4},.1],['Glide',{flight:'glide'},.4],['Crawl',{downed:true,vz:-1},.3],['Revive',{reviving:'mate'},.2],['Salute',{emote:{id:'salute',start:1.5}},.1],['Cheer',{emote:{id:'cheer',start:1.5}},.2],['Dance',{emote:{id:'shuffle',start:0}},.3],['Mantle',{mantle:{elapsed:.2,duration:.44}},.2],['Rifle / back draw',{draw:'sprinter'},.5],['Sidearm / hip draw',{draw:'pip'},.5]];
 window.checks=[];
 for(const [label,pose,at] of shots){
@@ -17,8 +21,23 @@ for(const [label,pose,at] of shots){
  for(let f=0;f<120;f++){model.position.set((p.vx||0)*f/60,0,(p.vz||0)*f/60);model.userData.held.position.set(VIEWMODEL.x,eyeHeight(p)+VIEWMODEL.y,VIEWMODEL.z);updateArms(model.userData.arms,-1,model.userData.blaster);animateHumanoid(model,p,1/60,f/60);}
  if(pose.draw){p.equipStarted=2;p.equipUntil=3;const {gun}=await import('../src/data.js');const t=2+gun(p).equipTime*at,draw=equipPose(p,t);model.userData.draw=draw;model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);model.userData.held.rotation.set(...draw.rotation);updateArms(model.userData.arms,-1,model.userData.blaster,0,draw.progress);for(let n=0;n<12;n++)animateHumanoid(model,p,1/60,t);}
  else for(let n=0;n<Math.round(at*60);n++){model.position.x+=(p.vx||0)/60;model.position.z+=(p.vz||0)/60;animateHumanoid(model,p,1/60,2+n/60);}
- camera.position.copy(model.position).add(new T.Vector3(-2.4,1.65,-3.65));camera.lookAt(model.position.clone().add(new T.Vector3(0,1,0)));renderer.render(scene,camera);
+ floor.position.set(model.position.x,0,model.position.z);camera.position.copy(model.position).add(new T.Vector3(-2.4,1.65,-3.65));camera.lookAt(model.position.clone().add(new T.Vector3(0,1,0)));renderer.render(scene,camera);
  const tile=document.createElement('article'),img=new Image(),title=document.createElement('strong');img.src=renderer.domElement.toDataURL();title.textContent=label;tile.append(img,title);document.querySelector('main').append(tile);window.checks.push({...humanoidDiagnostics(model),motion:model.userData.human.mocap?.id});scene.remove(model);
+}
+// Reproduce the recording's signature armor and cape across a whole stride,
+// rather than approving a single hand-picked pose without a visible floor.
+for(const tool of [false,true]){
+ const model=makeEgg({weapon:'sprinter',outfit:'outfit-voss-alt',backbling:'backbling-voss'}),motion=new LobbyMotion();scene.add(model);floor.position.set(0,0,0);
+ let axe;if(tool){axe=makeShopPickaxe('pickaxe-voss');model.userData.held.add(axe);model.userData.blaster.visible=false;}
+ for(let step=0;step<4;step++){
+  for(let f=0;f<15+(step===0?120:0);f++){
+   if(!tool)View.prototype.animateLobbyCharacter.call({},model,motion,1/60);
+   else {motion.time+=1/60;model.userData.held.position.set(VIEWMODEL.x,1.38,VIEWMODEL.z);animatePickaxe(axe,model.userData.arms,'pickaxe-voss',-1);animateHumanoid(model,{health:100,grounded:true,weapon:'sprinter',inventory:[{id:'pickaxe',pickaxe:true}],slot:0},1/60,motion.time);}
+  }
+  camera.position.set(-2.4,1.65,tool?-3.65:3.65);camera.lookAt(0,1,0);renderer.render(scene,camera);
+  const tile=document.createElement('article'),img=new Image(),title=document.createElement('strong');img.src=renderer.domElement.toDataURL();title.textContent=(tool?'Voss tool idle ':'Voss patrol phase ')+(step+1);tile.append(img,title);document.querySelector('main').append(tile);window.checks.push({...humanoidDiagnostics(model),motion:model.userData.human.mocap?.id});
+ }
+ scene.remove(model);
 }
 window.ready=true;
 </script></body></html>

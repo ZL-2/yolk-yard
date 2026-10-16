@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {Vector3} from 'three';
 import {makeHumanoid,animateHumanoid} from '../src/humanoid.js';
 import {MOTION_NAMES,motionSelection,motionInfo} from '../src/character-motion.js';
+import {updateCelebration} from '../src/celebration-view.js';
 
 test('downloaded motion covers every gameplay branch and all eight movement directions',()=>{
  for(const gait of ['walk','run','sprint','crouch'])for(const direction of ['forward','forward-right','right','backward-right','backward','backward-left','left','forward-left'])assert.ok(motionInfo(gait+'-'+direction));
@@ -38,4 +39,28 @@ test('locomotion soles keep floor contact and upper action layers preserve the m
   if(f>20){const b=m.userData.human.bones,y=Math.min(b.footL.getWorldPosition(new Vector3()).y,b.footR.getWorldPosition(new Vector3()).y);assert.ok(y>=.04&&y<.17,'feet stay on the floor: '+y);}
  }
  assert.equal(m.userData.human.mocap.id,'locomotion');assert.equal(m.userData.human.mocap.action,'reload');assert.ok(m.userData.human.mocap.phase>0);
+});
+
+test('walking retains upright proportions and support soles instead of a permanent rifle crouch',()=>{
+ const m=makeHumanoid(),b=m.userData.human.bones;
+ for(let f=0;f<240;f++){
+  m.position.z=-f*1.12/60;animateHumanoid(m,{health:100,grounded:true,weapon:'sprinter',vz:-1.12},1/60,f/60);m.updateMatrixWorld(true);
+  if(f<20)continue;
+  assert.ok(b.head.getWorldPosition(new Vector3()).y>1.50,'head collapsed into rifle level');
+  for(const name of ['footL','footR']){const foot=b[name],position=foot.getWorldPosition(new Vector3());if(position.y<.12){const up=new Vector3(0,1,0).applyQuaternion(foot.getWorldQuaternion(m.quaternion.clone()));assert.ok(up.y>.99,'support sole is tilted');}}
+ }
+});
+
+test('pickaxe, empty and consumable slots do not select the rifle idle',()=>{
+ for(const item of [null,{id:'pickaxe',pickaxe:true},{id:'mini'},{id:'sprinter',weapon:true}]){
+  const m=makeHumanoid();for(let f=0;f<30;f++)animateHumanoid(m,{health:100,grounded:true,weapon:'sprinter',inventory:[item],slot:0},1/60,f/60);
+  assert.equal(m.userData.human.mocap.unarmed,!item?.weapon);
+ }
+});
+
+test('victory crown follows the animated head through crouching and airborne poses',()=>{
+ const m=makeHumanoid();for(const pose of [{},{crouching:true},{flight:'glide'}]){
+  const p={health:100,crown:true,grounded:true,...pose};updateCelebration(m,p,1,()=>{});for(let f=0;f<30;f++)animateHumanoid(m,p,1/60,f/60);
+  assert.equal(m.userData.victoryCrown.parent,m.userData.human.bones.head);assert.ok(m.userData.victoryCrown.position.y<.37);
+ }
 });

@@ -57,13 +57,23 @@ export function animateCharacterMotion(h,p,dt,time,{menu=false}={}){
   const forward=menu?speed:-(p.vx||0)*Math.sin(p.yaw||0)-(p.vz||0)*Math.cos(p.yaw||0),side=menu?0:(p.vx||0)*Math.cos(p.yaw||0)-(p.vz||0)*Math.sin(p.yaw||0);
   const angle=(Math.atan2(side,forward)/(Math.PI/4)+8)%8,index=Math.floor(angle),w=angle-index;
   const gait=p.crouching?'crouch':p.sprinting?'sprint':speed>3.2?'run':'walk';
-  const unarmed=!p.weapon&&!p.inventory&&!p.aim&&!p.building&&!menu;
+  const item=p.inventory?.[p.slot||0];
+  // Inventory ownership is not evidence of a held gun.
+  const unarmed=!menu&&!p.aim&&!p.building&&(p.inventory?!item?.weapon:!p.weapon);
   const a=unarmed&&index===0&&!p.crouching?(speed>3.2?'unarmed-run':'unarmed-walk'):gait+'-'+directions[index],c=unarmed&&index===0?a:gait+'-'+directions[(index+1)%8],info=payload.clips[a];
-  state.phase=(state.phase+speed*dt/Math.max(.3,info.distance))%1;
+  const strideScale=gait==='walk'&&!unarmed?.7:1;
+  state.phase=(state.phase+speed*dt/Math.max(.3,info.distance*strideScale))%1;
   sample(a,state.phase*info.duration,b);sample(c,state.phase*payload.clips[c].duration,b,w);
   const idle=p.crouching?(p.aim?'crouch-aim':'crouch-idle'):unarmed?'unarmed-idle':p.aim?'aim':'idle';
   sample(idle,time,b,1-MathUtils.smoothstep(speed,.08,.75));
-  state.gait=gait;state.direction=directions[index];
+  state.gait=gait;state.direction=directions[index];state.unarmed=unarmed;
+  // The source rifle walk's deep crouch puts this shorter rig's face inside
+  // its independently positioned weapon. Adapt posture, not gameplay height.
+  if(!p.crouching){
+   const upright=gait==='walk'?.58:.28;
+   for(const name of ['hips','spine','chest'])b[name].quaternion.slerp(new Quaternion(),upright*MathUtils.smoothstep(speed,.08,.75));
+   b.hips.position.x*=.35;b.hips.position.z*=.35;
+  }
  }else{
   const info=payload.clips[s.id],at=s.progress!==undefined?s.progress*info.duration:s.at??(s.frozen?.5:s.id==='land'?state.elapsed/.22*info.duration:state.elapsed);
   sample(s.id,at,b,1,false,s.id==='crawl'&&!s.frozen?true:undefined);

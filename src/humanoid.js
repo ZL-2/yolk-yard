@@ -263,10 +263,15 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  if(motion&&['locomotion','land'].includes(motion.id)){
   h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert();
   const ankles=['L','R'].map(S=>b['foot'+S].getWorldPosition(V()).applyMatrix4(inverse));
-  const minimum=Math.min(...ankles.map(v=>v.y)),correction=T.MathUtils.clamp(.09-minimum,-.10,.10);
-  b.hips.position.y+=correction;
+  const minimum=Math.min(...ankles.map(v=>v.y));
+  const walking=motion.gait==='walk'&&speed>.3&&!p.crouching;
+  const strideScale=walking&&!motion.unarmed?.7:1;
+  for(const foot of ankles){foot.x=b.hips.position.x+(foot.x-b.hips.position.x)*strideScale;foot.z=b.hips.position.z+(foot.z-b.hips.position.z)*strideScale;foot.y=.09+Math.max(0,foot.y-minimum)*(walking?.7:1);}
+  let height=b.hips.position.y+T.MathUtils.clamp(.09-minimum,-.10,.10);
+  if(walking){height=.90;for(let i=0;i<2;i++){const foot=ankles[i],dx=foot.x-(i?.115:-.115)-b.hips.position.x,dz=foot.z-b.hips.position.z;height=Math.min(height,foot.y+.03+Math.sqrt(Math.max(.1,.803**2-dx*dx-dz*dz)));}}
+  b.hips.position.y=height;
   for(let i=0;i<2;i++){
-   const S=i?'R':'L',foot=ankles[i];foot.y+=correction;let contact=foot.y<.14&&speed>.3;
+   const S=i?'R':'L',foot=ankles[i];let contact=foot.y<.12&&speed>.3;
    if(menu){const heading=(p.yaw||Math.PI)-Math.PI,x=foot.x,z=foot.z;foot.x=Math.cos(heading)*x-Math.sin(heading)*z;foot.z=Math.sin(heading)*x+Math.cos(heading)*z;}
    const originalFoot=foot.clone(),yaw=model.rotation.y,cs=Math.cos(yaw),sn=Math.sin(yaw),old=h['plant'+S];
    if(contact&&old){if(menu)old.z-=(p.lobbyPatrol?.speed||speed)*dt;const dx=old.x-model.position.x,dz=old.z-model.position.z,x=cs*dx-sn*dz,z=sn*dx+cs*dz;if(Math.hypot(x-foot.x,z-foot.z)<.16){foot.x=x;foot.z=z;}else contact=false;}
@@ -275,6 +280,12 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
    const pole=b['shin'+S].getWorldPosition(V()).applyMatrix4(inverse),footQ=b['foot'+S].getWorldQuaternion(new T.Quaternion());
    solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,pole);
    b['foot'+S].quaternion.copy(b['foot'+S].parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(footQ));
+   // Flatten the support sole, preserving heading. Ankle contact alone let
+   // rotated source boots skate through the road.
+   if(foot.y<.18){const localQ=h.mesh.getWorldQuaternion(new T.Quaternion()).invert().multiply(footQ),yaw=new T.Euler().setFromQuaternion(localQ,'YXZ').y;
+    const flat=h.mesh.getWorldQuaternion(new T.Quaternion()).multiply(new T.Quaternion().setFromAxisAngle(V(0,1,0),yaw));
+    flat.slerp(footQ,T.MathUtils.smoothstep(foot.y,.12,.18));
+    b['foot'+S].quaternion.copy(b['foot'+S].parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(flat));}
   }
  }else if(motion){h.plantL=h.plantR=null;}
  if(motion?.id==='crawl'){h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert(),minimum=Math.min(...['L','R'].map(S=>b['foot'+S].getWorldPosition(V()).applyMatrix4(inverse).y));b.hips.position.y+=Math.max(0,.09-minimum);}

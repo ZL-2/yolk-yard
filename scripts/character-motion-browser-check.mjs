@@ -6,6 +6,6 @@ const out='test-results/character-motion',vite=await createServer({server:{host:
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('http://127.0.0.1:5278/tests/character-motion-preview.html');await page.waitForFunction(()=>window.ready,null,{timeout:60000});assert.deepEqual(errors,[]);assert.equal(await page.locator('article img').count(),16);assert.ok(await page.locator('article img').evaluateAll(images=>images.every(i=>i.complete&&i.naturalWidth===320)));
+ await page.goto('http://127.0.0.1:5278/tests/character-motion-preview.html');await page.waitForFunction(()=>window.ready,null,{timeout:60000});assert.deepEqual(errors,[]);assert.equal(await page.locator('article img').count(),24);assert.ok(await page.locator('article img').evaluateAll(images=>images.every(i=>i.complete&&i.naturalWidth===320)));
  const checks=await page.evaluate(()=>window.checks);assert.ok(checks.every(c=>c.revision===166&&c.bones===32&&c.vertices<13000&&c.motion));await mkdir(out,{recursive:true});await page.screenshot({path:out+'/operators.png',fullPage:true});await writeFile(out+'/result.json',JSON.stringify({result:'PASS',checks,errors},null,2));console.log('PASS desktop Mixamo animation states, existing rigs, shoulder and hip draw renders');
 }finally{await browser.close();await vite.close();}

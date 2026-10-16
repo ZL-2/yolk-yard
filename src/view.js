@@ -423,7 +423,7 @@ export class View {
     const pose=motion.update(dt),held=model.userData.held;
     model.userData.lobbyPose=pose;
     model.rotation.y=pose.yaw+yawOffset;
-    held.position.set(.10+pose.weaponSide,1.36+pose.breath+pose.grip+pose.weaponBob,-.22+pose.weaponDepth);
+    held.position.set(.07+pose.weaponSide,1.32+pose.breath+pose.grip+pose.weaponBob,-.14+pose.weaponDepth);
     held.rotation.set(pose.pitch,pose.weaponYaw,pose.roll,'YXZ');
     updateArms(model.userData.arms,-1,model.userData.blaster);
     animateHumanoid(model,{health:100,grounded:true,yaw:model.rotation.y,pitch:pose.pitch,
