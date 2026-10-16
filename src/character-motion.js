@@ -37,7 +37,7 @@ export function motionSelection(p,time,speed){
  if(p.traversal)return {id:'hang',freeHands:false,levelRoot:true};
  if(p.vehicleId)return {id:'sit',freeHands:false};
  if(p.emote)return {id:p.emote.id==='shuffle'?'shuffle':p.emote.id,at:Math.max(0,time-(p.emote.start??time)),freeHands:p.emote.id!=='crown'};
- if(p.sliding)return {id:'slide',at:clamp(p.slideAge||0,0,.9)+.2,freeHands:false};
+ if(p.sliding)return {id:'slide',at:clamp(p.slideAge||0,0,.12)+.18,freeHands:false};
  if(p.flight==='dive'||p.flight==='launch')return {id:'airborne',freeHands:false,levelRoot:true};
  if(p.flight==='glide')return {id:'hang',freeHands:false,levelRoot:true};
  if(p.grounded===false)return {id:(p.vy||0)>0?'jump':'fall',freeHands:false,levelRoot:true};
@@ -67,6 +67,7 @@ export function animateCharacterMotion(h,p,dt,time,{menu=false}={}){
  }else{
   const info=payload.clips[s.id],at=s.progress!==undefined?s.progress*info.duration:s.at??(s.frozen?.5:s.id==='land'?state.elapsed/.22*info.duration:state.elapsed);
   sample(s.id,at,b,1,false,s.id==='crawl'&&!s.frozen?true:undefined);
+  if(s.id==='slide'){b.hips.position.x=0;b.hips.position.z=0;}
   if(s.levelRoot)b.hips.position.set(0,.93,0); // Physics owns height/trajectory.
  }
  // Host-clock action layers retain movement underneath and exact gameplay timing.

@@ -13,6 +13,7 @@ const shots=[['Rifle idle',{},.4],['Walking',{vz:-2},.3],['Right strafe',{vx:3},
 window.checks=[];
 for(const [label,pose,at] of shots){
  const id=pose.draw||'sprinter',model=makeEgg({weapon:id,outfit:'outfit-garden'});scene.add(model);const p={health:100,grounded:true,weapon:id,slot:0,yaw:0,...pose};
+ model.userData.held.visible=!(p.emote||p.downed||p.reviving||p.mantle||p.flight==='glide'||p.flight==='dive');
  for(let f=0;f<120;f++){model.position.set((p.vx||0)*f/60,0,(p.vz||0)*f/60);model.userData.held.position.set(VIEWMODEL.x,eyeHeight(p)+VIEWMODEL.y,VIEWMODEL.z);updateArms(model.userData.arms,-1,model.userData.blaster);animateHumanoid(model,p,1/60,f/60);}
  if(pose.draw){p.equipStarted=2;p.equipUntil=3;const {gun}=await import('../src/data.js');const t=2+gun(p).equipTime*at,draw=equipPose(p,t);model.userData.draw=draw;model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);model.userData.held.rotation.set(...draw.rotation);updateArms(model.userData.arms,-1,model.userData.blaster,0,draw.progress);for(let n=0;n<12;n++)animateHumanoid(model,p,1/60,t);}
  else for(let n=0;n<Math.round(at*60);n++){model.position.x+=(p.vx||0)/60;model.position.z+=(p.vz||0)/60;animateHumanoid(model,p,1/60,2+n/60);}

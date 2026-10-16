@@ -277,9 +277,11 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
    b['foot'+S].quaternion.copy(b['foot'+S].parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(footQ));
   }
  }else if(motion){h.plantL=h.plantR=null;}
+ if(motion?.id==='crawl'){h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert(),minimum=Math.min(...['L','R'].map(S=>b['foot'+S].getWorldPosition(V()).applyMatrix4(inverse).y));b.hips.position.y+=Math.max(0,.09-minimum);}
  const held=model.userData.held,arms=model.userData.arms,draw=model.userData.draw;
  if(held&&arms){held.updateWorldMatrix(true,false);h.mesh.updateWorldMatrix(true,false);}
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R';let target;
+  if(motion?.id==='crawl'){h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert(),hand=b['hand'+S].getWorldPosition(V()).applyMatrix4(inverse),pole=b['forearm'+S].getWorldPosition(V()).applyMatrix4(inverse),orientation=b['hand'+S].getWorldQuaternion(new T.Quaternion());hand.y=Math.max(.065,hand.y);solveChain(h,'arm'+S,'forearm'+S,'hand'+S,hand,pole);b['hand'+S].quaternion.copy(b['forearm'+S].getWorldQuaternion(new T.Quaternion()).invert().multiply(orientation));}
   if(motion?.id==='salute'&&S==='R'){
    h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert(),head=b.head.getWorldPosition(V()).applyMatrix4(inverse),hand=b.handR.getWorldPosition(V()).applyMatrix4(inverse),pole=b.forearmR.getWorldPosition(V()).applyMatrix4(inverse),orientation=b.handR.getWorldQuaternion(new T.Quaternion());
    const weight=T.MathUtils.smoothstep(hand.y-head.y,-.35,-.15);hand.lerp(head.add(V(.115,.045,-.08)),weight);
