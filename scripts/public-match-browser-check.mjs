@@ -30,7 +30,7 @@ try{
  assert.equal(await page.locator('.public-royale-card [data-action=public-join]').count(),1);
  assert.equal(await page.locator('.public-royale-card').evaluate(el=>getComputedStyle(el).visibility),'visible');
  await page.screenshot({path:out+'/lobby.png'});checks.singleUnobscuredCard=true;
- await page.setViewportSize({width:390,height:844});assert.equal(await page.locator('#public-match-arrival').count(),0);await page.screenshot({path:out+'/mobile.png'});await page.setViewportSize({width:640,height:360});
+ await page.setViewportSize({width:390,height:844});assert.equal(await page.locator('#public-match-arrival').count(),0);assert.equal(await page.evaluate(()=>document.querySelector('.yard-party-stack').getBoundingClientRect().top>=document.querySelector('.public-royale-card').getBoundingClientRect().bottom),true);checks.mobileCardUnobscured=true;await page.screenshot({path:out+'/mobile.png'});await page.setViewportSize({width:640,height:360});
  await page.locator('.public-royale-card [data-action=public-join]').click();
  await page.waitForFunction(()=>{const r=window.__yolkTest.read();return r.host&&r.screen==='game'&&r.state?.royale?.stage==='spawn-island';});
  await until(()=>relay.relay.publicHost.members.size===1,'Browser owns the public room');record('browser-host');

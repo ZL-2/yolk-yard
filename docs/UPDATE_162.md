@@ -22,7 +22,7 @@ Additional defects corrected:
 - A migrated host that loses its canonical alias stops hosting rather than running an orphan simulation while trying to reacquire the address.
 - Bounded lifecycle logs record host creation, transfer, removal reasons, and rejected public connections. No tokens, private credentials, or player profiles are logged.
 
-The blue arrival banner, extra Join button, and CSS that hid the main match card have been removed. The existing unobtrusive arrival sound remains. The banner used the same public-queue action; removing it alone would not have corrected the reproduced failures.
+The blue arrival banner, extra Join button, and CSS that hid the main match card have been removed. The existing unobtrusive arrival sound remains. The mobile party panel is positioned below the complete public card so it cannot obscure the Join button or its description. The banner used the same public-queue action; removing it alone would not have corrected the reproduced failures.
 
 ## Verification
 
