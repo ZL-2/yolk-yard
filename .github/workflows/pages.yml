@@ -123,6 +123,8 @@ jobs:
           lobby_followup=files<={'.github/workflows/pages.yml','src/lobby-deploy.css','scripts/public-match-browser-check.mjs','scripts/release-live-check.mjs'} and json.loads(Path('package.json').read_text()).get('version')=='5.15.0'
           lobby_update=files<=lobby_allowed and (lobby_core<=files or previous<=lobby_allowed and lobby_core<=previous or lobby_followup)
           public_match=public_match or lobby_update
+          disconnect_allowed={'.github/workflows/pages.yml','docs/UPDATE_167.md','package.json','package-lock.json','src/releases.js','src/relay-peer.js','src/relay-recovery.js','server/realtime/relay.js','server/realtime/public-host.js','tests/public-disconnect.test.js'}
+          public_match=public_match or (files<=disconnect_allowed and {'server/realtime/public-host.js','tests/public-disconnect.test.js'}<=files)
           operator_allowed=set([".github/workflows/pages.yml","docs/UPDATE_166.md","package.json","package-lock.json","server/realtime/parties.js","src/equip.js","src/frontier-ui.css","src/humanoid.js","src/lobby-deploy.css","src/lobby-motion.js","src/lobby-ui.js","src/main.js","src/mode-activity.js","src/operator-motion.js","src/party-client.js","src/presence-ui.js","src/releases.js","src/royale-view.js","src/view.js","tests/equip.test.js","tests/field-detail.test.js","tests/hitbox.test.js","tests/lobby-motion.test.js","tests/operator-refresh.test.js","tests/operator-refresh-preview.html","scripts/operator-refresh-browser-check.mjs","scripts/public-match-browser-check.mjs"])
           operator_allowed.add('tests/leaderboards.test.js')
           operator_refresh=files<=operator_allowed and json.loads(Path('package.json').read_text()).get('version')=='5.16.0' and Path('tests/operator-refresh.test.js').exists()
@@ -233,7 +235,7 @@ jobs:
         run: node --test tests/referral-edit-fixes.test.js tests/perspective.test.js tests/building-overhaul.test.js tests/crew-update.test.js
       - name: Public singleton, six-player congestion, recovery, party admission and transport regressions
         if: needs.scope.outputs.public_match_fix == 'true'
-        run: node --test --test-concurrency=2 tests/public-pools.test.js tests/main-match-singleton.test.js tests/public-host.test.js tests/relay-compact.test.js tests/relay-queue.test.js tests/realtime-resume.test.js tests/recurring-royale.test.js tests/private-social.test.js tests/field-stability.test.js tests/snapshot-codec.test.js tests/relay-liveness.test.js tests/continuity.test.js tests/deployment.test.js
+        run: node --test --test-concurrency=2 tests/public-disconnect.test.js tests/public-pools.test.js tests/main-match-singleton.test.js tests/public-host.test.js tests/relay-compact.test.js tests/relay-queue.test.js tests/realtime-resume.test.js tests/recurring-royale.test.js tests/private-social.test.js tests/field-stability.test.js tests/snapshot-codec.test.js tests/relay-liveness.test.js tests/continuity.test.js tests/deployment.test.js
       - name: Public host handoff, frozen hosts, scoring and inventory recovery
         if: needs.scope.outputs.public_match_fix == 'true'
         run: node scripts/public-host-network-check.mjs

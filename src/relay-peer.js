@@ -3,6 +3,7 @@ import {mergeRelayMessage} from './relay-queue.js';
 import {SnapshotEncoder,SnapshotDecoder} from './snapshot-codec.js';
 import {HostHeartbeat} from './host-heartbeat.js';
 import {RelaySnapshotWork} from './relay-snapshot-work.js';
+import {RELAY_RECONNECT_MS} from './relay-recovery.js';
 // Peer-shaped, ordered WebSocket transport; the game rules stay in Network.
 // Explicit peer configuration retains the local WebRTC development path.
 export const relayURL=()=>globalThis.window?.YOLK_NETWORK?.relay||'';
@@ -46,13 +47,13 @@ export class RelayPeer extends Events {
   ws.addEventListener('error',()=>{if(!this.destroyed&&ws===this.socket&&this.protocol!==2)this.emit('error',{type:'socket-error'});});
   ws.addEventListener('close',event=>{
    if(this.destroyed||ws!==this.socket)return;
-   const reasons=['Server stopping','Connection too slow','Rate limit','Command sequence','Invalid relay message','Expired resume','Register first'];
+   const reasons=['Server stopping','Connection too slow','Rate limit','Command sequence','Invalid relay message','Expired resume','Register first','Public host stopped advancing','Public host transferred','Reconnect grace expired','Invalid public host state','Invalid frame'];
    this.emit('transport-close',{code:Number.isInteger(event.code)?event.code:0,reason:reasons.includes(event.reason)?event.reason:'unspecified'});
    if(this.protocol===2&&this.resume){
     this.reconnecting=true;this.rotating=true;
     if(!this.reconnectUntil){
-     this.reconnectUntil=Date.now()+8000;
-     this.reconnectDeadline=setTimeout(()=>{if(!this.reconnecting||this.destroyed)return;this.emit('error',{type:'socket-closed'});this.emit('disconnected');this.destroy();},8000);
+     this.reconnectUntil=Date.now()+RELAY_RECONNECT_MS;
+     this.reconnectDeadline=setTimeout(()=>{if(!this.reconnecting||this.destroyed)return;this.emit('error',{type:'socket-closed'});this.emit('disconnected');this.destroy();},RELAY_RECONNECT_MS);
     }
     if(Date.now()<this.reconnectUntil){this.emit('reconnecting');clearTimeout(this.reconnectTimer);this.reconnectTimer=setTimeout(()=>this.start(),400);return;}
    }
@@ -70,7 +71,7 @@ export class RelayPeer extends Events {
   if(this.rotating&&!['register','rotate'].includes(message.type)){
    if(message.type==='heartbeat')return;
    if(message.type==='publish')this.deferredControls=this.deferredControls.filter(m=>m.type!=='publish');
-   if(this.deferredControls.length>=64){this.destroy();return;}
+   if(this.deferredControls.length>=128){this.emit('error',{type:'server-error'});this.emit('disconnected');this.destroy();return;}
    this.deferredControls.push(message);return;
   }
   if(this.socket?.readyState===1){

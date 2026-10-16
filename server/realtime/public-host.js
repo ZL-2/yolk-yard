@@ -8,7 +8,8 @@ import {publicWindow} from '../../src/season-one.js';
 export class PublicRoom {
  constructor(relay,code=PUBLIC_ROYALE.code,options=publicMatchOptions()){this.code=code;this.options=options;this.relay=relay;this.enabled=false;this.members=new Map();this.joinSerial=0;this.order=0;this.key=`yolk-yard-v${VERSION}-${code}`;}
  enable(){this.enabled=true;return this;}
- report(action,reason){console.info(JSON.stringify({event:'public-match',code:this.code,pool:publicPoolKey(this.options),action,reason,members:this.members.size,round:this.state?.round||0}));}
+ report(action,reason){console.info(JSON.stringify({event:'public-match',code:this.code,pool:publicPoolKey(this.options),action,reason,members:this.members.size,round:this.state?.round||0,stage:this.state?.stage,alive:this.state?.alive,stalledMs:this.host?Date.now()-this.host.advancedAt:undefined}));}
+ successor(){return [...this.members.values()].filter(x=>x.peer!==this.host?.peer&&x.peer!==this.host?.address&&x.ready&&Date.now()-x.readyAt<8000&&x.readyMatch===this.state?.matchId&&!x.admission.friendSpectator&&this.relay.peers.get(x.peer)?.ws?.readyState===1).sort((a,b)=>a.order-b.order)[0];}
  pendingCount(spectator=false){return [...this.relay.parties.tickets.values()].filter(t=>t.recurring&&t.code===this.code&&!!t.spectator===spectator&&!this.members.has(t.peer)&&t.expires>Date.now()).length;}
  reserve(p,u){
   if(this.host||this.pending)return false;
@@ -20,7 +21,7 @@ export class PublicRoom {
   if(!this.host&&this.pending&&this.pending.expires>Date.now()&&ticket?.recurring&&ticket.code===this.code&&ticket.member===this.pending.leader&&ticket.party===this.pending.party&&ticket.expires>Date.now())return true;
   const proof=m.publicHostProof,peer=this.relay.peers.get(proof?.id);
   if(!peer||peer.token!==proof.token||!peer.ws||!this.members.has(peer.id)||this.host)return false;
-  const next=[...this.members.values()].filter(x=>x.ready&&Date.now()-x.readyAt<8000&&x.readyMatch===this.state?.matchId&&!x.admission.friendSpectator&&this.relay.peers.get(x.peer)?.ws?.readyState===1).sort((a,b)=>a.order-b.order)[0];
+  const next=this.successor();
   return next?.peer===peer.id;
  }
  ready(peer,m){const member=this.members.get(peer.id);if(!member||typeof m.matchId!=='string'||m.matchId.length>80)return;member.ready=m.ready!==false;member.readyMatch=m.matchId;member.readyAt=Date.now();}
@@ -55,7 +56,7 @@ export class PublicRoom {
   return true;
  }
  summary(){
-  const s=this.state,warmup=!s||this.options.mode==='ffa'||['spawn-island','starting'].includes(s.stage),recovering=!this.host&&(!!this.members.size||!!this.pending);
+  const s=this.state,warmup=!s||this.options.mode==='ffa'||['spawn-island','starting'].includes(s.stage),recovering=!this.host&&(!!this.members.size||!!this.pending)||!!(s&&this.host&&Date.now()-this.host.advancedAt>15000);
   const members=[...this.members.values()],humanPlayers=members.filter(x=>!x.admission.spectator).length,spectators=members.length-humanPlayers;
   const countdownSeconds=warmup&&s?.queueEnds?Math.max(0,Math.ceil(s.queueEnds-s.time)):0;
   return {availability:publicWindow(Date.now()),code:this.code,mode:this.options.mode,teamSize:this.options.teamSize,version:VERSION,hosting:'player',hostReady:!!this.host&&!!s,recovering,joinSerial:this.joinSerial,lastJoin:this.lastJoin,round:s?.round||0,matchId:s?.matchId||null,stage:s?.stage||'spawn-island',phase:s?.phase||'playing',capacity:this.options.capacity,difficulty:2,humanPlayers,spectators,botPlayers:s?.botPlayers??this.options.capacity,alive:warmup?this.options.capacity:s.alive,joinable:warmup&&!recovering,countdownStarted:countdownSeconds>0,countdownSeconds,estimatedSeconds:s?.estimatedSeconds||0,restartSeconds:s?.phase==='results'?s.estimatedSeconds:0,availableSeats:Math.max(0,this.options.capacity-humanPlayers-this.pendingCount()),availableSpectators:Math.max(0,16-spectators-this.pendingCount(true))};
@@ -74,7 +75,13 @@ export class PublicRoom {
  sweep(){
   if(!this.enabled)return;
   if(this.pending){const p=this.relay.parties.parties.get(this.pending.party);if(!p||p.state!=='queueing'||!p.launch?.recurring||p.launch.code!==this.code)this.pending=null;else if(this.pending.expires<Date.now()){this.pending=null;this.relay.parties.cancel(p,'The public host did not finish loading. Try joining again.');}}
-  if(this.host&&Date.now()-this.host.advancedAt>(this.state?15000:35000)){const peer=this.relay.peers.get(this.host.peer);if(peer)this.relay.remove(peer,1001,'Public host stopped advancing');}
+  if(this.host&&Date.now()-this.host.advancedAt>(this.state?15000:35000)){
+   const peer=this.relay.peers.get(this.host.peer);
+   // A stalled render is not a lost socket. Never destroy the only copy of a
+   // live round when there is nobody synchronized to take over. Disconnected
+   // sockets are reclaimed by the relay after their transport recovery window.
+   if(peer?.ws?.readyState===1&&(!this.state||this.successor()))this.relay.remove(peer,1001,'Public host stopped advancing');
+  }
 
  }
  saveCrown(peer,value){if(this.options.mode!=='royale'||!peer.publicMember||this.members.get(peer.id)?.admission.spectator)return;this.relay.progression.account(peer.progressId).crowns=crownRecord(value);this.relay.progression.dirty=true;void this.relay.progression.save();}

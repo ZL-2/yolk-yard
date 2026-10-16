@@ -7,7 +7,8 @@ import {mergeRelayMessage} from '../../src/relay-queue.js';
 import {ProgressionService} from './progression.js';
 import {PartyService} from './parties.js';
 import {MAX_HUMANS,MAX_CONTESTANTS,MAX_SPECTATORS} from '../../src/royale-phases.js';
-const MAX_FRAME=2_000_000, MAX_QUEUE=4_000_000, GRACE=10_000;
+import {RELAY_SESSION_GRACE_MS as GRACE} from '../../src/relay-recovery.js';
+const MAX_FRAME=2_000_000, MAX_QUEUE=4_000_000;
 const address=/^yolk-yard-v\d+-[A-Z2-9]{8}$/;
 // One persistent process owns every connected socket. No database in the data path.
 export class RealtimeRelay {
@@ -60,7 +61,7 @@ export class RealtimeRelay {
         if(ws.readyState===1)ws.send(JSON.stringify({type:'command-ack',seq:peer.clientSeq}));
       }catch(error){const reason=['Rate limit','Command sequence','Expired resume','Register first','Invalid public host state','Invalid frame'].includes(error.message)?error.message:'Invalid relay message';if(peer&&(this.publicHost.isTarget(peer)||peer.publicMember))this.publicHost.report('connection-rejected',reason,peer);ws.close(1008,reason);}
     });
-    ws.on('close',()=>{clearTimeout(registration);if(peer?.ws===ws){peer.ws=null;peer.detachedAt=Date.now();this.authority.connection(peer,false);}});
+    ws.on('close',(code)=>{clearTimeout(registration);if(peer?.ws===ws){if(this.publicHost.isTarget(peer))this.publicHost.report('host-transport-detached','WebSocket '+code,peer);peer.ws=null;peer.detachedAt=Date.now();this.authority.connection(peer,false);}});
     ws.on('error',()=>{});
     return ()=>peer;
   }
@@ -154,7 +155,7 @@ export class RealtimeRelay {
     peer.links.clear();peer.history=[];peer.pending=[];
   }
   sweep(){this.progression.sweep();this.publicHost.sweep();for(const peer of this.peers.values()){
-    if(peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)this.remove(peer);
+    if(peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)this.remove(peer,1001,'Reconnect grace expired');
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
