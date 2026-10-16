@@ -20,7 +20,8 @@ const trace=[];
 const record=(stage,detail={})=>{const row={stage,at:new Date().toISOString(),...detail};trace.push(row);console.log(JSON.stringify(row));};
 try{
  browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
- page=await browser.newPage({bypassCSP:true,viewport:{width:1280,height:720}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
+ // Keep desktop CSS dimensions while limiting SwiftShader's pixel workload.
+ page=await browser.newPage({bypassCSP:true,deviceScaleFactor:.5,viewport:{width:1280,height:720}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-150-dismissed','yes');localStorage.setItem('ravelfront-referrals-dismissed','yes');localStorage.setItem('ravelfront-perspective-157-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,musicVolume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Public UI Host'}));});
  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party().ready);await page.locator('#loading-screen').waitFor({state:'hidden'});
  relay.relay.parties.publishPublicMatch({...relay.relay.publicHost.summary(),joinSerial:1,lastJoin:{serial:1,name:'Arriving Friend',at:Date.now()}});

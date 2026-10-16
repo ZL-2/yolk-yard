@@ -119,7 +119,8 @@ jobs:
           lobby_allowed=set(['.github/workflows/pages.yml', 'docs/LOBBY_ART_164.json', 'docs/UPDATE_164.md', 'package-lock.json', 'package.json', 'public/modes/box-fights.webp', 'public/modes/choose.webp', 'public/modes/ffa.webp', 'public/modes/royale.webp', 'public/modes/training.webp', 'public/modes/zombies.webp', 'public/modes/zone-wars.webp', 'scripts/public-host-network-check.mjs', 'scripts/public-match-browser-check.mjs', 'server/realtime/index.js', 'server/realtime/match-launch.js', 'server/realtime/parties.js', 'server/realtime/public-host.js', 'server/realtime/relay.js', 'src/data.js', 'src/leaderboard-ui.js', 'src/lobby-deploy.css', 'src/lobby-news.js', 'src/lobby-ui.js', 'src/main.js', 'src/match-options.js', 'src/network.js', 'src/public-royale.js', 'src/releases.js', 'src/rewards.js', 'src/royale.js', 'src/simulation.js', 'src/view.js', 'tests/helpers/public-match.js', 'tests/main-match-singleton.test.js', 'tests/private-social.test.js', 'tests/public-host.test.js', 'tests/public-pools.test.js', 'tests/recurring-royale.test.js'])
           lobby_allowed.add('scripts/release-live-check.mjs')
           lobby_core={'src/lobby-news.js','src/lobby-deploy.css','server/realtime/public-host.js','tests/public-pools.test.js'}
-          lobby_update=files<=lobby_allowed and (lobby_core<=files or previous<=lobby_allowed and lobby_core<=previous)
+          lobby_followup=files<={'.github/workflows/pages.yml','src/lobby-deploy.css','scripts/public-match-browser-check.mjs','scripts/release-live-check.mjs'} and json.loads(Path('package.json').read_text()).get('version')=='5.15.0'
+          lobby_update=files<=lobby_allowed and (lobby_core<=files or previous<=lobby_allowed and lobby_core<=previous or lobby_followup)
           public_match=public_match or lobby_update
           for path in ['package.json','package-lock.json']:
             if path not in files: continue
