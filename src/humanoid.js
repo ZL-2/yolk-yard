@@ -265,17 +265,28 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   const ankles=['L','R'].map(S=>b['foot'+S].getWorldPosition(V()).applyMatrix4(inverse));
   const minimum=Math.min(...ankles.map(v=>v.y));
   const walking=motion.gait==='walk'&&speed>.3&&!p.crouching;
-  const strideScale=walking&&!motion.unarmed?.7:1;
+  const strideScale=walking?.7:1;
   for(const foot of ankles){foot.x=b.hips.position.x+(foot.x-b.hips.position.x)*strideScale;foot.z=b.hips.position.z+(foot.z-b.hips.position.z)*strideScale;foot.y=.09+Math.max(0,foot.y-minimum)*(walking?.7:1);}
   let height=b.hips.position.y+T.MathUtils.clamp(.09-minimum,-.10,.10);
-  if(walking){height=.90;for(let i=0;i<2;i++){const foot=ankles[i],dx=foot.x-(i?.115:-.115)-b.hips.position.x,dz=foot.z-b.hips.position.z;height=Math.min(height,foot.y+.03+Math.sqrt(Math.max(.1,.803**2-dx*dx-dz*dz)));}}
-  b.hips.position.y=height;
+  if(walking){height=.89;for(let i=0;i<2;i++){const foot=ankles[i],dx=foot.x-(i?.115:-.115)-b.hips.position.x,dz=foot.z-b.hips.position.z;height=Math.min(height,foot.y+.03+Math.sqrt(Math.max(.1,.785**2-dx*dx-dz*dz)));}}
+  h.contactHeight??=height;h.contactHeight+=(height-h.contactHeight)*(1-Math.exp(-dt*22));
+  b.hips.position.y=h.contactHeight;
   for(let i=0;i<2;i++){
-   const S=i?'R':'L',foot=ankles[i];let contact=foot.y<.12&&speed>.3;
+   const S=i?'R':'L',foot=ankles[i];
+   let contact=foot.y<.12&&speed>.3&&!h['release'+S];
    if(menu){const heading=(p.yaw||Math.PI)-Math.PI,x=foot.x,z=foot.z;foot.x=Math.cos(heading)*x-Math.sin(heading)*z;foot.z=Math.sin(heading)*x+Math.cos(heading)*z;}
    const originalFoot=foot.clone(),yaw=model.rotation.y,cs=Math.cos(yaw),sn=Math.sin(yaw),old=h['plant'+S];
    if(contact&&old){if(menu)old.z-=(p.lobbyPatrol?.speed||speed)*dt;const dx=old.x-model.position.x,dz=old.z-model.position.z,x=cs*dx-sn*dz,z=sn*dx+cs*dz;if(Math.hypot(x-foot.x,z-foot.z)<.16){foot.x=x;foot.z=z;}else contact=false;}
    if(contact){const hip=b['thigh'+S].getWorldPosition(V()).applyMatrix4(inverse),reach=b['shin'+S].userData.rest.length()+b['foot'+S].userData.rest.length()-.004;if(hip.distanceTo(foot)>reach){contact=false;foot.copy(originalFoot);}}
+   if(!contact&&old){h['release'+S]={...old,age:0};h['released'+S]=true;}
+   const release=h['release'+S];
+   if(contact)h['release'+S]=null;
+   else if(release){release.age+=dt;const t=T.MathUtils.smoothstep(release.age,0,.10),dx=release.x-model.position.x,dz=release.z-model.position.z;foot.x=T.MathUtils.lerp(cs*dx-sn*dz,foot.x,t);foot.z=T.MathUtils.lerp(sn*dx+cs*dz,foot.z,t);if(t===1)h['release'+S]=null;}
+   const worldFoot=V(model.position.x+cs*foot.x+sn*foot.z,foot.y,model.position.z-sn*foot.x+cs*foot.z),last=h['lastMotionFoot'+S];
+   // Bound transition/release velocity, not physical player movement. A newly
+   // chosen support foot must finish reaching the ground before it can lock.
+   if(last&&!(contact&&old)){const delta=worldFoot.clone().sub(last),limit=(6+speed)*dt;if(delta.length()>limit){worldFoot.copy(last).add(delta.setLength(limit));const dx=worldFoot.x-model.position.x,dz=worldFoot.z-model.position.z;foot.set(cs*dx-sn*dz,worldFoot.y,sn*dx+cs*dz);contact=false;}}
+   h['lastMotionFoot'+S]=worldFoot;
    h['plant'+S]=contact?{x:model.position.x+cs*foot.x+sn*foot.z,z:model.position.z-sn*foot.x+cs*foot.z}:null;
    const pole=b['shin'+S].getWorldPosition(V()).applyMatrix4(inverse),footQ=b['foot'+S].getWorldQuaternion(new T.Quaternion());
    solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,pole);
@@ -287,7 +298,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
     flat.slerp(footQ,T.MathUtils.smoothstep(foot.y,.12,.18));
     b['foot'+S].quaternion.copy(b['foot'+S].parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(flat));}
   }
- }else if(motion){h.plantL=h.plantR=null;}
+ }else if(motion){h.plantL=h.plantR=h.releaseL=h.releaseR=h.lastMotionFootL=h.lastMotionFootR=null;h.releasedL=h.releasedR=false;h.contactHeight=undefined;}
  if(motion?.id==='crawl'){h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert(),minimum=Math.min(...['L','R'].map(S=>b['foot'+S].getWorldPosition(V()).applyMatrix4(inverse).y));b.hips.position.y+=Math.max(0,.09-minimum);}
  const held=model.userData.held,arms=model.userData.arms,draw=model.userData.draw;
  if(held&&arms){held.updateWorldMatrix(true,false);h.mesh.updateWorldMatrix(true,false);}

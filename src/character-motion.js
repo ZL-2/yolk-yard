@@ -55,15 +55,23 @@ export function animateCharacterMotion(h,p,dt,time,{menu=false}={}){
  else state.elapsed+=dt;
  if(s.id==='locomotion'){
   const forward=menu?speed:-(p.vx||0)*Math.sin(p.yaw||0)-(p.vz||0)*Math.cos(p.yaw||0),side=menu?0:(p.vx||0)*Math.cos(p.yaw||0)-(p.vz||0)*Math.sin(p.yaw||0);
-  const angle=(Math.atan2(side,forward)/(Math.PI/4)+8)%8,index=Math.floor(angle),w=angle-index;
+  const desiredAngle=Math.atan2(side,forward);state.heading??=desiredAngle;
+  if(speed>.08)state.heading+=Math.atan2(Math.sin(desiredAngle-state.heading),Math.cos(desiredAngle-state.heading))*(1-Math.exp(-dt*16));
+  const angle=((state.heading/(Math.PI/4))%8+8)%8,index=Math.floor(angle),w=angle-index;
   const gait=p.crouching?'crouch':p.sprinting?'sprint':speed>3.2?'run':'walk';
   const item=p.inventory?.[p.slot||0];
   // Inventory ownership is not evidence of a held gun.
   const unarmed=!menu&&!p.aim&&!p.building&&(p.inventory?!item?.weapon:!p.weapon);
-  const a=unarmed&&index===0&&!p.crouching?(speed>3.2?'unarmed-run':'unarmed-walk'):gait+'-'+directions[index],c=unarmed&&index===0?a:gait+'-'+directions[(index+1)%8],info=payload.clips[a];
-  const strideScale=gait==='walk'&&!unarmed?.7:1;
+  const variant=gait+':'+unarmed;
+  if(state.variant!==undefined&&state.variant!==variant){state.blend=0;state.fromRoot.copy(state.previousRoot);state.from.forEach((q,i)=>q.copy(state.previous[i]));}
+  state.variant=variant;
+  // One phase-compatible directional family for the legs. Previously a tiny
+  // left/right input switched tools between unrelated axe and rifle strides.
+  const a=gait+'-'+directions[index],c=gait+'-'+directions[(index+1)%8],info=payload.clips[a];
+  const strideScale=gait==='walk'?.7:1;
   state.phase=(state.phase+speed*dt/Math.max(.3,info.distance*strideScale))%1;
   sample(a,state.phase*info.duration,b);sample(c,state.phase*payload.clips[c].duration,b,w);
+  if(unarmed&&!p.crouching){const upper=speed>3.2?'unarmed-run':'unarmed-walk';sample(upper,state.phase*payload.clips[upper].duration,b,1,true);}
   const idle=p.crouching?(p.aim?'crouch-aim':'crouch-idle'):unarmed?'unarmed-idle':p.aim?'aim':'idle';
   sample(idle,time,b,1-MathUtils.smoothstep(speed,.08,.75));
   state.gait=gait;state.direction=directions[index];state.unarmed=unarmed;

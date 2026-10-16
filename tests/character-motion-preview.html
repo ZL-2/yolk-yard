@@ -39,5 +39,14 @@ for(const tool of [false,true]){
  }
  scene.remove(model);
 }
+window.reviewMotion=async()=>{
+ document.body.replaceChildren(renderer.domElement);renderer.setSize(960,640);camera.aspect=1.5;camera.updateProjectionMatrix();
+ const model=makeEgg({weapon:'sprinter',outfit:'outfit-voss-alt',backbling:'backbling-voss'}),motion=new LobbyMotion();scene.add(model);
+ for(let f=0;f<240;f++){
+  if(f<120){model.position.set(0,0,0);View.prototype.animateLobbyCharacter.call({},model,motion,1/30);camera.position.set(-2.4,1.65,3.65);}
+  else {const speed=f<165?2:f<210?5:0,angle=f<190?0:.8;model.rotation.y=angle;model.position.x-=Math.sin(angle)*speed/30;model.position.z-=Math.cos(angle)*speed/30;model.userData.held.position.set(VIEWMODEL.x,1.38,VIEWMODEL.z);model.userData.held.rotation.set(0,0,0);updateArms(model.userData.arms,-1,model.userData.blaster);animateHumanoid(model,{health:100,grounded:true,weapon:'sprinter',yaw:angle,vx:-Math.sin(angle)*speed,vz:-Math.cos(angle)*speed},1/30,f/30);camera.position.copy(model.position).add(new T.Vector3(-2.4,1.65,3.65));}
+  floor.position.set(model.position.x,0,model.position.z);camera.lookAt(model.position.clone().add(new T.Vector3(0,1,0)));renderer.render(scene,camera);await new Promise(r=>setTimeout(r,33));
+ }
+};
 window.ready=true;
 </script></body></html>

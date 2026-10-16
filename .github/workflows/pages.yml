@@ -130,7 +130,7 @@ jobs:
           operator_allowed.add('tests/leaderboards.test.js')
           operator_refresh=files<=operator_allowed and json.loads(Path('package.json').read_text()).get('version')=='5.16.0' and Path('tests/operator-refresh.test.js').exists()
           mixamo_allowed=set(['.github/workflows/pages.yml', 'docs/UPDATE_168.md', 'docs/MIXAMO_ANIMATIONS.md', 'package.json', 'package-lock.json', 'src/releases.js', 'src/humanoid.js', 'src/character-motion.js', 'src/mixamo-clips.js', 'scripts/bake-mixamo.mjs', 'scripts/mixamo-manifest.json', 'scripts/character-motion-browser-check.mjs', 'tests/character-motion.test.js', 'tests/character-motion-preview.html', 'tests/operator-refresh.test.js', 'tests/lobby-motion.test.js'])
-          mixamo_allowed.update({'src/view.js','src/celebration-view.js','docs/UPDATE_169.md'})
+          mixamo_allowed.update({'src/view.js','src/celebration-view.js','docs/UPDATE_169.md','src/world-locations.js','docs/UPDATE_170.md'})
           mixamo_core={'src/character-motion.js','tests/character-motion.test.js'}
           mixamo_update=files<=mixamo_allowed and (mixamo_core<=files or previous<=mixamo_allowed and mixamo_core<=previous)
           for path in ['package.json','package-lock.json']:

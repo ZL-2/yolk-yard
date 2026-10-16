@@ -4,6 +4,8 @@ import {Vector3} from 'three';
 import {makeHumanoid,animateHumanoid} from '../src/humanoid.js';
 import {MOTION_NAMES,motionSelection,motionInfo} from '../src/character-motion.js';
 import {updateCelebration} from '../src/celebration-view.js';
+import {ROYALE_MAP} from '../src/royale-map.js';
+import {groundAt} from '../src/terrain.js';
 
 test('downloaded motion covers every gameplay branch and all eight movement directions',()=>{
  for(const gait of ['walk','run','sprint','crouch'])for(const direction of ['forward','forward-right','right','backward-right','backward','backward-left','left','forward-left'])assert.ok(motionInfo(gait+'-'+direction));
@@ -62,5 +64,28 @@ test('victory crown follows the animated head through crouching and airborne pos
  const m=makeHumanoid();for(const pose of [{},{crouching:true},{flight:'glide'}]){
   const p={health:100,crown:true,grounded:true,...pose};updateCelebration(m,p,1,()=>{});for(let f=0;f<30;f++)animateHumanoid(m,p,1/60,f/60);
   assert.equal(m.userData.victoryCrown.parent,m.userData.human.bones.head);assert.ok(m.userData.victoryCrown.position.y<.37);
+ }
+});
+
+test('tiny direction changes while holding a tool cannot swap unrelated leg cycles',()=>{
+ const models=[makeHumanoid(),makeHumanoid()];
+ for(let f=0;f<240;f++){
+  for(let i=0;i<2;i++)animateHumanoid(models[i],{health:100,grounded:true,weapon:'sprinter',inventory:[{id:'pickaxe',pickaxe:true}],slot:0,vz:-2,vx:i?.00001:-.00001},1/60,f/60);
+  if(f>20)for(const n of ['footL','footR','head'])assert.ok(models[0].userData.human.bones[n].getWorldPosition(new Vector3()).distanceTo(models[1].userData.human.bones[n].getWorldPosition(new Vector3()))<.005,n+' directional discontinuity');
+ }
+});
+
+test('vault slabs have terrain clearance instead of overlapping road-painted earth',()=>{
+ for(const v of ROYALE_MAP.vaults){const w=v.width||22,d=v.depth||18;for(let x=-w/2+2;x<=w/2-2;x+=1)for(let z=-d/2+2;z<=d/2-2;z+=1)assert.ok(v.y-groundAt(ROYALE_MAP,v.x+x,v.z+z)>.14,v.id+' coplanar floor');}
+});
+
+test('stride releases and walk/run transitions remain continuous over successive frames',()=>{
+ const m=makeHumanoid();let previous;
+ for(let f=0;f<480;f++){
+  const speed=f<120?2:f<240?5:f<360?2:0;m.position.z-=speed/60;
+  animateHumanoid(m,{health:100,grounded:true,weapon:'sprinter',inventory:[{id:'pickaxe',pickaxe:true}],slot:0,vz:-speed,vx:f<300?.001:-.001},1/60,f/60);m.updateMatrixWorld(true);
+  const points=['hips','head','footL','footR'].map(n=>m.userData.human.bones[n].getWorldPosition(new Vector3()));
+  if(previous&&f>30)for(let i=0;i<points.length;i++)assert.ok(points[i].distanceTo(previous[i])<.23,'joint teleported at frame '+f);
+  previous=points;
  }
 });

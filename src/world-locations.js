@@ -151,7 +151,9 @@ export function authorFrontierWorld(c){
    const tx=ix*terrain.cell-terrain.size,tz=iz*terrain.cell-terrain.size;
    const room=Math.abs(tx-x)<=w/2+1&&Math.abs(tz-z)<=d/2+1;
    const approach=Math.abs(tx-x)<=3&&tz>z+d/2&&tz<=z+d/2+11;
-   if(room||approach)terrain.heights[iz*terrain.n+ix]=!harbor&&approach?y+Math.max(0,Math.min(1,(tz-(z+d/2+2))/10))*(surface-y):harbor?y-.15:y;
+   // Keep earth below the solid floor/apron. Equal heights caused terrain road
+   // paint and the bunker slab to alternate per pixel (striped z-fighting).
+   if(room||approach)terrain.heights[iz*terrain.n+ix]=!harbor&&approach?y-.2+Math.max(0,Math.min(1,(tz-(z+d/2+2))/10))*(surface-y+.2):y-.2;
   }
   const shell=(dx,dy,dz,ww,hh,dd)=>put(x+dx,y+dy,z+dz,ww,hh,dd,color,{indestructible:true,vaultShell:true,material:'metal'});
   shell(0,-.25,0,w,.25,d);shell(0,h,0,w+.6,.5,d+.6);

@@ -53,13 +53,16 @@ for(const [id,entry]of Object.entries(manifest)){
   }
  }
  if(entry.loop){
-  const stride=3+names.length*4,tail=Math.min(4,frames-1);
-  for(let f=frames-tail;f<frames;f++){
-   const x=(f-(frames-tail)+1)/tail,w=x*x*(3-2*x),offset=f*stride;
-   for(let i=0;i<3;i++)values[offset+i]=Math.round(values[offset+i]*(1-w)+values[i]*w);
+  const stride=3+names.length*4,last=(frames-1)*stride,end=values.slice(last);
+  // Correct endpoint drift over the complete cycle. Replacing the last four
+  // frames with the opening pose compressed a quarter of each running stride.
+  for(let f=0;f<frames;f++){
+   const x=f/(frames-1),w=x*x*(3-2*x),offset=f*stride;
+   for(let i=0;i<3;i++)values[offset+i]=Math.round(values[offset+i]+(values[i]-end[i])*w);
    for(let i=0;i<names.length;i++){
     const k=3+i*4,q=new Quaternion(...values.slice(offset+k,offset+k+4).map(n=>n/32767)).normalize(),first=new Quaternion(...values.slice(k,k+4).map(n=>n/32767)).normalize();
-    q.slerp(first,w).toArray().forEach((n,j)=>values[offset+k+j]=Math.round(n*32767));
+    const correction=new Quaternion(...end.slice(k,k+4).map(n=>n/32767)).normalize().invert().multiply(first);
+    q.multiply(new Quaternion().slerp(correction,w)).normalize().toArray().forEach((n,j)=>values[offset+k+j]=Math.round(n*32767));
    }
   }
  }
