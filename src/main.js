@@ -1,6 +1,5 @@
 import './field-operations.css';
 import {MatchConnectionUI} from './match-connection-ui.js';
-import {PublicArrivalUI} from './public-arrival-ui.js';
 import {departureFeed,eliminationNotice} from './match-roster.js';
 import {FieldOperationsUI,fieldOrdersHTML,fieldStatsHTML} from './field-operations-ui.js';
 import {CombatConfirmation,CONFIRM_LABEL,DamageDirections} from './combat-feedback.js';
@@ -247,7 +246,6 @@ const royaleUI = new RoyaleUI(item=>view.itemPreview(item));
 const matchEndUI=new MatchEndUI();
 const fieldUI=new FieldOperationsUI();
 const matchConnectionUI=new MatchConnectionUI();
-const publicArrivalUI=new PublicArrivalUI();
 const buildControls={buildMode:false,buildType:'wall',buildMaterial:'wood',buildRotation:0,editing:false};
 document.addEventListener('build-edit-close',()=>{if(screen==='game'&&!paused&&!matchMedia('(pointer:coarse)').matches)view.renderer.domElement.requestPointerLock?.();});
 const buildUI=new BuildingUI(royaleUI.root,buildControls,action=>{if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});});
@@ -302,7 +300,7 @@ function refreshPublicMatch(){
 }
 const publicJoinChime=new PublicJoinChime();
 function publicMatchChanged(match){
- if(publicJoinChime.update(match,screen==='menu'&&!document.hidden)){sound.cue('public-join');publicArrivalUI.show(match);}
+ if(publicJoinChime.update(match,screen==='menu'&&!document.hidden))sound.cue('public-join');
  refreshPublicMatch();
 }
 let lobbyFooterObserver;
@@ -614,6 +612,8 @@ function callbacks() {
     onNameAccepted:()=>{if(dialogType==='rename'){dialog.close();dialogType='';if(screen==='game')void resume();}},
     onJoin: (id, p, admission) => {const joined=sim?.admitPlayer(id,p,admission);if(joined&&net?.officialPublic){joined.crownProgress=admission?.crownRecord||joined.crownProgress;attachCrown(sim,joined,id);}return !!joined;},
     onLeave: (id) => sim?.leavePlayer(id),
+    onSuspendPlayer: id => sim?.suspendPlayer?.(id),
+    onHostRecovery: ms => sim?.beginHostRecovery?.(ms),
     onRoster: ids => sim?.setConnectedHumans?.(ids),
     onPlayerAction: (id, action) => sim?.playerAction(id, action),
     onInput: (id, i) => sim?.setInput(id, i, true),
@@ -1900,7 +1900,6 @@ function loop(now) {
   lobbyStatus.update(now,now-lastTime,net,screen);
 
   matchConnectionUI.update(net,screen==='game',now);
-  publicArrivalUI.update(party?.publicMatch,screen==='menu'&&!dialog.open&&!document.hidden,party?.party,party?.id,now);
   pumpNetworkInput(now);
   if(state?.royale){view.buildMap=getMap(state.options.map);applyBuildState(view.buildMap,state.royale);}
 

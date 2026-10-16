@@ -7,6 +7,7 @@ import {publicWindow} from '../../src/season-one.js';
 export class PublicHost {
  constructor(relay){this.relay=relay;this.enabled=false;this.members=new Map();this.joinSerial=0;this.order=0;this.key=`yolk-yard-v${VERSION}-${PUBLIC_ROYALE.code}`;}
  enable(){this.enabled=true;return this;}
+ report(action,reason){console.info(JSON.stringify({event:'public-match',action,reason,members:this.members.size,round:this.state?.round||0}));}
  pendingCount(spectator=false){return [...this.relay.parties.tickets.values()].filter(t=>t.recurring&&!!t.spectator===spectator&&!t.peer&&t.expires>Date.now()).length;}
  reserve(p,u){
   if(this.host||this.pending)return false;
@@ -15,16 +16,18 @@ export class PublicHost {
  }
  authorize(m){
   const ticket=this.relay.parties.tickets.get(m.publicTicket);
-  if(this.pending&&ticket?.recurring&&ticket.member===this.pending.leader&&ticket.party===this.pending.party&&ticket.expires>Date.now())return true;
+  if(!this.host&&this.pending&&this.pending.expires>Date.now()&&ticket?.recurring&&ticket.member===this.pending.leader&&ticket.party===this.pending.party&&ticket.expires>Date.now())return true;
   const proof=m.publicHostProof,peer=this.relay.peers.get(proof?.id);
   if(!peer||peer.token!==proof.token||!peer.ws||!this.members.has(peer.id)||this.host)return false;
-  const next=[...this.members.values()].filter(x=>!x.admission.friendSpectator&&this.relay.peers.get(x.peer)?.ws).sort((a,b)=>a.order-b.order)[0];
+  const next=[...this.members.values()].filter(x=>x.ready&&Date.now()-x.readyAt<8000&&x.readyMatch===this.state?.matchId&&!x.admission.friendSpectator&&this.relay.peers.get(x.peer)?.ws?.readyState===1).sort((a,b)=>a.order-b.order)[0];
   return next?.peer===peer.id;
  }
+ ready(peer,m){const member=this.members.get(peer.id);if(!member||typeof m.matchId!=='string'||m.matchId.length>80)return;member.ready=m.ready!==false;member.readyMatch=m.matchId;member.readyAt=Date.now();}
  registered(peer,m){
   const owner=m.publicHostProof?.id||peer.id;
   this.host={address:peer.id,peer:owner,id:owner===peer.id?'host':owner,at:Date.now(),time:null,advancedAt:Date.now()};
   peer.publicHostOwner=owner;peer.rewardPublic=true;this.pending=null;
+  this.report(m.publicHostProof?'host-transferred':'host-created');
  }
  admission(peer,admission){
   if(!admission?.recurring)return null;
@@ -67,7 +70,7 @@ export class PublicHost {
  }
  sweep(){
   if(!this.enabled)return;
-  if(this.pending?.expires<Date.now()){const p=this.relay.parties.parties.get(this.pending.party);this.pending=null;if(p?.state==='queueing')this.relay.parties.cancel(p,'The public host did not finish loading. Try joining again.');}
+  if(this.pending){const p=this.relay.parties.parties.get(this.pending.party);if(!p||p.state!=='queueing'||!p.launch?.recurring)this.pending=null;else if(this.pending.expires<Date.now()){this.pending=null;this.relay.parties.cancel(p,'The public host did not finish loading. Try joining again.');}}
   if(this.host&&Date.now()-this.host.advancedAt>(this.state?15000:35000)){const peer=this.relay.peers.get(this.host.peer);if(peer)this.relay.remove(peer,1001,'Public host stopped advancing');}
   this.relay.parties.publishPublicMatch(this.summary());
  }

@@ -30,6 +30,9 @@ export class RealtimeRelay {
           }else{
             const id=m.id??`player-${randomUUID()}`;
             if(typeof id!=='string'||m.id!==undefined&&!address.test(id))throw Error('Invalid address');
+            // FRONTIER is reserved across protocol versions. An older tab must
+            // never recreate a second public room alongside the current one.
+            if(id.endsWith('-FRONTIER')&&id!==this.publicHost.key)throw Error('Refresh to join the public match');
             if(id===this.publicHost.key&&this.publicHost.enabled&&!this.publicHost.authorize(m))throw Error('Public host reservation required');
             if(this.peers.has(id)){ws.send(JSON.stringify({type:'error',error:'unavailable-id'}));ws.close(1008,'Address taken');return;}
             if(this.peers.size>=1000)throw Error('Server full');
@@ -54,7 +57,7 @@ export class RealtimeRelay {
         if(!Number.isSafeInteger(m.seq)||m.seq<1||m.seq>peer.clientSeq+1)throw Error('Command sequence');
         if(m.seq>peer.clientSeq){this.handle(peer,m);peer.clientSeq=m.seq;}
         if(ws.readyState===1)ws.send(JSON.stringify({type:'command-ack',seq:peer.clientSeq}));
-      }catch(error){ws.close(1008,['Rate limit','Command sequence','Expired resume','Register first'].includes(error.message)?error.message:'Invalid relay message');}
+      }catch(error){const reason=['Rate limit','Command sequence','Expired resume','Register first','Invalid public host state','Invalid frame'].includes(error.message)?error.message:'Invalid relay message';if(peer&&(this.publicHost.isTarget(peer)||peer.publicMember))this.publicHost.report('connection-rejected',reason);ws.close(1008,reason);}
     });
     ws.on('close',()=>{clearTimeout(registration);if(peer?.ws===ws){peer.ws=null;peer.detachedAt=Date.now();this.authority.connection(peer,false);}});
     ws.on('error',()=>{});
@@ -94,6 +97,7 @@ export class RealtimeRelay {
     if(m.type==='authority-create'||m.type==='authority-command'){this.authority.command(peer,m);return;}
     if(m.type==='public-progress'){if(peer.id===this.publicHost.key&&this.publicHost.isTarget(peer)&&m.state?.matchId===this.publicHost.state?.matchId)this.progression.frame(peer,m.state);return;}
     if(m.type==='public-crown'){this.publicHost.saveCrown(peer,m.record);return;}
+    if(m.type==='public-member-ready'){this.publicHost.ready(peer,m);return;}
     if(m.type==='progress')return; // Only the elected public host or legacy authority may report results.
     if(m.type==='list'){
       const rooms=[...this.peers.values()].filter(p=>(p.ws||p.virtualRoom)&&p.listing&&p.listing.public!==false&&Date.now()-p.listedAt<15000).map(p=>p.listing).slice(0,100);
@@ -141,8 +145,9 @@ export class RealtimeRelay {
     throw Error('Unknown command');
   }
   remove(peer,code=1000,reason='Session ended'){
-    if(!this.peers.has(peer.id))return;
+    if(this.peers.get(peer.id)!==peer)return;
     if(this.authority.disconnect(peer))return;
+    if(this.publicHost.isTarget(peer))this.publicHost.report('host-removed',reason);
     this.peers.delete(peer.id);this.sessions.delete(peer);this.publicHost.left(peer);peer.ws?.close(code,reason);peer.ws=null;
     for(const [channel,other] of peer.links){other.links.delete(channel);this.send(other,{type:'closed',channel});}
     peer.links.clear();peer.history=[];peer.pending=[];

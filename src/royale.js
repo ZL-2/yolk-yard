@@ -45,7 +45,7 @@ import {surfaceAt,navigation,navigationSteps} from './maps.js';
 import {groundAt} from './terrain.js';
 import {ITEMS,ammoType,AMMO_CAPS,makeStorm,stormAt,makeFlight,transportAt} from './royale-data.js';
 
-const battlePreparation=new WeakMap();
+const battlePreparation=new WeakMap(),recoveryDeadlines=new WeakMap();
 const movementItemKinds=new Set(['jumpRig','shadowstep','winch','impulse','launchpad']);
 
 export class RoyaleSimulation extends Simulation {
@@ -86,6 +86,9 @@ export class RoyaleSimulation extends Simulation {
  }
  teamPlace(p,place){if(this.matchTeams?.[p.team])this.matchTeams[p.team].place=place;for(const mate of this.players.values())if(mate.contestant&&teamKey(this.options,mate)===teamKey(this.options,p)){mate.place=place;const result=this.placements.find(r=>r.id===mate.id);if(result)result.place=place;else this.placements.push({id:mate.id,name:mate.name,team:mate.team,place,kills:mate.kills});}}
  humanContestants(){return [...this.players.values()].filter(p=>!p.bot&&p.connected!==false&&p.contestant&&!p.spectating&&!p.lateSpectator);}
+ beginHostRecovery(milliseconds=10000){recoveryDeadlines.set(this,performance.now()+milliseconds);}
+ recoveringHumans(){return performance.now()<(recoveryDeadlines.get(this)||0)&&[...this.players.values()].some(p=>!p.bot&&p.connected===false&&p.contestant&&p.health>0&&!p.spectating&&!p.lateSpectator);}
+ suspendPlayer(id){this.inputs.delete(id);this.remoteInputs.delete(id);const p=this.players.get(id);if(p){p.fireLatch=false;p.popperLatch=false;}}
  setConnectedHumans(ids){
   const connected=new Set(ids);
   for(const p of this.players.values())if(!p.bot)p.connected=connected.has(p.id);
@@ -375,7 +378,7 @@ export class RoyaleSimulation extends Simulation {
  }
  eliminationCredit(victim,attacker){return victim.downed&&this.players.get(victim.knockedBy)||attacker;}
  admitPlayer(id,profile,admission=null){
-  if(this.players.has(id))return this.players.get(id);
+  if(this.players.has(id)){const player=this.players.get(id);player.connected=true;return player;}
   this.advanceWarmupClock();
   if(admission?.spectator){const p=this.addPlayer(id,profile,false,true);if(p)Object.assign(p,{friendSpectator:!admission.publicSpectator,watchId:admission.watchId,partyId:admission.partyId,memberId:admission.memberId,partySize:admission.partySize||1});return p;}
   if(admission&&(admission.teamSize!==this.options.teamSize||!this.options.recurring&&this.options.teamSize<(admission.partySize||1)))return null;
@@ -443,7 +446,7 @@ export class RoyaleSimulation extends Simulation {
  advanceWarmupClock(unsteppedSeconds=0){
   if(this.phase!=='playing'||!isWarmup(this.stage))return;if(this.options.training){this.queueEnds=this.time+3600;return;}
   if(this.options.recurring){
-   if(!this.humanContestants().length){if(this.queueEnds)this.resetPublicWarmup();return;}
+   if(!this.humanContestants().length){if(this.queueEnds&&!this.recoveringHumans())this.resetPublicWarmup();return;}
    if(!this.queueEnds){this.queueEnds=this.time+PUBLIC_ROYALE.warmupSeconds;this.stage=RP.ISLAND;this.lastCountdown=null;unsteppedSeconds=0;}
   }
   // The host's physics loop intentionally drops long frame gaps. Translate
@@ -457,10 +460,11 @@ export class RoyaleSimulation extends Simulation {
    if(full||this.time>=this.queueEnds)this.beginBattle(full?'human-full':'timer');
  }
  tick(dt){
+  if(this.options.recurring&&this.recoveringHumans())return;
   dt=clamp(dt,0,1/30);this.time+=dt;
   if(this.options.recurring){
    if(this.phase==='results'){this.publicRestartAt??=this.time+PUBLIC_ROYALE.restartSeconds;if(this.time>=this.publicRestartAt){this.startRound();this.publicRestartAt=null;}}
-   else if(!isWarmup(this.stage)&&!this.humanContestants().length){this.phase='results';this.startRound();this.publicRestartAt=null;}
+   else if(!isWarmup(this.stage)&&!this.humanContestants().length&&!this.recoveringHumans()){this.phase='results';this.startRound();this.publicRestartAt=null;}
   }
   if(this.phase!=='playing'){for(const p of this.players.values()){if(p.emote)emoteInput(this,p,this.inputs.get(p.id)||{});if(this.phase==='results'&&this.time-(this.finishedAt??-100)<2&&p.health>0&&!p.spectating&&!p.boss&&!p.henchman){const input=this.inputs.get(p.id)||{},before={x:p.x,z:p.z};movePlayer(p,{...input,fire:false,aim:false,jump:false,sprint:false},this.map,dt*.25);p.vx=(p.x-before.x)/dt;p.vz=(p.z-before.z)/dt;p.moving=Math.hypot(p.vx,p.vz)>.01;}}return;}
   if(isWarmup(this.stage)&&!this.options.training)this.prepareBattleWorld();

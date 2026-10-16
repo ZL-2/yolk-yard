@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
 import WebSocket from 'ws';
 import {startRealtimeServer} from '../server/realtime/index.js';
 import {Network} from '../src/network.js';
@@ -6,6 +8,8 @@ import {RoyaleSimulation} from '../src/royale.js';
 import {VERSION,safeProfile} from '../src/data.js';
 import {publicRoyaleOptions} from '../src/public-royale.js';
 
+const temp=await mkdtemp(tmpdir()+'/ravel-host-check-');
+process.env.RAVEL_SOCIAL_DATA_PATH=temp+'/social.json';process.env.RAVEL_REWARD_DATA_PATH=temp+'/rewards.json';process.env.YOLK_OWNER_DATA_PATH=temp+'/owner.json';
 const app=await startRealtimeServer({port:0,host:'127.0.0.1'}),base=`ws://127.0.0.1:${app.server.address().port}`,users=[],games=[];
 globalThis.window={YOLK_NETWORK:{relay:base+'/game'}};
 globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
@@ -19,7 +23,7 @@ async function user(name){
 }
 async function game(u,host=false){
  const launch=u.launches.at(-1),g={errors:[],states:0};games.push(g);
- g.net=new Network({getCheckpoint:()=>g.sim?.checkpoint(),getChatState:()=>g.sim?.snapshot()||g.state,onState:s=>{g.state=s;g.states++;},onJoin:(id,p,a)=>!!g.sim?.admitPlayer(id,p,a),onLeave:id=>g.sim?.leavePlayer(id),onRoster:ids=>g.sim?.setConnectedHumans(ids),onInput:(id,input)=>g.sim?.setInput(id,input,true),onPlayerAction:(id,action)=>g.sim?.playerAction(id,action),onError:e=>g.errors.push(e),onHost:(checkpoint,departed)=>{g.sim=new RoyaleSimulation(checkpoint.options).restore(checkpoint);for(const p of g.sim.players.values())if(!p.bot)p.connected=p.id===g.net.id;for(const id of departed)g.sim.leavePlayer(id);}});
+ g.net=new Network({getCheckpoint:()=>g.sim?.checkpoint(),getChatState:()=>g.sim?.snapshot()||g.state,onState:s=>{g.state=s;g.states++;},onJoin:(id,p,a)=>!!g.sim?.admitPlayer(id,p,a),onLeave:id=>g.sim?.leavePlayer(id),onRoster:ids=>g.sim?.setConnectedHumans(ids),onSuspendPlayer:id=>g.sim?.suspendPlayer(id),onHostRecovery:ms=>g.sim?.beginHostRecovery(ms),onInput:(id,input)=>g.sim?.setInput(id,input,true),onPlayerAction:(id,action)=>g.sim?.playerAction(id,action),onError:e=>g.errors.push(e),onHost:(checkpoint,departed)=>{g.sim=new RoyaleSimulation(checkpoint.options).restore(checkpoint);for(const p of g.sim.players.values())if(!p.bot)p.connected=p.id===g.net.id;for(const id of departed)g.sim.leavePlayer(id);}});
  g.clock=setInterval(()=>{if(!g.net.isHost||!g.sim||g.net.closed)return;g.sim.setInput(g.net.id,{yaw:0,forward:0});g.sim.tick(1/60);if((g.frame=(g.frame||0)+1)%3===0){g.state=g.sim.snapshot();g.net.broadcast(g.state);}},1000/60);
  if(host){g.sim=new RoyaleSimulation(publicRoyaleOptions());g.sim.addPlayer('host',u.profile);await g.net.host(launch.code,launch.ticket);g.net.visibility='public';g.sim.startRound();g.net.broadcast(g.sim.snapshot());await u.ask('host-ready',{id:launch.id});}
  else await g.net.join(launch.code,u.profile,launch.ticket);
@@ -56,4 +60,4 @@ try{
  const publicBoard=await (await fetch(`http://127.0.0.1:${app.server.address().port}/leaderboards`)).json();assert.equal(publicBoard.kills.rows.some(p=>p.you),false);assert.ok(publicBoard.kills.total>=4);assert.equal(JSON.stringify(publicBoard).includes('progressId'),false);
  assert.equal(app.relay.authority.rooms.size,0);for(const g of [h,j,k,next,viewer])assert.deepEqual(g.errors,[]);
  console.log(JSON.stringify({result:'PASS',protocol:VERSION,serverSimulations:0,firstPlayerHost:true,concurrentJoins:true,briefReconnect:true,gracefulTransfer:true,gracefulTransferMs,finalCheckpoint:true,abruptTransfer:true,frozenHostTransfer:true,checkpointWorldPreserved:true,inventoryPreferences:true,preferenceMigration:true,joinAfterMigration:true,lateSpectator:true,authenticatedLeaderboards:true}));
-}catch(e){console.error(JSON.stringify({summary:app.relay.publicHost.summary(),members:[...app.relay.publicHost.members.values()].map(x=>({id:x.id,spectator:x.admission.spectator})),games:games.map(g=>({id:g.net.id,host:g.net.isHost,errors:g.errors,players:g.sim?[...g.sim.players.values()].filter(p=>!p.bot).map(p=>({id:p.id,contestant:p.contestant,connected:p.connected,spec:p.spectating})):null}))}));throw e;}finally{for(const g of games){clearInterval(g.clock);g.net.destroy();}for(const u of users)u.ws.close();await app.close();}
+}catch(e){console.error(JSON.stringify({summary:app.relay.publicHost.summary(),members:[...app.relay.publicHost.members.values()].map(x=>({id:x.id,spectator:x.admission.spectator})),games:games.map(g=>({id:g.net.id,host:g.net.isHost,errors:g.errors,players:g.sim?[...g.sim.players.values()].filter(p=>!p.bot).map(p=>({id:p.id,contestant:p.contestant,connected:p.connected,spec:p.spectating})):null}))}));throw e;}finally{for(const g of games){clearInterval(g.clock);g.net.destroy();}for(const u of users)u.ws.close();await app.close();await rm(temp,{recursive:true,force:true});}

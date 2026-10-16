@@ -23,7 +23,23 @@ export class PartyService{
  limit(u,key,count,window){u.limits??=new Map();const now=Date.now(),times=(u.limits.get(key)||[]).filter(t=>now-t<window);if(times.length>=count)throw Error('Please wait before trying that again.');times.push(now);u.limits.set(key,times);}
  detachMember(u,{solo=true,reason='left'}={}){const p=this.parties.get(u.party);if(!p)return;if(p.state==='queueing')this.cancel(p,'Party membership changed.');p.members=p.members.filter(id=>id!==u.id);for(const [id,i]of this.invites)if(i.from===u.id||i.to===u.id||i.party===p.id&&p.members.length===0)this.invites.delete(id);for(const [id,t]of this.tickets)if(t.member===u.id&&!t.peer)this.tickets.delete(id);if(!p.members.length)this.parties.delete(p.id);else{if(p.leader===u.id)p.leader=p.members.find(id=>this.connected(this.users.get(id)))||p.members[0];if(!p.members.some(id=>this.users.get(id)?.inMatch)){p.state='idle';delete p.launch;}this.sync(p);}u.ready=false;if(!u.inMatch)delete u.joined;delete u.party;if(solo){this.create(u);this.sync(this.parties.get(u.party));}if(solo||reason==='timeout')this.send(u,{type:'party-notice',message:reason==='removed'?'You were removed from the party.':reason==='timeout'?'Your disconnected party membership expired.':'You left the party.'});this.changed();}
  leave(u,reason){this.detachMember(u,{reason});}
- cancel(p,reason='Matchmaking cancelled.'){this.relay.authority?.capacity?.release(p.id);const launchId=p.launch?.id,aborting=p.state==='queueing',waiting=aborting&&p.launch?.creating&&!p.launch.hostReady?[...this.parties.values()].filter(other=>other!==p&&other.state==='queueing'&&other.launch?.code===p.launch.code):[];for(const id of p.members){const u=this.users.get(id);if(aborting){const ticket=this.tickets.get(u.ticket),peer=this.relay.peers.get(ticket?.peer);if(peer?.authorityRoom)this.relay.authority.disconnect(peer);u.inMatch=false;delete u.matchPeer;}u.ready=false;delete u.joined;}p.state=p.members.some(id=>this.users.get(id)?.inMatch)?'playing':'idle';delete p.launch;for(const [t,a]of this.tickets)if(a.party===p.id&&(aborting||!a.peer))this.tickets.delete(t);for(const id of p.members)this.send(this.users.get(id),{type:'cancel',message:reason,launchId});this.sync(p);for(const other of waiting)this.cancel(other,'The pending match closed. Find a match again.');}
+ cancel(p,reason='Matchmaking cancelled.'){
+  this.relay.authority?.capacity?.release(p.id);
+  const launchId=p.launch?.id,aborting=p.state==='queueing',kept=new Set(),waiting=aborting&&p.launch?.creating&&!p.launch.hostReady?[...this.parties.values()].filter(other=>other!==p&&other.state==='queueing'&&other.launch?.code===p.launch.code):[];
+  if(this.relay.publicHost?.pending?.party===p.id)this.relay.publicHost.pending=null;
+  for(const id of p.members){
+   const u=this.users.get(id);
+   // A failed party member may cancel their own admission, but must not evict
+   // already-playing public members (especially the host for other parties).
+   if(p.launch?.recurring&&u.inMatch&&this.relay.peers.has(u.matchPeer))kept.add(id);
+   else if(aborting){const ticket=this.tickets.get(u.ticket),peer=this.relay.peers.get(ticket?.peer);if(peer?.authorityRoom)this.relay.authority.disconnect(peer);u.inMatch=false;delete u.matchPeer;}
+   u.ready=false;delete u.joined;
+  }
+  p.state=p.members.some(id=>this.users.get(id)?.inMatch)?'playing':'idle';delete p.launch;
+  for(const [t,a]of this.tickets)if(a.party===p.id&&!kept.has(a.member)&&(aborting||!a.peer))this.tickets.delete(t);
+  for(const id of p.members)this.send(this.users.get(id),kept.has(id)?{type:'party-notice',message:'Party matchmaking stopped. Your public match continues.'}:{type:'cancel',message:reason,launchId});
+  this.sync(p);for(const other of waiting)this.cancel(other,'The pending match closed. Find a match again.');
+ }
  attach(ws){let user,at=0,count=0,queue=Promise.resolve();const timeout=setTimeout(()=>{if(!user)ws.close();},10000);timeout.unref?.();
   ws.on('message',raw=>{let m;try{if(raw.length>8192)throw Error('Message too large');m=JSON.parse(raw);if(Date.now()-at>1000){at=Date.now();count=0;}if(++count>25)throw Error('Too many requests');}catch(e){ws.close(1008,e.message.slice(0,100));return;}
    // Serialize each session while awaiting durable writes, without blocking gameplay.

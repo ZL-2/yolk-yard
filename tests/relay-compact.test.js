@@ -28,3 +28,22 @@ test('channel failures stay local during election; registration failures still r
 });
 
 test('private hosts admit all 48 contestant seats and spectator transport channels',()=>{const peer=Object.assign(Object.create(RelayPeer.prototype),{connections:new Map(),events:new Map(),enqueue(){},flush(){}});for(let i=0;i<63;i++)peer.message({type:'incoming',channel:'seat-'+i,peer:'player-'+i});assert.equal(peer.connections.size,63);for(const c of peer.connections.values())assert.equal(c.open,true);});
+
+test('UTF-8 batches stay below the server frame limit and retain all action entries',()=>{
+ const {peer,frames}=transport(false);peer.socket.bufferedAmount=100000;
+ for(let i=0;i<5;i++)peer.enqueue({type:'data',channel:i%2?'a':'b',data:{type:'action',index:i,text:'界'.repeat(150000)}});
+ assert.equal(peer.destroyed,undefined);peer.socket.bufferedAmount=0;peer.flush();
+ assert.ok(frames.length>1,'Wire bytes, rather than JavaScript string length, split the batch');
+ assert.ok(frames.every(frame=>Buffer.byteLength(JSON.stringify(frame))<2000000));
+ assert.deepEqual(frames.flatMap(frame=>frame.messages.map(m=>m.data.index)),[0,1,2,3,4]);
+});
+
+test('a refused snapshot preserves the queued state and does not terminate other channels',()=>{
+ const {peer,frames}=transport(false);peer.socket.bufferedAmount=100000;
+ const first=state('a',1);first.data.checkpoint={padding:'x'.repeat(1000000)};
+ assert.equal(peer.enqueue(first),true);
+ const second=state('b',2);second.data.checkpoint={padding:'x'.repeat(1000000)};
+ assert.equal(peer.enqueue(second),false);assert.equal(peer.queue.length,1);assert.equal(peer.destroyed,undefined);
+ peer.socket.bufferedAmount=0;peer.flush();assert.equal(frames[0].messages[0].data.state.time,1);
+ assert.equal(peer.enqueue(second),true);peer.flush();assert.equal(frames[1].messages[0].data.state.time,2);
+});

@@ -13,10 +13,19 @@ test('main-match arrival notices count real admissions, exclude spectators, and 
  host.admission(viewer,{recurring:true,spectator:true});assert.equal(host.joinSerial,1);assert.equal(host.summary().humanPlayers,1);assert.equal(host.summary().spectators,1);assert.equal(Object.hasOwn(host.summary().lastJoin,'memberId'),false);
 });
 test('the public address requires the reserved leader ticket or the elected live session proof',()=>{
- const {relay,host}=fixture();assert.equal(host.authorize({}),false);host.pending={party:'party',leader:'first'};relay.parties.tickets.set('ticket',{recurring:true,member:'first',party:'party',expires:Date.now()+1000});assert.equal(host.authorize({publicTicket:'ticket'}),true);assert.equal(host.authorize({publicTicket:'unknown'}),false);
- host.pending=null;for(const [id,order]of [['oldest',1],['later',2]]){relay.peers.set(id,{id,token:id+'-secret',ws:{readyState:1}});host.members.set(id,{peer:id,order,admission:{}});}
+ const {relay,host}=fixture();assert.equal(host.authorize({}),false);host.pending={party:'party',leader:'first',expires:Date.now()+1000};relay.parties.tickets.set('ticket',{recurring:true,member:'first',party:'party',expires:Date.now()+1000});assert.equal(host.authorize({publicTicket:'ticket'}),true);assert.equal(host.authorize({publicTicket:'unknown'}),false);
+ host.pending=null;host.state={matchId:'test-round'};for(const [id,order]of [['oldest',1],['later',2]]){relay.peers.set(id,{id,token:id+'-secret',ws:{readyState:1}});host.members.set(id,{peer:id,order,ready:true,readyAt:Date.now(),readyMatch:'test-round',admission:{}});}
  assert.equal(host.authorize({publicHostProof:{id:'later',token:'later-secret'}}),false);assert.equal(host.authorize({publicHostProof:{id:'oldest',token:'wrong'}}),false);assert.equal(host.authorize({publicHostProof:{id:'oldest',token:'oldest-secret'}}),true);
+ host.members.get('oldest').ready=false;assert.equal(host.authorize({publicHostProof:{id:'later',token:'later-secret'}}),true,'An unsynchronized or hidden member cannot block a ready successor');
+ host.members.get('oldest').ready=true;host.members.get('oldest').readyAt=Date.now()-9000;assert.equal(host.authorize({publicHostProof:{id:'later',token:'later-secret'}}),true,'A frozen tab answering native pings cannot block host recovery');
  host.host={peer:'oldest',address:host.key,id:'oldest'};assert.equal(host.authorize({publicHostProof:{id:'later',token:'later-secret'}}),false,'a second host cannot claim a live lease');
+});
+
+test('late cleanup of an old peer cannot remove a replacement using the same public address',()=>{
+ const current={id:'same-public-address'},old={id:current.id};let disconnected=false;
+ const relay={peers:new Map([[current.id,current]]),authority:{disconnect(){disconnected=true;}}};
+ RealtimeRelay.prototype.remove.call(relay,old);
+ assert.equal(relay.peers.get(current.id),current);assert.equal(disconnected,false);
 });
 test('private callers cannot publish the public phase or save crowns; spectators preserve ownership',()=>{
  const {relay,host}=fixture(),peer={id:'player',progressId:'account',ws:{readyState:1}};relay.peers.set(peer.id,peer);assert.equal(host.publish(peer,{recurring:true}),false);host.saveCrown(peer,{season:1,owned:true});assert.equal(relay.progression.account('account').crowns,undefined);

@@ -37,9 +37,10 @@ export function queueMatch(service,u,m){
 function queuePublicRoyale(service,u,m){
  const p=service.parties.get(u.party),publicHost=service.relay.publicHost;
  if(!publicHost?.enabled)throw Error('The public match is unavailable.');
- const summary=publicHost.summary(),creating=publicHost.reserve(p,u),spectator=!creating&&(!!m.spectate||!!publicHost.state&&!acceptsContestants(publicHost.state.stage)||publicHost.state?.phase==='results');
- if(!creating&&!summary.hostReady&&!publicHost.pending&&!publicHost.host)throw Error('The public host is loading or transferring. Try again shortly.');
+ const summary=publicHost.summary(),spectator=!!(publicHost.host||publicHost.pending)&&(!!m.spectate||!!publicHost.state&&!acceptsContestants(publicHost.state.stage)||publicHost.state?.phase==='results');
+ if(!summary.hostReady&&!publicHost.pending&&!publicHost.host&&publicHost.members.size)throw Error('The public host is loading or transferring. Try again shortly.');
  if((spectator?summary.availableSpectators:summary.availableSeats)<p.members.length)throw Error('The public match cannot fit your party right now.');
+ const creating=publicHost.reserve(p,u);
  const launch={id:randomUUID(),code:PUBLIC_ROYALE.code,options:publicRoyaleOptions(),creating,hostRun:true,recurring:true,rewardPublic:false,spectator,visibility:'public',created:Date.now()};
  p.launch=launch;p.state='queueing';
  for(const id of p.members){const token=randomUUID(),t={party:p.id,member:id,code:launch.code,teamSize:1,teamFill:true,partySize:p.members.length,hostRun:true,recurring:true,spectator,publicSpectator:spectator,expires:Date.now()+90000,token};service.tickets.set(token,t);service.users.get(id).ticket=token;}

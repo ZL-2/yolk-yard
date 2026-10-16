@@ -46,7 +46,7 @@ export class Network {
   constructor(callbacks = {}) {
     this.callbacks = callbacks;
     this.visibility = "public";
-    this.hostId="host";this.members=[];this.memberOrder=0;this.migrating=false;this.failedHosts=new Set();
+    this.hostId="host";this.members=[];this.memberOrder=0;this.migrating=false;this.failedHosts=new Set();this.reconnectingMembers=new Map();
     this.maxConnections=15;
     this.peer = null;
     this.connections = new Map();
@@ -103,7 +103,7 @@ export class Network {
         this.callbacks.onStatus?.(
           "Reconnecting to the room service…",
         );
-      if(!this.closed && relayURL()){this.callbacks.onError?.('The game server connection ended. Rejoin the room or create another match.');}
+      if(!this.closed && relayURL()){if(this.officialPublic){this.isHost=false;this.publicLeaseAuthorized=false;}this.callbacks.onError?.('The game server connection ended. Rejoin the room or create another match.');}
       else if(!this.closed)this.later(()=>{if(this.peer?.disconnected&&!this.peer.destroyed)this.peer.reconnect();},1200);
     });
     return new Promise((resolve, reject) => {
@@ -207,11 +207,12 @@ export class Network {
           return;
         }
         accepted = true;
+        const reconnectTimer=this.reconnectingMembers.get(conn.peer);clearTimeout(reconnectTimer);this.timers.delete(reconnectTimer);this.reconnectingMembers.delete(conn.peer);
         clearTimeout(timeout);
         this.timers.delete(timeout);
         this.connections.set(conn.peer, conn);
         if(!this.members.some(m=>m.id===conn.peer))this.members.push({id:conn.peer,peerId:conn.peer,order:++this.memberOrder,spectator:!!msg.admission?.friendSpectator||!this.officialPublic&&!!msg.admission?.spectator||!!this.snapshot?.players.find(p=>p.id===conn.peer)?.friendSpectator});
-        this.callbacks.onRoster?.([this.id,...[...this.connections].filter(([,c])=>c.open).map(([id])=>id)]);
+        this.syncRoster();
         conn.send({
           type: "welcome",
           hostId:this.id,members:this.members,checkpoint:this.migrationData(),
@@ -244,14 +245,24 @@ export class Network {
       this.timers.delete(timeout);
       if (this.connections.get(conn.peer) === conn) {
         this.connections.delete(conn.peer);
-        this.members=this.members.filter(m=>m.id!==conn.peer);
-        this.chatRoom.remove(conn.peer);
-        this.callbacks.onLeave?.(conn.peer);
-        this.callbacks.onRoster?.([this.id,...[...this.connections].filter(([,c])=>c.open).map(([id])=>id)]);
+        const depart=()=>{this.reconnectingMembers.delete(conn.peer);if(this.connections.has(conn.peer))return;this.members=this.members.filter(m=>m.id!==conn.peer);this.chatRoom.remove(conn.peer);this.callbacks.onLeave?.(conn.peer);this.syncRoster();};
+        if(this.officialPublic&&!this.closed){
+          // A dropped logical channel is recoverable using the still-live relay
+          // session. Do not replace this contestant with a bot or lose inventory.
+          this.callbacks.onSuspendPlayer?.(conn.peer);
+          this.reconnectingMembers.set(conn.peer,this.later(depart,10000));
+        }else depart();
       }
     };
     conn.on("close", close);
     conn.on("error", close);
+  }
+  syncRoster(){this.callbacks.onRoster?.([this.id,...[...this.connections].filter(([,c])=>c.open).map(([id])=>id),...this.reconnectingMembers.keys()]);}
+  publicReady(){
+    if(!this.officialPublic||!this.ready||!this.lastCheckpoint?.simulation)return;
+    const checkpoint=this.lastCheckpoint.simulation,ready=globalThis.document?.hidden!==true,key=checkpoint.matchId+':'+ready;
+    const now=performance.now();if(this.lastReadyMatch===key&&now-(this.lastReadySent||0)<2000)return;this.lastReadyMatch=key;this.lastReadySent=now;
+    this.peer?.control?.({type:'public-member-ready',matchId:checkpoint.matchId,ready});
   }
   async join(code, profile, ticket) {
     this.ticket=ticket;this.officialPublic=cleanCode(code)==='FRONTIER';
@@ -298,6 +309,7 @@ export class Network {
           this.id = msg.id;this.serverAuthority=!!msg.serverAuthority;
           this.hostId=msg.hostId||"host";this.members=msg.members||[];if(msg.checkpoint)this.lastCheckpoint=msg.checkpoint;
           this.ready = true;
+          this.publicReady();
           this.lastState = performance.now();
           this.hostHeartbeat.contact(this.lastState);
           resolve();
@@ -341,6 +353,7 @@ export class Network {
           }):[];
           if(s.network){this.hostId=s.network.hostId;this.members=s.network.members;}
           if(msg.checkpoint)this.lastCheckpoint=msg.checkpoint;
+          this.publicReady();
           this.snapshot=s;
           this.chatEnabled=s.chatEnabled !== false;
           this.chatMuted=Array.isArray(s.chatMuted)?s.chatMuted.filter(id=>typeof id==='string').slice(0,20):[];
@@ -375,6 +388,7 @@ export class Network {
     clearInterval(this.heartbeat);
     this.hostHeartbeat = new HostHeartbeat(performance.now());
     this.heartbeat = setInterval(() => {
+      this.publicReady();
       if (this.closed || this.isHost || this.migrating || this.peer?.reconnecting) return;
       const now=performance.now();this.send({ type: "ping", time: now });
       // The persistent relay owns the room address and closes the host channel
@@ -477,34 +491,36 @@ export class Network {
     let checkpoint;
     if(checkpointDue){this.lastCheckpointSent=performance.now();this.checkpointWorldVersion=worldVersion;checkpoint={simulation:this.callbacks.getCheckpoint?.(),chat:{sequence:this.chatRoom.sequence,enabled:this.chatEnabled,muted:this.chatMuted,members:[...this.chatRoom.members],reports:[...this.chatRoom.reports]},kicked:[...this.kicked]};}
     const recipients=[...this.connections.values()];
-    const broadcasts=new Map();
+    // A congested recipient gets this checkpoint on its next accepted frame.
+    // Keep one shared reference instead of duplicating the world in the queue.
+    if(checkpoint)for(const conn of recipients)conn.pendingCheckpoint=checkpoint;
     const offset=(this.broadcastCursor||0)%Math.max(1,recipients.length);
     this.broadcastCursor=offset+1;
     // Shared-socket backpressure must not repeatedly favor the first seats.
     for (let i=0;i<recipients.length;i++) {
       const conn=recipients[(i+offset)%recipients.length];
       if (!conn.open || (conn.dataChannel?.bufferedAmount || 0) >= 131072) continue;
-      const recipient=state.players.find(p=>p.id===conn.peer),teamGroup=isTeamRoyale(state.options)?recipient?.team:conn.peer;
-      const observer=state.players.find(p=>p.id===(recipient?.watchingId||recipient?.killerId))||recipient;
-      const group=[conn.royaleVersion,conn.buildVersion,conn.lastEventSent,teamGroup,conn.peer,Math.floor((observer?.x||0)/64),Math.floor((observer?.z||0)/64),!!observer?.aim].join('|'),cached=broadcasts.get(group);
-      if(cached){Object.assign(conn,cached.cursor);conn.send(cached.message);continue;}
+      const recipient=state.players.find(p=>p.id===conn.peer);
       let outgoing=state;
+      const cursor={};
       if(state.royale){
         outgoing={...state,royale:{...state.royale,markers:visibleMarkers(state,recipient)}};
         const version=state.royale.matchId+':'+state.options.map+':'+state.round+':'+state.royale.lootVersion;
         if(conn.royaleVersion===version){const {loot,chests,...royale}=outgoing.royale;outgoing={...state,royale};}
-        conn.royaleVersion=version;
+        cursor.royaleVersion=version;
         const buildVersion=state.royale.matchId+':'+state.options.map+':'+state.round+':'+state.royale.buildVersion;
         if(conn.buildVersion===buildVersion){const {builds,worldDamage,...royale}=outgoing.royale;outgoing={...outgoing,royale};}
-        conn.buildVersion=buildVersion;
+        cursor.buildVersion=buildVersion;
       }
       // Ordered delivery and reconnect replay preserve each event once. Do not
       // retransmit the last 60 events in every movement snapshot.
       const events=outgoing.events.filter(e=>(!Number.isFinite(e.id)||e.id>(conn.lastEventSent??-1))&&(e.type!=='duo-marker'||e.player===conn.peer||isTeamRoyale(state.options)&&e.team===recipient?.team));
-      for(const event of events)if(Number.isFinite(event.id))conn.lastEventSent=Math.max(conn.lastEventSent??-1,event.id);
+      cursor.lastEventSent=conn.lastEventSent;
+      for(const event of events)if(Number.isFinite(event.id))cursor.lastEventSent=Math.max(cursor.lastEventSent??-1,event.id);
       this.interest??=new SnapshotInterest();outgoing={...outgoing,events,players:this.interest.players(outgoing,recipient)};
-      const message={type:'state',state:outgoing,...(checkpoint?{checkpoint}:{})};
-      broadcasts.set(group,{message,cursor:{royaleVersion:conn.royaleVersion,buildVersion:conn.buildVersion,lastEventSent:conn.lastEventSent}});conn.send(message);
+      const recovery=conn.pendingCheckpoint;
+      const message={type:'state',state:outgoing,...(recovery?{checkpoint:recovery}:{})};
+      if(conn.send(message)!==false){Object.assign(conn,cursor);conn.pendingCheckpoint=null;}
     }
   }
   migrationData(){return {simulation:this.callbacks.getCheckpoint?.(),chat:{sequence:this.chatRoom.sequence,enabled:this.chatEnabled,muted:this.chatMuted,members:[...this.chatRoom.members],reports:[...this.chatRoom.reports]},kicked:[...this.kicked]};}
@@ -549,6 +565,7 @@ export class Network {
         welcomed=true;clearTimeout(timer);this.timers.delete(timer);this.migrating=false;this.hostId=msg.hostId;this.members=msg.members;this.lastState=performance.now();
         this.failedHosts.delete(this.hostId);
         this.hostHeartbeat=new HostHeartbeat(this.lastState);
+        this.publicReady();
         this.callbacks.onStatus?.('New host connected. Match continues.');
       }else if(msg.type==='reject'&&!welcomed){retry();}
       else if(msg.type==='state'&&welcomed){
@@ -558,7 +575,7 @@ export class Network {
         this.lastState=performance.now();this.snapshot=s;this.members=s.network?.members||this.members;this.hostId=s.network?.hostId||this.hostId;
         this.hostHeartbeat.contact(this.lastState);
         this.chatEnabled=s.chatEnabled!==false;this.chatMuted=s.chatMuted||[];
-        if(msg.checkpoint)this.lastCheckpoint=msg.checkpoint;this.callbacks.onState?.(s);
+        if(msg.checkpoint)this.lastCheckpoint=msg.checkpoint;this.publicReady();this.callbacks.onState?.(s);
       }else if(msg.type==='chat-message')this.callbacks.onChat?.(msg.message);
       else if(msg.type==='chat-status')this.callbacks.onChatStatus?.(msg);
       else if(msg.type==='pong'&&Number.isFinite(msg.time)){const now=performance.now();this.hostHeartbeat.contact(now);this.latency=Math.max(0,Math.round(now-msg.time));}
@@ -580,6 +597,7 @@ export class Network {
     this.chatMuted=checkpoint.chat?.muted||[];this.chatRoom.muted=new Set(this.chatMuted);this.chatRoom.members=new Map(checkpoint.chat?.members||[]);this.chatRoom.reports=new Set(checkpoint.chat?.reports||[]);this.kicked=new Set(checkpoint.kicked||[]);
     this.maxConnections=(checkpoint.simulation.options.mode==='royale'?Math.min(checkpoint.simulation.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     this.callbacks.onHost?.(checkpoint.simulation,[...this.failedHosts]);
+    this.callbacks.onHostRecovery?.(10000);
     this.lastPublish=0;this.lastCheckpointSent=0;this.claimRoomAddress();
     this.callbacks.onStatus?.('You are now the host. The match continues.');
     this.later(()=>{for(const member of [...this.members])if(member.id!==this.id&&!this.connections.has(member.id)){this.members=this.members.filter(m=>m.id!==member.id);this.callbacks.onLeave?.(member.id);}},10000);
@@ -592,8 +610,9 @@ export class Network {
     const alias=relayURL()?new RelayPeer(PREFIX+this.code,this.officialPublic?{publicHostProof:{id:this.peer.id,token:this.peer.resume?.resume}}:{}):new Peer(PREFIX+this.code,{debug:0,...config.peer,config:{iceServers:config.iceServers||[{urls:'stun:stun.l.google.com:19302'}]}});this.aliasPeer=alias;
     alias.on('open',()=>{if(this.closed)return;if(recovering&&this.migrating){this.publicLeaseAuthorized=true;this.promote();}this.publishRoom();});for(const type of ['reward','afk','afk-enforce'])alias.on(type,event=>this.callbacks.onProgress?.(type,event));
     alias.on('connection',conn=>this.accept(conn));
-    alias.on('error',()=>{alias.destroy();this.later(()=>this.isHost?this.claimRoomAddress():recovering&&this.recoverPublicHost(),recovering?800:2500);});
-    alias.on('disconnected',()=>{if(!alias.destroyed&&!this.closed){if(relayURL()){alias.destroy();this.later(()=>this.claimRoomAddress(),2500);}else alias.reconnect();}});
+    const lost=()=>{if(this.aliasPeer!==alias)return;alias.destroy();if(this.closed)return;if(this.officialPublic&&this.isHost){this.isHost=false;this.publicLeaseAuthorized=false;this.callbacks.onError?.('The public host connection ended. Return to the lobby to rejoin the main match.');return;}this.later(()=>this.isHost?this.claimRoomAddress():recovering&&this.recoverPublicHost(),recovering?800:2500);};
+    alias.on('error',lost);
+    alias.on('disconnected',()=>{if(!alias.destroyed&&!this.closed){if(relayURL())lost();else alias.reconnect();}});
   }
   kick(id) {
     if(this.officialPublic)return;
