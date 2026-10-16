@@ -1,7 +1,7 @@
 // One travel clock drives the grounded stride and the moving lobby scenery.
 // The upper-body patrol is a continuous, looping sequence of sector checks.
 export const PATROL_SPEED=1.12;
-export const PATROL_CYCLE=1.35;
+export const PATROL_CYCLE=1.16;
 export const PATROL_SCAN_CYCLE=24;
 const sectors=[.05,.70,.05,-.70,.10,.66,.03,-.72,.12,.64,-.10,-.65];
 const aiming=[.85,.75,.35,.95,.30,.90,.75,.95,.30,.65,.80,.95];
@@ -26,16 +26,16 @@ export class LobbyMotion{
   const weaponYaw=rifle*.86+Math.sin(phase)*.010*(1-ready*.75);
   const hipYaw=Math.sin(phase)*.026,spineYaw=body*.20,chestYaw=rifle*.57-Math.sin(phase)*.018;
   const torsoYaw=hipYaw+spineYaw+chestYaw,look=scan*(1-ready*.75)+weaponYaw*ready*.75;
-  const bodySway=Math.sin(phase)*.047-Math.sin(phase*2)*.008+body*.027;
+  const bodySway=Math.sin(phase)*.023-Math.sin(phase*2)*.004+body*.012;
   this.yaw=Math.PI+.12+track(sectors,t-.90)*.17+Math.sin(phase)*.013;
   this.pitch=-.125+ready*.112-lower*.25+Math.sin(t*.9)*.014*(1-ready*.8);
   return {yaw:this.yaw,pitch:this.pitch,scan,gazeYaw:look,headYaw:look-torsoYaw,
    spineYaw,chestYaw,hipYaw,headPitch:-ready*.055-lower*.035+Math.sin(t*1.7)*.008,
    headRoll:-ready*.075+Math.sin(phase)*.012,
    speed:PATROL_SPEED,phase,distance:this.distance,cycleDistance:PATROL_CYCLE,
-   bodyBob:-Math.cos(phase*2)*.024,bodySway,
+   bodyBob:-Math.cos(phase*2)*.010,bodySway,
    roll:-.035-ready*.045+Math.sin(phase)*.018*(1-ready*.7),grip:ready*.095-lower*.065,
-   breath:Math.sin(t*1.7)*.003,lean:Math.sin(phase)*.034+body*.027,ready,lower,
+   breath:Math.sin(t*1.7)*.003,lean:Math.sin(phase)*.018+body*.015,ready,lower,
    // Rotate around the inner shoulder instead of swinging the stock away from it.
    weaponYaw,weaponSide:bodySway+.12*Math.cos(torsoYaw)-.19*Math.sin(weaponYaw)-.10,
    weaponDepth:-.12*Math.sin(torsoYaw)-.19*Math.cos(weaponYaw)+.22,

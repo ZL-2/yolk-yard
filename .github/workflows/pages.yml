@@ -19,6 +19,7 @@ jobs:
       models_only: ${{ steps.scope.outputs.models_only }}
       field_control_update: ${{ steps.scope.outputs.field_control_update }}
       public_match_fix: ${{ steps.scope.outputs.public_match_fix }}
+      operator_refresh: ${{ steps.scope.outputs.operator_refresh }}
       built_world_update: ${{ steps.scope.outputs.built_world_update }}
       environment_only: ${{ steps.scope.outputs.environment_only }}
       visual_only: ${{ steps.scope.outputs.visual_only }}
@@ -122,6 +123,9 @@ jobs:
           lobby_followup=files<={'.github/workflows/pages.yml','src/lobby-deploy.css','scripts/public-match-browser-check.mjs','scripts/release-live-check.mjs'} and json.loads(Path('package.json').read_text()).get('version')=='5.15.0'
           lobby_update=files<=lobby_allowed and (lobby_core<=files or previous<=lobby_allowed and lobby_core<=previous or lobby_followup)
           public_match=public_match or lobby_update
+          operator_allowed=set([".github/workflows/pages.yml","docs/UPDATE_166.md","package.json","package-lock.json","server/realtime/parties.js","src/equip.js","src/frontier-ui.css","src/humanoid.js","src/lobby-deploy.css","src/lobby-motion.js","src/lobby-ui.js","src/main.js","src/mode-activity.js","src/operator-motion.js","src/party-client.js","src/presence-ui.js","src/releases.js","src/royale-view.js","src/view.js","tests/equip.test.js","tests/field-detail.test.js","tests/hitbox.test.js","tests/lobby-motion.test.js","tests/operator-refresh.test.js","tests/operator-refresh-preview.html","scripts/operator-refresh-browser-check.mjs","scripts/public-match-browser-check.mjs"])
+          operator_allowed.add('tests/leaderboards.test.js')
+          operator_refresh=files<=operator_allowed and json.loads(Path('package.json').read_text()).get('version')=='5.16.0' and Path('tests/operator-refresh.test.js').exists()
           for path in ['package.json','package-lock.json']:
             if path not in files: continue
             old=json.loads(subprocess.check_output(['git','show','HEAD^:'+path],text=True));new=json.loads(Path(path).read_text())
@@ -138,8 +142,9 @@ jobs:
             built_world=built_world and old==new
             field_control=field_control and old==new
             public_match=public_match and old==new
+            operator_refresh=operator_refresh and old==new
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('focused',scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match)]: out.write(key+'='+str(value).lower()+'\n')
+            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('focused',scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh)]: out.write(key+'='+str(value).lower()+'\n')
           print('Focused release:',{'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
   build:
@@ -232,6 +237,9 @@ jobs:
       - name: Public host handoff, frozen hosts, scoring and inventory recovery
         if: needs.scope.outputs.public_match_fix == 'true'
         run: node scripts/public-host-network-check.mjs
+      - name: Operator motion, draw clocks, live counts, party presence and rig budgets
+        if: needs.scope.outputs.operator_refresh == 'true'
+        run: node --test --test-concurrency=2 tests/operator-refresh.test.js tests/lobby-motion.test.js tests/arms.test.js tests/equip.test.js tests/field-detail.test.js tests/hitbox.test.js tests/private-social.test.js tests/crew-update.test.js tests/public-pools.test.js tests/leaderboards.test.js tests/deployment.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -263,10 +271,19 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Lobby discovery, options, readiness, room pools and browser host reconnect
-        if: needs.scope.outputs.public_match_fix == 'true'
+        if: needs.scope.outputs.public_match_fix == 'true' || needs.scope.outputs.operator_refresh == 'true'
         run: node scripts/public-match-browser-check.mjs
+      - name: Render operator stride and shoulder versus hip draws
+        if: needs.scope.outputs.operator_refresh == 'true'
+        run: node scripts/operator-refresh-browser-check.mjs
       - uses: actions/upload-artifact@v4
-        if: always() && needs.scope.outputs.public_match_fix == 'true'
+        if: always() && needs.scope.outputs.operator_refresh == 'true'
+        with:
+          name: operator-refresh-browser-evidence
+          path: test-results/operator-refresh
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always() && (needs.scope.outputs.public_match_fix == 'true' || needs.scope.outputs.operator_refresh == 'true')
         with:
           name: public-match-browser-evidence
           path: test-results/public-match

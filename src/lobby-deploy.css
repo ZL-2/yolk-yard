@@ -33,7 +33,7 @@
 #menu .yard-party-stack .yard-party{position:static;top:auto;right:auto;width:100%;padding:12px;border:1px solid #cee2e52b;border-top:2px solid #c0e0d88c;background:linear-gradient(135deg,#122a3be8,#112735ae);border-radius:8px;flex:none}
 #menu .yard-member{padding:8px 0;gap:10px}#menu .yard-member strong{font-size:13px}#menu .yard-member small{font-size:9px}#menu .yard-invite{padding:7px 10px;font-size:11px;min-height:35px}#menu .yard-party-link{margin-top:6px;min-height:26px;font-size:9px}
 #menu .yard-party-stack .frontier-leaderboard{position:static;width:100%;margin:0;max-height:none;flex:1;min-height:220px;overflow:hidden;border-radius:8px;background:#102537dc}
-#menu .yard-party-stack .frontier-board-ranks{max-height:180px}
+#menu .yard-party-stack .frontier-board-ranks{max-height:none}
 #menu .yard-party-stack .frontier-board-heading h2{font-size:16px}
 #menu .yard-character-label{left:52%;top:auto;bottom:calc(var(--lobby-footer-height,58px) + 28px)}
 #menu .yard-footer{padding:12px 24px;gap:20px;flex-wrap:wrap;min-height:42px;background:#0b1d2de0;align-items:center;border-top:1px solid #b9d9e31a}
@@ -49,6 +49,9 @@
 #dialog .lobby-discover .yard-mode-card:enabled:hover{transform:translateY(-3px);border-color:#e8f1ff}
 #dialog .lobby-discover .yard-mode-card[aria-pressed=true]{border-color:#f5e35c;box-shadow:0 0 0 1px #f5e35c}
 .lobby-discover .yard-mode-card img{display:block;width:100%;aspect-ratio:1.7;object-fit:cover}
+.mode-card-art{position:relative;display:block;width:100%;flex:none}
+.mode-population{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid #b7d8e366;border-radius:6px;background:#081b2bed;color:#fff;box-shadow:0 2px 8px #0005;font-size:12px;font-variant-numeric:tabular-nums}
+.mode-population svg{width:13px;height:13px;fill:currentColor}.mode-population span{font-size:8px;letter-spacing:.08em}.mode-population b{color:inherit!important}
 .lobby-discover .mode-card-copy{padding:14px;display:block}.lobby-discover .mode-card-copy strong{font-size:22px;line-height:1.1}.lobby-discover .mode-card-copy .eyebrow{margin:0;font-size:9px}.lobby-discover .mode-card-copy p{font-size:12px;line-height:1.5;min-height:36px}.lobby-discover .mode-card-copy small{font-size:10px}
 #dialog[data-kind=play] .lobby-discover .eyebrow{color:#abdce7}#dialog[data-kind=play] .lobby-discover .coming-soon .eyebrow{color:#fff}#dialog[data-kind=play] .lobby-discover p,#dialog[data-kind=play]>.dialog-body>p{color:#c7dce4}
 #dialog .lobby-discover .coming-soon{opacity:1;cursor:default}.coming-soon img{filter:saturate(.65)}.coming-soon .eyebrow{display:inline-block;background:#53607d;color:#fff;padding:5px 8px;border-radius:4px}
@@ -61,3 +64,5 @@
 @media(max-width:760px) and (max-height:560px){#menu[data-section=play]{--lobby-gap:12px;--lobby-top:62px;--lobby-left:200px;--lobby-right:162px}#menu .yard-nav{min-height:54px;flex-wrap:nowrap;padding:7px 12px;gap:8px}#menu .yard-logo{font-size:17px}#menu .yard-nav nav{order:0;width:auto;border:0;gap:0}#menu .yard-nav nav button{font-size:9px;padding:8px 6px}#menu .yard-nav .yard-feature-top{position:static;order:0;font-size:7px;padding:7px 5px;margin-left:auto}#menu .yard-feature-top span{display:none}#menu .yard-nav-tools{gap:1px;margin-left:0}#menu .yard-nav-tools>button{min-width:28px;padding:7px;font-size:10px}#menu .yard-nav-tools .currency-label{display:none}#menu .lobby-news-story{aspect-ratio:3.2}.lobby-news-story strong{font-size:13px}.lobby-news-story small{display:none}.lobby-news-controls{height:25px}#menu .yard-play-card.lobby-deploy{left:12px;right:auto;width:200px;display:flex;padding:8px;gap:5px}.lobby-deploy h1{font-size:18px}.lobby-mode-kicker,.lobby-play-status{display:none}.lobby-options-button{min-height:29px;padding:6px 9px}.lobby-mode-picker{min-height:40px;padding:8px}.lobby-mode-picker small{display:none}#menu .lobby-deploy .lobby-play{min-height:36px;font-size:22px}#menu .yard-party-stack{top:62px;bottom:var(--lobby-footer-height,42px);gap:7px}#menu .yard-character-label{display:none}#menu .yard-footer{min-height:32px;padding:8px 12px;gap:9px}#menu .yard-footer button{font-size:7px}}
 
 body:has(#menu[data-section=play]:not([hidden])) #emote-button{display:none}#menu .yard-footer .yard-footer-emotes{display:inline-flex}
+/* Let the scroll viewport consume the whole remaining desktop column. */
+@media(min-width:761px){#menu .yard-party-stack .frontier-leaderboard{height:auto;flex:1 1 0;min-height:230px;display:flex;flex-direction:column}#menu .yard-party-stack .frontier-board-scroll{flex:1 1 0;min-height:60px}#menu .yard-party-stack .frontier-board-ranks{height:100%;min-height:0;max-height:none}}

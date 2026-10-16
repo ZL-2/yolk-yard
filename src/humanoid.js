@@ -5,6 +5,8 @@ import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js'
 import {shopItem} from './shop-catalog.js';
 import {addOperatorDesign} from './operator-designs.js';
 import {surfaceUV,surfaceAtlasMaterial} from './model-surfaces.js';
+import {strideProfile,strideFoot,pelvisTurn} from './operator-motion.js';
+import {equipPose} from './equip.js';
 
 // One anatomical bind pose and skeleton contract for every cosmetic. Distances
 // are metres. Rigid gear and clothing are cosmetic; physics never reads this mesh.
@@ -66,7 +68,7 @@ function template(profile){
  rings([[1.425,.088,.073],[1.465,.088,.073],[1.48,.07,.064]],colors.dark,'neck');
  ellipsoid(0,1.515,0,.064,.082,.062,colors.skin,'neck');
  // Sculpted cranium: jaw narrows below cheeks, recessed temples, defined brow.
- const head=new T.SphereGeometry(1,24,18),hp=head.attributes.position;
+ const head=new T.SphereGeometry(1,28,20),hp=head.attributes.position;
  for(let i=0;i<hp.count;i++){let x=hp.getX(i),y=hp.getY(i),z=hp.getZ(i);const jaw=y<-.18?(light?.74:.80)+.18*(y+1)/.82:1;const front=Math.max(0,-z),cheek=(y>-.2&&y<.15?Math.sin((y+.2)/.35*Math.PI)*.006:0);hp.setXYZ(i,x*(light?.111:.118)*jaw+Math.sign(x)*cheek*front,1.666+y*.162,z*.109-(y>-.1&&y<.25?.008*front:0));}head.computeVertexNormals();add(head,skin,'head',null,null,'skin');
  ellipsoid(0,1.553,-.035,.066,.026,.057,skin,'head');
  for(const side of [-1,1]){
@@ -74,6 +76,9 @@ function template(profile){
   ellipsoid(side*.044,1.692,-.101,.029,.012,.012,skin,'head');
   ellipsoid(side*.044,1.695,-.111,.019,.005,.004,'#d6cec4','head',10,'glass');
   ellipsoid(side*.044,1.695,-.115,.006,.005,.003,'#354c4b','head',10,'glass');
+  ellipsoid(side*.044,1.695,-.118,.0027,.0037,.0015,'#101c20','head',8,'glass');
+  ellipsoid(side*.042,1.697,-.119,.0013,.0012,.001,'#edf3e6','head',8,'glass');
+  ellipsoid(side*.125,1.667,-.011,.008,.025,.012,new T.Color(skin).multiplyScalar(.79),'head',8,'skin');
   ellipsoid(side*.045,1.716,-.099,.035,.006,.01,colors.hair,'head');
  }
  ellipsoid(0,1.668,-.115,.016,.037,.021,skin,'head');ellipsoid(0,1.646,-.132,.02,.012,.016,skin,'head');
@@ -130,21 +135,32 @@ function template(profile){
   for(let j=0;j<3;j++)panel(side*.44+(j-1)*.016,.838,-.016,.011,.014,.009,item?.model==='wren'?leather:colors.armor,'hand'+s,item?.model==='wren'?'leather':'polymer');
   panel(side*.226,.79,-.038,.009,.09,.014,colors.dark,'thigh'+s,'leather');
   panel(side*.226,.813,-.050,.013,.025,.008,colors.trim,'thigh'+s,'metal');
+  // Tailored elbow darts, knee-pad edging and articulated ankle cuffs.
+  // These join the existing skinned mesh and share its surface atlas.
+  panel(side*.12,.545,-.084,.084,.012,.009,colors.cloth,'shin'+s,'cloth');
+  panel(side*.12,.447,-.083,.078,.010,.008,colors.dark,'shin'+s,'rubber');
+  for(const edge of [-1,1])panel(side*.12+edge*.043,.49,-.083,.006,.08,.007,colors.cloth,'shin'+s,'cloth');
+  panel(side*.12,.223,-.037,.076,.014,.012,seam,'shin'+s,'cloth');
+  panel(side*.373,1.192,-.04,.043,.009,.006,seam,'forearm'+s,'cloth');
+  panel(side*.378,1.173,-.04,.041,.007,.006,colors.cloth,'forearm'+s,'cloth');
  }
+ if(!signature){for(const side of [-1,1]){
+  panel(side*.105,1.32,.132,.148,.19,.025,colors.armor,'chest','polymer');
+  panel(side*.11,1.305,.149,.118,.009,.006,colors.cloth,'chest','cloth');
+  panel(side*.147,1.398,.083,.036,.07,.018,colors.cloth,'chest','cloth');
+ }}
  // Tailored seams/zipper stay inexpensive even in the 48-combatant match.
  for(const side of [-1,1])for(let row=0;row<6;row++)panel(side*.155,1.075+row*.025,-.112,.003,.015,.003,seam,'spine','cloth');
  if(!item?.model){panel(0,1.19,-.169,.009,.27,.005,colors.dark,'spine','metal');panel(0,1.324,-.175,.016,.025,.006,colors.trim,'chest','metal');}
- const geo=mergeGeometries(parts);parts.forEach(g=>g.dispose());geo.computeBoundingSphere();geo.userData.shared=true;geo.userData.artRevision=155;geo.userData.surfaceKinds=[...finishes];geometries.set(key,geo);return geo;
+ const geo=mergeGeometries(parts);parts.forEach(g=>g.dispose());geo.computeBoundingSphere();geo.userData.shared=true;geo.userData.artRevision=166;geo.userData.surfaceKinds=[...finishes];geometries.set(key,geo);return geo;
 }
 export function makeHumanoid(profile={}){
  const root=new T.Group();root.name='Ravelfront operator';const bones={},list=[];
  for(const [name,parent,xyz]of defs){const b=new T.Bone();b.name=name;const rest=V(...xyz).sub(parent?points[parent]:V());b.position.copy(rest);b.userData.rest=rest.clone();bones[name]=b;list.push(b);if(parent)bones[parent].add(b);}
- const mesh=new T.SkinnedMesh(template(profile),surfaceAtlasMaterial());mesh.name='Skinned operator';mesh.add(bones.root);mesh.bind(new T.Skeleton(list));mesh.boundingSphere=new T.Sphere(new T.Vector3(0,.9,0),2);mesh.frustumCulled=true;mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);root.userData.artRevision=155;
- root.userData.human={mesh,bones,clock:0,phase:0,speed:0,previous:null,grounded:true,land:0,air:0,death:0,lastYaw:0,pose:'idle',nextUpdate:0};root.userData.cracks=[];
+ const mesh=new T.SkinnedMesh(template(profile),surfaceAtlasMaterial());mesh.name='Skinned operator';mesh.add(bones.root);mesh.bind(new T.Skeleton(list));mesh.boundingSphere=new T.Sphere(new T.Vector3(0,.9,0),2);mesh.frustumCulled=true;mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);root.userData.artRevision=166;
+ root.userData.human={mesh,bones,clock:0,phase:0,speed:0,previous:null,grounded:true,land:0,air:0,death:0,lastYaw:null,pose:'idle',nextUpdate:0};root.userData.cracks=[];
  return root;
 }
-const identityQuaternion=new T.Quaternion();
-const scratchA=V(),scratchB=V(),scratchC=V(),scratchQ=new T.Quaternion();
 // Analytic two-bone IK. Targets are in character coordinates. Elbow/knee poles
 // remain on the anatomical side; fixed limb lengths prevent stretching.
 function solveChain(h,upper,lower,end,target,pole,blend=1){
@@ -160,9 +176,11 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const h=model.userData.human;if(!h)return;h.clock+=dt;
  // 60 Hz nearby, 20 Hz at distance, 10 Hz far away. Animation clocks continue.
  const interval=distance>90?.1:distance>40?.05:0;if(h.clock<h.nextUpdate){h.skipped=(h.skipped||0)+dt;return;}dt=Math.min(.12,dt+(h.skipped||0));h.skipped=0;h.nextUpdate=h.clock+interval;
- const b=h.bones,alpha=1-Math.exp(-dt*12);for(const bone of Object.values(b)){bone.position.copy(bone.userData.rest);bone.quaternion.slerp(identityQuaternion,alpha);}
- const vx=p.vx||0,vz=p.vz||0,speed=Math.min(9,Math.hypot(vx,vz)),grounded=p.grounded!==false;
- h.speed+=(speed-h.speed)*(1-Math.exp(-dt*10));const cycleDistance=p.lobbyPatrol?.cycleDistance|| (p.downed?.85:p.crouching?1.1:p.tacticalSprint?2.45:p.sprinting?2.0:1.7);h.phase+=speed*dt/cycleDistance*Math.PI*2;
+ // Layer from the bind pose each frame. Adding yaw onto last frame's residual
+ // quaternion accumulated a permanent sideways twist (especially at low FPS).
+ const b=h.bones;for(const bone of Object.values(b)){bone.position.copy(bone.userData.rest);bone.quaternion.identity();}
+ const vx=p.vx||0,vz=p.vz||0,speed=Math.min(16,Math.hypot(vx,vz)),grounded=p.grounded!==false;
+ h.speed+=(speed-h.speed)*(1-Math.exp(-dt*10));const gait=strideProfile(h.speed,p),cycleDistance=p.lobbyPatrol?.cycleDistance||gait.distance;h.phase+=speed*dt/cycleDistance*Math.PI*2;
  if(grounded&&!h.grounded)h.land=T.MathUtils.clamp(-(h.lastVy||0)/10,.15,1.5);h.lastVy=p.vy||0;h.grounded=grounded;h.land*=Math.exp(-dt*9);
  const airborne=['dive','glide','launch'].includes(p.flight),dead=p.health!==undefined&&p.health<=0;
  h.air+=(Number(airborne)-h.air)*(1-Math.exp(-dt*7));h.death+=(Number(dead)-h.death)*(1-Math.exp(-dt*6));
@@ -172,27 +190,27 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  h.upperState=throwing?'throwing':p.downed?(p.reviverId?'being-revived':'downed'):p.reviving?'reviving':p.reloadEnd>time?'reloading':p.shotRecoil>.02?'firing':p.building?(p.editing?'editing':'building'):p.aim?'ads':'ready';
  h.pose=dead?'elimination':throwing?'throw':p.mantle?p.mantle.kind:emote?'emote-'+emote.id:p.downed?(p.reviverId?'being-revived':speed>.1?'crawling':'downed'):p.reviving?'reviving':p.sliding?'sliding':p.crouching?(speed>.1?'crouch-moving':'crouch-idle'):p.flight==='dive'?'skydive':p.flight==='glide'?'glide':!grounded?(p.vy>0?'jump':'fall'):p.building?(p.editing?'edit':'build'):p.use?'use':p.swingAt&&time-p.swingAt<.55?'melee':p.reloadEnd>time?'reload':p.equipUntil>time?(p.equipHolster&&time-p.equipStarted<p.equipHolster?'holster':'draw'):p.aim?'aim':p.sprinting?'sprint':h.speed>5.5?'run':h.speed>.2?'locomotion':'idle';
  if(previousPose!==h.pose){h.fromPose=previousPose;h.transition=0;}h.transition=Math.min(1,(h.transition||0)+dt*7);
- const forward=-vx*Math.sin(p.yaw||0)-vz*Math.cos(p.yaw||0),side=vx*Math.cos(p.yaw||0)-vz*Math.sin(p.yaw||0),moving=Math.min(1,h.speed/2),step=cycleDistance*.54/2*moving;
+ const forward=-vx*Math.sin(p.yaw||0)-vz*Math.cos(p.yaw||0),side=vx*Math.cos(p.yaw||0)-vz*Math.sin(p.yaw||0),moving=gait.moving;
  const blend=1-Math.exp(-dt*14);for(const [key,on]of [['crouch',p.crouching&&!p.sliding],['compact',p.lowCrouch],['slide',p.sliding],['down',p.downed],['revive',p.reviving]])h[key]=(h[key]||0)+(Number(!!on)-(h[key]||0))*blend;
  h.forward=(h.forward||0)+(forward-(h.forward||0))*blend;h.side=(h.side||0)+(side-(h.side||0))*blend;
  const acceleration=T.MathUtils.clamp((forward-h.forward)*.017,-.045,.045);
  const lower=Math.max(h.crouch*.53+h.compact*.29,h.slide*.87,h.down*.65,h.revive*.53);
- b.hips.position.y-=lower+(.09+(p.sprinting?.025:0))*moving*(1-Math.max(h.slide,h.down,h.crouch))+h.land*.075+h.death*.58;
+ b.hips.position.y-=lower+.025*moving*(1-Math.max(h.slide,h.down,h.crouch))+h.land*.075+h.death*.58;
  b.hips.rotation.x=-.06*moving-acceleration-(p.tacticalSprint?.18:p.sprinting?.08:0)-h.crouch*.12+h.slide*.27-h.down*1.14-h.revive*.12+h.death*.85;
- const turn=Math.atan2(Math.sin((p.yaw||0)-h.lastYaw),Math.cos((p.yaw||0)-h.lastYaw))/Math.max(.016,dt);h.lastYaw=p.yaw||0;h.turn=(h.turn||0)+(turn-(h.turn||0))*blend;b.spine.rotation.z=T.MathUtils.clamp(-h.side*.012-h.turn*.007,-.09,.09);b.hips.rotation.y=T.MathUtils.clamp(turn*.008,-.07,.07);b.chest.rotation.y=Math.sin(h.phase)*.018*moving;b.chest.rotation.x=Math.sin(time*1.8)*.008+(p.lastDamage&&time-p.lastDamage<.18?-.09*(1-(time-p.lastDamage)/.18):0)+(p.shotRecoil||0)*.018;
+ const turn=Math.atan2(Math.sin((p.yaw||0)-(h.lastYaw??p.yaw??0)),Math.cos((p.yaw||0)-(h.lastYaw??p.yaw??0)))/Math.max(.016,dt);h.lastYaw=p.yaw||0;h.turn=(h.turn||0)+(turn-(h.turn||0))*blend;b.spine.rotation.z=T.MathUtils.clamp(-h.side*.008-h.turn*.005,-.07,.07);b.hips.rotation.y=T.MathUtils.clamp(h.turn*.008,-.07,.07);b.chest.rotation.y=Math.sin(h.phase)*.025*moving;b.chest.rotation.x=Math.sin(time*1.8)*.008+(p.lastDamage&&time-p.lastDamage<.18?-.09*(1-(time-p.lastDamage)/.18):0)+(p.shotRecoil||0)*.018;
  b.head.rotation.x=(menu?Math.sin(time*.7)*.025:-(p.pitch||0)*.3)+h.down*1.04+h.revive*.14;
  if(menu){b.head.rotation.y=p.scan||0;b.chest.rotation.y+=(p.scan||0)*.3;}
  // Turn the pelvis into the stride while the shoulders retain aim. Feet are
  // still solved against their planted world targets; no cosmetic root motion.
  if(!menu&&!airborne&&!dead&&!emote&&!p.downed&&!p.sliding&&!p.vehicleId){
-  const strideYaw=Math.atan2(side,Math.max(.25,Math.abs(forward)))*.28*moving;h.strideYaw=(h.strideYaw||0)+(strideYaw-(h.strideYaw||0))*blend;
+  const strideYaw=pelvisTurn(h.forward,h.side,moving);h.strideYaw=(h.strideYaw||0)+(strideYaw-(h.strideYaw||0))*blend;
   b.hips.rotation.y+=h.strideYaw;b.spine.rotation.y-=h.strideYaw*.7;b.chest.rotation.y-=h.strideYaw*.3;
   b.chest.rotation.x-=(p.pitch||0)*.12;
  }
  const patrol=menu?p.lobbyPatrol:null;
  if(patrol){
   h.phase=patrol.phase;h.speed=patrol.speed;
-  b.hips.position.x+=patrol.bodySway;b.hips.position.y=b.hips.userData.rest.y-.13+patrol.bodyBob;
+  b.hips.position.x+=patrol.bodySway;b.hips.position.y=b.hips.userData.rest.y-.025+patrol.bodyBob;
   b.hips.rotation.x=-.025;b.hips.rotation.y=patrol.hipYaw;
   b.hips.rotation.z=patrol.lean;b.spine.rotation.z=-patrol.lean*.65;
   b.spine.rotation.y=patrol.spineYaw;b.spine.rotation.x=-patrol.ready*.025;
@@ -202,21 +220,15 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   b.head.position.x+=patrol.ready*.018;
   b.head.rotation.x=patrol.headPitch;
  }
- const f=forward/(speed||1),s=side/(speed||1);
- for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R',phase=h.phase+(sideSign<0?Math.PI:0),cycle=((phase/(2*Math.PI))%1+1)%1;
-  // Stance travels backward linearly at ground speed; swing lifts the foot.
-  const stance=cycle<.54,u=stance?cycle/.54:(cycle-.54)/.46,stride=stance?1-u*2:-Math.cos(u*Math.PI),lift=stance?0:Math.sin(u*Math.PI)*(p.tacticalSprint?.25:.12)*moving;
-  let foot=V(sideSign*.12+s*stride*step,.09+lift,-f*stride*step);
+ const directionalSpeed=Math.hypot(h.forward,h.side)||1,f=h.forward/directionalSpeed,s=h.side/directionalSpeed,legs=[];
+ const walking=grounded&&!airborne&&!dead&&!emote&&!p.sliding&&!p.downed&&!p.reviving&&!p.vehicleId&&!p.mantle&&!p.traversal;
+ for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R',phase=h.phase+(sideSign<0?Math.PI:0),pose=strideFoot(h.phase,sideSign,patrol?{...gait,distance:patrol.cycleDistance,stance:.58,lift:.085,moving:1}:gait),{contact:stance,lift,roll}=pose;
+  let foot=V(sideSign*.112+s*pose.stride,.09+lift,-f*pose.stride);
   if(patrol){
-   // 62% stance: planted boot travels at exactly the scenery's local speed.
-   const stanceFraction=.62,onGround=cycle<stanceFraction;
-   const u=onGround?cycle/stanceFraction:(cycle-stanceFraction)/(1-stanceFraction);
-   const halfStride=patrol.cycleDistance*stanceFraction/2;
-   const travel=onGround?1-2*u:-Math.cos(u*Math.PI);
-   const travelZ=-travel*halfStride,heading=(p.yaw||Math.PI)-Math.PI;
+   const travelZ=-pose.stride,heading=(p.yaw||Math.PI)-Math.PI;
    // Counter the root turn so the planted boot keeps following the straight road.
-   foot=V(Math.cos(heading)*sideSign*.135-Math.sin(heading)*travelZ,
-    .09+(onGround?0:Math.sin(u*Math.PI)*.105),Math.sin(heading)*sideSign*.135+Math.cos(heading)*travelZ);
+   foot=V(Math.cos(heading)*sideSign*.112-Math.sin(heading)*travelZ,
+    .09+lift,Math.sin(heading)*sideSign*.112+Math.cos(heading)*travelZ);
   }
   if(!grounded&&!airborne)foot=V(sideSign*.14,.17+(sideSign>0?.10:0),.10);
   if(airborne)foot=V(sideSign*(p.flight==='glide'?.18:.29),p.flight==='glide'?.14:.18+Math.sin(time*2.3+sideSign)*.018,p.flight==='glide'?.10:.34+sideSign*.035);
@@ -226,11 +238,25 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   if(p.vehicleId)foot=V(sideSign*.4,.43,-.35);
   if(dead)foot=V(sideSign*.23,.12,-.12);
   if(emote)foot=V(...emotePose(emote.id,emote.t,sideSign).foot);
-  h['footTarget'+S]??=foot.clone();if(patrol)h['footTarget'+S].copy(foot);else h['footTarget'+S].lerp(foot,1-Math.exp(-dt*(h.transition<1?22:55)));
-  solveChain(h,'thigh'+S,'shin'+S,'foot'+S,h['footTarget'+S],V(sideSign*.15,.5,-1));const footBone=b['foot'+S];footBone.quaternion.copy(footBone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(h.mesh.getWorldQuaternion(new T.Quaternion())));if(!stance)footBone.rotateX(-lift*1.5);
+  // Contact locks in world space through aim turns and velocity changes.
+  // Lobby actors walk in place, so their contact uses the moving-road clock.
+  const planted=walking&&!patrol&&stance&&speed>.3,old=h['plant'+S],yaw=model.rotation.y,cs=Math.cos(yaw),sn=Math.sin(yaw);
+  if(planted){
+   if(old){const dx=old.x-model.position.x,dz=old.z-model.position.z;if(Math.hypot(dx,dz)<.72){foot.x=cs*dx-sn*dz;foot.z=sn*dx+cs*dz;}}
+   h['plant'+S]={x:model.position.x+cs*foot.x+sn*foot.z,z:model.position.z-sn*foot.x+cs*foot.z};
+  }else h['plant'+S]=null;
+  const bootRoll=walking?roll*.65:0;foot.y+=bootRoll>0?Math.sin(bootRoll)*.065:-Math.sin(bootRoll)*.195;
+  h['footTarget'+S]??=foot.clone();if(walking&&(speed>.3||patrol))h['footTarget'+S].copy(foot);else h['footTarget'+S].lerp(foot,1-Math.exp(-dt*18));
+  legs.push({S,sideSign,stance,bootRoll,foot:h['footTarget'+S]});
+ }
+ // Raise the pelvis on passing steps and lower only enough to reach the
+ // planted ankle. The old permanent squat kept both knees deeply bent.
+ if(walking&&!p.crouching){let height=b.hips.position.y;for(const leg of legs){const reach=Math.hypot(leg.foot.x-leg.sideSign*.115,leg.foot.z);height=Math.min(height,leg.foot.y+.03+Math.sqrt(Math.max(.40,.802**2-reach**2)));}b.hips.position.y=Math.max(.75,height);}
+ for(const {S,sideSign,bootRoll,foot} of legs){const yaw=b.hips.rotation.y,pole=V(sideSign*.115-Math.sin(yaw)*.7,.5,-Math.cos(yaw)*.7);
+  solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,pole);const footBone=b['foot'+S];footBone.quaternion.copy(footBone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(h.mesh.getWorldQuaternion(new T.Quaternion())));footBone.rotateY(patrol?Math.PI-(p.yaw||Math.PI):yaw*.8);footBone.rotateX(bootRoll);
  }
  if(emote){const pose=emotePose(emote.id,emote.t,1);b.hips.position.x+=pose.sway;b.hips.position.y+=pose.bob;b.chest.rotation.z=pose.sway*.5;}
- const held=model.userData.held,arms=model.userData.arms;
+ const held=model.userData.held,arms=model.userData.arms,draw=model.userData.draw;
  if(held&&arms){held.updateWorldMatrix(true,false);h.mesh.updateWorldMatrix(true,false);}
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R';let target;
   if(emote)target=V(...emotePose(emote.id,emote.t,sideSign).hand);
@@ -241,13 +267,15 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   else if(airborne)target=p.flight==='glide'?V(sideSign*.33,1.93,-.06):V(sideSign*.61,1.42+Math.sin(time*2.1+sideSign)*.025,-.17);
   else if(p.building)target=V(sideSign*.25,1.22-lower+(sideSign>0?Math.sin(time*8)*.035:0),-.38);
   else if(p.use){const t=T.MathUtils.clamp((time-(p.use.start??time))/Math.max(.1,(p.use.end??time+1)-(p.use.start??time)),0,1),lift=Math.min(1,t/.18)*Math.min(1,(1-t)/.14),drink=['mini','flask'].includes(p.use.id);target=drink?V(sideSign*.16,(sideSign>0?1.2+lift*.36:1.15)-lower,-.24):V(sideSign*.17+Math.sin(t*Math.PI*10)*.02,1.08-lower,-.36);}
+  else if(sideSign<0&&held?.visible&&draw?.active&&draw.route==='back'&&draw.progress<.52)target=V(-.24,1.12-lower,-.18);
   else if(held?.visible&&arms){const limb=arms.userData.limbs.find(l=>l.side===sideSign);target=limb.hand.getWorldPosition(V());target.applyMatrix4(h.mesh.matrixWorld.clone().invert());target.y+=.035;}
-  else target=V(sideSign*.33,1.03,-Math.sin(h.phase+(sideSign<0?Math.PI:0))*.16*moving);
+  else if(model.userData.utility){const draw=equipPose(p,time);target=V(sideSign*.26,1.08-lower+(sideSign>0?draw.position[1]*.65:0),-.25+(sideSign>0?draw.position[2]:0));if(sideSign>0)target.x+=draw.position[0];}
+  else target=V(sideSign*.27,1.02-lower,-Math.sin(h.phase+(sideSign<0?Math.PI:0))*.20*moving);
   if(p.downed)target=V(sideSign*.29,.14+Math.max(0,Math.sin(h.phase+(sideSign<0?Math.PI:0)))*.045*moving,-.46-Math.sin(h.phase+(sideSign<0?Math.PI:0))*.13*moving);
   if(p.reviving)target=V(sideSign*.18,.58+Math.sin(time*3+sideSign)*.025,-.49);
   if(dead)target=V(sideSign*.40,.6,-.10);
   h['handTarget'+S]??=target.clone();h['handTarget'+S].lerp(target,1-Math.exp(-dt*(h.transition<1?16:40)));
-  solveChain(h,'arm'+S,'forearm'+S,'hand'+S,h['handTarget'+S],V(sideSign*.65,1.0,.25));
+  solveChain(h,'arm'+S,'forearm'+S,'hand'+S,h['handTarget'+S],V(sideSign*.46,1.08,.15));
   const hand=b['hand'+S];let handQ=h.mesh.getWorldQuaternion(new T.Quaternion());
   if(held?.visible&&arms&&!emote&&!airborne&&!p.traversal&&!p.mantle&&!p.use&&!p.building&&!throwing){handQ=arms.userData.limbs.find(l=>l.side===sideSign).hand.getWorldQuaternion(new T.Quaternion());}
   hand.quaternion.copy(hand.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(handQ));hand.rotateX(-.12);

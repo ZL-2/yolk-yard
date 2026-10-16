@@ -14,7 +14,7 @@ test('head and body are distinct; empty silhouette space misses; skins cannot ch
 });
 test('shared humanoid mesh has 32 anatomical bones and bounded complexity; all states remain finite',()=>{
  const a=makeHumanoid({outfit:'outfit-garden'}),b=makeHumanoid({outfit:'outfit-garden'});assert.equal(a.userData.human.mesh.geometry,b.userData.human.mesh.geometry);assert.notEqual(a.userData.human.mesh.skeleton,b.userData.human.mesh.skeleton);
- const d=humanoidDiagnostics(a);assert.equal(d.bones,32);assert.ok(d.vertices>4000&&d.vertices<10000);assert.ok(d.triangles<12000);
+ const d=humanoidDiagnostics(a);assert.equal(d.bones,32);assert.ok(d.vertices>4000&&d.vertices<13000);assert.ok(d.triangles<14000);
  const poses=[{grounded:true},{vx:3,vz:-3},{vx:0,vz:7},{sprinting:true,vz:-7.4},{grounded:false,vy:5},{grounded:false,vy:-4},{flight:'dive',grounded:false},{flight:'glide',grounded:false},{building:true},{use:{id:'mini'}},{reloadEnd:100},{equipUntil:100,equipStarted:0},{health:0}];
  poses.push({crouching:true},{crouching:true,vz:-2.4,shotRecoil:1},{sliding:true,vz:-7},{downed:true},{downed:true,vz:-1},{reviving:'mate'},{downed:true,reviverId:'mate'});
  for(const pose of poses)for(let i=0;i<20;i++){animateHumanoid(a,{x:0,y:0,z:0,yaw:0,health:100,grounded:true,...pose},1/60,i/60);a.updateMatrixWorld(true);for(const bone of a.userData.human.mesh.skeleton.bones)assert.ok(bone.matrixWorld.elements.every(Number.isFinite),bone.name);}

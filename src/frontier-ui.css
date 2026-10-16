@@ -10,6 +10,15 @@
 #dialog :is(button,.field,select,input:not([type=checkbox]):not([type=range])),.panel :is(button,.field,select),.season-launch button {
  background:#233f4d;color:#f1f6f7;border:1px solid #6d8a98;box-shadow:none;
 }
+/* Legacy action rules used pale paper with the new light --ink variable.
+   Fix the shared secondary action classes, including hover and nested labels. */
+:is(#dialog,.panel,.dialog-panel,.season-launch) :is(.split-actions button,button.secondary,button.plain,button.icon-btn,button.close-btn,.dialog-body button[data-action]):not(.primary,.yard-mode-card,.play-mode-card,.weapon-card,.cosmetic-tile,.swatch,.royale-slot,[aria-selected=true],[aria-pressed=true]){
+ background:#233f4d!important;color:#f1f6f7!important;border-color:#7394a5!important;text-shadow:none;
+}
+:is(#dialog,.panel,.dialog-panel,.season-launch) :is(.split-actions button,button.secondary,button.plain,button.icon-btn,button.close-btn,.dialog-body button[data-action]):not(.primary,.yard-mode-card,.play-mode-card,.weapon-card,.cosmetic-tile,.swatch,.royale-slot,[aria-selected=true],[aria-pressed=true]):hover:enabled{
+ background:#34596a!important;color:#fff!important;border-color:#b9d9e4!important;
+}
+:is(#dialog,.panel,.dialog-panel,.season-launch) button:not(.yard-mode-card,.play-mode-card,.weapon-card,.cosmetic-tile,.swatch,.royale-slot) :is(strong,b,span){color:inherit}
 #dialog :is(button:hover,button:focus-visible),.panel button:hover{background:#34596a;color:#fff;border-color:#b9d9e4}
 #dialog :is(button.primary,button[aria-selected=true]),.panel button.primary,.season-launch button.primary {
  background:#efbc61!important;color:#132632!important;border-color:#ffe0a3;box-shadow:none;

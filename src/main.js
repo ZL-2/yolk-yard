@@ -39,6 +39,7 @@ import {InputClock} from './input-clock.js';
 import {RemoteSimulation} from './remote-simulation.js';
 import {canFight} from './stance.js';
 import {StreakUI} from './streak-ui.js';
+import {modePopulationMarkup} from './mode-activity.js';
 import {PartyClient} from './party-client.js';
 import {lobbyMarkup,lobbyOptionsMarkup,modeMarkup,socialMarkup,EXPERIENCES} from './lobby-ui.js';
 import {teammates,wonRoyale,isTeamRoyale} from './teams.js';
@@ -284,7 +285,7 @@ function titleBar() {
   return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
 let socialActivityKey='';
-function syncSocialActivity(me){if(!party?.ready)return;const activity=screen==='game'?(me?.spectating||me?.health<=0?'spectating':'in-match'):'lobby',key=activity+':'+party.id;if(key===socialActivityKey)return;socialActivityKey=key;party.request('presence',{activity,visible:!document.hidden&&document.hasFocus()}).catch(()=>{socialActivityKey='';});}
+function syncSocialActivity(me){if(!party?.ready)return;const activity=screen==='game'&&state?.phase==='playing'?(me?.spectating||me?.health<=0?'spectating':'in-match'):'lobby',mode=activity!=='lobby'?(state?.options.training?'training':state?.options.mode):null,key=activity+':'+mode+':'+party.id;if(key===socialActivityKey)return;socialActivityKey=key;party.request('presence',{activity,mode,visible:!document.hidden&&document.hasFocus()}).catch(()=>{socialActivityKey='';});}
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();if(screen==='menu')renderMenu();}});
 function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
 function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}installLeaderboardScrollbars();}
@@ -1209,7 +1210,7 @@ async function copy(text) {
 async function partyRequest(type,data={}){
  try{return await party.request(type,data);}catch(error){toast(error.message);return null;}
 }
-function playMenu(){modal('CHOOSE GAME MODE',modeMarkup(party?.party?.selection,party?.party?.leader!==party?.id,party?.party?.members.length||1),'play');}
+function playMenu(){modal('CHOOSE GAME MODE',modeMarkup(party?.party?.selection,party?.party?.leader!==party?.id,party?.party?.members.length||1,party?.modeCounts),'play');}
 async function selectExperience(id){
  const e=EXPERIENCES.find(e=>e.id===id);if(!e||e.soon)return;
  if(!party?.ready||party.party.leader!==party.id)return;
@@ -1282,6 +1283,7 @@ function initializeParty(){
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   'social-changed':scheduleSocialRefresh,
+  'mode-counts':counts=>{for(const badge of document.querySelectorAll('[data-mode-population]')){const template=document.createElement('template');template.innerHTML=modePopulationMarkup(badge.dataset.modePopulation,counts);badge.replaceWith(template.content.firstElementChild);}},
   'party-notice':m=>toast(m.message),
   'friend-request':m=>{toast(m.name+' sent a friend request. Open Social to accept or decline.');sound.cue('queue-found');scheduleSocialRefresh();},
   cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing'||activeLaunch&&m.launchId===activeLaunch;activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);toast(m.message);if(screen==='menu')renderMenu();}

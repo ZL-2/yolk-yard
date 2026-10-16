@@ -14,7 +14,7 @@ test('every blaster holsters before drawing and settles exactly into its grip',(
   assert.equal(equipPose(p,10.07).visible,false);
   const mid=equipPose(p,10+p.equipHolster+w.equipTime/2);
   assert.equal(mid.visible,true);assert.equal(mid.active,true);
-  assert.ok(mid.position[1]<0);assert.ok(mid.progress>.49&&mid.progress<.51);
+  assert.equal(mid.route,DRAW_POSES[w.id].route||'hip');assert.ok(mid.route==='back'?mid.position[1]>0:mid.position[1]<0);assert.ok(mid.progress>.49&&mid.progress<.51);
   poses.add(JSON.stringify(mid.position));
   assert.equal(p.nextShot,p.equipUntil);
   const done=equipPose(p,p.equipUntil+.001);

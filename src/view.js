@@ -28,7 +28,7 @@ import {LobbyMotion} from './lobby-motion.js';
 import {FrontierAtmosphere} from './atmosphere.js';
 import {eyeHeight,bodyHeight,canFight} from './stance.js';
 import * as THREE from "three";
-import {equipPose} from "./equip.js";
+import {equipPose,itemDrawProfile,drawTransform} from "./equip.js";
 import { makeArms, updateArms, reloadProgress, utilityArms, throwArms, armAppearance } from "./arms.js";
 import { patternedShell, addHeadwear, addEyewear, optionProfile } from "./cosmetics.js";
 import { getMap } from "./maps.js";
@@ -545,15 +545,15 @@ export class View {
     const old=owner.outgoing;if(!old)return;
     if(!visible || pose.holster>=1){this.clearOutgoing(owner);return;}
     old.group.position.copy(old.position);
-    old.group.position.y-=pose.holster*.9;
-    old.group.position.x+=pose.holster*.12;
+    const stow=drawTransform(old.profile||itemDrawProfile({id:'pip'}),1-pose.holster);
+    old.group.position.x+=stow.position[0];old.group.position.y+=stow.position[1]*(old.thirdPerson?.5:1);old.group.position.z+=stow.position[2];
     old.group.rotation.copy(old.rotation);
-    old.group.rotation.x-=pose.holster*.5;
-    old.group.rotation.z-=pose.holster*.35;
+    old.group.rotation.x+=stow.rotation[0];old.group.rotation.y+=stow.rotation[1];old.group.rotation.z+=stow.rotation[2];
     old.group.visible=true;
   }
   setWeapon(p,draw) {
     const id = gun(p).id;
+    const previousDrawItem=this.localDrawItem;this.localDrawItem=p.inventory?.[p.slot]||{id,weapon:true};
     const appearance=JSON.stringify([armAppearance(p),p.wrap,p.outfit]);
     if (id === this.localWeapon && appearance === this.armStyle) return;
     this.clearOutgoing(this);
@@ -563,7 +563,7 @@ export class View {
       old.position.copy(this.gunGroup.position);old.rotation.copy(this.gunGroup.rotation);
       while(this.gunGroup.children.length)old.add(this.gunGroup.children[0]);
       this.viewmodelCamera.add(old);
-      this.outgoing={group:old,position:old.position.clone(),rotation:old.rotation.clone()};
+      this.outgoing={group:old,position:old.position.clone(),rotation:old.rotation.clone(),profile:itemDrawProfile(previousDrawItem||{id:this.localWeapon,weapon:true})};
     }
     this.armStyle = appearance;
     this.localWeapon = id;
@@ -985,7 +985,7 @@ export class View {
           const old=model.userData.held;
           if(draw.holster<1){
             updateArms(model.userData.arms,-1,model.userData.blaster);
-            model.userData.outgoing={group:old,position:old.position.clone(),rotation:old.rotation.clone()};
+            model.userData.outgoing={group:old,position:old.position.clone(),rotation:old.rotation.clone(),profile:model.userData.drawProfile||itemDrawProfile({id:model.userData.arms.userData.id,weapon:true}),thirdPerson:true};
           }else{old.removeFromParent();this.disposeGroup(old);}
           const held=new THREE.Group(),blaster=makeBlaster(gun(p).id,p.wrap),arms=makeArms(gun(p).id,p,false);
           held.scale.setScalar(VIEWMODEL.scale);arms.visible=false;held.add(blaster,arms);model.add(held);
@@ -998,6 +998,7 @@ export class View {
         if(model.userData.shopTool)model.userData.shopTool.visible=harvesting;
         model.userData.blaster.visible=!harvesting;
         model.userData.draw=draw;
+        model.userData.drawProfile=itemDrawProfile(p.inventory?.[p.slot]||{id:gun(p).id,weapon:true});
         const deathAge=p.health<=0?state.time-(p.eliminatedAt??p.respawnAt-3):0;
         model.visible=p.health>0||deathAge<(state.royale ? .16 : 1.3);
         if (model.userData.arms&&poseDue) {

@@ -12,10 +12,11 @@ export class PartyClient {
    else if(m.type==='referrals'){this.referrals=m.referrals;this.handlers.referrals?.(m.referrals);}
    else if(m.type==='deployment')this.handlers.deployment?.(m.deployment);
    else if(m.type==='public-match'){this.publicMatch=m.match;this.publicMatchAt=performance.now();this.handlers['public-match']?.(m.match);}
+   else if(m.type==='mode-counts'){this.modeCounts=m.counts;this.handlers['mode-counts']?.(m.counts);}
    else if(m.type==='party'){this.party=m.party;this.handlers.change?.(m.party);}
    else this.handlers[m.type]?.(m[m.type]??m);
   };
-  ws.onerror=()=>{};ws.onclose=event=>{if(ws!==this.ws||this.closed)return;if(event?.code===1008&&/Refresh Ravelfront/.test(event.reason||''))this.handlers.deployment?.({updating:true});this.ready=false;for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(Error('Party connection interrupted.'));}this.pending.clear();if(this.identityBlocked)return;this.handlers.status?.('Reconnecting…');this.retry=setTimeout(()=>this.connect(),2000);};
+  ws.onerror=()=>{};ws.onclose=event=>{if(ws!==this.ws||this.closed)return;if(event?.code===1008&&/Refresh Ravelfront/.test(event.reason||''))this.handlers.deployment?.({updating:true});this.ready=false;this.modeCounts=null;this.handlers['mode-counts']?.(null);for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(Error('Party connection interrupted.'));}this.pending.clear();if(this.identityBlocked)return;this.handlers.status?.('Reconnecting…');this.retry=setTimeout(()=>this.connect(),2000);};
  }
  blockIdentity(message){this.identityBlocked=message;this.ready=false;this.ws?.close();this.handlers.status?.('Friend identity needs restoration');this.handlers['party-notice']?.({message:message+' Open Social to retry.'});}
  retryIdentity(){this.identityBlocked=null;clearTimeout(this.retry);this.connect();}
