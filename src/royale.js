@@ -182,7 +182,7 @@ export class RoyaleSimulation extends Simulation {
   for(const p of [...this.players.values()])if(!p.bot&&p.connected===false)this.removePlayer(p.id);
   // Commit only complete invited groups. An invitation arriving at the cutoff
   // never sends one party member into combat and the other into spectating.
-  for(const p of this.players.values())if(!this.options.recurring&&p.contestant&&p.partyId&&p.partySize>1&&[...this.players.values()].filter(o=>!o.bot&&o.connected!==false&&o.partyId===p.partyId).length<p.partySize)Object.assign(p,{contestant:false,spectating:true,lateSpectator:true,health:0,flight:'out'});
+  for(const p of this.players.values())if(p.contestant&&p.partyId&&p.partySize>1&&[...this.players.values()].filter(o=>!o.bot&&o.connected!==false&&o.partyId===p.partyId).length<p.partySize)Object.assign(p,{contestant:false,spectating:true,lateSpectator:true,health:0,flight:'out'});
   this.addBots();this.fillBotTeammates();
   const seats=[...this.players.values()].filter(p=>p.contestant);
   if(seats.length<2||isTeamRoyale(this.options)&&livingTeams(this.options,seats).size<2){this.queueEnds=this.time+10;this.stage=RP.ISLAND;return false;}
@@ -381,7 +381,7 @@ export class RoyaleSimulation extends Simulation {
   if(this.players.has(id)){const player=this.players.get(id);player.connected=true;return player;}
   this.advanceWarmupClock();
   if(admission?.spectator){const p=this.addPlayer(id,profile,false,true);if(p)Object.assign(p,{friendSpectator:!admission.publicSpectator,watchId:admission.watchId,partyId:admission.partyId,memberId:admission.memberId,partySize:admission.partySize||1});return p;}
-  if(admission&&(admission.teamSize!==this.options.teamSize||!this.options.recurring&&this.options.teamSize<(admission.partySize||1)))return null;
+  if(admission&&(admission.teamSize!==this.options.teamSize||this.options.teamSize<(admission.partySize||1)))return null;
   if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;
   if(acceptsContestants(this.stage)){
    const humans=[...this.players.values()].filter(p=>!p.bot&&p.contestant),groups=new Map();

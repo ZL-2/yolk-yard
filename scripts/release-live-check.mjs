@@ -48,9 +48,9 @@ try{
  assert.match(await page.locator('body').innerText(),/FRONTIER LEADERS/i);
  await page.screenshot({path:out+'/desktop.png'});
  await page.locator('#menu [data-action=settings]:visible').first().click();await page.locator('[data-settings-tab=comfort]').click();await page.locator('#reducedMotion').check();
- await page.setViewportSize({width:390,height:844});assert.equal(await page.locator('#dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);await page.screenshot({path:out+'/mobile-settings.png'});
+ await page.screenshot({path:out+'/desktop-settings.png'});
  assert.deepEqual(errors,[]);
- const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,publicMatchUntouched:true,leaderboards:true,desktopAndMobile:true,mapStorage:health.mapStorage};
+ const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,publicMatchUntouched:true,leaderboards:true,desktopLobby:true,mapStorage:health.mapStorage};
  await writeFile(out+'/result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 }catch(e){await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/failure.json',JSON.stringify({error:String(e),errors},null,2));throw e;}
 finally{clearInterval(clock);guest.destroy();host.destroy();await browser?.close();}

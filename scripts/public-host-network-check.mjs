@@ -18,7 +18,7 @@ async function until(fn,label,ms=18000){const end=Date.now()+ms;while(!fn()){ass
 async function user(name){
  const u={profile:safeProfile({name}),launches:[],pending:new Map(),serial:0},ws=new globalThis.WebSocket(base+'/social');u.ws=ws;users.push(u);
  ws.on('open',()=>ws.send(JSON.stringify({type:'hello',version:VERSION,profile:u.profile})));
- ws.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='party')u.party=m.party;if(m.type==='public-match')u.match=m.match;if(m.type==='launch')u.launches.push(m.launch);if(m.type==='reply'){const p=u.pending.get(m.request);if(p){clearTimeout(p.timer);u.pending.delete(m.request);m.error?p.reject(Error(m.error)):p.resolve(m.result);}}});
+ ws.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='hello')u.id=m.id;if(m.type==='party')u.party=m.party;if(m.type==='public-match')u.match=m.match;if(m.type==='launch')u.launches.push(m.launch);if(m.type==='reply'){const p=u.pending.get(m.request);if(p){clearTimeout(p.timer);u.pending.delete(m.request);m.error?p.reject(Error(m.error)):p.resolve(m.result);}}});
  u.ask=(type,data={})=>new Promise((resolve,reject)=>{const request=++u.serial,timer=setTimeout(()=>reject(Error('Social timeout: '+type)),12000);u.pending.set(request,{resolve,reject,timer});ws.send(JSON.stringify({type,...data,request}));});await until(()=>u.party,'Social ready');return u;
 }
 async function game(u,host=false){
@@ -52,7 +52,7 @@ try{
  const d=await user('Public Host Four');await d.ask('queue',{publicRoyale:true});const next=await game(d);await until(()=>app.relay.publicHost.summary().humanPlayers===2,'Join after migration');
  app.relay.publicHost.host.advancedAt=Date.now()-16000;app.relay.publicHost.sweep();k.net.destroy();await c.ask('returned');await until(()=>next.net.isHost&&app.relay.publicHost.host?.peer===next.net.peer.id,'Frozen host lease transfers');assert.equal(next.sim.matchId,round);
  next.sim.time=next.sim.queueEnds;next.sim.advanceWarmupClock();next.net.broadcast(next.sim.snapshot());next.net.publishRoom();assert.equal(next.sim.stage,'battle-bus');
- const e=await user('Public Late Viewer');await e.ask('queue',{publicRoyale:true});const viewer=await game(e);await until(()=>next.sim.players.has(viewer.net.id),'Late viewer arrives');assert.equal(next.sim.players.get(viewer.net.id).lateSpectator,true);assert.equal(next.sim.players.get(viewer.net.id).contestant,false);
+ const e=await user('Public Late Viewer');await e.ask('friend-send',{id:d.id});await d.ask('friend-accept',{id:e.id});await e.ask('spectate-friend',{id:d.id});const viewer=await game(e);await until(()=>next.sim.players.has(viewer.net.id),'Late viewer arrives');assert.equal(next.sim.players.get(viewer.net.id).lateSpectator,true);assert.equal(next.sim.players.get(viewer.net.id).contestant,false);
  next.sim.beginBattle();const scorer=next.sim.players.get(next.net.id),victim=[...next.sim.players.values()].find(p=>p.bot&&!p.boss&&p.contestant);Object.assign(scorer,{flight:'ground',grounded:true,spectating:false,shieldUntil:0});Object.assign(victim,{flight:'ground',spectating:false,shieldUntil:0,shield:0});next.sim.damage(victim,scorer,9999,'Test');assert.equal(scorer.kills,1);
  for(let i=0;i<180;i++)next.sim.emit('shot',{player:'bot-1'});assert.equal(next.sim.snapshot().events.some(e=>e.type==='elimination'),false,'Kill event has rolled out of the display buffer');
  await until(()=>app.relay.progression.account(app.relay.peers.get(next.net.peer.id).progressId).publicTotals?.kills===1,'Actual host score reaches progression without its transient kill event');

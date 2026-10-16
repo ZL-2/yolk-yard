@@ -1,3 +1,4 @@
+import {isPublicCode} from './public-royale.js';
 import {rewardFrame} from './rewards.js';
 import {isWarmup,MAX_SPECTATORS,MAX_HUMANS,MAX_SNAPSHOT_ACTORS} from './royale-phases.js';
 import {SnapshotInterest} from './snapshot-interest.js';
@@ -265,7 +266,7 @@ export class Network {
     this.peer?.control?.({type:'public-member-ready',matchId:checkpoint.matchId,ready});
   }
   async join(code, profile, ticket) {
-    this.ticket=ticket;this.officialPublic=cleanCode(code)==='FRONTIER';
+    this.ticket=ticket;this.officialPublic=isPublicCode(cleanCode(code));
     this.joinProfile=safeProfile(profile);
     this.code = cleanCode(code);
     if (this.code.length !== 8)
@@ -470,7 +471,7 @@ export class Network {
     const s = this.snapshot;
     const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
     const capacity=s?.royale?Math.min(s.options.capacity,MAX_HUMANS):(s?.options.capacity||8);
-    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,public:this.visibility==='public',players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase,...(this.officialPublic?{recurring:true,hostId:this.id,publicState:{stage:s.royale.stage,phase:s.phase,time:s.time,queueEnds:s.royale.queueEnds,elapsed:s.royale.elapsed,round:s.round,matchId:s.royale.matchId,alive:s.royale.alive,botPlayers:s.players.filter(p=>p.bot&&p.contestant).length,contestants:s.players.filter(p=>!p.bot&&p.contestant).map(p=>p.id),estimatedSeconds:s.phase==='results'?Math.max(0,Math.ceil((s.publicRestartAt||s.time+10)-s.time)):Math.max(0,Math.ceil((s.royale.matchEnd||600)+20-s.royale.elapsed))}}:{})} : null;
+    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,public:this.visibility==='public',players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase,...(this.officialPublic?{recurring:true,hostId:this.id,publicState:{stage:s.royale?.stage||(s.phase==='results'?'finished':'arena'),phase:s.phase,time:s.time,queueEnds:s.royale?.queueEnds||0,elapsed:s.royale?.elapsed||0,round:s.round,matchId:s.royale?.matchId||s.matchId,alive:s.royale?.alive||humans.length,botPlayers:s.players.filter(p=>p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).length,contestants:s.players.filter(p=>!p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).map(p=>p.id),estimatedSeconds:s.phase==='results'?Math.max(0,Math.ceil((s.publicRestartAt||s.time+10)-s.time)):Math.max(0,Math.ceil(s.royale?(s.royale.matchEnd||600)+20-s.royale.elapsed:s.remaining))}}:{})} : null;
     if(relayURL()){const relay=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;relay?.publish?.(this.visibility==='public'||relay.protocol===2?listing:null);}
     else directory.publish(this.visibility==='public'?listing:null);
   }
@@ -479,7 +480,7 @@ export class Network {
     this.snapshot = state;
     if (!this.lastPublish || performance.now() - this.lastPublish > 2000 || this.lastPublishedStage!==state.royale?.stage || this.lastPublishedPhase!==state.phase) { this.lastPublish = performance.now();this.lastPublishedStage=state.royale?.stage;this.lastPublishedPhase=state.phase;this.publishRoom(); }
     if(this.officialPublic){
-      const scores=state.royale?.matchId+':'+state.phase+':'+state.players.filter(p=>!p.bot&&!p.lateSpectator).map(p=>p.id+','+(p.kills||0)+','+(p.place||0)).join(';');
+      const scores=(state.royale?.matchId||state.matchId)+':'+state.phase+':'+state.players.filter(p=>!p.bot&&!p.lateSpectator).map(p=>p.id+','+(p.kills||0)+','+(p.place||0)).join(';');
       if(scores!==this.lastPublicScores||performance.now()-(this.lastPublicProgress||0)>=500){this.lastPublicScores=scores;this.lastPublicProgress=performance.now();const hostPeer=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;if(hostPeer?.id===PREFIX+this.code)hostPeer.control({type:'public-progress',state:rewardFrame(state,this.id,this.callbacks.getHostInput?.()||{})});}
     }
     this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;

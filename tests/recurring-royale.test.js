@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {RoyaleSimulation} from '../src/royale.js';
 import {publicRoyaleOptions,PUBLIC_ROYALE} from '../src/public-royale.js';
 import {RealtimeRelay} from '../server/realtime/relay.js';
-import {lobbyMarkup,publicRoyaleMarkup} from '../src/lobby-ui.js';
+import {lobbyMarkup} from '../src/lobby-ui.js';
 import {markerAction} from '../src/team-markers.js';
 import {movePlayer,canStand} from '../src/physics.js';
 import {startShadowstep} from '../src/shadowstep.js';
@@ -44,7 +44,7 @@ test('visual footsteps omit teammates while preserving enemy footsteps',()=>{
  const fake={hidden:false,append(){},setAttribute(){},className:'',innerHTML:'',dataset:{},style:{setProperty(){}},querySelector:()=>({toggleAttribute(){},setAttribute(){}})},old=globalThis.document;globalThis.document={createElement:()=>({...fake})};
  try{const sounds=new SoundVisuals(fake),p={id:'me',team:1,x:0,y:0,z:0,health:100,yaw:0,flight:'ground'},mate={...p,id:'mate',x:3,moving:true,grounded:true,vx:2},enemy={...mate,id:'enemy',team:2,x:-3};sounds.update({phase:'playing',round:1,time:1,options:{mode:'royale',teamSize:2},royale:{stage:'active',matchId:'test',chests:[]},players:[p,mate,enemy],events:[]},p,{},1000);assert.equal(sounds.signals.has('footsteps:mate'),false);assert.equal(sounds.signals.has('footsteps:enemy'),true);}finally{globalThis.document=old;}
 });
-test('the public card shows the 30-second clock and blocks joins during host recovery',()=>{
- const model={profile:{name:'Test'},id:'a',online:true,balance:0,party:{leader:'a',state:'idle',members:[{id:'a',profile:{name:'Test'},ready:true}]},publicMatch:{phase:'playing',stage:'spawn-island',humanPlayers:7,capacity:48,joinable:true,countdownSeconds:30,estimatedSeconds:590,availableSeats:41,availableSpectators:16}};
- assert.match(lobbyMarkup(model),/30s to departure/);assert.match(publicRoyaleMarkup({...model,publicMatch:{...model.publicMatch,recovering:true}}),/CONNECTING PUBLIC HOST/);assert.match(publicRoyaleMarkup({...model,publicMatch:{...model.publicMatch,recovering:true}}),/disabled/);
+test('the lobby offers pool matchmaking without the retired singleton card',()=>{
+ const markup=lobbyMarkup({profile:{name:'Test'},id:'a',online:true,balance:0,party:{leader:'a',state:'idle',selection:{mode:'royale',teamSize:1,access:'public'},members:[{id:'a',profile:{name:'Test'},ready:false}]}});
+ assert.match(markup,/data-action="lobby-play" >PLAY/);assert.doesNotMatch(markup,/ONE PUBLIC MATCH|public-royale-card/);
 });

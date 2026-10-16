@@ -116,6 +116,11 @@ jobs:
           public_match_core={'src/network.js','src/relay-peer.js','server/realtime/public-host.js','tests/main-match-singleton.test.js'}
           public_match_followup=files<={'.github/workflows/pages.yml','docs/UPDATE_162.md','scripts/public-match-browser-check.mjs','tests/main-match-singleton.test.js','src/field-stability.css'} and json.loads(Path('package.json').read_text()).get('version')=='5.14.1'
           public_match=files<=public_match_allowed and (public_match_core<=files or previous<=public_match_allowed and public_match_core<=previous or public_match_followup)
+          lobby_allowed=set(['.github/workflows/pages.yml', 'docs/LOBBY_ART_164.json', 'docs/UPDATE_164.md', 'package-lock.json', 'package.json', 'public/modes/box-fights.webp', 'public/modes/choose.webp', 'public/modes/ffa.webp', 'public/modes/royale.webp', 'public/modes/training.webp', 'public/modes/zombies.webp', 'public/modes/zone-wars.webp', 'scripts/public-host-network-check.mjs', 'scripts/public-match-browser-check.mjs', 'server/realtime/index.js', 'server/realtime/match-launch.js', 'server/realtime/parties.js', 'server/realtime/public-host.js', 'server/realtime/relay.js', 'src/data.js', 'src/leaderboard-ui.js', 'src/lobby-deploy.css', 'src/lobby-news.js', 'src/lobby-ui.js', 'src/main.js', 'src/match-options.js', 'src/network.js', 'src/public-royale.js', 'src/releases.js', 'src/rewards.js', 'src/royale.js', 'src/simulation.js', 'src/view.js', 'tests/helpers/public-match.js', 'tests/main-match-singleton.test.js', 'tests/private-social.test.js', 'tests/public-host.test.js', 'tests/public-pools.test.js', 'tests/recurring-royale.test.js'])
+          lobby_allowed.add('scripts/release-live-check.mjs')
+          lobby_core={'src/lobby-news.js','src/lobby-deploy.css','server/realtime/public-host.js','tests/public-pools.test.js'}
+          lobby_update=files<=lobby_allowed and (lobby_core<=files or previous<=lobby_allowed and lobby_core<=previous)
+          public_match=public_match or lobby_update
           for path in ['package.json','package-lock.json']:
             if path not in files: continue
             old=json.loads(subprocess.check_output(['git','show','HEAD^:'+path],text=True));new=json.loads(Path(path).read_text())
@@ -222,7 +227,7 @@ jobs:
         run: node --test tests/referral-edit-fixes.test.js tests/perspective.test.js tests/building-overhaul.test.js tests/crew-update.test.js
       - name: Public singleton, six-player congestion, recovery, party admission and transport regressions
         if: needs.scope.outputs.public_match_fix == 'true'
-        run: node --test --test-concurrency=2 tests/main-match-singleton.test.js tests/public-host.test.js tests/relay-compact.test.js tests/relay-queue.test.js tests/realtime-resume.test.js tests/recurring-royale.test.js tests/private-social.test.js tests/field-stability.test.js tests/snapshot-codec.test.js tests/relay-liveness.test.js tests/continuity.test.js tests/deployment.test.js
+        run: node --test --test-concurrency=2 tests/public-pools.test.js tests/main-match-singleton.test.js tests/public-host.test.js tests/relay-compact.test.js tests/relay-queue.test.js tests/realtime-resume.test.js tests/recurring-royale.test.js tests/private-social.test.js tests/field-stability.test.js tests/snapshot-codec.test.js tests/relay-liveness.test.js tests/continuity.test.js tests/deployment.test.js
       - name: Public host handoff, frozen hosts, scoring and inventory recovery
         if: needs.scope.outputs.public_match_fix == 'true'
         run: node scripts/public-host-network-check.mjs
@@ -256,7 +261,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Single public card, actual browser host, guest admission and reconnect
+      - name: Lobby discovery, options, readiness, room pools and browser host reconnect
         if: needs.scope.outputs.public_match_fix == 'true'
         run: node scripts/public-match-browser-check.mjs
       - uses: actions/upload-artifact@v4

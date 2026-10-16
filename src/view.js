@@ -806,7 +806,9 @@ export class View {
       this.camera.position.set(narrow&&partyCount>1?partyOffset:5.8+partyOffset,4.3,narrow?(partyCount===3?34:partyCount>1?29:partyCount?22.5:19):partyCount>1?19:shortLobby?15.5:12.5);
       this.camera.lookAt(partyOffset, narrow?(partyOffset?1.7:1):shortLobby?2.6:1.8, 0);
       this.camera.fov = narrow?47:48;
-      this.camera.updateProjectionMatrix();
+      this.camera.updateProjectionMatrix();this.camera.updateMatrixWorld(true);
+      // The anchor sits above the highest crown, then the label grows upward.
+      for(const label of this.lobbyLabels||[]){const index=Number(label.dataset.lobbyPlayer),model=index===0?this.menuEgg:this.partyEggs?.[index-1];if(!model)continue;const point=new THREE.Vector3(model.position.x,model.position.y+5.45,model.position.z).project(this.camera);label.style.left=((point.x+1)*50)+'%';label.style.top=((1-point.y)*50)+'%';}
     } else if (local) {
       const hold=!!this.cinematic?.hold,victory=!!this.cinematic?.victory;
       const killer = !hold&&local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && canSpectate(p,local.id));

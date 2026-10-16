@@ -13,7 +13,8 @@ import {showFrontMessage,updateFrontMessage} from './front-message.js';
 import {emoteWheel} from './emote-ui.js';
 import {EMOTES} from './emotes.js';
 import {CROWN_ICON} from './crowns.js';
-import {PublicJoinChime} from './public-join-chime.js';
+import {LobbyNews} from './lobby-news.js';
+import {publicMatchOptions} from './public-royale.js';
 import './crowns-emotes.css';
 import {SoundVisuals} from './sound-visuals.js';
 import {inventoryDropTarget} from './inventory-drag.js';
@@ -39,7 +40,7 @@ import {RemoteSimulation} from './remote-simulation.js';
 import {canFight} from './stance.js';
 import {StreakUI} from './streak-ui.js';
 import {PartyClient} from './party-client.js';
-import {lobbyMarkup,publicRoyaleMarkup,modeMarkup,socialMarkup,EXPERIENCES} from './lobby-ui.js';
+import {lobbyMarkup,lobbyOptionsMarkup,modeMarkup,socialMarkup,EXPERIENCES} from './lobby-ui.js';
 import {teammates,wonRoyale,isTeamRoyale} from './teams.js';
 import {arrangeSettings} from './settings-layout.js';
 import {eggsMarkup,formatEggs} from './currency-ui.js';
@@ -81,6 +82,7 @@ import './field-update.css';
 import './frontier-ui.css';
 import './field-refinement.css';
 import './field-stability.css';
+import './lobby-deploy.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
@@ -292,17 +294,7 @@ async function refreshLeaderboards(force=false){
  leaderboardPending=true;renderLeaderboard();try{let progressToken;try{progressToken=localStorage.getItem('ravelfront-progress-token');}catch{}const result=await party.request('leaderboards',{progressToken,offset});if(!offset)leaderboards=result;leaderboardPageBoards=result;leaderboardError='';}catch(error){leaderboardError=error.message;}finally{leaderboardPending=false;leaderboardFetchedAt=performance.now();renderLeaderboard();}
 }
 setInterval(()=>{void refreshLeaderboards();},15000);
-function refreshPublicMatch(){
- if(screen!=='menu'||menuSection!=='play')return;
- const card=$('#menu .public-royale-card');if(!card)return;
- const focused=card.contains(document.activeElement)?document.activeElement.dataset.action:null;
- card.innerHTML=publicRoyaleMarkup(menuModel());if(focused)card.querySelector(`[data-action="${focused}"]`)?.focus({preventScroll:true});
-}
-const publicJoinChime=new PublicJoinChime();
-function publicMatchChanged(match){
- if(publicJoinChime.update(match,screen==='menu'&&!document.hidden))sound.cue('public-join');
- refreshPublicMatch();
-}
+const lobbyNews=new LobbyNews();
 let lobbyFooterObserver;
 function renderMenu(force=false) {
  lobbyFooterObserver?.disconnect();
@@ -312,7 +304,7 @@ function renderMenu(force=false) {
   const shell=document.createElement('template');shell.innerHTML=lobbyNavigation({...model,section:menuSection});root.querySelector('.yard-nav')?.replaceWith(shell.content.querySelector('.yard-nav'));return;
  }
  root.dataset.section=menuSection;
- if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);installLeaderboardScrollbars();const footer=root.querySelector('.yard-footer');if(footer){lobbyFooterObserver=new ResizeObserver(()=>document.documentElement.style.setProperty('--lobby-footer-height',Math.ceil(footer.getBoundingClientRect().height)+16+'px'));lobbyFooterObserver.observe(footer);}void refreshLeaderboards();return;}
+ if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);lobbyNews.mount(root.querySelector('.lobby-news'));view.lobbyLabels=[...root.querySelectorAll('[data-lobby-player]')];installLeaderboardScrollbars();const footer=root.querySelector('.yard-footer');if(footer){lobbyFooterObserver=new ResizeObserver(()=>document.documentElement.style.setProperty('--lobby-footer-height',Math.ceil(footer.getBoundingClientRect().height)+16+'px'));lobbyFooterObserver.observe(footer);}void refreshLeaderboards();return;}
  root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':'Career'}" tabindex="-1">${menuSection==='career'?careerMarkup({stats,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
  if(menuSection==='career')$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};
  else {
@@ -444,13 +436,12 @@ function setupMenu(editing = false, draft = null) {
   const nextRound = editing && state.phase === "results";
   const select = (id,label,items,value) => `<label>${label}<select class="field" id="setup-${id}">${items.map(([key,text])=>`<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
   modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Custom Private Match",
-    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your rules and invite friends. This private match runs on your computer; keep this tab open."}</p><div class="split-actions"><button data-match-preset="quick">QUICK ROYALE</button><button data-match-preset="zero">ZERO BUILD</button><button data-match-preset="precision">PRECISION ARENA</button></div><div class="form-grid match-rules">${select("visibility","VISIBILITY",net?.serverAuthority?[["public","Public matchmaking"]]:[["private","Private · invite code only"]],net?.serverAuthority?"public":"private")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("teamSize","ROYALE TEAM MODE",[[1,"Solo"],[2,"Duos"],[4,"Squads"]],o.teamSize||1)}${select("teamFill","TEAMMATES",[["on","Fill"],["off","No Fill"]],o.teamFill===false?"off":"on")}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[[48,"48 · empty seats filled by bots"]],o.capacity||MAX_CONTESTANTS)}${select("building","BUILDING",[["on","Building enabled"],["off","Zero Build"]],o.building===false?"off":"on")}${select("weaponPool","ARENA WEAPONS",[["all","All weapons"],["precision","Precision practice"],["close","Close quarters"]],o.weaponPool||"all")}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===4?'Last squad standing wins. Eight contestant positions minimum.':o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'48 contestants in every private Royale; friends replace bots. Fill teams get bot teammates in any remaining positions at departure. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
+    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your rules and invite friends. This private match runs on your computer; keep this tab open."}</p><div class="split-actions"><button data-match-preset="quick">QUICK ROYALE</button><button data-match-preset="zero">ZERO BUILD</button><button data-match-preset="precision">PRECISION ARENA</button></div><div class="form-grid match-rules">${select("visibility","VISIBILITY",net?.serverAuthority?[["public","Public matchmaking"]]:[["private","Private · invite code only"]],net?.serverAuthority?"public":"private")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.map(m=>[m.id,m.name]),o.mode)}${select("teamSize","ROYALE TEAM MODE",[[1,"Solo"],[2,"Duos"],[4,"Squads"]],o.teamSize||1)}${select("teamFill","TEAMMATES",[["on","Fill"],["off","No Fill"]],o.teamFill===false?"off":"on")}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[2,4,8,16,24,32,48].map(n=>[n,String(n)]),o.capacity||MAX_CONTESTANTS)}${select("building","BUILDING",[["on","Building enabled"],["off","Zero Build"]],o.building===false?"off":"on")}${select("weaponPool","ARENA WEAPONS",[["all","All weapons"],["precision","Precision practice"],["close","Close quarters"]],o.weaponPool||"all")}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===4?'Last squad standing wins. Eight contestant positions minimum.':o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Choose your contestant limit; friends replace bots. Fill teams get bot teammates in any remaining positions at departure. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
   $('#setup-visibility').disabled=true;
   const royale=o.mode==='royale';
   if(!editing)$('#setup-mode').disabled=false;
   if(royale){for(const option of $('#setup-capacity').options)option.disabled=Number(option.value)<(o.teamSize||1)*2;if(o.capacity<(o.teamSize||1)*2)$('#setup-capacity').value=String((o.teamSize||1)*2);for(const option of $('#setup-teamSize').options)option.disabled=Number(option.value)<(party?.party?.members.length||1);$('#setup-teamSize').onchange=()=>{const next={...getOptions(),visibility:$('#setup-visibility').value};setupMenu(editing,next);};}
   for(const key of ['minutes','scoreLimit']){$(`#setup-${key}`).closest('label').hidden=royale;$(`#setup-${key}`).disabled=royale;}
-  if(royale){$('#setup-capacity').value='48';$('#setup-fill').value='on';$('#setup-bots').value='47';$('#setup-fill').disabled=true;$('#setup-bots').disabled=true;}
   for(const key of ['capacity','storm','teamSize','teamFill','building'])$(`#setup-${key}`).closest('label').hidden=!royale;
   $('#setup-map').disabled=royale;$('#setup-weaponPool').closest('label').hidden=royale;
   for(const b of dialog.querySelectorAll('[data-match-preset]'))b.onclick=()=>{const presets={quick:{mode:'royale',teamSize:1,capacity:48,bots:47,fill:true,storm:'quick',building:true},zero:{mode:'royale',teamSize:1,capacity:48,bots:47,fill:true,storm:'normal',building:false},precision:{mode:'ffa',map:'yard',bots:3,fill:false,minutes:5,scoreLimit:25,weaponPool:'precision'}};setupMenu(editing,matchOptions({...o,...presets[b.dataset.matchPreset]}));};
@@ -601,7 +592,7 @@ function callbacks() {
     getCheckpoint:()=>sim?.checkpoint(),
     getHostInput:()=>sim?.inputs.get(net?.id),
     onHost:(checkpoint,departed)=>{
-      sim=checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options);if(net.officialPublic)bindPublicCrowns(sim);sim.restore(checkpoint);
+      sim=checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options);if(net.officialPublic&&checkpoint.options.mode==='royale')bindPublicCrowns(sim);sim.restore(checkpoint);
       if(sim instanceof RoyaleSimulation)for(const p of sim.players.values())if(!p.bot)p.connected=p.id===net.id;
       for(const id of departed)sim.leavePlayer(id);
       state=sim.snapshot();localId=net.id;pendingInputs=[];predicted=null;
@@ -610,7 +601,7 @@ function callbacks() {
     },
     onNameRequired:()=>renamePrompt(),
     onNameAccepted:()=>{if(dialogType==='rename'){dialog.close();dialogType='';if(screen==='game')void resume();}},
-    onJoin: (id, p, admission) => {const joined=sim?.admitPlayer(id,p,admission);if(joined&&net?.officialPublic){joined.crownProgress=admission?.crownRecord||joined.crownProgress;attachCrown(sim,joined,id);}return !!joined;},
+    onJoin: (id, p, admission) => {const joined=sim?.admitPlayer(id,p,admission);if(joined&&net?.officialPublic&&sim.options.mode==='royale'){joined.crownProgress=admission?.crownRecord||joined.crownProgress;attachCrown(sim,joined,id);}return !!joined;},
     onLeave: (id) => sim?.leavePlayer(id),
     onSuspendPlayer: id => sim?.suspendPlayer?.(id),
     onHostRecovery: ms => sim?.beginHostRecovery?.(ms),
@@ -677,7 +668,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   const visibility=launch?.recurring?'public':launch?.hostRun||!launch?'private':visibilityOverride||'public';
   busy=true;await refreshPublishedMaps();
   beginSim();
-  if(launch?.recurring){bindPublicCrowns(sim);attachCrown(sim,sim.players.get('host'));sim.players.get('host').crownProgress={...crownStatus};attachCrown(sim,sim.players.get('host'));}
+  if(launch?.recurring&&sim.options.mode==='royale'){bindPublicCrowns(sim);attachCrown(sim,sim.players.get('host'));sim.players.get('host').crownProgress={...crownStatus};attachCrown(sim,sim.players.get('host'));}
   if(launch?.admission)sim.assignTeam?.(sim.players.get("host"),launch.admission);
   busy = true;
   modal(
@@ -1218,10 +1209,21 @@ async function copy(text) {
 async function partyRequest(type,data={}){
  try{return await party.request(type,data);}catch(error){toast(error.message);return null;}
 }
-function playMenu(){modal('Choose your experience',modeMarkup(party?.party?.selection,party?.party?.leader!==party?.id),'play');}
+function playMenu(){modal('CHOOSE GAME MODE',modeMarkup(party?.party?.selection,party?.party?.leader!==party?.id,party?.party?.members.length||1),'play');}
 async function selectExperience(id){
- const e=EXPERIENCES.find(e=>e.id===id);if(!e)return;
- if(await partyRequest('select',{mode:e.mode,teamSize:e.teamSize,teamFill:party.party.selection.teamFill})){closeDialog();renderMenu();}
+ const e=EXPERIENCES.find(e=>e.id===id);if(!e||e.soon)return;
+ if(!party?.ready||party.party.leader!==party.id)return;
+ if(e.mode==='training'){if(party.party.members.length>1)return toast('Leave your party to train solo.');closeDialog();actions.training();return;}
+ const previous=party.party.selection,teamSize=e.mode==='royale'?Math.max(previous.teamSize||1,party.party.members.length>2?4:party.party.members.length):1;
+ if(await partyRequest('select',{mode:e.mode,teamSize,access:previous.access,teamFill:previous.teamFill,options:matchOptions({...previous,mode:e.mode,map:e.mode==='royale'?'sunnybreak':'yard',teamSize,bots:e.mode==='royale'?47:7,capacity:e.mode==='royale'?48:8})})){closeDialog();renderMenu();}
+}
+function lobbyOptionsMenu(draft=party?.party?.selection){
+ if(!draft||!party?.ready)return toast('Matchmaking is connecting.');
+ const locked=party.party.leader!==party.id||party.party.state!=='idle';
+ modal('MATCH OPTIONS',lobbyOptionsMarkup(draft,{locked,partySize:party.party.members.length,maps:MAPS.filter(m=>m.id!=='sunnybreak'&&m.id!=='hatchery-atoll'),difficulties:BOT_DIFFICULTIES}),'lobby-options');
+ const form=$('#lobby-options-form'),read=()=>{const next={...draft};for(const key of ['access','teamSize','building','teamFill','capacity','storm','map','weaponPool','minutes','scoreLimit','fill','bots','difficulty']){const field=$('#lobby-'+key);if(!field)continue;next[key]=['building','teamFill','fill'].includes(key)?field.value==='true':['teamSize','capacity','minutes','scoreLimit','bots','difficulty'].includes(key)?Number(field.value):field.value;}return next;};
+ for(const key of ['access','teamSize']){const field=$('#lobby-'+key);if(field)field.onchange=()=>{let next=read();if(next.access==='public')next={...publicMatchOptions(next),access:'public'};else next.capacity=Math.max(next.capacity||8,(next.teamSize||1)*2);lobbyOptionsMenu(next);};}
+ form.onsubmit=async event=>{event.preventDefault();if(locked||!form.reportValidity())return;const next=read(),button=form.querySelector('[type=submit]');button.disabled=true;if(await partyRequest('select',{...next,options:next})){closeDialog();renderMenu();}else button.disabled=false;};
 }
 let socialTab='friends',socialModel=null,socialOffset=0,socialRefreshTimer=null,socialFetching=false;
 async function socialMenu(){
@@ -1249,7 +1251,7 @@ function receiveInvite(invite){
 }
 async function queueParty(custom=false,code=null){
  if(state){toast('Return to the lobby before finding another match.');return;}
- const selected=custom?getOptions():matchOptions({...party?.party?.selection,fill:true,bots:party?.party?.selection.mode==='royale'?31:7});
+ const selected=custom?getOptions():matchOptions(party?.party?.selection);
  if(!selected)return;
  // The custom launch applies its selection atomically, retaining party readiness.
  if(await partyRequest('queue',{custom,code,options:selected,visibility:custom?'private':'public'})){dialog.close();dialogType='';renderMenu();}
@@ -1267,7 +1269,7 @@ async function launchParty(launch){
   else {spectateTarget=launch.watchId||null;ok=await joinRoom(launch.code,false,launch.ticket);}
   if(activeLaunch!==launch.id)return;
   if(!ok)throw Error('Your party could not enter that match together.');
-  if(launch.host){const admission=await party.request('host-ready',{id:launch.id});if(launch.recurring&&admission?.crownRecord){const me=sim.players.get(localId);me.crownProgress=admission.crownRecord;attachCrown(sim,me,localId);}}
+  if(launch.host){const admission=await party.request('host-ready',{id:launch.id});if(launch.recurring&&sim.options.mode==='royale'&&admission?.crownRecord){const me=sim.players.get(localId);me.crownProgress=admission.crownRecord;attachCrown(sim,me,localId);}}
   await party.request('joined',{id:launch.id});
  }catch(error){await partyRequest('failed',{id:launch.id,reason:error.message});if(activeLaunch===launch.id)activeLaunch=null;}
 }
@@ -1279,7 +1281,6 @@ function initializeParty(){
   status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
-  'public-match':publicMatchChanged,
   'social-changed':scheduleSocialRefresh,
   'party-notice':m=>toast(m.message),
   'friend-request':m=>{toast(m.name+' sent a friend request. Open Social to accept or decline.');sound.cue('queue-found');scheduleSocialRefresh();},
@@ -1335,9 +1336,12 @@ const actions = {
  'perspective-briefing':()=>showPerspectiveBriefing({force:true}),
  'quick-rematch':()=>{if(net?.officialPublic)return toast('The next public round starts automatically.');if(sim&&!sim.remote&&state?.phase==='results'&&(!net||net.isHost)){closeDialog();launchRound();}},
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
- 'start-training':()=>{if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
+ 'start-training':()=>{if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
  'career':()=>selectMenuSection('career'),
- 'find-public':()=>setupMenu(),
+ 'find-public':()=>lobbyOptionsMenu(),
+ 'choose-mode':playMenu,
+ 'lobby-options':()=>lobbyOptionsMenu(),
+ 'lobby-play':()=>queueParty(false),
  'public-join':()=>queuePublicRoyale(false),
  'public-spectate':()=>queuePublicRoyale(true),
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
@@ -1452,7 +1456,10 @@ document.addEventListener("click", (e) => {
   if(b.dataset.spectateFriend){if(state){toast('Return to the lobby before spectating a friend.');return;}b.disabled=true;void partyRequest('spectate-friend',{id:b.dataset.spectateFriend}).then(()=>{b.disabled=false;});}
   if(b.dataset.friendNickname){friendNicknameMenu(b.dataset.friendNickname);return;}
   if(b.dataset.socialAction){b.disabled=true;void partyRequest(b.dataset.socialAction,{id:b.dataset.playerId}).then(ok=>{b.disabled=false;if(ok){toast(b.dataset.socialAction==='friend-send'?(ok.status==='friends'?'Friend request accepted.':'Friend request sent.'):'Social list updated.');void socialMenu();}});}
-  if(b.dataset.experience)void selectExperience(b.dataset.experience);
+  if(b.dataset.experience&&!b.disabled)void selectExperience(b.dataset.experience);
+  if(b.dataset.newsIndex!==undefined)lobbyNews.go(Number(b.dataset.newsIndex));
+  if(b.dataset.newsStep)lobbyNews.go(lobbyNews.index+Number(b.dataset.newsStep));
+  if(b.hasAttribute('data-news-pause'))lobbyNews.toggle();
   for(const [key,type]of [['partyInvite','invite'],['partyAccept','accept'],['partyDecline','decline'],['partyKick','kick'],['partyJoin','join']])if(b.dataset[key]){
     void partyRequest(type,{id:b.dataset[key]}).then(ok=>{if(ok){if(type==='accept'||type==='decline'){document.querySelector(`[data-invitation-id="${b.dataset[key]}"]`)?.remove();b.closest('.party-invitation')?.remove();}if(type==='invite')toast('Invitation sent.');if(dialogType==='social')void socialMenu();}});
   }
@@ -2021,7 +2028,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return showWelcomeBack().then(()=>showReferrals({party})).then(()=>showPerspectiveBriefing());}).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);
@@ -2132,7 +2139,7 @@ const updates = new UpdateWatcher({
   },
 });
 setInterval(() => void updates.check(), 20000);
-setInterval(refreshPublicMatch,1000);
+
 window.addEventListener("focus", () => void updates.check());
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) void updates.check();

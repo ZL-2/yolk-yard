@@ -1,3 +1,4 @@
+import {isPublicCode} from '../../src/public-royale.js';
 import {acceptFrame} from './rate-budget.js';
 import {PublicHost} from './public-host.js';
 import {MatchAuthority} from './authority.js';
@@ -30,17 +31,17 @@ export class RealtimeRelay {
           }else{
             const id=m.id??`player-${randomUUID()}`;
             if(typeof id!=='string'||m.id!==undefined&&!address.test(id))throw Error('Invalid address');
-            // FRONTIER is reserved across protocol versions. An older tab must
-            // never recreate a second public room alongside the current one.
-            if(id.endsWith('-FRONTIER')&&id!==this.publicHost.key)throw Error('Refresh to join the public match');
-            if(id===this.publicHost.key&&this.publicHost.enabled&&!this.publicHost.authorize(m))throw Error('Public host reservation required');
+            // Public room codes are reserved across protocol versions and require
+            // a matching lease; a reconnect cannot register an orphan simulation.
+            if(isPublicCode(id.split('-').at(-1))&&!this.publicHost.roomByAddress(id))throw Error('Public host reservation required');
+            if(this.publicHost.roomByAddress(id)&&this.publicHost.enabled&&!this.publicHost.authorize(m))throw Error('Public host reservation required');
             if(this.peers.has(id)){ws.send(JSON.stringify({type:'error',error:'unavailable-id'}));ws.close(1008,'Address taken');return;}
             if(this.peers.size>=1000)throw Error('Server full');
             peer={id,token:randomUUID(),ws,links:new Map(),pending:[],pendingBytes:0,seq:0,acked:0,clientSeq:0,history:[],historyBytes:0,lastSeen:Date.now(),rateAt:Date.now(),frames:0,bytes:0};
-            this.peers.set(id,peer);this.sessions.add(peer);if(id===this.publicHost.key&&this.publicHost.enabled)this.publicHost.registered(peer,m);void this.progression.register(peer,m.progressToken);
+            this.peers.set(id,peer);this.sessions.add(peer);if(this.publicHost.roomByAddress(id)&&this.publicHost.enabled)this.publicHost.registered(peer,m);void this.progression.register(peer,m.progressToken);
             // The elected alias shares its proven live member's progression identity,
             // including browsers that cannot persist a local storage credential.
-            if(id===this.publicHost.key&&this.publicHost.enabled&&m.publicHostProof){const owner=this.peers.get(m.publicHostProof.id);if(owner?.progressId)peer.progressId=owner.progressId;}
+            if(this.publicHost.roomByAddress(id)&&this.publicHost.enabled&&m.publicHostProof){const owner=this.peers.get(m.publicHostProof.id);if(owner?.progressId)peer.progressId=owner.progressId;}
           }
           clearTimeout(registration);peer.detachedAt=0;peer.lastSeen=Date.now();this.authority.connection(peer,true);
           ws.send(JSON.stringify({type:'ready',id:peer.id,resumed:!!m.resume,resume:peer.token,protocol:2}));
@@ -57,7 +58,7 @@ export class RealtimeRelay {
         if(!Number.isSafeInteger(m.seq)||m.seq<1||m.seq>peer.clientSeq+1)throw Error('Command sequence');
         if(m.seq>peer.clientSeq){this.handle(peer,m);peer.clientSeq=m.seq;}
         if(ws.readyState===1)ws.send(JSON.stringify({type:'command-ack',seq:peer.clientSeq}));
-      }catch(error){const reason=['Rate limit','Command sequence','Expired resume','Register first','Invalid public host state','Invalid frame'].includes(error.message)?error.message:'Invalid relay message';if(peer&&(this.publicHost.isTarget(peer)||peer.publicMember))this.publicHost.report('connection-rejected',reason);ws.close(1008,reason);}
+      }catch(error){const reason=['Rate limit','Command sequence','Expired resume','Register first','Invalid public host state','Invalid frame'].includes(error.message)?error.message:'Invalid relay message';if(peer&&(this.publicHost.isTarget(peer)||peer.publicMember))this.publicHost.report('connection-rejected',reason,peer);ws.close(1008,reason);}
     });
     ws.on('close',()=>{clearTimeout(registration);if(peer?.ws===ws){peer.ws=null;peer.detachedAt=Date.now();this.authority.connection(peer,false);}});
     ws.on('error',()=>{});
@@ -95,7 +96,7 @@ export class RealtimeRelay {
   handle(peer,m){
     if(m.type==='performance-report'){this.serviceStatus?.report(peer,m.metrics);return;}
     if(m.type==='authority-create'||m.type==='authority-command'){this.authority.command(peer,m);return;}
-    if(m.type==='public-progress'){if(peer.id===this.publicHost.key&&this.publicHost.isTarget(peer)&&m.state?.matchId===this.publicHost.state?.matchId)this.progression.frame(peer,m.state);return;}
+    if(m.type==='public-progress'){if(!!this.publicHost.roomByAddress(peer.id)&&this.publicHost.isTarget(peer)&&m.state?.matchId===this.publicHost.roomFor(peer)?.state?.matchId)this.progression.frame(peer,m.state);return;}
     if(m.type==='public-crown'){this.publicHost.saveCrown(peer,m.record);return;}
     if(m.type==='public-member-ready'){this.publicHost.ready(peer,m);return;}
     if(m.type==='progress')return; // Only the elected public host or legacy authority may report results.
@@ -107,9 +108,9 @@ export class RealtimeRelay {
       if(this.authority.rooms.has(peer.id))return;
       if(!address.test(peer.id))throw Error('Not a room');
       const r=m.room;
-      if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!['royale','ffa'].includes(r.mode)||!Number.isInteger(r.players)||r.players<1||r.players>MAX_HUMANS+MAX_SPECTATORS))throw Error('Invalid room');
-      if(this.publicHost.enabled&&peer.id===this.publicHost.key&&!this.publicHost.publish(peer,r))throw Error('Invalid public host state');
-      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:r.mode,players:r.players,capacity:Math.max(2,Math.min(MAX_HUMANS,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(MAX_CONTESTANTS,Number(r.contestantCapacity)||8)),teamSize:[2,4].includes(r.teamSize)?r.teamSize:1,public:peer.id===this.publicHost.key,hostRun:true,recurring:peer.id===this.publicHost.key,phase:r.phase}:null;
+      if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!['royale','ffa'].includes(r.mode)||!Number.isInteger(r.players)||r.players<0||r.players>MAX_HUMANS+MAX_SPECTATORS))throw Error('Invalid room');
+      if(this.publicHost.enabled&&!!this.publicHost.roomByAddress(peer.id)&&!this.publicHost.publish(peer,r))throw Error('Invalid public host state');
+      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:r.mode,players:r.players,capacity:Math.max(2,Math.min(MAX_HUMANS,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(MAX_CONTESTANTS,Number(r.contestantCapacity)||8)),teamSize:[2,4].includes(r.teamSize)?r.teamSize:1,public:!!this.publicHost.roomByAddress(peer.id),hostRun:true,recurring:!!this.publicHost.roomByAddress(peer.id),phase:r.phase}:null;
       peer.listedAt=Date.now();return;
     }
     if(m.type==='connect'){
@@ -133,7 +134,7 @@ export class RealtimeRelay {
             this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'The public match is reconnecting. Join the main match from Play.'}});continue;
           }
           let admission=entry.data.ticket?this.parties.claim(entry.data.ticket,peer.id,other.id):null;
-          if(this.publicHost.enabled&&(this.publicHost.isTarget(other)||this.publicHost.members.has(other.id))){admission??=this.publicHost.members.get(peer.id)?.admission;admission=this.publicHost.admission(peer,admission);if(!admission){this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'Join the public match from Play, or wait for host transfer.'}});continue;}}
+          if(this.publicHost.enabled&&(this.publicHost.isTarget(other)||this.publicHost.members.has(other.id))){admission??=this.publicHost.members.get(peer.id)?.admission;admission=this.publicHost.admission(peer,admission,other);if(!admission){this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'Join the public match from Play, or wait for host transfer.'}});continue;}}
           if(entry.data.ticket&&!admission){this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'Your party reservation expired. Return to the lobby and try again.'}});continue;}
           // Never forward a self-reported party or team claim.
           entry.data={...entry.data,admission};delete entry.data.ticket;
@@ -147,7 +148,7 @@ export class RealtimeRelay {
   remove(peer,code=1000,reason='Session ended'){
     if(this.peers.get(peer.id)!==peer)return;
     if(this.authority.disconnect(peer))return;
-    if(this.publicHost.isTarget(peer))this.publicHost.report('host-removed',reason);
+    if(this.publicHost.isTarget(peer))this.publicHost.report('host-removed',reason,peer);
     this.peers.delete(peer.id);this.sessions.delete(peer);this.publicHost.left(peer);peer.ws?.close(code,reason);peer.ws=null;
     for(const [channel,other] of peer.links){other.links.delete(channel);this.send(other,{type:'closed',channel});}
     peer.links.clear();peer.history=[];peer.pending=[];

@@ -57,6 +57,7 @@ export class Simulation {
     this.eventId = 0;
     this.time = 0;
     this.round = 0;
+    this.matchId=globalThis.crypto.randomUUID();
     this.phase = "lobby";
     this.remaining = this.options.minutes * 60;
     this.scores = [0, 0];
@@ -232,6 +233,7 @@ export class Simulation {
     return true;
   }
   startRound() {
+    this.matchId=globalThis.crypto.randomUUID();this.publicRestartAt=null;
     this.phase = "playing";
     this.round++;
     this.remaining = this.options.minutes * 60;
@@ -373,6 +375,7 @@ export class Simulation {
     dt = clamp(dt, 0, 1 / 30);
     this.time += dt;
     this.recordPoses();this.tickActivity(dt);
+    if(this.options.recurring&&this.phase==='results'){this.publicRestartAt??=this.time+10;if(this.time>=this.publicRestartAt)this.startRound();}
     if (this.phase !== "playing") {for(const p of this.players.values())if(p.emote)emoteInput(this,p,this.inputs.get(p.id)||{});return;}
     this.remaining = Math.max(0, this.remaining - dt);
     for (const p of this.players.values()) {
@@ -834,6 +837,7 @@ export class Simulation {
   finish() {
     if (this.phase !== "playing") return;
     this.phase = "results";
+    if(this.options.recurring)this.publicRestartAt=this.time+10;
     if (mode(this.options.mode).teams)
       this.winner =
         this.scores[0] === this.scores[1]
@@ -876,6 +880,8 @@ export class Simulation {
     if([...this.players.values()].filter(p=>!p.lateSpectator).length>=capacity){const bot=[...this.players.values()].find(p=>p.bot);if(!bot)return null;this.players.delete(bot.id);this.inputs.delete(bot.id);}
     const p=this.addPlayer(id,profile);if(p)this.assignTeam(p,admission);return p;
   }
+  suspendPlayer(id){this.inputs.delete(id);this.remoteInputs.delete(id);const p=this.players.get(id);if(p){p.fireLatch=false;p.popperLatch=false;}}
+  setConnectedHumans(ids){const connected=new Set(ids);for(const p of this.players.values())if(!p.bot)p.connected=connected.has(p.id);}
   leavePlayer(id) { this.removePlayer(id); if(this.phase==='playing')this.addBots(); }
   safeSpawn(p) {
     const living=[...this.players.values()].filter(e=>e!==p&&e.health>0&&!e.spectating);
@@ -955,7 +961,7 @@ export class Simulation {
       "aim",
     ];
     return {
-      version: VERSION,
+      version: VERSION,matchId:this.matchId,publicRestartAt:this.publicRestartAt,
       mapLayouts:this.mapLayouts,mapLayoutKey:this.mapLayoutKey,
       time: this.time,
       round: this.round,
