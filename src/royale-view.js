@@ -226,7 +226,7 @@ export class RoyaleView{
   if(model.userData.utility&&item?.id==='anchorWinch'){model.userData.utility.position.set(.3,1.13,-.42);model.userData.utility.rotation.x=p.pitch;const cup=model.userData.utility.getObjectByName('grappler-plunger');if(cup)cup.visible=!p.grapple;}
   else if(model.userData.utility){model.userData.utility.position.y=p.use?1.15+Math.sin(t*7)*.02:.7;if(item?.pickaxe){const swing=Math.max(0,1-(this.view.lastStateTime-(p.swingAt??-100))/.45);model.userData.utility.rotation.x=-Math.sin(swing*Math.PI)*1.5;}}
 
-  if(pose.air>.01){model.rotation.y=pose.yaw;model.rotation.x=model.rotation.x*(1-pose.air)+pose.pitch;model.rotation.z=model.rotation.z*(1-pose.air)+pose.roll;model.position.y+=pose.bob;}
+  if(pose.air>.01){model.rotation.order='YXZ';model.rotation.y=pose.yaw;model.rotation.x=model.rotation.x*(1-pose.air)+pose.pitch;model.rotation.z=model.rotation.z*(1-pose.air)+pose.roll;model.position.y+=pose.bob;}
 
   if(p.place===1&&p.health>0)model.userData.victory=true;
  }

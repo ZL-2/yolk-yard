@@ -315,7 +315,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   else if(p.vehicleId&&p.vehicleSeat===0)target=V(sideSign*.36,1.2,-.58);
   else if(p.mantle)target=V(sideSign*.28,1.68,-.38);
   else if(p.traversal)target=V(sideSign*.24,1.95,-.08);
-  else if(airborne)target=p.flight==='glide'?V(sideSign*.33,1.93,-.06):V(sideSign*.61,1.42+Math.sin(time*2.1+sideSign)*.025,-.17);
+  else if(airborne)target=p.flight==='glide'?V(sideSign*.33,1.93,-.06):V(sideSign*.70,1.47+Math.sin(time*2.1+sideSign)*.012,-.10);
   else if(p.building)target=V(sideSign*.25,1.22-lower+(sideSign>0?Math.sin(time*8)*.035:0),-.38);
   else if(p.use){const t=T.MathUtils.clamp((time-(p.use.start??time))/Math.max(.1,(p.use.end??time+1)-(p.use.start??time)),0,1),lift=Math.min(1,t/.18)*Math.min(1,(1-t)/.14),drink=['mini','flask'].includes(p.use.id);target=drink?V(sideSign*.16,(sideSign>0?1.2+lift*.36:1.15)-lower,-.24):V(sideSign*.17+Math.sin(t*Math.PI*10)*.02,1.08-lower,-.36);}
   else if(sideSign<0&&held?.visible&&draw?.active&&draw.route==='back'&&draw.progress<.52)target=V(-.24,1.12-lower,-.18);

@@ -9,6 +9,7 @@ import {equipPose} from '../src/equip.js';
 import {updateArms} from '../src/arms.js';
 import {VIEWMODEL} from '../src/physics.js';
 import {eyeHeight} from '../src/stance.js';
+import {RoyaleView} from '../src/royale-view.js';
 const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(320,390);renderer.outputColorSpace=T.SRGBColorSpace;
 const scene=new T.Scene();scene.background=new T.Color('#8fa7b0');scene.add(new T.HemisphereLight(0xffffff,0x354652,2.4));const light=new T.DirectionalLight(0xffecd6,2.7);light.position.set(-3,5,-4);scene.add(light);
 const camera=new T.PerspectiveCamera(32,320/390,.01,40);
@@ -40,12 +41,18 @@ for(const tool of [false,true]){
  scene.remove(model);
 }
 window.reviewMotion=async()=>{
- document.body.replaceChildren(renderer.domElement);renderer.setSize(960,640);camera.aspect=1.5;camera.updateProjectionMatrix();
- const model=makeEgg({weapon:'sprinter',outfit:'outfit-voss-alt',backbling:'backbling-voss'}),motion=new LobbyMotion();scene.add(model);
- for(let f=0;f<240;f++){
-  if(f<120){model.position.set(0,0,0);View.prototype.animateLobbyCharacter.call({},model,motion,1/30);camera.position.set(-2.4,1.65,3.65);}
-  else {const speed=f<165?2:f<210?5:0,angle=f<190?0:.8;model.rotation.y=angle;model.position.x-=Math.sin(angle)*speed/30;model.position.z-=Math.cos(angle)*speed/30;model.userData.held.position.set(VIEWMODEL.x,1.38,VIEWMODEL.z);model.userData.held.rotation.set(0,0,0);updateArms(model.userData.arms,-1,model.userData.blaster);animateHumanoid(model,{health:100,grounded:true,weapon:'sprinter',yaw:angle,vx:-Math.sin(angle)*speed,vz:-Math.cos(angle)*speed},1/30,f/30);camera.position.copy(model.position).add(new T.Vector3(-2.4,1.65,3.65));}
-  floor.position.set(model.position.x,0,model.position.z);camera.lookAt(model.position.clone().add(new T.Vector3(0,1,0)));renderer.render(scene,camera);await new Promise(r=>setTimeout(r,33));
+ document.body.replaceChildren(renderer.domElement);document.body.style.margin='0';renderer.setSize(960,640);camera.aspect=1.5;camera.updateProjectionMatrix();
+ const caption=document.createElement('div');caption.style.cssText='position:fixed;top:16px;left:20px;background:#102330;padding:10px;color:white';document.body.append(caption);
+ const model=makeEgg({weapon:'sprinter',outfit:'outfit-voss-alt',backbling:'backbling-voss'}),motion=new LobbyMotion(),presenter=Object.create(RoyaleView.prototype);presenter.flightPoses=new Map();scene.add(model);
+ floor.visible=false;const road=new T.GridHelper(80,320,0x395665,0x6c8792);scene.add(road);window.motionEvidence=[];
+ for(let f=0;f<360;f++){
+  let lookY=1;
+  if(f<144){caption.textContent='Voss combat patrol — moving road';model.position.set(0,0,0);View.prototype.animateLobbyCharacter.call({},model,motion,1/24);camera.position.set(-2.4,1.65,3.65);road.position.z=-(motion.distance%.25);}
+  else if(f<240){caption.textContent='Combat walk — side view, fixed ground';model.rotation.y=0;model.position.z-=1.12/24;road.position.z=0;model.userData.held.position.set(VIEWMODEL.x,1.38,VIEWMODEL.z);model.userData.held.rotation.set(0,0,0);updateArms(model.userData.arms,-1,model.userData.blaster);animateHumanoid(model,{health:100,grounded:true,weapon:'sprinter',yaw:0,vz:-1.12},1/24,f/24);camera.position.copy(model.position).add(new T.Vector3(-3.9,1.5,-1.4));}
+  else {const flight=f<324?'dive':'glide',yaw=f<288?0:Math.PI/2;caption.textContent=flight==='dive'?'Actual royale skydive — extended legs, belly down':'Actual royale glider deployment';road.visible=false;model.position.set(0,0,0);model.rotation.set(0,yaw,0);const p={id:'review',health:100,grounded:false,flight,yaw,vx:-Math.sin(yaw)*15,vz:-Math.cos(yaw)*15};presenter.animateActor(model,p,f/24,1/24);animateHumanoid(model,p,1/24,f/24);camera.position.set(-2.8,1.6,-3.7);lookY=.4;}
+  camera.lookAt(model.position.clone().add(new T.Vector3(0,lookY,0)));renderer.render(scene,camera);
+  if((f>=48&&f<=114&&f%6===0)||(f>=168&&f<=216&&f%12===0)||[264,276,312,323,348,359].includes(f))window.motionEvidence.push({frame:f,label:caption.textContent,image:renderer.domElement.toDataURL()});
+  await new Promise(r=>setTimeout(r,42));
  }
 };
 window.ready=true;

@@ -131,6 +131,7 @@ jobs:
           operator_refresh=files<=operator_allowed and json.loads(Path('package.json').read_text()).get('version')=='5.16.0' and Path('tests/operator-refresh.test.js').exists()
           mixamo_allowed=set(['.github/workflows/pages.yml', 'docs/UPDATE_168.md', 'docs/MIXAMO_ANIMATIONS.md', 'package.json', 'package-lock.json', 'src/releases.js', 'src/humanoid.js', 'src/character-motion.js', 'src/mixamo-clips.js', 'scripts/bake-mixamo.mjs', 'scripts/mixamo-manifest.json', 'scripts/character-motion-browser-check.mjs', 'tests/character-motion.test.js', 'tests/character-motion-preview.html', 'tests/operator-refresh.test.js', 'tests/lobby-motion.test.js'])
           mixamo_allowed.update({'src/view.js','src/celebration-view.js','docs/UPDATE_169.md','src/world-locations.js','docs/UPDATE_170.md'})
+          mixamo_allowed.update({'src/glide-pose.js','src/royale-view.js','tests/gameplay-overhaul.test.js','docs/UPDATE_171.md'})
           mixamo_core={'src/character-motion.js','tests/character-motion.test.js'}
           mixamo_update=files<=mixamo_allowed and (mixamo_core<=files or previous<=mixamo_allowed and mixamo_core<=previous)
           for path in ['package.json','package-lock.json']:
@@ -249,7 +250,9 @@ jobs:
         run: node --test --test-concurrency=2 tests/operator-refresh.test.js tests/lobby-motion.test.js tests/arms.test.js tests/equip.test.js tests/field-detail.test.js tests/hitbox.test.js tests/private-social.test.js tests/crew-update.test.js tests/public-pools.test.js tests/leaderboards.test.js tests/deployment.test.js
       - name: Mixamo anatomy, state coverage, clock independence, weapon grips and camera safety
         if: needs.scope.outputs.mixamo_update == 'true'
-        run: node --test --test-concurrency=2 tests/character-motion.test.js tests/operator-refresh.test.js tests/arms.test.js tests/equip.test.js tests/field-detail.test.js tests/hitbox.test.js tests/perspective.test.js tests/lobby-motion.test.js tests/deployment.test.js
+        run: |
+          node --test --test-concurrency=2 tests/character-motion.test.js tests/operator-refresh.test.js tests/arms.test.js tests/equip.test.js tests/field-detail.test.js tests/hitbox.test.js tests/perspective.test.js tests/lobby-motion.test.js tests/deployment.test.js
+          node --test --test-name-pattern='glider deployment' tests/gameplay-overhaul.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js

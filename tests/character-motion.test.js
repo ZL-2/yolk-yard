@@ -6,6 +6,9 @@ import {MOTION_NAMES,motionSelection,motionInfo} from '../src/character-motion.j
 import {updateCelebration} from '../src/celebration-view.js';
 import {ROYALE_MAP} from '../src/royale-map.js';
 import {groundAt} from '../src/terrain.js';
+import {RoyaleView} from '../src/royale-view.js';
+import {LobbyMotion} from '../src/lobby-motion.js';
+import {View,makeEgg} from '../src/view.js';
 
 test('downloaded motion covers every gameplay branch and all eight movement directions',()=>{
  for(const gait of ['walk','run','sprint','crouch'])for(const direction of ['forward','forward-right','right','backward-right','backward','backward-left','left','forward-left'])assert.ok(motionInfo(gait+'-'+direction));
@@ -87,5 +90,48 @@ test('stride releases and walk/run transitions remain continuous over successive
   const points=['hips','head','footL','footR'].map(n=>m.userData.human.bones[n].getWorldPosition(new Vector3()));
   if(previous&&f>30)for(let i=0;i<points.length;i++)assert.ok(points[i].distanceTo(previous[i])<.23,'joint teleported at frame '+f);
   previous=points;
+ }
+});
+
+test('combat steps stay in their own lanes rather than crossing and kicking sideways',()=>{
+ for(const lobby of [false,true]){
+  const m=makeEgg({weapon:'sprinter',outfit:'outfit-voss-alt'}),motion=new LobbyMotion(),lanes=[[],[]];
+  for(let f=0;f<60*24;f++){
+   if(lobby)View.prototype.animateLobbyCharacter.call({},m,motion,1/60);
+   else {m.position.z-=1.12/60;animateHumanoid(m,{health:100,grounded:true,weapon:'sprinter',vz:-1.12},1/60,f/60);}
+   m.updateMatrixWorld(true);if(f<60)continue;
+   // Lobby root faces the camera; compare against the straight road, not
+   // against the scanning pelvis which caused the original lateral kicks.
+   const b=m.userData.human.bones;
+   for(const [i,S]of ['L','R'].entries()){
+    const foot=b['foot'+S].getWorldPosition(new Vector3()).sub(m.position),x=lobby?-foot.x:foot.x;
+    assert.ok(i?x>.035:x<-.035,'boot crossed the centre line');lanes[i].push(x);
+   }
+  }
+  for(const lane of lanes)assert.ok(Math.max(...lane)-Math.min(...lane)<.13,'boot sways sideways instead of stepping forward');
+ }
+});
+
+test('actual royale presentation keeps freefall extended and belly-down in every heading',()=>{
+ for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2])for(const flight of ['dive','launch']){
+  const m=makeHumanoid(),presenter=Object.create(RoyaleView.prototype);presenter.flightPoses=new Map();
+  const p={id:'review',health:100,grounded:false,flight,yaw,vx:-Math.sin(yaw)*15,vz:-Math.cos(yaw)*15};
+  const before=structuredClone(p);
+  for(let f=0;f<180;f++){
+   m.rotation.set(0,yaw,0);m.position.set(0,10,0);
+   presenter.animateActor(m,p,f/60,1/60);animateHumanoid(m,p,1/60,f/60);m.updateMatrixWorld(true);if(f<60)continue;
+   const b=m.userData.human.bones,point=n=>m.worldToLocal(b[n].getWorldPosition(new Vector3()));
+   for(const S of ['L','R']){
+    const hip=point('thigh'+S),knee=point('shin'+S),foot=point('foot'+S);
+    assert.ok(hip.distanceTo(foot)>.74,'leg folded into the torso');
+    assert.ok(hip.y-knee.y>.36,'knee tucked up to the chest');
+    assert.ok(Math.abs(point('hand'+S).x)>.62,'arms are not spread');
+   }
+   const chestFront=new Vector3(0,0,-1).applyQuaternion(b.chest.getWorldQuaternion(m.quaternion.clone()));
+   assert.ok(chestFront.y<-.8,'chest must face the ground, not the sky');
+   const spineDirection=b.head.getWorldPosition(new Vector3()).sub(b.hips.getWorldPosition(new Vector3())).normalize();
+   assert.ok(spineDirection.dot(new Vector3(-Math.sin(yaw),0,-Math.cos(yaw)))>.8,'body tilt ignores flight heading');
+  }
+  assert.deepEqual(p,before);
  }
 });

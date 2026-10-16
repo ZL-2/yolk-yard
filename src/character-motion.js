@@ -38,7 +38,7 @@ export function motionSelection(p,time,speed){
  if(p.vehicleId)return {id:'sit',freeHands:false};
  if(p.emote)return {id:p.emote.id==='shuffle'?'shuffle':p.emote.id,at:Math.max(0,time-(p.emote.start??time)),freeHands:p.emote.id!=='crown'};
  if(p.sliding)return {id:'slide',at:clamp(p.slideAge||0,0,.12)+.18,freeHands:false};
- if(p.flight==='dive'||p.flight==='launch')return {id:'airborne',freeHands:false,levelRoot:true};
+ if(p.flight==='dive'||p.flight==='launch')return {id:'skydive',freeHands:false,levelRoot:true};
  if(p.flight==='glide')return {id:'hang',freeHands:false,levelRoot:true};
  if(p.grounded===false)return {id:(p.vy||0)>0?'jump':'fall',freeHands:false,levelRoot:true};
  return {id:'locomotion',freeHands:false};
@@ -47,7 +47,7 @@ export function animateCharacterMotion(h,p,dt,time,{menu=false}={}){
  const b=h.bones,speed=menu&&p.lobbyPatrol?p.lobbyPatrol.speed:Math.hypot(p.vx||0,p.vz||0),s=motionSelection(p,time,speed);
  if(s.id==='locomotion'&&speed<.75&&(['jump','fall'].includes(h.mocap?.id)||h.mocap?.id==='land'&&h.mocap.elapsed<.22))s.id='land';
  // A missing optional clip is a development error, never a silent state swap.
- if(s.id!=='locomotion'&&!payload.clips[s.id])return null;
+ if(!['locomotion','skydive'].includes(s.id)&&!payload.clips[s.id])return null;
  let state=h.mocap;
  if(!state){state=h.mocap={id:'',elapsed:0,phase:0,blend:1,previous:[],from:[],previousRoot:new Vector3(0,.93,0),fromRoot:new Vector3(0,.93,0)};for(const name of bones){state.previous.push(b[name].quaternion.clone());state.from.push(b[name].quaternion.clone());}}
  const changed=state.id!==s.id;
@@ -79,8 +79,27 @@ export function animateCharacterMotion(h,p,dt,time,{menu=false}={}){
   // its independently positioned weapon. Adapt posture, not gameplay height.
   if(!p.crouching){
    const upright=gait==='walk'?.58:.28;
+   // Preserve the captured leg directions in character space. Changing the
+   // pelvis quaternion alone swung both entire leg chains sideways, turning
+   // parallel combat steps into crossing, outward-kicking dance steps.
+   const hipBefore=b.hips.quaternion.clone();
    for(const name of ['hips','spine','chest'])b[name].quaternion.slerp(new Quaternion(),upright*MathUtils.smoothstep(speed,.08,.75));
+   const legCompensation=b.hips.quaternion.clone().invert().multiply(hipBefore);
+   for(const side of ['L','R'])b['thigh'+side].quaternion.premultiply(legCompensation);
    b.hips.position.x*=.35;b.hips.position.z*=.35;
+  }
+ }else if(s.id==='skydive'){
+  // The Mixamo falling-idle clip is a tucked jump fall, not freefall.
+  // Author the spread-eagle pose in this rig's upright coordinates; the
+  // shared flight presenter alone tilts it belly-down into the air stream.
+  b.hips.position.set(0,.93,0);
+  b.spine.rotation.x=.06;b.chest.rotation.x=.06;
+  b.neck.rotation.x=.12;b.head.rotation.x=.28;
+  for(const side of ['L','R']){
+   const sign=side==='L'?-1:1,wind=Math.sin(time*2.1+sign)*.012;
+   b['thigh'+side].rotation.set(.08+wind,0,sign*.23);
+   b['shin'+side].rotation.x=-.48+wind;
+   b['foot'+side].rotation.x=.16;
   }
  }else{
   const info=payload.clips[s.id],at=s.progress!==undefined?s.progress*info.duration:s.at??(s.frozen?.5:s.id==='land'?state.elapsed/.22*info.duration:state.elapsed);

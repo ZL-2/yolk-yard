@@ -80,5 +80,5 @@ test('bot priorities distinguish survival, useful loot, storm timing and team in
 });
 
 test('glider deployment, banking and landing poses interpolate without snaps or animation packets',()=>{
- const p={flight:'dive',yaw:0,vx:0,vz:-15};let pose;for(let i=0;i<90;i++)pose=glidePose(pose,p,1/60,i/60);assert.ok(pose.pitch>.6);p.flight='glide';const previous=pose.pitch;pose=glidePose(pose,p,1/60,1.5);assert.ok(Math.abs(pose.pitch-previous)<.12);for(let i=0;i<120;i++)pose=glidePose(pose,p,1/60,2+i/60);assert.ok(pose.glide>.99);p.yaw=1;pose=glidePose(pose,p,1/60,5);assert.ok(Math.abs(pose.roll)<.24);p.flight='ground';for(let i=0;i<180;i++)pose=glidePose(pose,p,1/60,6+i/60);assert.ok(pose.air<.001);assert.ok(Math.abs(pose.pitch)<.001);
+ const p={flight:'dive',yaw:0,vx:0,vz:-15};let pose;for(let i=0;i<90;i++)pose=glidePose(pose,p,1/60,i/60);assert.ok(pose.pitch<-1.1);p.flight='glide';const previous=pose.pitch;pose=glidePose(pose,p,1/60,1.5);assert.ok(Math.abs(pose.pitch-previous)<.12);for(let i=0;i<120;i++)pose=glidePose(pose,p,1/60,2+i/60);assert.ok(pose.glide>.99);p.yaw=1;pose=glidePose(pose,p,1/60,5);assert.ok(Math.abs(pose.roll)<.24);p.flight='ground';for(let i=0;i<180;i++)pose=glidePose(pose,p,1/60,6+i/60);assert.ok(pose.air<.001);assert.ok(Math.abs(pose.pitch)<.001);
 });
