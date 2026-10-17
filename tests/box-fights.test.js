@@ -43,6 +43,7 @@ test('round transition resets construction, gear and inputs; alternates sides an
 test('simultaneous eliminations draw once; storm resolves camping within the round limit',()=>{
  const s=setup();fight(s);s.damage(s.players.get('a'),null,999,'Storm');s.damage(s.players.get('b'),null,999,'Storm');s.tick(1/30);assert.equal(s.roundWinner,null);assert.equal(s.roundHistory.length,1);assert.deepEqual(s.roundWins,{});
  const storm=setup();fight(storm);advance(storm,99);assert.ok(storm.roundHistory.length>=1);assert.ok(storm.events.some(e=>e.type==='box-cue'&&e.cue==='storm'));
+ const capped=setup({scoreLimit:3});fight(capped);capped.roundWins={0:1};capped.boxRound=22;capped.endBoxRound(null,'time');assert.equal(capped.phase,'results');assert.equal(capped.seriesWinner,0,'A sole leading team wins the bounded series after repeated draws');
 });
 test('late joining humans keep the current bot alive, spectate and replace it next round',()=>{
  const s=new BoxFightSimulation({teamSize:1,fill:true});s.addPlayer('a',{name:'Alpha'});s.startRound();fight(s);const p=s.admitPlayer('late',{name:'Late Arrival'},{partyId:'late',partySize:1});assert.ok(p);assert.equal(s.players.size,3);assert.equal(p.health,0);assert.equal(p.waitingRound,true);s.tick(1/30);assert.equal(s.boxStage,'fight');assert.equal(s.players.get('box-bot-0').health,100);assert.equal(s.admitPlayer('overflow',{name:'No Room'}),null);s.endBoxRound(0);s.boxEnd=s.time;s.tick(1/30);assert.equal(s.players.size,2);assert.equal(p.health,100);assert.equal(p.spectating,false);assert.equal(p.waitingRound,false);

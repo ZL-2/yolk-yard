@@ -67,7 +67,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
  setBarrier(enabled){this.map.boxPrep=enabled;this.worldDamage['box-divider']={destroyed:!enabled||this.options.boxFormat==='ffa'};this.buildVersion++;rebuildMap(this);}
  startRound(){
   if(this.phase==='playing')return false;
-  this.matchId=globalThis.crypto.randomUUID();this.roundWins={};this.roundHistory=[];this.boxDraws=0;this.seriesWinner=null;this.winner='';this.boxRound=0;this.boxStage='waiting';this.phase='playing';this.stage='active';this.publicRestartAt=null;this.queueEnds=this.time+(this.options.recurring?R.queue:0);
+  this.matchId=globalThis.crypto.randomUUID();this.roundWins={};this.roundHistory=[];this.scores=[0,0];this.boxDraws=0;this.seriesWinner=null;this.winner='';this.boxRound=0;this.boxStage='waiting';this.phase='playing';this.stage='active';this.publicRestartAt=null;this.queueEnds=this.time+(this.options.recurring?R.queue:0);
   for(const p of this.players.values()){p.kills=p.deaths=p.assists=p.points=p.boxWins=p.boxDamage=0;resetFieldRecord(p);p.connected=p.bot||p.connected!==false;}
   this.addBots();if(!this.options.recurring)return this.beginBoxRound();this.emit('box-cue',{cue:'waiting'});return true;
  }
@@ -120,7 +120,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
   this.scores=[this.roundWins[0]||0,this.roundWins[1]||0];this.roundHistory.push({round:this.boxRound,winner,reason});this.roundHistory=this.roundHistory.slice(-20);
   this.emit('box-cue',{cue:winner==null?'draw':'round-win',winner,round:this.boxRound});
   if(winner!=null&&this.roundWins[winner]>=this.options.scoreLimit||this.boxRound>=this.options.scoreLimit*4+10){
-   const ranking=Object.entries(this.roundWins).sort((a,b)=>b[1]-a[1]);this.seriesWinner=winner!=null&&this.roundWins[winner]>=this.options.scoreLimit?winner:ranking[0]?.[1]>ranking[1]?.[1]?(this.options.boxFormat==='ffa'?ranking[0][0]:Number(ranking[0][0])):null;
+   const ranking=Object.entries(this.roundWins).sort((a,b)=>b[1]-a[1]);this.seriesWinner=winner!=null&&this.roundWins[winner]>=this.options.scoreLimit?winner:ranking.length&&(!ranking[1]||ranking[0][1]>ranking[1][1])?(this.options.boxFormat==='ffa'?ranking[0][0]:Number(ranking[0][0])):null;
    this.phase='results';this.finishedAt=this.time;this.winner=this.seriesWinner==null?'Series drawn':this.options.boxFormat==='ffa'?(this.players.get(this.seriesWinner)?.name||'Operator')+' wins the series':(this.seriesWinner===0?'Blue':'Orange')+' team wins the series';this.publicRestartAt=this.options.recurring?this.time+R.restart:null;this.emit('finish',{winner:this.winner});this.emit('box-cue',{cue:'series-win',winner:this.seriesWinner});
   }
  }
