@@ -4,6 +4,7 @@ import WebSocket from 'ws';
 import {chromium} from 'playwright';
 import {Network} from '../src/network.js';
 import {Simulation} from '../src/simulation.js';
+import {zombieClients} from './zombies-clients.mjs';
 import {VERSION,safeProfile} from '../src/data.js';
 
 const front='https://zl-2.github.io/yolk-yard/',relay='https://yolk-yard-relay.onrender.com';
@@ -19,7 +20,7 @@ await wait(async()=>{
  try{[published,health]=await Promise.all([get(front+'version.json?t='+Date.now()),get(relay+'/health')]);return published.build===expected&&health.build===expected&&published.appVersion===version&&health.gameVersion===VERSION&&health.deployment?.updating===false&&health.socialAvailable;}
  catch(e){lastError=e.message;return false;}
 },'Website and relay must finish the same release'+(lastError||''),360000);
-assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.deepEqual(health.serverModes,[]);assert.equal(health.capacity.rooms,0);
+assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,1);
 const history=await get(front+'release-history.json?t='+Date.now());assert.equal(history.build,expected);assert.equal(history.releases[0].number,published.release);
 const board=await get(relay+'/leaderboards');assert.ok(Array.isArray(board.kills.rows)&&Array.isArray(board.wins.rows));
 
@@ -29,7 +30,7 @@ globalThis.window={YOLK_NETWORK:{relay:relay.replace('https:','wss:')+'/game'}};
 globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:new URL(front).origin});}};
 const errors=[],sim=new Simulation({mode:'ffa',bots:0}),suffix=Date.now().toString(36).slice(-5);
 sim.addPlayer('host',safeProfile({name:'Release Host '+suffix}));
-let state,clock,browser,page;
+let state,clock,browser,page,zclients,zclock;
 const host=new Network({getCheckpoint:()=>sim.checkpoint(),getState:()=>sim.snapshot(),onJoin:(id,p,a)=>!!sim.admitPlayer(id,p,a),onInput:(id,i)=>sim.setInput(id,i,true),onError:e=>errors.push(String(e))});
 const guest=new Network({onState:s=>state=s,onError:e=>errors.push(String(e))});
 try{
@@ -40,6 +41,8 @@ try{
  guest.input({seq:1,crouch:true,dt:1/60});await wait(()=>sim.inputs.get(guest.id)?.crouch,'Guest input reaches live host');sim.tick(1/60);
  await wait(()=>state.players.find(p=>p.id===guest.id)?.crouching,'Authoritative crouch reaches guest');assert.notEqual(guest.serverAuthority,true);
  clearInterval(clock);guest.destroy();host.destroy();
+ zclients=zombieClients(relay.replace('https:','wss:'),new URL(front).origin);
+ const za=await zclients.user('Release Z Lead '+suffix),zb=await zclients.user('Release Z Partner '+suffix);await zclients.invite(za,zb);await za.ask('select',{mode:'zombies',teamSize:2,access:'private'});await zb.ask('ready',{value:true});await za.ask('queue');await wait(()=>za.launches.length&&zb.launches.length,'Live Zombies reservations');const [zg,zh]=await Promise.all([zclients.launch(za),zclients.launch(zb)]);assert.equal(zg.net.serverAuthority,true);assert.equal(zh.state.players.length,2);assert.equal(zh.state.options.mode,'zombies');zg.net.authorityCommand({type:'start'});zclock=setInterval(()=>{zg.send();zh.send();},100);await wait(()=>zh.state?.zombies?.enemies.length>0,'Live authoritative first Zombies wave',25000);assert.equal(zg.state.matchId,zh.state.matchId);assert.deepEqual(zg.errors,[]);assert.deepEqual(zh.errors,[]);clearInterval(zclock);await zclients.close();
  browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
  page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-150-dismissed','yes');localStorage.setItem('ravelfront-referrals-dismissed','yes');localStorage.setItem('ravelfront-perspective-157-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Release Lobby'}));});
@@ -50,7 +53,7 @@ try{
  await page.locator('#menu [data-action=settings]:visible').first().click();await page.locator('[data-settings-tab=comfort]').click();await page.locator('#reducedMotion').check();
  await page.screenshot({path:out+'/desktop-settings.png'});
  assert.deepEqual(errors,[]);
- const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,publicMatchUntouched:true,leaderboards:true,desktopLobby:true,mapStorage:health.mapStorage};
+ const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,privateZombiesCoop:true,serverZombiesWave:true,publicMatchUntouched:true,leaderboards:true,desktopLobby:true,mapStorage:health.mapStorage};
  await writeFile(out+'/result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 }catch(e){await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/failure.json',JSON.stringify({error:String(e),errors},null,2));throw e;}
-finally{clearInterval(clock);guest.destroy();host.destroy();await browser?.close();}
+finally{clearInterval(clock);clearInterval(zclock);guest.destroy();host.destroy();await zclients?.close();await browser?.close();}

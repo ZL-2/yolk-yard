@@ -7,10 +7,10 @@ import {makeBlaster} from './zombies-weapons.js';
 import {clamp} from './data.js';
 
 const amber=0xffba68,cyan=0x72e5db;
-const material=(color,glow=false)=>new THREE.MeshStandardMaterial({color,roughness:glow?.3:.85,metalness:glow?.25:.15,...(glow?{emissive:color,emissiveIntensity:1.1}:{})});
+const material=(color,glow=false)=>{const m=new THREE.MeshStandardMaterial({color,roughness:glow?.3:.85,metalness:glow?.25:.15,...(glow?{emissive:color,emissiveIntensity:1.1}:{})});m.userData.zombiesOwned=true;return m;};
 function label(parent,text,x,y,z,width=3,color='#f6d39c'){
  const canvas=document.createElement('canvas');canvas.width=768;canvas.height=128;const c=canvas.getContext('2d');c.fillStyle='#10272dec';c.fillRect(0,0,768,128);c.fillStyle=color;c.fillRect(0,0,7,128);c.font='bold 37px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(text.toUpperCase(),388,66,724);const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
- const mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,width/6),new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide}));mesh.position.set(x,y,z);parent.add(mesh);return mesh;
+ const mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,width/6),new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide}));mesh.userData.ownedMaterial=true;mesh.position.set(x,y,z);parent.add(mesh);return mesh;
 }
 // Static architecture is merged by material. Decorative machinery stays inside
 // authored collision volumes; it cannot create invisible navigation obstacles.
@@ -68,6 +68,9 @@ export function buildBlacktide(parent){
  }
  const shutters=new Map();for(const e of Z_ENTRANCES){const group=new THREE.Group();group.position.set(e.x,e.y,e.z);parent.add(group);shutters.set(e.id,group);for(let i=0;i<3;i++){const board=new THREE.Mesh(new THREE.BoxGeometry(2,.22,.14),material(0x80715a));board.position.set(0,.5+i*.5,0);board.rotation.z=(i%2?1:-1)*.12;group.add(board);}label(group,'QUARANTINE',0,2,0,2.3,'#e8ad81');}
  for(const [key,geos]of buckets){const merged=mergeGeometries(geos,false),mesh=new THREE.Mesh(merged,colors.get(key));mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);for(const g of geos)g.dispose();}unit.dispose();cyl.dispose();
+ // The existing world disposer frees owned materials and their canvas textures
+ // when switching modes. Shared weapon surfaces remain cached and reusable.
+ parent.traverse(o=>{if(o.material?.userData.zombiesOwned)o.userData.ownedMaterial=true;});
  parent.userData.blacktide={doors,stationGroups,shutters,aerial};
 }
 

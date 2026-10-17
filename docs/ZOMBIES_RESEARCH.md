@@ -37,7 +37,7 @@ Economy comparison: classic hit-based rewards encourage early weak-weapon use an
 | Points / crafting | Essential: Charge points and Scrap, separate from Marks | Atomic purchase, range/visibility/power/zone checks, bounded wallets |
 | Random weapon machine | Essential: Signal Cache with weighted roll, exclusive claim, relocation | No paid real-money randomness; authoritative result and expiry |
 | Wall weapons / ammunition | Essential: labeled weapon racks and ammo refills | Check weapon ownership and upgraded ammo price |
-| Perks | Essential: original Vigor, Quickhands, Stride, Lifeline, Deadeye, Recovery | Four equipped; no duplicates; downing loses newest, bleed-out loses all |
+| Perks | Essential: Iron Pulse, Quickwire, Longstride, Lifeline, Glass Eye, Second Wind | Four equipped; no duplicates; downing loses newest, bleed-out loses all |
 | Weapon upgrades | Essential: Resonance Forge, three tiers | Damage/magazine/reserve/visual changes; no PvP stat mutation |
 | Rarity / ammo mods | Selective: three salvage grades; chill, chain and burn | Explicit cooldown and target caps; independent of upgrade tiers |
 | Special weapons | Essential: Arc Loom, Rift Driver, Cinder Lance | Distinct bounded crowd-control roles; finite ammo and acquisition paths |
@@ -47,7 +47,7 @@ Economy comparison: classic hit-based rewards encourage early weak-weapon use an
 | Downing / revive / spectate | Essential: bleed-out, hold revive, solo recovery, next-wave return | Team wipe only when no valid recovery remains; no free respawn command |
 | Main quest | Essential: restore power, find three relay cores, solve order puzzle, charge conduits, boss finale | Solo completable; no simultaneous four-person switches; shared progress |
 | Side discoveries | Essential: logs, hidden cache and station trial | Once-per-run rewards; independent from required survival progression |
-| Boss | Essential: original Bellwether with telegraphed pulse, charge, summons and phase changes | No unavoidable instant attacks; arena remains navigable |
+| Boss | Essential: original Bellwether with telegraphed slam, pulse and summons; attack rotation changes as health falls | No unavoidable instant attacks; arena remains navigable |
 | Exfil | Essential: majority vote, rendezvous, timed final wave | Disconnect-aware vote; definitive success/failure; no duplicate payout |
 | Equipment / field abilities | Essential: fragmentation, decoy, pulse, sanctuary | Charges/cooldowns; nearby limits; damage respects walls |
 | HUD / tutorial / results | Essential: round, enemy pressure, economy, team, objectives, stations, controls | Stable DOM; no 60 Hz large HTML reconstruction |
@@ -63,7 +63,7 @@ Economy comparison: classic hit-based rewards encourage early weak-weapon use an
 
 **BLACKTIDE RELAY**: a storm-battered coastal signal station whose experimental resonance lattice has fused the missing staff into an infected collective. The operators are sent to restore the beacon, discover the failed evacuation, and choose between shutting the lattice down or escaping with its records.
 
-Arrival Yard → Pump Hall / Freight Arcade → Reactor Court → Signal Gallery → Beacon Platform. Connecting routes open loops rather than a single dead-end corridor. Covered interiors, an elevated gallery with ramps, a central machinery landmark, a secret archive, an extraction pad and service openings provide distinct spatial identities. Emergency amber contrasts with cool coastal fog and restrained cyan resonance effects. Human enemy silhouettes use workwear, maintenance armor and exposed lattice growth, never eggs or copied COD creatures.
+Arrival Yard → Pump Hall / Freight Arcade → Reactor Court → Signal Gallery → Beacon Platform. Connecting routes open loops rather than a single dead-end corridor. Covered interiors, an elevated gallery with two stairways, a central machinery landmark, a secret archive, an extraction pad and service openings provide distinct spatial identities. Emergency amber contrasts with cool coastal fog and restrained cyan resonance effects. Human enemy silhouettes use workwear, maintenance armor and exposed lattice growth, never eggs or copied COD creatures.
 
 Design constraints: no required copyrighted reference asset, no copied quest puzzle, no global damage mutation, no client-issued rewards, no zombie simulation in the PvP player collection, no unbounded event/corpse/projectile history. Public/private Zombies run under the relay's authoritative simulation so closing the party leader's browser cannot destroy the only copy of a live run.
 
