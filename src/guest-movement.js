@@ -13,6 +13,7 @@ export function predictionCopy(p){
 }
 // Use the same exit rule as the host, without waiting a round trip to begin a dive.
 export function predictMovement(player,input,map,dt,royale,time=0){
+ if(player.zVehicle){player.yaw=input.yaw??player.yaw;player.pitch=input.pitch??player.pitch;return;}
  if(royale?.boxfightStage==='intermission')return;
  if(player.vehicleId){
   const source=royale?.vehicles?.find(v=>v.id===player.vehicleId);if(!source)return;

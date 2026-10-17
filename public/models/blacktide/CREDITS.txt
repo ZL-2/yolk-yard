@@ -1,0 +1,28 @@
+BLACKTIDE EXTRACTION — THIRD-PARTY ASSET CREDITS
+
+Humanoid animation: Universal Animation Library 2 Standard, Quaternius,
+CC0 1.0. Zombie idle, walk, attack, hit reaction and climb clips retargeted
+offline to Ravelfront's original anatomical mesh and skeleton.
+https://opengameart.org/content/universal-animation-library-2
+https://quaternius.com/packs/universalanimationlibrary2.html
+Ravelfront's existing licensed Mixamo run/death clips are reused in-game.
+
+Zombie, Quaternius (2024), CC0 1.0.
+https://poly.pizza/m/VlXjG0N8Eg
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Zombie, Big arm, German Shepard, Quaternius (2024), CC BY 3.0.
+https://poly.pizza/m/22K0aSZkHV
+https://poly.pizza/m/KaVJET0WHx
+https://poly.pizza/m/Hssa6NPc6W
+https://creativecommons.org/licenses/by/3.0/
+Changes: selected animation clips, runtime scaling, original class names,
+material tinting, state blending and distance-based animation scheduling.
+No endorsement by the creator is implied.
+
+Zombie Sound Pack, artisticdude (2011), CC0 1.0.
+https://opengameart.org/content/zombies-sound-pack
+Changes: selected 12 recordings, loudness normalization, mono Ogg conversion.
+
+All map layout, mission text, game rules, UI and original sound cues are
+Ravelfront work. No Call of Duty assets, dialogue or soundtrack are included.

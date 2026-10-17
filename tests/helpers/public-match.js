@@ -47,6 +47,7 @@ export async function fixture(){
   await until(()=>user.party,'Social connected');return user;
  }
  async function game(user){
+  await until(()=>user.launches.length,'Match reservation dispatched');
   const launch=user.launches.at(-1),game={errors:[],promotions:0,states:0};games.push(game);
   game.net=new Network({
    getCheckpoint:()=>game.sim?.checkpoint(),getChatState:()=>game.sim?.snapshot()||game.state,

@@ -4,6 +4,7 @@ const tone=(f,d=.3,v=.05,to=0,at=0,w='sine')=>({f,d,v,to,at,w});
 const air=(f,d=.3,v=.04,at=0)=>({noise:true,f,d,v,at});
 const chime=[tone(392,.18,.045),tone(466,.22,.045,0,.13),tone(587,.45,.035,0,.3)];
 export const ZOMBIE_SOUNDS={
+ 'z-contract':chime,'z-contract-complete':[...chime,tone(784,.7,.04,0,.5)],'z-shutdown':[tone(440,.4,.06),tone(330,.4,.06,0,.6),tone(220,1,.06,0,1.2)],'z-transport-landed':[...chime],'z-transport-depart':[tone(110,1.4,.05,220)],
  'z-arrival':[air(260,2,.06),tone(73.4,2,.07,55),tone(146.8,1.5,.025,0,.6)],
  'z-wave':[tone(82.4,.8,.08,55),air(390,.55,.06,.1),tone(164.8,1.1,.025,110,.25)],
  'z-special-wave':[tone(110,1,.08,65),air(980,.8,.045),tone(220,.5,.04,146,.5)],

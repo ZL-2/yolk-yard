@@ -50,7 +50,7 @@ export class MatchAuthority{
    if(m.version!==VERSION||room.kicked.has(peer.progressId))return reject('Refresh the game or choose another room.'),true;
    const profile=safeProfile(m.profile);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
    const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission||(room.recurring||room.zombies)&&!admission)return reject('Party reservation expired. Join the match from Play.'),true;
-   if(room.zombies&&!room.sim.players.has(peer.id)&&!admission?.spectator&&(room.sim.phase==='results'||room.sim.zWave>10||room.sim.zStage==='exfil'))return reject('This run is closed to new operators.'),true;
+   if(room.zombies&&!room.sim.players.has(peer.id)&&!admission?.spectator&&!room.sim.acceptsJoining())return reject('This deployment is closed to new operators.'),true;
    room.sim.advanceWarmupClock?.();
    const reserved=admission&&this.capacity.reservations.has(admission.partyId);
    const spectator=!!admission?.spectator||room.sim.options.mode==='royale'&&!acceptsContestants(room.sim.stage),added=room.sim.players.has(peer.id)?0:1;
@@ -59,7 +59,7 @@ export class MatchAuthority{
    const plan=room.recurring?{ok:!spectator||this.capacity.spectators(room)<MAX_SPECTATORS,reason:'The public spectator seats are full. Try again shortly.'}:this.capacity.plan(room.sim.options,{key:room.key,humans:this.capacity.humans(room)+this.capacity.pending(room.key)+(!spectator&&!reserved?added:0),spectators:this.capacity.spectators(room)+this.capacity.pending(room.key,true)+(spectator&&!reserved?added:0),botLimit:room.sim.botLimit});if(!plan.ok)return reject(plan.reason),true;
    if([...room.members.values()].some(o=>o!==peer&&o.ws&&o.progressId===peer.progressId))return reject('This saved player is already in the public match in another tab.'),true;
    const p=room.sim.admitPlayer(peer.id,profile,admission);if(!p)return reject('This room is full.'),true;
-   if(room.zombies){if(!room.owner||admission.memberId===room.leaderSocial)room.owner=p.id;room.startedWaitingAt??=room.age;}
+   if(room.zombies){if(!room.owner||admission.memberId===room.leaderSocial)room.owner=p.id;room.startedWaitingAt??=room.age;if(peer.progressId&&!p.zAccount)room.sim.bindAccount(p,this.relay.progression.account(peer.progressId));}
    if(room.recurring)attachCrown(room.sim,p,peer.progressId);
    if(room.recurring&&!room.members.has(p.id))room.joinSerial=(room.joinSerial||0)+1;
    peer.authorityRoom=room.key;peer.authorityId=p.id;peer.controlReady=false;p.loading=true;room.members.set(p.id,peer);room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));
@@ -136,7 +136,7 @@ export class MatchAuthority{
    const message=encoder.encode({type:'authority-state',state:presentation},batch);this.send(peer,{type:'authority-frame',frame:message.frame},batch.serialize(message.frame));
   }
   if(!room.publishedAt||room.age-room.publishedAt>=2){this.publish(room);room.publishedAt=room.age;}
-  if(room.zombies){if(sim.phase==='results')for(const [id,peer]of room.members)settleZombiesPlayer(this.relay,room,sim.players.get(id),peer);}
+  if(room.zombies){for(const [id,peer]of room.members){const p=sim.players.get(id);if(sim.phase==='results'||p?.zExtracted)settleZombiesPlayer(this.relay,room,p,peer);}if(sim.zAccountDirty){this.relay.progression.dirty=true;sim.zAccountDirty=false;void this.relay.progression.save();}}
   else if(room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,room.owner,room.sim.inputs.get(room.owner)||{}));}
   const broadcastCost=finishTiming(broadcastStarted);recordTiming(room,timingPhase(room.sim),'broadcastMaxMs',broadcastCost.wallMs,broadcastCost.cpuMs);
  }

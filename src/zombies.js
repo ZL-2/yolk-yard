@@ -12,7 +12,7 @@ import {ZombieNavigation} from './zombies-navigation.js';
 const distance=(a,b)=>Math.hypot(a.x-b.x,(a.y||0)-(b.y||0),a.z-b.z);
 const clone=x=>structuredClone(x);
 const live=p=>!!p&&p.health>0&&!p.downed&&!p.spectating&&p.connected!==false&&!p.loading&&!p.friendSpectator;
-function infectedHit(origin,d,e){const scale=Z_TYPES[e.type].scale,pose=e.history?.findLast(h=>h.time<=e.sampleTime)||e;const contact=humanHit({x:pose.x+(origin.x-pose.x)/scale,y:pose.y+(origin.y-pose.y)/scale,z:pose.z+(origin.z-pose.z)/scale},d,{...pose,yaw:e.yaw,grounded:true,vx:0,vz:0});contact.distance*=scale;return contact;}
+function infectedHit(origin,d,e){const scale=Z_TYPES[e.type].scale,pose=e.history?.findLast(h=>h.time<=e.sampleTime)||e;if(e.type==='hound'){const cy=pose.y+.45,rx=.3,ry=.42,rz=.7,c=Math.cos(e.yaw),s=Math.sin(e.yaw),dx=origin.x-pose.x,dz=origin.z-pose.z,a=[(dx*c-dz*s)/rx,(origin.y-cy)/ry,(dx*s+dz*c)/rz],b=[(d.x*c-d.z*s)/rx,d.y/ry,(d.x*s+d.z*c)/rz],A=b.reduce((n,v)=>n+v*v,0),B=2*a.reduce((n,v,i)=>n+v*b[i],0),C=a.reduce((n,v)=>n+v*v,0)-1,D=B*B-4*A*C,t=D>=0?(-B-Math.sqrt(D))/(2*A):Infinity;return {distance:t>=0?t:Infinity,region:'body'};}const contact=humanHit({x:pose.x+(origin.x-pose.x)/scale,y:pose.y+(origin.y-pose.y)/scale,z:pose.z+(origin.z-pose.z)/scale},d,{...pose,yaw:e.yaw,grounded:true,vx:0,vz:0});contact.distance*=scale;return contact;}
 const serialKeys=['zombieKit','zPerks','zScrap','zCharge','zField','zDecoys','zSelf','zStats','zJoinedRound','zBleedEnd','zRecovery','zDisrupted','zProtected','zFeedback','zRevive','zWaiting','zArmor','swingAt'];
 
 export class ZombiesSimulation extends Simulation{

@@ -1,7 +1,7 @@
 // Lossless deltas on an ordered connection. Each new connection starts with a
 // complete baseline. Encoding happens at flush, after stale snapshots merge.
 const recordKeys=['players','projectiles'];
-const zombieRecords=['enemies','drops','effects','grenades'];
+const zombieRecords=['enemies','drops','effects','grenades','contracts','loot','vehicles','evacs','supports'];
 function records(value,key='id'){return Object.fromEntries(value.map(row=>[row[key],row]));}
 // Broadcast recipients share immutable state objects. Normalize each once;
 // per-connection baselines and recovery checkpoints remain independent.

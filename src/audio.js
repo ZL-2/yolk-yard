@@ -1,3 +1,4 @@
+import {ZombieSamples} from './zombies-samples.js';
 import {ZOMBIE_SOUNDS,updateZombiesAudio} from './zombies-audio.js';
 import {AdaptiveScore} from './adaptive-score.js';
 import {bulletPass} from './sound-spatial.js';
@@ -110,7 +111,7 @@ for(const [i,id]of Object.keys(ITEMS).entries()){
 }
 export const SHOT_PALETTE={sprinter:[145,1200,.15],scatter:[78,700,.25],needle:[62,2100,.33],zipper:[210,1900,.10],thumper:[52,500,.45],anchor:[100,1100,.19],duet:[185,1800,.14],pip:[240,1800,.12],peeper:[105,2500,.21],doubleyolk:[95,900,.21],comet:[520,2400,.18]};
 export class Sound {
- constructor(){this.score=new AdaptiveScore(this);this.occlusion=new Map();this.lobbyMusic=new LobbyMusic();this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];this.bossAudio=new BossVoiceAudio(this);this.fieldSamples=new FieldSamples(this);}
+ constructor(){this.score=new AdaptiveScore(this);this.occlusion=new Map();this.lobbyMusic=new LobbyMusic();this.ctx=null;this.volume=.45;this.effectsVolume=.85;this.ambienceVolume=.5;this.musicVolume=.3;this.enabled=true;this.voices=new Set();this.loops=new Map();this.cooldowns=new Map();this.listener=null;this.clock=0;this.lastAlive=0;this.wasStorm=false;this.wasExhausted=false;this.reloadTimers=[];this.bossAudio=new BossVoiceAudio(this);this.fieldSamples=new FieldSamples(this);this.zombieSamples=new ZombieSamples(this);}
  unlock(){
   this.lobbyMusic.unlock();
   if(!this.ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(Audio){this.ctx=new Audio();this.master=this.ctx.createGain();this.compressor=this.ctx.createDynamicsCompressor();this.master.connect(this.compressor).connect(this.ctx.destination);this.scoreBus=this.ctx.createGain();this.scoreBus.gain.value=0;this.scoreBus.connect(this.master);this.master.gain.value=this.volume;const size=this.ctx.sampleRate*2;this.noiseBuffer=this.ctx.createBuffer(1,size,this.ctx.sampleRate);const a=this.noiseBuffer.getChannelData(0);let seed=12345;for(let i=0;i<size;i++){seed=(seed*1664525+1013904223)>>>0;a[i]=seed/2147483648-1;}}}
@@ -139,6 +140,7 @@ export class Sound {
   source.start(at);source.stop(at+p.d+.01);return source;
  }
  cue(id,position=null,scale=1){
+  if(this.zombieSamples.play(id,position,scale))return;
   const preset=SOUND_CUES[id];if(!preset)return;
   const category=id==='victory'||id==='defeat'?'music':id.startsWith('ambient')?'ambience':'effects';
   const key=id+(position?Math.round(position.x/5)+':'+Math.round(position.z/5):'');
@@ -191,7 +193,7 @@ export class Sound {
   }
   if(loop){loop.filter.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);if(!loop.useNoise)loop.source.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);loop.gain.gain.setTargetAtTime(Math.max(0,target)*volume*this.ambienceVolume,this.ctx.currentTime,.3);if(!target){if(!loop.silentAt)loop.silentAt=this.clock;if(this.clock-loop.silentAt>1.5){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();this.loops.delete(id);}}else loop.silentAt=0;}
  }
- stopWorld(){this.score.stop();this.occlusion.clear();this.bossAudio.stop();this.fieldSamples.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.stepClocks?.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;this.nextBirdAt=this.clock+8;}
+ stopWorld(){this.score.stop();this.occlusion.clear();this.bossAudio.stop();this.fieldSamples.stop();this.zombieSamples.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.stepClocks?.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;this.nextBirdAt=this.clock+8;}
  event(e,me,state){
   if(e.type==='z-cue'){if(e.player&&e.player!==me?.id&&e.x===undefined)return;this.cue('z-'+e.cue,e.x===undefined?null:e,e.cue==='attack'?.55:1);return;}
   if(e.type==='boss-voice'){const listener=me?.spectating?state.players.find(p=>p.id===this.listener?.id)||me:me;return this.bossAudio.event(e,state,listener);}

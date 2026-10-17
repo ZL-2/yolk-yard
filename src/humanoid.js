@@ -25,12 +25,13 @@ export const HUMANOID_BONES=Object.freeze(defs.map(d=>d[0]));
 const ids=Object.fromEntries(defs.map((d,i)=>[d[0],i])),points=Object.fromEntries(defs.map(d=>[d[0],V(...d[2])]));
 const geometries=new Map();
 function template(profile){
- const outfit=shopItem(profile.outfit),item=profile.henchman&&outfit?{...outfit,model:'guard-'+outfit.model}:outfit,style=item?.shape??0,skin=(item?.model?.startsWith('guard-')||['voss','rook','nyx','morrow'].includes(item?.model))?'#121c23':item?.skin||['#c58a65','#754b37','#d7a47f','#a86d4f','#dfb696','#543728'][style%6];
- const colors={cloth:item?.color||profile.color||'#334952',trim:item?.accent||profile.accent||'#e8ae4c',skin,armor:item?.armor||'#243039',dark:'#121c23',sole:'#11171b',hair:item?.hair||['#241b19','#161619','#302620','#3e2b21'][style%4]};
+ const outfit=shopItem(profile.outfit),item=profile.henchman&&outfit?{...outfit,model:'guard-'+outfit.model}:outfit,style=item?.shape??0,baseSkin=(item?.model?.startsWith('guard-')||['voss','rook','nyx','morrow'].includes(item?.model))?'#121c23':item?.skin||['#c58a65','#754b37','#d7a47f','#a86d4f','#dfb696','#543728'][style%6];
+ const skin=profile.infectedSkin||baseSkin;
+ const colors={cloth:item?.color||profile.color||'#334952',trim:item?.accent||profile.accent||'#e8ae4c',skin:profile.infectedSkin||skin,armor:item?.armor||'#243039',dark:'#121c23',sole:'#11171b',hair:item?.hair||['#241b19','#161619','#302620','#3e2b21'][style%4]};
  if(profile.teamColor){colors.cloth=profile.teamColor;colors.trim=profile.teamColor;}
  const trouser=new T.Color(item?.model?colors.armor:colors.cloth).multiplyScalar(.84),seam=new T.Color(colors.cloth).multiplyScalar(.68);
  colors.cloth=new T.Color(colors.cloth).lerp(new T.Color('#43504b'),item?.model?0:item?.12:.58).getStyle();colors.trim=new T.Color(colors.trim).lerp(new T.Color('#b7b099'),item?.model?0:.25).getStyle();
- const key=JSON.stringify([colors,style,item?.model]);if(geometries.has(key))return geometries.get(key);
+ const key=JSON.stringify([colors,style,item?.model,profile.infectedType]);if(geometries.has(key))return geometries.get(key);
  const parts=[],finishes=new Set(),light=['wren','pulse'].includes(item?.model),signature=['voss','rook','nyx','wren','pulse','morrow'].includes(item?.model),leather=item?.model==='wren'?'#604331':colors.dark;
  function finishFor(color,bone){const value=color?.isColor?color.getHexString():new T.Color(color).getHexString();if(value===new T.Color(colors.dark).getHexString())return bone.startsWith('hand')||bone.startsWith('finger')||bone.startsWith('foot')?'leather':'polymer';if(value===new T.Color(skin).getHexString())return 'skin';if(value===new T.Color(colors.hair).getHexString())return 'cloth';if(value===new T.Color(colors.sole).getHexString())return 'rubber';if(value===new T.Color(colors.armor).getHexString())return 'polymer';return 'cloth';}
  function add(g,color,bone,next=null,blend=null,finish=null){
@@ -154,6 +155,7 @@ function template(profile){
  // Tailored seams/zipper stay inexpensive even in the 48-combatant match.
  for(const side of [-1,1])for(let row=0;row<6;row++)panel(side*.155,1.075+row*.025,-.112,.003,.015,.003,seam,'spine','cloth');
  if(!item?.model){panel(0,1.19,-.169,.009,.27,.005,colors.dark,'spine','metal');panel(0,1.324,-.175,.016,.025,.006,colors.trim,'chest','metal');}
+ if(profile.infectedType){for(const x of [-.044,.044])ellipsoid(x,1.695,-.121,.012,.005,.002,'#dec992','head',8,'glass');for(let n=0;n<4;n++)panel(-.073+n*.009,1.64+n*.014,-.106,.006,.033,.007,'#66483e','head','skin');for(let n=0;n<6;n++)panel(.1,1.19+n*.025,-.203,.08,.01,.01,'#514c39','chest','cloth');if(['armored','heavy','elite','boss','colossus'].includes(profile.infectedType)){panel(0,1.3,-.2,.39,.3,.09,'#52615a','chest','metal');for(const side of [-1,1])panel(side*.27,1.43,0,.18,.1,.23,'#616b5d','arm'+(side<0?'L':'R'),'metal');}if(['disruptor','boss','mimic'].includes(profile.infectedType))for(const side of [-1,1])ellipsoid(side*.19,1.44,.1,.07,.15,.07,'#677f78','chest',8,'skin');}
  const geo=mergeGeometries(parts);parts.forEach(g=>g.dispose());geo.computeBoundingSphere();geo.userData.shared=true;geo.userData.artRevision=166;geo.userData.surfaceKinds=[...finishes];geometries.set(key,geo);return geo;
 }
 export function makeHumanoid(profile={}){

@@ -161,6 +161,12 @@ jobs:
           zombies_files=set(subprocess.check_output(['git','diff','--name-only','784f7a04e0fc36bd20e8002238beda5c7591745e','HEAD'],text=True).splitlines())
           zombies_allowed=set(['.github/workflows/pages.yml', 'docs/UPDATE_173.md', 'docs/ZOMBIES_RESEARCH.md', 'package-lock.json', 'package.json', 'public/modes/blacktide-173.webp', 'scripts/release-live-check.mjs', 'scripts/zombies-browser.mjs', 'scripts/zombies-clients.mjs', 'scripts/zombies-performance.mjs', 'server/realtime/authority.js', 'server/realtime/capacity.js', 'server/realtime/index.js', 'server/realtime/match-launch.js', 'server/realtime/parties.js', 'server/realtime/zombies-service.js', 'src/arms.js', 'src/audio.js', 'src/career-ui.js', 'src/career.js', 'src/chat.js', 'src/data.js', 'src/equip.js', 'src/loading-screen.js', 'src/lobby-ui.js', 'src/main.js', 'src/maps.js', 'src/match-options.js', 'src/mode-activity.js', 'src/presence-ui.js', 'src/public-royale.js', 'src/releases.js', 'src/snapshot-codec.js', 'src/teams.js', 'src/view.js', 'src/weapon-presentation.js', 'src/weapons.js', 'src/zombies-audio.js', 'src/zombies-config.js', 'src/zombies-map.js', 'src/zombies-navigation.js', 'src/zombies-ui.js', 'src/zombies-view.js', 'src/zombies-weapons.js', 'src/zombies.css', 'src/zombies.js', 'tests/public-pools.test.js', 'tests/zombies-network.test.js', 'tests/zombies-preview.html', 'tests/zombies.test.js'])
           zombies_update=zombies_files<=zombies_allowed and {'src/zombies.js','server/realtime/zombies-service.js','tests/zombies.test.js','tests/zombies-network.test.js'}<=zombies_files
+          extraction_files=set(subprocess.check_output(['git','diff','--name-only','0885f3b9df6afa3f62803abcc29b38aaa7c75026','HEAD'],text=True).splitlines())
+          extraction_allowed=zombies_allowed|set(['docs/UPDATE_175.md','docs/BLACKTIDE_EXTRACTION_DESIGN.md','scripts/extraction-performance.mjs','scripts/extraction-art-check.mjs','scripts/bake-zombie-motion.mjs','scripts/prepare-blacktide-models.mjs','scripts/prepare-zombie-audio.mjs','src/guest-movement.js','src/humanoid.js','src/zombies-actors.js','src/zombies-contracts.js','src/zombies-expedition-config.js','src/zombies-expedition-map.js','src/zombies-expedition.js','src/zombies-loadout.js','src/zombies-motion.js','src/zombies-motion-data.js','src/zombies-samples.js','src/zombies-world.js','tests/zombies-expedition.test.js','tests/box-fights-network.test.js'])
+          extraction_allowed.add('tests/helpers/public-match.js')
+          extraction_assets=all(f.startswith(('public/audio/blacktide/','public/models/blacktide/')) for f in extraction_files-extraction_allowed)
+          extraction_update=extraction_assets and {'src/zombies-expedition.js','src/zombies-contracts.js','server/realtime/zombies-service.js','tests/zombies-expedition.test.js','tests/zombies-network.test.js'}<=extraction_files
+          zombies_update=zombies_update or extraction_update
           box_files=set(subprocess.check_output(['git','diff','--name-only','5b1c924','HEAD'],text=True).splitlines())
           box_allowed=set(['.github/workflows/pages.yml', 'docs/BOX_FIGHTS_REFERENCE.md', 'docs/UPDATE_174.md', 'package-lock.json', 'package.json', 'scripts/box-fights-browser.mjs', 'scripts/release-live-check.mjs', 'server/realtime/index.js', 'server/realtime/match-launch.js', 'server/realtime/parties.js', 'server/realtime/progression.js', 'server/realtime/public-host.js', 'server/realtime/relay.js', 'src/box-fight-map.js', 'src/box-fight-rules.js', 'src/box-fight-ui.js', 'src/box-fight-view.js', 'src/box-fights.css', 'src/box-fights.js', 'src/building-ui.js', 'src/building.js', 'src/career.js', 'src/chat.js', 'src/data.js', 'src/guest-movement.js', 'src/loading-screen.js', 'src/lobby-ui.js', 'src/main.js', 'src/maps.js', 'src/match-end-ui.js', 'src/match-options.js', 'src/mode-activity.js', 'src/network.js', 'src/presence-ui.js', 'src/public-royale.js', 'src/releases.js', 'src/rewards.js', 'src/royale-ui.js', 'src/royale-view.js', 'src/royale.js', 'src/spectator-status.js', 'src/teams.js', 'src/view.js', 'tests/box-fights-network.test.js', 'tests/box-fights.test.js', 'tests/helpers/public-match.js', 'tests/public-pools.test.js'])
           box_fights_update=box_files<=box_allowed and {'src/box-fights.js','tests/box-fights.test.js','tests/box-fights-network.test.js','scripts/box-fights-browser.mjs'}<=box_files
@@ -266,17 +272,17 @@ jobs:
         run: |
           node --test --test-concurrency=2 tests/character-motion.test.js tests/operator-refresh.test.js tests/arms.test.js tests/equip.test.js tests/field-detail.test.js tests/hitbox.test.js tests/perspective.test.js tests/lobby-motion.test.js tests/deployment.test.js
           node --test --test-name-pattern='glider deployment' tests/gameplay-overhaul.test.js
-      - name: Zombies gameplay, four-player authority, PvP isolation and reconnect regressions
+      - name: Extraction authority, parties, Box Fights isolation and reconnect regressions
         if: needs.scope.outputs.zombies_update == 'true'
-        run: node --test --test-concurrency=2 tests/zombies.test.js tests/zombies-network.test.js tests/snapshot-codec.test.js tests/career.test.js tests/chat.test.js tests/private-social.test.js tests/public-pools.test.js tests/public-disconnect.test.js tests/weapon-balance.test.js tests/realtime-resume.test.js tests/arms.test.js tests/equip.test.js
-      - name: Ten-minute four-player crowd and snapshot performance budget
+        run: node --test --test-concurrency=2 tests/zombies.test.js tests/zombies-network.test.js tests/box-fights.test.js tests/box-fights-network.test.js tests/snapshot-codec.test.js tests/career.test.js tests/chat.test.js tests/private-social.test.js tests/public-pools.test.js tests/public-disconnect.test.js tests/weapon-balance.test.js tests/realtime-resume.test.js tests/arms.test.js tests/equip.test.js
+      - name: Ten-minute 24-operator crowd and snapshot performance budget
         if: needs.scope.outputs.zombies_update == 'true'
         run: node --expose-gc scripts/zombies-performance.mjs
       - uses: actions/upload-artifact@v4
         if: always() && needs.scope.outputs.zombies_update == 'true'
         with:
           name: zombies-performance
-          path: test-results/zombies/performance.json
+          path: test-results/zombies/extraction-performance-24.json
           retention-days: 14
       - name: Box Fights rules, real matchmaking, guest edits, host recovery and shared regressions
         if: needs.scope.outputs.box_fights_update == 'true'
@@ -335,7 +341,7 @@ jobs:
           name: box-fights-browser
           path: test-results/box-fights
           retention-days: 14
-      - name: Desktop Zombies party, stations, HUD, crowd, quest journal and rendering
+      - name: Desktop extraction party, contracts, HUD, crowd, boarding and replay
         if: needs.scope.outputs.zombies_update == 'true'
         run: node scripts/zombies-browser.mjs
       - uses: actions/upload-artifact@v4

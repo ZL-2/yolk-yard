@@ -1,5 +1,7 @@
 # Ravelfront Zombies — research and design record
 
+> Historical design for Update 173. Update 175 replaces its round-based format with timed open-world extraction. See [BLACKTIDE_EXTRACTION_DESIGN.md](BLACKTIDE_EXTRACTION_DESIGN.md) and [UPDATE_175.md](UPDATE_175.md) for the current rules. The original-only asset statement below describes that older release; Update 175 also includes credited third-party CC0/CC BY assets.
+
 Research date: 17 October 2026. This is an original cooperative survival mode, not a port of Call of Duty. Names, map geometry, narrative, models, effects, music and sounds are original. No Activision assets are included.
 
 ## What the generations teach us

@@ -788,7 +788,7 @@ export class View {
     this.recoil = Math.max(0, this.recoil - dt * (local?gun(local).recoilRecovery:7));
     if(playing)this.loadMap(state?.options.map || "yard");
     if(playing&&state?.royale?.practice&&!state.options.training)this.prepareBattleMap();
-    this.world.visible=playing;const dark=playing&&!!state?.zombies;this.hemi.intensity=dark?1.15:2.25;this.hemi.color.setHex(dark?0x9ecbd3:0xe5f4ff);this.hemi.groundColor.setHex(dark?0x304c54:0x88a16a);this.sun.intensity=dark?.8:2.2;this.sun.color.setHex(dark?0xaacbd8:0xfff3de);
+    this.world.visible=playing;const dark=playing&&!!state?.zombies;this.hemi.intensity=dark?1.65:2.25;this.hemi.color.setHex(dark?0x9ecbd3:0xe5f4ff);this.hemi.groundColor.setHex(dark?0x304c54:0x88a16a);this.sun.intensity=dark?1.5:2.2;this.sun.color.setHex(dark?0xaacbd8:0xfff3de);
     updateEnvironmentSurfaces(this.clock);
     if(playing){const detailQuality=this.detailPressure?'low':this.settings.quality;updateTerrainEnvironment(this.world,this.clock,detailQuality);this.world.userData.groundCover?.update(predicted||local,{quality:detailQuality,time:this.clock});}
     if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x6f9295;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(playing&&map.theme==='royale'?0xc1e6f0:sky,playing?(map.theme==='royale'?280:72):35,playing?(map.theme==='royale'?1050:175):125);}
@@ -1208,7 +1208,7 @@ export class View {
       this.gunGroup.visible = true;
     }
     if(playing&&this.scopeActive&&gun(local).ads?.overlay&&this.aimBlend>.8)this.gunGroup.visible=false;
-    this.royaleView.update(state,this.renderLocalActor||local,dt,playing);updateBoxArena(this.world,state);this.zombiesView.update(state,dt,this.camera,playing);if(playing&&state?.zombies){this.scene.fog.near=32;this.scene.fog.far=115;}
+    this.royaleView.update(state,this.renderLocalActor||local,dt,playing);updateBoxArena(this.world,state);this.zombiesView.update(state,dt,this.camera,playing);if(playing&&state?.zombies){this.scene.fog.near=65;this.scene.fog.far=245;}
     this.throwablePreview.update(state,this.renderLocalActor||predicted||local,this.buildMap||this.map,playing,this.clock);
     this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
     if(this.needsMapCompile){

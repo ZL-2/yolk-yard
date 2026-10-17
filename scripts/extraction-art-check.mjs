@@ -1,0 +1,5 @@
+import {chromium} from 'playwright';
+import {createServer} from 'vite';
+import {mkdir} from 'node:fs/promises';
+const vite=await createServer({server:{host:'127.0.0.1',port:5286,strictPort:true,watch:null}});await vite.listen();let browser;
+try{browser=await chromium.launch({...(process.env.PLAYWRIGHT_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH}:{}),headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:5286/tests/zombies-preview.html');await page.waitForFunction(()=>window.ready,null,{timeout:90000});await mkdir('test-results/zombies',{recursive:true});await page.screenshot({path:'test-results/zombies/extraction-art.png',fullPage:true});console.log(JSON.stringify({errors,checks:await page.evaluate(()=>window.checks)}));if(errors.length)throw Error(errors.join('\n'));}finally{await browser?.close();await vite.close();}
