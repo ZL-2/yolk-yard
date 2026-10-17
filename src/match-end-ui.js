@@ -6,7 +6,7 @@ export class MatchEndUI{
  reset(){this.worldKey=null;this.outcomeKey=null;this.started=0;this.resultStarted=0;this.watching=false;this.markupKey='';this.root.hidden=true;this.phase='none';}
  watch(){this.watching=true;this.markupKey='';}
  update(state,id,playing,now=performance.now()){
-  if(!playing||!state?.royale){if(!this.root.hidden)this.reset();return null;}
+  if(!playing||!state?.royale||state.boxfight){if(!this.root.hidden)this.reset();return null;}
   const worldKey=(state.royale.matchId||'local')+':'+state.round;
   if(this.worldKey!==worldKey){this.reset();this.worldKey=worldKey;}
   const outcome=matchOutcome(state,id);

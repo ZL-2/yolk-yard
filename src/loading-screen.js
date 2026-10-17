@@ -1,4 +1,5 @@
 export const ZOMBIES_LOADING_ART={id:'blacktide',file:'modes/blacktide-173.webp',location:'BLACKTIDE RELAY',eyebrow:'ZOMBIES / THE LAST TRANSMISSION',title:'THE SIGNAL<br>IS ALIVE.',story:'Restore the lattice. Keep your team standing. Something is listening from the other side.',position:'65% center'};
+export const BOX_LOADING_ART={id:'boxfight',file:'modes/box-fights.webp',location:'RAVEL COMBAT SIMULATION',eyebrow:'BOX FIGHTS / BUILD. EDIT. CLUTCH.',title:'OWN<br>THE ANGLE.',story:'Build your defense before the barrier drops. Take the wall, find your opening, and keep your team standing.',position:'65% center'};
 // Artwork is presentation only. Never change match admission, physics or timings.
 export const LOADING_ART=Object.freeze({
  startup:Object.freeze({id:'startup',file:'loading/season-one-172.webp',location:'OPERATION BREAKWATER',eyebrow:'SEASON 1 / OPERATION BREAKWATER',title:'RAVELFRONT<br>SEASON ONE.',story:'Beyond the coast, the storm is closing in. Stay together. Move with purpose. Make every shot count.',position:'67% center'}),

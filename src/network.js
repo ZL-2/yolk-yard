@@ -226,7 +226,7 @@ export class Network {
       }
       if (!accepted) return;
       if (msg.type === "input") this.callbacks.onInput?.(conn.peer, msg.input);
-      else if (msg.type === "player-action" && (["respawn", "spectate", "rejoin", "team-entry-0", "team-entry-1"].includes(msg.action)||/^inventory-(select-[0-5]|drop-[1-5]|drop-one-[1-5]|split-[1-5]|swap-[1-5]-[1-5]|supply-(wood|brick|metal|light|medium|shells|heavy|rockets)-(half|all))$/.test(msg.action)||typeof msg.action==='string'&&msg.action.length<350&&(msg.action==='build-repair'||msg.action.startsWith('build-change:')||msg.action.startsWith('inventory-preferences:')||msg.action.startsWith('ping-')||msg.action.startsWith('watch:'))))
+      else if (msg.type === "player-action" && (["respawn", "spectate", "rejoin", "team-entry-0", "team-entry-1", "box-team-0", "box-team-1"].includes(msg.action)||/^inventory-(select-[0-5]|drop-[1-5]|drop-one-[1-5]|split-[1-5]|swap-[1-5]-[1-5]|supply-(wood|brick|metal|light|medium|shells|heavy|rockets)-(half|all))$/.test(msg.action)||typeof msg.action==='string'&&msg.action.length<350&&(msg.action==='build-repair'||msg.action.startsWith('build-change:')||msg.action.startsWith('inventory-preferences:')||msg.action.startsWith('ping-')||msg.action.startsWith('watch:'))))
         this.callbacks.onPlayerAction?.(conn.peer, msg.action);
       else if (msg.type === "profile") {
         const profile=safeProfile(msg.profile);
@@ -344,7 +344,7 @@ export class Network {
             return player;
           });
           s.round=Number.isSafeInteger(s.round)?Math.max(0,s.round):0;
-          s.options=matchOptions(s.options);if(s.royale)s.options.map=isWarmup(s.royale.stage)?'hatchery-atoll':'sunnybreak';
+          s.options=matchOptions(s.options);if(s.royale&&!s.boxfight)s.options.map=isWarmup(s.royale.stage)?'hatchery-atoll':'sunnybreak';
           s.winner=safeSystemText(s.winner, 'Round complete');
           s.events=Array.isArray(s.events)?s.events.slice(-128).map(e=>{
             const event={...e};
@@ -471,14 +471,14 @@ export class Network {
     const s = this.snapshot;
     const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
     const capacity=s?.royale?Math.min(s.options.capacity,MAX_HUMANS):(s?.options.capacity||8);
-    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,public:this.visibility==='public',players:humans.length,capacity,phase:s.royale?.accepting?"lobby":s.phase,...(this.officialPublic?{recurring:true,hostId:this.id,publicState:{stage:s.royale?.stage||(s.phase==='results'?'finished':'arena'),phase:s.phase,time:s.time,queueEnds:s.royale?.queueEnds||0,elapsed:s.royale?.elapsed||0,round:s.round,matchId:s.royale?.matchId||s.matchId,alive:s.royale?.alive||humans.length,botPlayers:s.players.filter(p=>p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).length,contestants:s.players.filter(p=>!p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).map(p=>p.id),estimatedSeconds:s.phase==='results'?Math.max(0,Math.ceil((s.publicRestartAt||s.time+10)-s.time)):Math.max(0,Math.ceil(s.royale?(s.royale.matchEnd||600)+20-s.royale.elapsed:s.remaining))}}:{})} : null;
+    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,boxFormat:s.options.boxFormat,public:this.visibility==='public',players:humans.length,capacity,phase:s.boxfight?s.phase:s.royale?.accepting?"lobby":s.phase,...(this.officialPublic?{recurring:true,hostId:this.id,publicState:{stage:s.boxfight?(s.phase==='results'?'finished':'box-'+s.boxfight.stage):s.royale?.stage||(s.phase==='results'?'finished':'arena'),phase:s.phase,time:s.time,queueEnds:s.royale?.queueEnds||0,elapsed:s.royale?.elapsed||0,round:s.round,matchId:s.royale?.matchId||s.matchId,alive:s.royale?.alive||humans.length,botPlayers:s.players.filter(p=>p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).length,contestants:s.players.filter(p=>!p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).map(p=>p.id),estimatedSeconds:s.phase==='results'?Math.max(0,Math.ceil((s.publicRestartAt||s.time+10)-s.time)):Math.max(0,Math.ceil(s.royale?(s.royale.matchEnd||600)+20-s.royale.elapsed:s.remaining))}}:{})} : null;
     if(relayURL()){const relay=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;relay?.publish?.(this.visibility==='public'||relay.protocol===2?listing:null);}
     else directory.publish(this.visibility==='public'?listing:null);
   }
   broadcast(state) {
     if(this.serverAuthority)return;
     this.snapshot = state;
-    if (!this.lastPublish || performance.now() - this.lastPublish > 2000 || this.lastPublishedStage!==state.royale?.stage || this.lastPublishedPhase!==state.phase) { this.lastPublish = performance.now();this.lastPublishedStage=state.royale?.stage;this.lastPublishedPhase=state.phase;this.publishRoom(); }
+    if (!this.lastPublish || performance.now() - this.lastPublish > 2000 || this.lastPublishedStage!==(state.boxfight?.stage||state.royale?.stage) || this.lastPublishedPhase!==state.phase) { this.lastPublish = performance.now();this.lastPublishedStage=state.boxfight?.stage||state.royale?.stage;this.lastPublishedPhase=state.phase;this.publishRoom(); }
     if(this.officialPublic){
       const scores=(state.royale?.matchId||state.matchId)+':'+state.phase+':'+state.players.filter(p=>!p.bot&&!p.lateSpectator).map(p=>p.id+','+(p.kills||0)+','+(p.place||0)).join(';');
       if(scores!==this.lastPublicScores||performance.now()-(this.lastPublicProgress||0)>=500){this.lastPublicScores=scores;this.lastPublicProgress=performance.now();const hostPeer=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;if(hostPeer?.id===PREFIX+this.code)hostPeer.control({type:'public-progress',state:rewardFrame(state,this.id,this.callbacks.getHostInput?.()||{})});}
@@ -571,7 +571,7 @@ export class Network {
       }else if(msg.type==='reject'&&!welcomed){retry();}
       else if(msg.type==='state'&&welcomed){
         const s=msg.state;if(s?.version!==VERSION||!Array.isArray(s.players)||s.players.length>MAX_SNAPSHOT_ACTORS)return;
-        s.players=s.players.map(p=>({...p,...safeProfile(p)}));s.options=matchOptions(s.options);if(s.royale)s.options.map=isWarmup(s.royale.stage)?'hatchery-atoll':'sunnybreak';s.winner=safeSystemText(s.winner,'Round complete');
+        s.players=s.players.map(p=>({...p,...safeProfile(p)}));s.options=matchOptions(s.options);if(s.royale&&!s.boxfight)s.options.map=isWarmup(s.royale.stage)?'hatchery-atoll':'sunnybreak';s.winner=safeSystemText(s.winner,'Round complete');
         s.events=(s.events||[]).slice(-120).map(e=>{const next={...e};for(const key of ['name','targetName'])if(key in next)next[key]=safeName(next[key]);for(const key of ['text','winner','weapon'])if(key in next)next[key]=safeSystemText(next[key]);return next;});
         this.lastState=performance.now();this.snapshot=s;this.members=s.network?.members||this.members;this.hostId=s.network?.hostId||this.hostId;
         this.hostHeartbeat.contact(this.lastState);

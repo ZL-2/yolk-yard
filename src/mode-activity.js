@@ -1,6 +1,6 @@
 // Counts are unique connected people, never bots, match capacity or spectators.
 export function modePopulation(id,counts){
- if(['box-fights','zone-wars'].includes(id))return 0;
+ if(id==='zone-wars')return 0;if(id==='box-fights')id='boxfight';
  const n=counts?.[id];return Number.isFinite(n)&&n>=0?Math.floor(n):null;
 }
 export function modePopulationMarkup(id,counts){

@@ -32,7 +32,7 @@ export class PublicRoom {
   this.report(m.publicHostProof?'host-transferred':'host-created');
  }
  admission(peer,admission){
-  if(!admission?.recurring||admission.code&&admission.code!==this.code||(admission.teamSize||1)!==this.options.teamSize||this.options.mode==='royale'&&admission.partySize>this.options.teamSize)return null;
+  if(!admission?.recurring||admission.code&&admission.code!==this.code||(admission.teamSize||1)!==this.options.teamSize||['royale','boxfight'].includes(this.options.mode)&&admission.partySize>this.options.teamSize)return null;
   const previous=this.members.get(peer.id);if(previous)return previous.admission;
   const status=this.summary(),spectator=!!admission.spectator||this.state&&!status.joinable;
   const reserved=[...this.relay.parties.tickets.values()].some(t=>t.code===this.code&&t.peer===peer.id&&t.member===admission.memberId&&t.expires>Date.now()&&!!t.spectator===spectator);
@@ -46,7 +46,7 @@ export class PublicRoom {
  publish(peer,r){
   if(!this.isTarget(peer)||!r?.recurring||r.hostId!==this.host.id||(r.mode&&r.mode!==this.options.mode)||(r.teamSize&&r.teamSize!==this.options.teamSize))return false;
   const s=r.publicState;
-  if(!s||!(this.options.mode==='ffa'?['arena','finished']:['spawn-island','starting','battle-bus','drop','active','ending','finished']).includes(s.stage)||!['playing','results'].includes(s.phase)||!Number.isFinite(s.time))return false;
+  if(!s||!(this.options.mode==='boxfight'?['box-waiting','box-prepare','box-fight','box-intermission','finished']:this.options.mode==='ffa'?['arena','finished']:['spawn-island','starting','battle-bus','drop','active','ending','finished']).includes(s.stage)||!['playing','results'].includes(s.phase)||!Number.isFinite(s.time))return false;
   const now=Date.now();this.host.at=now;
   if(s.time!==this.host.time){this.host.time=s.time;this.host.advancedAt=now;}
   const count=(n,max)=>Math.max(0,Math.min(max,Math.floor(n)||0));
@@ -56,7 +56,7 @@ export class PublicRoom {
   return true;
  }
  summary(){
-  const s=this.state,warmup=!s||this.options.mode==='ffa'||['spawn-island','starting'].includes(s.stage),recovering=!this.host&&(!!this.members.size||!!this.pending)||!!(s&&this.host&&Date.now()-this.host.advancedAt>15000);
+  const s=this.state,warmup=!s||this.options.mode==='boxfight'&&s.stage==='box-waiting'||this.options.mode==='ffa'||['spawn-island','starting'].includes(s.stage),recovering=!this.host&&(!!this.members.size||!!this.pending)||!!(s&&this.host&&Date.now()-this.host.advancedAt>15000);
   const members=[...this.members.values()],humanPlayers=members.filter(x=>!x.admission.spectator).length,spectators=members.length-humanPlayers;
   const countdownSeconds=warmup&&s?.queueEnds?Math.max(0,Math.ceil(s.queueEnds-s.time)):0;
   return {availability:publicWindow(Date.now()),code:this.code,mode:this.options.mode,teamSize:this.options.teamSize,version:VERSION,hosting:'player',hostReady:!!this.host&&!!s,recovering,joinSerial:this.joinSerial,lastJoin:this.lastJoin,round:s?.round||0,matchId:s?.matchId||null,stage:s?.stage||'spawn-island',phase:s?.phase||'playing',capacity:this.options.capacity,difficulty:2,humanPlayers,spectators,botPlayers:s?.botPlayers??this.options.capacity,alive:warmup?this.options.capacity:s.alive,joinable:warmup&&!recovering,countdownStarted:countdownSeconds>0,countdownSeconds,estimatedSeconds:s?.estimatedSeconds||0,restartSeconds:s?.phase==='results'?s.estimatedSeconds:0,availableSeats:Math.max(0,this.options.capacity-humanPlayers-this.pendingCount()),availableSpectators:Math.max(0,16-spectators-this.pendingCount(true))};

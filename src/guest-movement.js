@@ -1,3 +1,4 @@
+import {constrainBoxMovement} from './box-fight-rules.js';
 import {emoteInput} from './emotes.js';
 import {launchPlayer} from './airborne.js';
 import {movePlayer} from './physics.js';
@@ -12,6 +13,7 @@ export function predictionCopy(p){
 }
 // Use the same exit rule as the host, without waiting a round trip to begin a dive.
 export function predictMovement(player,input,map,dt,royale,time=0){
+ if(royale?.boxfightStage==='intermission')return;
  if(player.vehicleId){
   const source=royale?.vehicles?.find(v=>v.id===player.vehicleId);if(!source)return;
   if(!player.predictedVehicle||player.predictedVehicle.id!==source.id)player.predictedVehicle={...source,seats:[...source.seats]};
@@ -28,4 +30,5 @@ export function predictMovement(player,input,map,dt,royale,time=0){
  }
  input=emoteInput({time},player,input);
  movePlayer(player,input,map,dt,time);
+ if(map.boxArena)constrainBoxMovement(player,map,['waiting','prepare'].includes(royale?.boxfightStage));
 }
