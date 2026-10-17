@@ -1,7 +1,7 @@
 import './zombies.css';
 import {ZombiesSimulation} from './zombies.js';
 import {applyZombiesState} from './zombies-map.js';
-import {ZombiesUI,nearbyZombieStation,zombiesStationMenu,zombiesJournal,zombiesResults} from './zombies-ui.js';
+import {ZombiesUI,nearbyDownedZombiePlayer,nearbyZombieStation,zombiesStationMenu,zombiesJournal,zombiesResults} from './zombies-ui.js';
 import {ZOMBIES_LOADING_ART} from './loading-screen.js';
 import './field-operations.css';
 import {MatchConnectionUI} from './match-connection-ui.js';
@@ -1573,7 +1573,7 @@ document.addEventListener("pointerlockchange", () => {
     pauseMenu();
 });
 function pressControl(code) {
-  if(state?.zombies){const p=state.players.find(p=>p.id===localId);for(const [key,action]of [['buildWall','z:field'],['drop','z:decoy'],['buildStairs','z:melee']])if(settings.keybinds[key].includes(code)){sendPlayerAction(action);return;}if(settings.keybinds.buildEdit.includes(code)){openZombiesJournal();return;}if(settings.keybinds.interact.includes(code)&&p&&!p.downed&&!state.players.some(o=>o!==p&&o.downed&&Math.hypot(o.x-p.x,o.y-p.y,o.z-p.z)<2.5)){const station=nearbyZombieStation(state,p);if(station){modal(station.name,zombiesStationMenu(station,state,p),'z-station');return;}}}
+  if(state?.zombies){const p=state.players.find(p=>p.id===localId);for(const [key,action]of [['buildWall','z:field'],['drop','z:decoy'],['buildStairs','z:melee']])if(settings.keybinds[key].includes(code)){sendPlayerAction(action);return;}if(settings.keybinds.buildEdit.includes(code)){openZombiesJournal();return;}if(settings.keybinds.interact.includes(code)&&p&&!p.downed&&!nearbyDownedZombiePlayer(state,p)){const station=nearbyZombieStation(state,p);if(station){modal(station.name,zombiesStationMenu(station,state,p),'z-station');return;}}}
 
   if(settings.keybinds.startNow.includes(code)){startPrivateRoyale();return;}
   if(settings.keybinds.emotes.includes(code)){openEmotes();return;}

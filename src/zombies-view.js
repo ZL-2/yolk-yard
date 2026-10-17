@@ -74,7 +74,7 @@ export function buildBlacktide(parent){
   else{add(0,.6,0,1.1,1.2,.65,0x38525d);add(0,1.3,0,1,.35,.7,0x7b8e8e);add(0,1.5,.1,.6,.06,.36,tint);}
   label(group,t.name,0,t.kind==='forge'?3:2.3,0,t.kind==='wall'?2.7:2.4);
  }
- const shutters=new Map();for(const e of Z_ENTRANCES){const group=new THREE.Group();group.position.set(e.x,e.y,e.z);parent.add(group);shutters.set(e.id,group);for(let i=0;i<3;i++){const board=new THREE.Mesh(new THREE.BoxGeometry(2,.22,.14),material(0x80715a));board.position.set(0,.5+i*.5,0);board.rotation.z=(i%2?1:-1)*.12;group.add(board);}label(group,'QUARANTINE',0,2,0,2.3,'#e8ad81');}
+ const shutters=new Map();for(const e of Z_ENTRANCES){const group=new THREE.Group();group.position.set(e.x,e.y,e.z);parent.add(group);shutters.set(e.id,group);for(let i=0;i<3;i++){const board=new THREE.Mesh(new THREE.BoxGeometry(2.1,.08,.52),material(0x80715a));board.position.set(0,.11,(i-1)*.63);board.rotation.y=(i%2?1:-1)*.035;group.add(board);}box(e.x,e.y+.045,e.z,2.5,.05,2.5,0x17282d);for(const side of [-1,1]){box(e.x+side*1.25,e.y+.08,e.z,.12,.1,2.6,0xb29b59);box(e.x,e.y+.08,e.z+side*1.25,2.6,.1,.12,0xb29b59);}label(group,'QUARANTINE HATCH',0,1.6,0,2.3,'#e8ad81');}
  for(const [key,geos]of buckets){const merged=mergeGeometries(geos,false),mesh=new THREE.Mesh(merged,colors.get(key));mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);for(const g of geos)g.dispose();}unit.dispose();cyl.dispose();
  // The existing world disposer frees owned materials and their canvas textures
  // when switching modes. Shared weapon surfaces remain cached and reusable.

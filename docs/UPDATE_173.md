@@ -26,8 +26,8 @@ Maximum 32 living infected and 10 short-lived corpses; four shared reverse navig
 
 ## Verification status
 
-The focused CI suite passes 95 gameplay, real-socket multiplayer and regression checks. These cover public party admission, capacity, reconnects, leader departure, failed partner reservations, private starts, late joins, navigation/climbing, purchases, revives, the full quest, extraction, reward receipts and PvP isolation.
+The focused CI suite covers gameplay, real-socket multiplayer and regression checks, including public party admission, capacity, reconnects, leader departure, failed partner reservations, private starts, late joins, navigation/climbing, purchases, revive line of sight, the full quest, extraction, reward receipts and PvP isolation.
 
 The ten-minute simulated four-player load run with 32 active infected measured a 0.831 ms simulation-step p99, 22.74 ms of CPU work per simulated second, 44.11 KiB/s of encoded snapshot traffic per player, and 25.41 MiB retained heap growth. Entity counts stayed within their configured caps. These are GitHub CI measurements, not a promise of zero latency or a hardware frame-rate benchmark.
 
-Desktop rendered review remains required before publishing. The live release check will verify matching website/relay builds, a private PvP host/guest match and a separate authoritative private Zombies duo. No mobile additions or mobile acceptance runs are included.
+The desktop acceptance flow checks mode selection, a private trio, deployment, station purchases, a 32-infected crowd, the field journal, results and replay, and saves rendered screenshots. Publication requires that flow to pass. The live release check verifies matching website/relay builds, a private PvP host/guest match and a separate authoritative private Zombies duo. No mobile additions or mobile acceptance runs are included.
