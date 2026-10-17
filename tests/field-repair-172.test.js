@@ -17,8 +17,20 @@ import {navigate} from '../src/bot-navigation.js';
 import {armPose,makeArms,updateArms,RELOAD_STYLES} from '../src/arms.js';
 import {makeBlaster} from '../src/weapons.js';
 import {WEAPONS} from '../src/data.js';
+import {makeHumanoid,animateHumanoid} from '../src/humanoid.js';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
+
+test('placing or teleporting a preposed operator resets stale foot contacts immediately',()=>{
+ for(const [x,z,scale,menu]of [[-34,-34,1,false],[3.2,-1.4,2.3,true],[120,45,1,false]]){
+  const m=makeHumanoid(),p={health:100,grounded:true,weapon:'sprinter'};
+  for(let i=0;i<20;i++)animateHumanoid(m,p,1/60,i/60,{menu:true});
+  m.position.set(x,4,z);m.scale.setScalar(scale);m.rotation.y=.7;
+  for(let i=0;i<4;i++){animateHumanoid(m,p,1/60,1+i/60,{menu});m.updateMatrixWorld(true);const inverse=m.matrixWorld.clone().invert();
+   for(const S of ['L','R']){const foot=m.userData.human.bones['foot'+S].getWorldPosition(new T.Vector3()).applyMatrix4(inverse);assert.ok(foot.y<.17&&foot.y>.03,'spawned foot must immediately reach the floor');assert.ok(Math.abs(foot.z)<.45&&Math.abs(foot.x)<.45,'spawned legs must remain beneath the operator');}
+  }
+ }
+});
 
 test('a full party enters public and private Arena together and bots release all four seats',async()=>{
  for(const access of ['public','private']){const f=await fixture();try{

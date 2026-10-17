@@ -182,6 +182,13 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  // quaternion accumulated a permanent sideways twist (especially at low FPS).
  const b=h.bones;for(const bone of Object.values(b)){bone.position.copy(bone.userData.rest);bone.quaternion.identity();}
  const vx=p.vx||0,vz=p.vz||0,speed=Math.min(16,Math.hypot(vx,vz)),grounded=p.grounded!==false;
+ // Models are first posed at the origin, then placed in the lobby or world.
+ // A foot from that old location must never become an IK target at spawn.
+ const lastRoot=h.contactTransform,scale=model.scale.x;
+ if(!lastRoot||lastRoot.menu!==menu||lastRoot.scale!==scale||Math.hypot(model.position.x-lastRoot.x,model.position.y-lastRoot.y,model.position.z-lastRoot.z)>Math.max(.8,speed*dt*2+.25)){
+  h.plantL=h.plantR=h.releaseL=h.releaseR=h.lastMotionFootL=h.lastMotionFootR=h.footTargetL=h.footTargetR=null;h.releasedL=h.releasedR=false;h.contactHeight=undefined;
+ }
+ const contactTransform=h.contactTransform??={};contactTransform.x=model.position.x;contactTransform.y=model.position.y;contactTransform.z=model.position.z;contactTransform.scale=scale;contactTransform.menu=menu;
  const terrainContact=!menu&&grounded&&!p.vehicleId&&map?.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.16;
  const placeFoot=foot=>{if(!terrainContact)return;const cs=Math.cos(model.rotation.y),sn=Math.sin(model.rotation.y),x=model.position.x+cs*foot.x+sn*foot.z,z=model.position.z-sn*foot.x+cs*foot.z;
   // Sample the sole, not just the capsule center: uphill toes otherwise cut

@@ -13,6 +13,7 @@ Version 5.18.0. Desktop gameplay, presentation and lobby repairs. Protocol 58 re
 
 ## Presentation
 
+- **Spawned operator legs:** foot-contact history from the initial origin pose survived placement, teleportation and lobby scaling. The contact cache now resets on those changes so it cannot pull the legs toward the old world location. Regression coverage checks the first frames at distant map positions and scaled party positions.
 - Reduced walk bob, roll, landing bounce and sway while keeping aiming and motion settings functional.
 - Separate magazine, bullpup, pistol, bolt rifle, break-action, tube-fed, rocket and energy-cell reload mechanisms, using custom animation matched to the existing models. Magazine pivots rotate around the magazine itself; visible feed lips and rounds improve close-up detail. Reload completion and cancellation still follow the authoritative weapon clock.
 - Rounded road corners, continuous markings and intersection masking. A 2048-pixel packed road control map improves definition at a bounded additional 4 MiB per active terrain.
