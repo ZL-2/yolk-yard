@@ -1,10 +1,11 @@
 import {MYTHIC_WEAPONS} from './bosses.js';
+import {Z_SPECIALS,zombiesGun} from './zombies-config.js';
 import { safeName } from './moderation.js';
 import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Shared camera targeting and remote commands require matching host/client releases.
-export const VERSION = 58;
+export const VERSION = 59;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -138,6 +139,7 @@ for(const w of [...WEAPONS,...ROYALE_WEAPONS]){
 }
 const royaleStats = new Map();
 export const MODES = [
+ {id:'zombies',name:'Zombies',short:'ZOMBIES',description:'Survive the Blacktide Relay. Round-based co-op for 1–4 operators.',limit:0,teams:true},
  {id:"royale",name:"Frontier Royale",short:"ROYALE",description:"Drop in, loot up, outrun the storm. Last operator standing.",limit:1,teams:false},
   {
     id: "ffa",
@@ -172,8 +174,10 @@ const cosmeticIndex = (value, options) => Number.isInteger(Number(value)) && Num
 export const TEAM_COLORS = [0x3d8ce8, 0xd94949];
 export const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const weaponIndex=new Map([...ROYALE_WEAPONS,...WEAPONS].map(w=>[w.id,w])),itemStats=new WeakMap();
+for(const special of Z_SPECIALS)weaponIndex.set(special.id,{...weaponIndex.get(special.base),...special});
 export const weapon = (id) => weaponIndex.get(id)||WEAPONS[0];
 export const gun = (p, slot=p.slot) => {
+ if(p.zombieKit)return zombiesGun(weapon(p.zombieKit[slot]?.id||'pip'),p.zombieKit[slot],p.zPerks||[]);
  if (!p.inventory) return weapon(slot === 1 ? "pip" : p.weapon);
  const item=p.inventory[slot],cached=item&&itemStats.get(item);if(cached&&cached.id===item.id&&cached.rarity===item.rarity&&cached.bossId===item.bossId&&cached.weapon===item.weapon)return cached.stats;
  const base=weapon(item?.weapon ? item.id : 'pip');

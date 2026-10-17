@@ -1,4 +1,5 @@
 import {bindCrownStore,attachCrown} from '../../src/crowns.js';
+import {settleZombiesPlayer} from './zombies-service.js';
 import {timingPhase,roomTiming,recordTiming,startTiming,finishTiming} from './timing.js';
 import {SnapshotInterest} from '../../src/snapshot-interest.js';
 import {randomInt,randomUUID} from 'node:crypto';
@@ -19,7 +20,7 @@ const address=new RegExp('^yolk-yard-v'+VERSION+'-([A-Z2-9]{8})$');
 // The relay owns simulation and persistent room lifetime. Browsers submit bounded
 // input/interaction intent only; even the room leader cannot submit game state.
 export class MatchAuthority{
- constructor(relay){this.relay=relay;this.rooms=new Map();this.capacity=new MatchCapacity(this);this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),250);this.timer.unref?.();}
+ constructor(relay){this.relay=relay;this.rooms=new Map();this.capacity=new MatchCapacity(this);this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),16);this.timer.unref?.();}
  roomFor(peer){return this.rooms.get(peer.authorityRoom);}
  connection(peer,connected){const room=this.roomFor(peer),p=room?.sim.players.get(peer.authorityId);if(p){p.connected=connected;if(p.activity)p.activity.last=room.sim.time;room.sim.advanceWarmupClock();}}
  send(peer,message,serialized){if(peer&&this.relay.peers.has(peer.id))this.relay.send(peer,message,serialized);}
@@ -48,7 +49,8 @@ export class MatchAuthority{
    const reject=reason=>this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason}});
    if(m.version!==VERSION||room.kicked.has(peer.progressId))return reject('Refresh the game or choose another room.'),true;
    const profile=safeProfile(m.profile);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
-   const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission||room.recurring&&!admission)return reject('Party reservation expired. Join the public match from Play.'),true;
+   const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission||(room.recurring||room.zombies)&&!admission)return reject('Party reservation expired. Join the match from Play.'),true;
+   if(room.zombies&&!room.sim.players.has(peer.id)&&!admission?.spectator&&(room.sim.phase==='results'||room.sim.zWave>10||room.sim.zStage==='exfil'))return reject('This run is closed to new operators.'),true;
    room.sim.advanceWarmupClock?.();
    const reserved=admission&&this.capacity.reservations.has(admission.partyId);
    const spectator=!!admission?.spectator||room.sim.options.mode==='royale'&&!acceptsContestants(room.sim.stage),added=room.sim.players.has(peer.id)?0:1;
@@ -57,6 +59,7 @@ export class MatchAuthority{
    const plan=room.recurring?{ok:!spectator||this.capacity.spectators(room)<MAX_SPECTATORS,reason:'The public spectator seats are full. Try again shortly.'}:this.capacity.plan(room.sim.options,{key:room.key,humans:this.capacity.humans(room)+this.capacity.pending(room.key)+(!spectator&&!reserved?added:0),spectators:this.capacity.spectators(room)+this.capacity.pending(room.key,true)+(spectator&&!reserved?added:0),botLimit:room.sim.botLimit});if(!plan.ok)return reject(plan.reason),true;
    if([...room.members.values()].some(o=>o!==peer&&o.ws&&o.progressId===peer.progressId))return reject('This saved player is already in the public match in another tab.'),true;
    const p=room.sim.admitPlayer(peer.id,profile,admission);if(!p)return reject('This room is full.'),true;
+   if(room.zombies){if(!room.owner||admission.memberId===room.leaderSocial)room.owner=p.id;room.startedWaitingAt??=room.age;}
    if(room.recurring)attachCrown(room.sim,p,peer.progressId);
    if(room.recurring&&!room.members.has(p.id))room.joinSerial=(room.joinSerial||0)+1;
    peer.authorityRoom=room.key;peer.authorityId=p.id;peer.controlReady=false;p.loading=true;room.members.set(p.id,peer);room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));
@@ -80,6 +83,7 @@ export class MatchAuthority{
   if(m.type==='profile'){const ok=sim.setProfile(id,safeProfile(m.profile));this.send(peer,{type:'authority-notice',event:ok===false?'name-required':'name-accepted'});return;}
   if(m.type==='chat-send'){const result=room.chat.submit(id,m,sim.snapshot());if(!result.ok)this.send(peer,{type:'authority-notice',event:'chat-status',data:result});else for(const recipient of result.recipients){const target=room.members.get(recipient);if(target)this.send(target,{type:'authority-notice',event:'chat-message',data:result.message});}return;}
   if(m.type==='chat-report'){const report=room.chat.report(id,m.target,m.reason,sim.snapshot());if(report)this.send(room.members.get(room.owner),{type:'authority-notice',event:'chat-report',data:report});return;}
+  if(room.zombies&&m.type==='configure')return;
   if(room.recurring||!leader)return;
   if(m.type==='start'&&sim.phase!=='playing'){if(peer.authorityConfigRejected){peer.authorityConfigRejected=false;return;}const plan=this.capacity.roundPlan(room);if(!plan.ok){this.send(peer,{type:'authority-notice',event:'match-capacity',data:{message:plan.reason}});return;}this.capacity.rematch(room.key);sim.startRound();this.broadcast(room);}
   if(m.type==='configure'&&sim.phase!=='playing'){
@@ -132,7 +136,8 @@ export class MatchAuthority{
    const message=encoder.encode({type:'authority-state',state:presentation},batch);this.send(peer,{type:'authority-frame',frame:message.frame},batch.serialize(message.frame));
   }
   if(!room.publishedAt||room.age-room.publishedAt>=2){this.publish(room);room.publishedAt=room.age;}
-  if(room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,room.owner,room.sim.inputs.get(room.owner)||{}));}
+  if(room.zombies){if(sim.phase==='results')for(const [id,peer]of room.members)settleZombiesPlayer(this.relay,room,sim.players.get(id),peer);}
+  else if(room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,room.owner,room.sim.inputs.get(room.owner)||{}));}
   const broadcastCost=finishTiming(broadcastStarted);recordTiming(room,timingPhase(room.sim),'broadcastMaxMs',broadcastCost.wallMs,broadcastCost.cpuMs);
  }
  restartPublicRoom(room){
@@ -145,6 +150,7 @@ export class MatchAuthority{
  }
  disconnect(peer){
   const room=this.roomFor(peer),id=peer.authorityId;if(!room||room.members.get(id)!==peer)return false;
+  if(room.zombies)settleZombiesPlayer(this.relay,room,room.sim.players.get(id),peer);
   room.sim.leavePlayer(id);room.members.delete(id);room.encoders.delete(id);room.eventCursors.delete(id);delete peer.authorityRoom;delete peer.authorityId;
   if(room.recurring){room.sim.setConnectedHumans([...room.members].filter(([,p])=>p.ws).map(([id])=>id));this.resetEmptyPublicRound(room);this.broadcast(room);return false;}
   if(!room.members.size){this.rooms.delete(room.key);this.capacity.releaseRoom(room.key);room.hostPeer.virtualRoom=false;room.hostPeer.listing=null;if(room.hostPeer!==peer)this.relay.remove(room.hostPeer);return false;}
@@ -159,6 +165,7 @@ export class MatchAuthority{
   const sliceStarted=performance.now();
   const elapsed=Math.max(0,(now-this.last)/1000);this.last=now;this.accumulator=Math.min(.75,this.accumulator+elapsed);let steps=0;
   for(const room of this.rooms.values()){
+   if(room.zombies){if(!room.members.size&&Date.now()-room.created>90000){this.rooms.delete(room.key);this.capacity.releaseRoom(room.key);this.relay.remove(room.hostPeer);continue;}if(room.autoStart&&room.sim.phase==='lobby'&&room.startedWaitingAt!=null&&room.age-room.startedWaitingAt>=12&&[...room.sim.players.values()].some(p=>p.connected!==false))room.sim.startRound();}
    this.resetEmptyPublicRound(room);
    if(room.recurring&&room.sim.phase==='results'){room.restartAt??=room.age+PUBLIC_ROYALE.restartSeconds;if(room.age>=room.restartAt)this.restartPublicRoom(room);}
    recordTiming(room,timingPhase(room.sim),'gapMaxMs',elapsed*1000);

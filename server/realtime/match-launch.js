@@ -1,4 +1,5 @@
 import {randomUUID,randomInt} from 'node:crypto';
+import {queueZombies} from './zombies-service.js';
 import {VERSION} from '../../src/data.js';
 import {matchOptions} from '../../src/match-options.js';
 import {MAX_SPECTATORS} from '../../src/royale-phases.js';
@@ -11,6 +12,7 @@ export function queueMatch(service,u,m){
  if(service.relay.deployment?.snapshot().updating)throw Error('Ravelfront is updating. Matchmaking will reopen when publishing finishes.');
  if(p.members.some(id=>!service.connected(service.users.get(id))))throw Error('Wait for your party members to reconnect.');
  if(p.members.some(id=>id!==u.id&&!service.users.get(id).ready))throw Error('Every party member must ready up.');
+ if(p.selection.mode==='zombies'||m.code&&authority?.rooms.get(address(m.code))?.zombies)return queueZombies(service,u,m);
  if(m.publicRoyale||m.code===PUBLIC_ROYALE.code||!m.code&&!m.custom&&p.selection.access!=='private')return queuePublicMatch(service,u,m);
  if(m.code&&isPublicCode(m.code))throw Error('Use Play to join public matchmaking, or Spectate Friend to watch a friend.');
  if((m.options?.mode||p.selection.mode)==='teams')throw Error('Team Scramble has been retired. Choose Free For All or Frontier Royale.');

@@ -22,6 +22,7 @@ export const VIEWMODELS={
  doubleyolk:{scale:.48,x:.23,y:-.22,z:-.64,fov:70},
  comet:{scale:.48,x:.24,y:-.22,z:-.64,fov:70},
 };
+VIEWMODELS.arcLoom=VIEWMODELS.comet;VIEWMODELS.riftDriver=VIEWMODELS.thumper;VIEWMODELS.cinderLance=VIEWMODELS.anchor;
 export function viewmodelProfile(id,aspect=16/9){const p=VIEWMODELS[id]||VIEWMODELS.sprinter;return {...p,z:p.z-Math.max(0,1.25/aspect-1)*.26};}
 export const RETICLES={sprinter:'crosshair',scatter:'iron',needle:'mil-dot',zipper:'reflex-dot',thumper:'ring',anchor:'chevron',duet:'chevron',pip:'iron',peeper:'mil-dot',doubleyolk:'iron',comet:'reflex-dot'};
 export const GROUND_DISPLAY = {

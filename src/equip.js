@@ -16,7 +16,7 @@ export const DRAW_POSES={
 };
 DRAW_POSES.peeper = DRAW_POSES.needle;
 DRAW_POSES.doubleyolk = DRAW_POSES.scatter;
-DRAW_POSES.comet = DRAW_POSES.sprinter;
+DRAW_POSES.comet = DRAW_POSES.sprinter;DRAW_POSES.arcLoom=DRAW_POSES.comet;DRAW_POSES.riftDriver=DRAW_POSES.thumper;DRAW_POSES.cinderLance=DRAW_POSES.anchor;
 const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 const toolDraw={route:'back',offset:[.28,.62,.62],rotation:[1.05,-.42,.48]};
 const utilityDraw={route:'hip',offset:[.24,-.62,.18],rotation:[-.28,-.18,-.42]};

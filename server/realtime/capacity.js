@@ -2,6 +2,7 @@
 // a claim of certified hardware capacity. Actual CPU/throttle pressure is a
 // second gate. Warmup reserves battle cost before the bus departs.
 export function matchWorkload(options,humans=1,botLimit=Infinity){
+ if(options.mode==='zombies')return {humans,bots:0,cost:60+humans*8};
  const capacity=options.capacity||(options.mode==='royale'?32:8);
  const bots=Math.max(0,Math.min(capacity-humans,options.fill?capacity:options.bots||0,botLimit));
  return {humans,bots,cost:options.mode==='royale'?52+humans*9+bots*7:30+humans*8+bots*11};
@@ -21,8 +22,8 @@ export class MatchCapacity {
   for(const r of this.reservations.values())if(r.key===key&&!!r.spectator===spectator){let joined=0;if(room)for(const p of room.sim.players.values())if(!p.bot&&p.partyId===r.partyId)joined++;humans+=Math.max(0,r.humans-joined);}
   return humans;
  }
- humans(room){let n=0;for(const p of room.sim.players.values())if(!p.bot&&!p.lateSpectator)n++;return n;}
- spectators(room){let n=0;for(const p of room.sim.players.values())if(!p.bot&&p.lateSpectator)n++;return n;}
+ humans(room){let n=0;for(const p of room.sim.players.values())if(!p.bot&&!p.lateSpectator&&!p.friendSpectator)n++;return n;}
+ spectators(room){let n=0;for(const p of room.sim.players.values())if(!p.bot&&(p.lateSpectator||p.friendSpectator))n++;return n;}
  roomCost(room){
   const cost=matchWorkload(room.sim.options,this.humans(room)+this.pending(room.key),room.sim.botLimit).cost+(this.spectators(room)+this.pending(room.key,true))*4;
   return room.sim.phase==='results'?Math.max(22,cost*.4):cost;

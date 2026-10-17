@@ -1,11 +1,12 @@
 import {RADIUS,HEIGHT,canStand,boxTop,playerBoxOverlap} from './physics.js';
+import {ZOMBIES_MAP,zombieClientMap} from './zombies-map.js';
 import {SPAWN_ISLAND} from './spawn-island.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {groundAt} from './terrain.js';
 import {createRavelArenas} from './ravel-arenas.js';
 import {compileLayout,validateLayout,layoutKey,MAP_LIMITS} from './map-layout.js';
 export const MAPS=createRavelArenas();
-export const BASE_MAPS=[ROYALE_MAP,SPAWN_ISLAND,...MAPS];
+export const BASE_MAPS=[ROYALE_MAP,SPAWN_ISLAND,ZOMBIES_MAP,...MAPS];
 export const baseMap=id=>BASE_MAPS.find(m=>m.id===id)||MAPS[0];
 const emptyBundle=Object.freeze({});
 let publishedLayouts=emptyBundle,matchLayouts=null,matchKey='';
@@ -25,6 +26,7 @@ export function useMatchLayouts(bundle,key){
  const checked=validateLayoutBundle(bundle);matchLayouts=checked;matchKey=key||mapBundleKey(checked);
 }
 export function getMap(id,bundle=matchLayouts||publishedLayouts){
+ if(id==='blacktide')return zombieClientMap();
  const base=baseMap(id);if(!bundle[base.id]?.objects?.length)return base;
  if(!compiledMaps.has(bundle))compiledMaps.set(bundle,new Map());const cache=compiledMaps.get(bundle);
  if(!cache.has(base.id))cache.set(base.id,compileLayout(base,bundle[base.id]));return cache.get(base.id);

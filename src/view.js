@@ -1,3 +1,4 @@
+import {buildBlacktide,ZombiesView} from './zombies-view.js';
 import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay} from './perspective.js';
 import {warmArchitectureSurfaces} from './architecture-surfaces.js';
 import {fpsLimit} from './frame-pacing.js';
@@ -34,7 +35,7 @@ import { patternedShell, addHeadwear, addEyewear, optionProfile } from "./cosmet
 import { getMap } from "./maps.js";
 import { gun, weapon, TEAM_COLORS, mode, clamp, NO_EYEWEAR } from "./data.js";
 import { EYE, VIEWMODEL, direction, wallDistance, worldHit } from "./physics.js";
-import { makeBlaster, weaponPortrait } from "./weapons.js";
+import { makeBlaster, weaponPortrait, setResonance } from "./weapons.js";
 import { buildArena } from "./arenas.js";
 const palette = {
   sand: 0xe9d9b2,
@@ -166,8 +167,8 @@ export class View {
     );
     this.camera.rotation.order = "YXZ";
     this.scene.add(this.camera);
-    this.scene.add(new THREE.HemisphereLight(0xe5f4ff, 0x88a16a, 2.25));
-    const sun = new THREE.DirectionalLight(0xfff3de, 2.2);
+    this.hemi=new THREE.HemisphereLight(0xe5f4ff,0x88a16a,2.25);this.scene.add(this.hemi);
+    const sun = this.sun = new THREE.DirectionalLight(0xfff3de, 2.2);
     sun.position.set(-15, 38, 18);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
@@ -250,7 +251,7 @@ export class View {
     const vmKey=new THREE.DirectionalLight(0xffedcf,2.4);vmKey.position.set(-2,4,3);this.viewmodelCamera.add(vmKey);
     this.resize();
     window.addEventListener("resize", () => this.resize());
-    this.royaleView = new RoyaleView(this, {block,ball,cylinder,mat,palette});
+    this.royaleView = new RoyaleView(this, {block,ball,cylinder,mat,palette});this.zombiesView=new ZombiesView(this.scene,this.world);
 
     canvas.addEventListener("webglcontextlost", (e) => {
       e.preventDefault();
@@ -333,7 +334,7 @@ export class View {
     this.mapId = id;
     this.needsMapCompile=true;
     const map = getMap(id);
-    this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;delete this.world.userData.groundCover;delete this.world.userData.terrainEnvironment;
+    this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;delete this.world.userData.groundCover;delete this.world.userData.terrainEnvironment;delete this.world.userData.blacktide;
     this.scene.background = new THREE.Color(map.sky);
     this.scene.fog = new THREE.Fog(map.theme==='royale'?0xc1e6f0:map.sky, map.theme==='royale'?280:72, map.theme==='royale'?1050:175);
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;
@@ -344,8 +345,8 @@ export class View {
       // A full-human early departure may arrive before preparation finishes.
       if(!pending.done)for(const _ of pending.steps){}
       this.world.add(...pending.group.children.slice());if(pending.group.userData.details)pending.group.userData.details.attach(this.world);if(pending.group.userData.groundCover)pending.group.userData.groundCover.attach(this.world);this.world.userData.terrainEnvironment=pending.group.userData.terrainEnvironment;this.preparedBattle=null;
-    }else (map.theme==='royale'?buildIsland:buildArena)(this.world, map.authored?{...map,boxes:map.authored}:map, { block, ball, cylinder, mat, palette });
-    for (let i = 0; i < 2; i++) {
+    }else if(map.theme==='zombies')buildBlacktide(this.world);else (map.theme==='royale'?buildIsland:buildArena)(this.world, map.authored?{...map,boxes:map.authored}:map, { block, ball, cylinder, mat, palette });
+    for (let i = 0; i < (map.theme==='zombies'?0:2); i++) {
       const [x, z] = map.bases[i];
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(2.1, 0.08, 8, 48),
@@ -784,7 +785,7 @@ export class View {
     this.recoil = Math.max(0, this.recoil - dt * (local?gun(local).recoilRecovery:7));
     if(playing)this.loadMap(state?.options.map || "yard");
     if(playing&&state?.royale?.practice&&!state.options.training)this.prepareBattleMap();
-    this.world.visible=playing;
+    this.world.visible=playing;const dark=playing&&!!state?.zombies;this.hemi.intensity=dark?1.15:2.25;this.hemi.color.setHex(dark?0x9ecbd3:0xe5f4ff);this.hemi.groundColor.setHex(dark?0x304c54:0x88a16a);this.sun.intensity=dark?.8:2.2;this.sun.color.setHex(dark?0xaacbd8:0xfff3de);
     updateEnvironmentSurfaces(this.clock);
     if(playing){const detailQuality=this.detailPressure?'low':this.settings.quality;updateTerrainEnvironment(this.world,this.clock,detailQuality);this.world.userData.groundCover?.update(predicted||local,{quality:detailQuality,time:this.clock});}
     if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x6f9295;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(playing&&map.theme==='royale'?0xc1e6f0:sky,playing?(map.theme==='royale'?280:72):35,playing?(map.theme==='royale'?1050:175):125);}
@@ -835,7 +836,7 @@ export class View {
       }
       const draw=equipPose(local,state.time);
       this.drawPresentation=draw;
-      this.setWeapon(local,draw);
+      this.setWeapon(local,draw);if(local.zombieKit)setResonance(this.localModel,gun(local).tier);
       this.lowerOutgoing(this,draw,local.health>0);
       this.gunGroup.visible=this.gunGroup.visible&&draw.visible;
       const w = gun(local),
@@ -997,7 +998,7 @@ export class View {
         const harvesting=!!p.inventory?.[p.slot]?.pickaxe;
         if(harvesting&&!model.userData.shopTool){const tool=shopItem(p.pickaxe)?makeShopPickaxe(p.pickaxe):this.royaleView.itemModel({id:'pickaxe',pickaxe:true},false);tool.scale.setScalar(.5);tool.position.set(-.05,-.12,-.2);model.userData.held.add(tool);model.userData.shopTool=tool;}
         if(model.userData.shopTool)model.userData.shopTool.visible=harvesting;
-        model.userData.blaster.visible=!harvesting;
+        model.userData.blaster.visible=!harvesting;if(p.zombieKit)setResonance(model.userData.blaster,gun(p).tier);
         model.userData.draw=draw;
         model.userData.drawProfile=itemDrawProfile(p.inventory?.[p.slot]||{id:gun(p).id,weapon:true});
         const deathAge=p.health<=0?state.time-(p.eliminatedAt??p.respawnAt-3):0;
@@ -1203,7 +1204,7 @@ export class View {
       this.gunGroup.visible = true;
     }
     if(playing&&this.scopeActive&&gun(local).ads?.overlay&&this.aimBlend>.8)this.gunGroup.visible=false;
-    this.royaleView.update(state,this.renderLocalActor||local,dt,playing);
+    this.royaleView.update(state,this.renderLocalActor||local,dt,playing);this.zombiesView.update(state,dt,this.camera,playing);if(playing&&state?.zombies){this.scene.fog.near=32;this.scene.fog.far=115;}
     this.throwablePreview.update(state,this.renderLocalActor||predicted||local,this.buildMap||this.map,playing,this.clock);
     this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
     if(this.needsMapCompile){

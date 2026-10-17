@@ -1,3 +1,4 @@
+import {ZOMBIE_SOUNDS,updateZombiesAudio} from './zombies-audio.js';
 import {AdaptiveScore} from './adaptive-score.js';
 import {bulletPass} from './sound-spatial.js';
 import {wallDistance} from './physics.js';
@@ -12,7 +13,7 @@ import {getMap} from './maps.js';
 import {ITEMS} from './royale-data.js';
 const note=(f,d=.12,v=.12,w='sine',to=0,at=0)=>({f,d,v,w,to,at});
 const noise=(f,d=.15,v=.15,at=0)=>({noise:true,f,d,v,at});
-export const SOUND_CUES={
+export const SOUND_CUES={...ZOMBIE_SOUNDS,
  'uplink-active':[note(392,.18,.05,'triangle'),note(587,.2,.06,'sine',0,.18),note(784,.5,.05,'sine',0,.4),noise(1600,.22,.025,.36)],
  'uplink-secured':[note(523,.18,.055),note(659,.22,.065,'sine',0,.14),note(784,.3,.065,'sine',0,.28),note(1046,.65,.05,'sine',0,.45)],
  'field-medal':[note(880,.09,.055),note(1174,.18,.055,'triangle',0,.08),note(1760,.42,.035,'sine',0,.2)],
@@ -192,6 +193,7 @@ export class Sound {
  }
  stopWorld(){this.score.stop();this.occlusion.clear();this.bossAudio.stop();this.fieldSamples.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.stepClocks?.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;this.nextBirdAt=this.clock+8;}
  event(e,me,state){
+  if(e.type==='z-cue'){if(e.player&&e.player!==me?.id&&e.x===undefined)return;this.cue('z-'+e.cue,e.x===undefined?null:e,e.cue==='attack'?.55:1);return;}
   if(e.type==='boss-voice'){const listener=me?.spectating?state.players.find(p=>p.id===this.listener?.id)||me:me;return this.bossAudio.event(e,state,listener);}
   if(e.type==='round')this.cue('round-start');
   if(e.type==='uplink-active')this.cue('uplink-active');
@@ -211,9 +213,10 @@ export class Sound {
   if(e.type==='bounce')this.cue('ricochet',e,.4);
  }
  update(state,me,dt,playing){
-  this.clock+=dt;this.listener=me;this.score.update(state,me,playing);
+  this.clock+=dt;this.listener=me;this.score.update(state,me,playing&&!state?.zombies);
   if(!playing||!me||me.downed||!(me.reloadEnd>state?.time))this.cancelReload();
   if(!playing||!state||!me){if(this.loops.size||this.bossAudio.active.size||[...this.fieldSamples.active.values()].some(v=>v.size))this.stopWorld();this.bossAudio.update(state,me,false);return;}
+  updateZombiesAudio(this,state,me);
   const royale=state.royale,ground=me.flight==='ground'||!royale;
   const map=getMap(state.options?.map);this.worldMap=this.collisionMap||map;
   this.bossAudio.update(state,me,playing,map);

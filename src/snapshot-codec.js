@@ -1,6 +1,7 @@
 // Lossless deltas on an ordered connection. Each new connection starts with a
 // complete baseline. Encoding happens at flush, after stale snapshots merge.
 const recordKeys=['players','projectiles'];
+const zombieRecords=['enemies','drops','effects','grenades'];
 function records(value,key='id'){return Object.fromEntries(value.map(row=>[row[key],row]));}
 // Broadcast recipients share immutable state objects. Normalize each once;
 // per-connection baselines and recovery checkpoints remain independent.
@@ -55,7 +56,8 @@ export class SnapshotBatch {
    const cached={};value[key]=cached;this.normalized.set(source,cached);
    const name=key==='state'?'royale':'simulation';
    for(const field of Object.keys(source)){
-    if(field===name&&source[name]){const world={};cached[name]=world;
+    if(field==='zombies'&&source[field]){cached[field]=this.clone(source[field]);for(const key of zombieRecords)if(Array.isArray(cached[field][key]))cached[field][key]=this.index(cached[field][key]);}
+    else if(field===name&&source[name]){const world={};cached[name]=world;
      for(const collection of Object.keys(source[name])){if(collection==='players'&&Array.isArray(source[name][collection])){world[collection]=this.players(source[name][collection]);continue;}const cloned=this.clone(source[name][collection]);if(cloned!==undefined)world[collection]=Array.isArray(cloned)&&['loot','chests','builds','vehicles'].includes(collection)?this.index(cloned,collection==='loot'?'uid':'id'):cloned;}
     }else if(field==='mapLayouts'&&source[field])cached[field]=snapshotLayout(source[field]);else if(field==='players'&&Array.isArray(source[field]))cached[field]=this.players(source[field]);else{const cloned=this.clone(source[field]);if(cloned!==undefined)cached[field]=recordKeys.includes(field)&&Array.isArray(cloned)?this.index(cloned):cloned;}
    }
@@ -87,6 +89,7 @@ function normalize(message){
   if(!cached){cached=JSON.parse(JSON.stringify({...source,mapLayouts:undefined}));if(source.mapLayouts)cached.mapLayouts=snapshotLayout(source.mapLayouts);
    const world=key==='state'?cached.royale:cached.simulation;
    for(const [name,id]of [['loot','uid'],['chests','id'],['builds','id'],['vehicles','id']])if(Array.isArray(world?.[name]))world[name]=records(world[name],id);
+   for(const name of zombieRecords)if(Array.isArray(cached.zombies?.[name]))cached.zombies[name]=records(cached.zombies[name]);
    for(const name of recordKeys)if(Array.isArray(cached[name]))cached[name]=records(cached[name]);
    if(Array.isArray(cached.simulation?.players))cached.simulation.players=records(cached.simulation.players);
    cache.set(source,cached);
@@ -121,7 +124,7 @@ function patch(previous,next){
  if(Array.isArray(previous)||Array.isArray(next))return equalJson(previous,next)?undefined:[next];
  const changes=Object.create(null);
  for(const key of Object.keys(previous))if(!Object.hasOwn(next,key))changes[key]=[];
- for(const key of Object.keys(next)){const change=(['state','royale','simulation','players','projectiles','loot','chests','builds','worldDamage'].includes(key)?sharedPatch:patch)(previous[key],next[key]);if(change!==undefined)changes[key]=change;}
+ for(const key of Object.keys(next)){const change=(['state','royale','zombies','enemies','simulation','players','projectiles','loot','chests','builds','worldDamage'].includes(key)?sharedPatch:patch)(previous[key],next[key]);if(change!==undefined)changes[key]=change;}
  return Object.keys(changes).length?changes:undefined;
 }
 function apply(previous,changes){
@@ -167,6 +170,7 @@ export class SnapshotDecoder {
   if(frame.omitWorld?.length&&rest.state?.royale){payload.state={...rest.state,royale:{...rest.state.royale}};for(const key of frame.omitWorld)if(['loot','chests','builds','worldDamage'].includes(key))delete payload.state.royale[key];}
   const message=cloneSnapshot(payload);
   if(checkpoint&&(frame.full||Object.hasOwn(frame.patch||{},'checkpoint')))message.checkpoint=cloneSnapshot({checkpoint}).checkpoint;
+  for(const key of zombieRecords)if(message.state?.zombies?.[key])message.state.zombies[key]=Object.values(message.state.zombies[key]);
   for(const key of recordKeys)if(message.state?.[key])message.state[key]=Object.values(message.state[key]);
   if(message.checkpoint?.simulation?.players)message.checkpoint.simulation.players=Object.values(message.checkpoint.simulation.players);
   for(const key of ['loot','chests','builds','vehicles']){if(message.state?.royale?.[key])message.state.royale[key]=Object.values(message.state.royale[key]);if(message.checkpoint?.simulation?.[key])message.checkpoint.simulation[key]=Object.values(message.checkpoint.simulation[key]);}
