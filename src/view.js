@@ -35,7 +35,8 @@ import { patternedShell, addHeadwear, addEyewear, optionProfile } from "./cosmet
 import { getMap } from "./maps.js";
 import { gun, weapon, TEAM_COLORS, mode, clamp, NO_EYEWEAR } from "./data.js";
 import { EYE, VIEWMODEL, direction, wallDistance, worldHit } from "./physics.js";
-import { makeBlaster, weaponPortrait, setResonance } from "./weapons.js";
+import {weaponPortrait} from "./weapons.js";
+import {makeBlaster,setResonance} from "./zombies-weapons.js";
 import { buildArena } from "./arenas.js";
 const palette = {
   sand: 0xe9d9b2,
@@ -613,6 +614,7 @@ export class View {
       }
     }
 
+    if(e.type==='z-cue'&&e.cue==='throw'){if(e.player===localId)this.localThrowStart=this.clock;const actor=this.models.get(e.player);if(actor)actor.userData.throwStart=this.clock;}
     if (e.type === "shot" || e.type === "launch") {
       if (e.player === localId&&!e.echoed) this.recoil = Math.min(1.6, this.recoil + weapon(e.weapon).recoilUp*70);
       const actor = this.models.get(e.player);
@@ -899,6 +901,7 @@ export class View {
         this.gunGroup.position.y-=.19*gesture;
         this.gunGroup.rotation.x+=.2*gesture;
       }
+      if(local.zombieKit&&state.time-(local.swingAt??-100)<.55){const swing=Math.sin(Math.PI*Math.max(0,(state.time-local.swingAt)/.55));this.gunGroup.position.z-=.24*swing;this.gunGroup.rotation.z-=.45*swing;this.gunGroup.position.x-=.12*swing;}
       const sprint=local.sprintBlend||0;this.gunGroup.position.y-=sprint*.28;this.gunGroup.position.x+=sprint*.12;this.gunGroup.rotation.x+=sprint*.55;this.gunGroup.rotation.z+=sprint*.28;
       if(local.traversal||local.mantle)this.gunGroup.position.y-=.8;
       this.scopeActive = !!aiming && scoped && this.aimBlend > 0.1 && (!local.inventory||!!local.inventory[local.slot]?.weapon);

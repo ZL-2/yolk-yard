@@ -26,10 +26,10 @@ export function queueZombies(service,u,m){
 }
 export function settleZombiesPlayer(relay,room,p,peer){
  if(!peer?.progressId||!p||room.sim.phase==='lobby'||p.friendSpectator||!p.zStats)return;const now=relay.progression.clock(),account=relay.progression.account(peer.progressId),id=`z:${room.sim.matchId}:${peer.progressId.slice(0,12)}`;if(account.receipts.some(r=>r.id===id))return;
- const s=p.zStats,elapsed=room.sim.time-(room.sim.zRunStarted||0),eligible=elapsed>=60&&s.active>=30&&s.rounds>=2&&(s.kills>=8||s.revives>=2&&s.damage>=400)&&!p.afkRemoved;
+ const s=p.zStats,elapsed=room.sim.time-(room.sim.zRunStarted||0),eligible=elapsed>=60&&s.active>=30&&s.survived>=2&&(s.kills>=8||s.revives>=2&&s.damage>=400)&&!p.afkRemoved;
  account.earned=(account.earned||[]).filter(r=>now-r.time<3600);const earned=account.earned.reduce((n,r)=>n+r.amount,0),extracted=room.sim.zOutcome==='extracted',quest=!!room.sim.zQuest.complete;
- const amount=eligible?Math.max(0,Math.min(200,400-earned,Math.floor(Math.min(s.rounds,40)*4+Math.min(s.kills,300)*.12+s.revives*3+(extracted?30:0)+(quest?40:0)))):0;
- const record={highestRound:s.rounds,kills:s.kills,critical:s.critical,revives:s.revives,extractions:Number(extracted),quests:Number(quest),bosses:s.bosses,games:1,cooperative:Number(room.sim.options.capacity>1)};
+ const amount=eligible?Math.max(0,Math.min(200,400-earned,Math.floor(Math.min(s.survived,40)*4+Math.min(s.kills,300)*.12+s.revives*3+(extracted?30:0)+(quest?40:0)))):0;
+ const record={highestRound:s.rounds,kills:s.kills,critical:s.critical,revives:s.revives,extractions:Number(extracted),quests:Number(quest),bosses:s.bosses,games:1,cooperative:Number(s.cooperative)};
  const receipt={id,amount,label:extracted?'Blacktide extracted':'Blacktide run complete',mode:'zombies',won:extracted,eligible,reason:eligible?'Verified Zombies contribution':'Survive two rounds and actively contribute to earn progression.',kills:eligible?s.kills:0,assists:eligible?p.assists:0,zombies:eligible?record:null,time:now,custom:room.visibility==='private'};
  if(eligible){account.zombies??={};for(const [k,v]of Object.entries(record))account.zombies[k]=k==='highestRound'?Math.max(account.zombies[k]||0,v):(account.zombies[k]||0)+v;}
  account.receipts.push(receipt);account.receipts=account.receipts.slice(-60);if(amount)account.earned.push({time:now,amount});relay.progression.dirty=true;if(peer.ws)relay.send(peer,{type:'reward',receipt});void relay.progression.save();

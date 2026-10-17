@@ -3,7 +3,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {ZOMBIES,Z_TYPES,Z_PERKS,Z_POWERUPS} from './zombies-config.js';
 import {ZOMBIES_MAP,Z_ZONES,Z_DOORS,Z_STATIONS,Z_CACHE_SITES,Z_ENTRANCES} from './zombies-map.js';
-import {makeBlaster} from './weapons.js';
+import {makeBlaster} from './zombies-weapons.js';
 import {clamp} from './data.js';
 
 const amber=0xffba68,cyan=0x72e5db;
