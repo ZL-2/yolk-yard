@@ -34,10 +34,11 @@ function anchored(p,map){
  const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,5)];
  return bs.some(b=>supportSamples(b).some(([x,z])=>Math.abs(b.y-groundAt(map,x,z))<.32))||near.some(b=>!b.buildId&&blocksBuilding(b)&&bs.some(a=>Math.abs(a.y-(b.y+b.h))<.24&&Math.abs(a.x-b.x)<(a.w+b.w)/2&&Math.abs(a.z-b.z)<(a.d+b.d)/2));
 }
-export function validPlacement(p,map,builds,players=[]){
+export function validPlacement(p,map,builds,players=[],builder=null){
  if(![p.x,p.y,p.z,p.rotation].every(Number.isFinite)||p.y<0)return 'Invalid coordinates';
  if(!PIECES.includes(p.type)||!MATERIALS[p.material]||Math.abs(p.x)>map.size-3||Math.abs(p.z)>map.size-3||p.y>100)return 'Outside build area';
- if(builds.length>=600)return 'Build limit reached';
+ const area=map.buildBounds;if(area){const b=bounds(p);if(b.minX<area.minX-.2||b.maxX>area.maxX+.2||b.minZ<area.minZ-.2||b.maxZ>area.maxZ+.2||b.maxY>area.maxY+.02)return 'Outside box arena';if(map.boxPrep&&builder?.boxSpawn){const s=builder.boxSpawn;if(builder.boxFFA?(Math.abs(p.x-s.x)>2.1||Math.abs(p.z-s.z)>2.1):(s.z<0?p.z>-2:p.z<2))return 'Build on your side until the barrier drops';}}
+ if(builds.length>=(map.buildLimit||600))return 'Build limit reached';
  if(builds.some(b=>b.type===p.type&&b.x===p.x&&Math.abs(b.y-p.y)<.2&&b.z===p.z&&(p.type!=='wall'||b.rotation%2===p.rotation%2)))return 'Already built';
  const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,4)].filter(o=>!o.buildId&&blocksBuilding(o));
  for(const b of bs){
@@ -93,7 +94,7 @@ export function solvePlacement(p,type,rotation,material,map,builds=[],players=[]
  let best=null,firstReason='Needs support';
  for(const option of ranked){
   if(best&&option.score>best.score+.5)break;
-  const reason=validPlacement(option.piece,map,builds,players);
+  const reason=validPlacement(option.piece,map,builds,players,p);
   if(!best&&option===ranked[0])firstReason=reason;
   if(reason)continue;
   // Test the sight line to the near face; tiny props never veto a connection.
@@ -190,7 +191,7 @@ export function buildingTick(sim,p,input){
    const mat=p.buildMaterial;
    const {piece:build,reason}=solvePlacement(p,p.buildType,p.buildRotation,mat,sim.map,sim.builds,[...sim.players.values()],input.buildAnchor);
    p.buildReason=reason||(p.materials[mat]<COST?'Not enough '+mat:'');
-   if(!reason&&p.materials[mat]>=COST){p.buildBufferedUntil=0;const def=MATERIALS[mat];p.materials[mat]-=COST;sim.builds.push({...build,id:'build-'+(++sim.buildId),owner:p.id,team:p.team,teamMode:sim.options.mode==='teams'||sim.options.mode==='royale'&&(sim.options.teamSize||1)>1,health:def.start,maxHealth:def.health,constructionRemaining:def.health-def.start,constructionTick:sim.time+.5,revision:0,created:sim.time,lastDamage:-100});p.buildMaterial=selectMaterial(p.materials,mat)||mat;sim.buildVersion++;rebuildMap(sim);resolveBuildOccupants(sim,sim.builds.at(-1));sim.emit('royale-cue',{cue:'build-place',player:p.id,x:build.x,y:build.y,z:build.z});}
+   if(!reason&&p.materials[mat]>=COST){p.buildBufferedUntil=0;const def=MATERIALS[mat];p.materials[mat]-=COST;sim.builds.push({...build,id:'build-'+(++sim.buildId),owner:p.id,team:p.team,teamMode:sim.options.mode==='boxfight'&&sim.options.boxFormat!=='ffa'||sim.options.mode==='teams'||sim.options.mode==='royale'&&(sim.options.teamSize||1)>1,health:def.start,maxHealth:def.health,constructionRemaining:def.health-def.start,constructionTick:sim.time+.5,revision:0,created:sim.time,lastDamage:-100});p.buildMaterial=selectMaterial(p.materials,mat)||mat;sim.buildVersion++;rebuildMap(sim);resolveBuildOccupants(sim,sim.builds.at(-1));sim.emit('royale-cue',{cue:'build-place',player:p.id,x:build.x,y:build.y,z:build.z});}
   }
   return true;
  }
@@ -255,6 +256,7 @@ export function constructionTick(sim){
 }
 // Remote prediction and rendering use their own map; simulation maps never mutate the authored island.
 export function applyBuildState(map,r){
+ if(map.boxArena)map.boxPrep=['waiting','prepare'].includes(r.boxfightStage);
  updateDoorCollisions(map,r.doors,r.time??0);
  const revision=Number.isFinite(r.buildVersion)?r.matchId+':'+r.round+':'+r.buildVersion:null;
  if(revision!==null&&map.appliedBuildRevision===revision)return;

@@ -79,7 +79,7 @@ export class BuildingUI{
   this.root.querySelector('.build-toggle kbd').textContent=label('buildToggle');
   const help=this.root.querySelector('.build-help');help.hidden=!c.buildMode||p.health<=0||!!this.edit;help.textContent=`${c.reason||'10 '+c.buildMaterial.toUpperCase()+' · '+c.buildType.toUpperCase()} · ${label('fire')} BUILD · ${label('buildRotate')} ROTATE · ${label('buildMaterial')} MATERIAL`;
   const pose={...p,yaw:c.yaw??p.yaw,pitch:c.pitch??p.pitch},hit=aimedObject(map,pose,EDIT_RANGE),b=this.edit||targetBuild(map,state.royale.builds||[],pose),current=state.royale.builds.find(v=>v.id===b?.id),health=current||state.royale.worldDamage?.[hit?.box.objectId],def=hit?harvestDefinition(hit.box,map):null;
-  const target=this.root.querySelector('.build-target');target.hidden=(!hit&&!b)||p.health<=0;
+  const target=this.root.querySelector('.build-target');target.hidden=(!hit&&!b)||p.health<=0||!!(hit?.box.indestructible&&!b);
   if(hit||b){const max=health?.maxHealth??def?.health??0,hp=health?.health??max;target.innerHTML=`<b>${b?b.material.toUpperCase()+' '+b.type.toUpperCase():hit.box.material.toUpperCase()}</b><div><i style="width:${Math.max(0,hp/max*100)}%"></i></div><span>${Math.ceil(hp)} / ${max} HP${current?.constructionRemaining>0?' · CONSTRUCTING':''}${canEdit(b,p)?' · '+label('buildEdit')+' EDIT · '+label('buildRepair')+' REPAIR':''}${b&&wallPattern(b.mask)?.door!=null?' · '+label('interact')+' '+(b.doorOpen?'CLOSE':'OPEN'):''}</span>`;}
   if(this.edit){
    this.root.querySelector('[data-build-control="confirm"]').textContent=label('buildEdit')+' CONFIRM';

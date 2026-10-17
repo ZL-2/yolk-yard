@@ -19,9 +19,9 @@ export function queueMatch(service,u,m){
  let options=matchOptions({...p.selection,...m.options,...(!m.custom?p.selection:{}),session:'online',recurring:false}),room;
  const rooms=[...service.relay.peers.values()].filter(peer=>peer.ws&&peer.listing&&!authority?.rooms.has(peer.id)&&Date.now()-peer.listedAt<15000).map(peer=>peer.listing);
  const pending=code=>[...service.tickets.values()].filter(t=>!t.spectator&&t.code===code&&t.expires>Date.now()&&(!t.peer||t.claimedAt>(service.relay.peers.get(address(code))?.listedAt||0))).length;
- if(m.code){room=rooms.find(r=>r.code===m.code&&r.version===VERSION);if(!room)throw Error('That private room is unavailable. Check the code with its host.');options=matchOptions({...options,mode:room.mode,teamSize:room.teamSize,capacity:room.contestantCapacity,recurring:false});}
- if(options.mode==='royale'&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
- if(room)options=matchOptions({...options,mode:room.mode,capacity:room.contestantCapacity||room.capacity,teamSize:room.teamSize});
+ if(m.code){room=rooms.find(r=>r.code===m.code&&r.version===VERSION);if(!room)throw Error('That private room is unavailable. Check the code with its host.');options=matchOptions({...options,mode:room.mode,boxFormat:room.boxFormat,teamSize:room.teamSize,capacity:room.contestantCapacity,recurring:false});}
+ if((options.mode==='royale'||options.mode==='boxfight'&&options.recurring)&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
+ if(room)options=matchOptions({...options,mode:room.mode,boxFormat:room.boxFormat,capacity:room.contestantCapacity||room.capacity,teamSize:room.teamSize});
  if(!room&&options.mode==='royale'&&options.capacity<options.teamSize*2)throw Error('Team Royale needs positions for at least two full teams.');
  let roomCode=room?.code||newCode();while(!room&&(isPublicCode(roomCode)||service.relay.peers.has(address(roomCode))))roomCode=newCode();
  const hostRun=true,spectator=room?.mode==='royale'&&room.phase!=='lobby';
@@ -38,9 +38,9 @@ export function queueMatch(service,u,m){
 function queuePublicMatch(service,u){
  const p=service.parties.get(u.party),pool=service.relay.publicHost;
  if(!pool?.enabled)throw Error('Public matchmaking is unavailable.');
- if(!['royale','ffa'].includes(p.selection.mode))throw Error('Choose an available game mode.');
+ if(!['royale','ffa','boxfight'].includes(p.selection.mode))throw Error('Choose an available game mode.');
  const options=publicMatchOptions(p.selection);
- if(options.mode==='royale'&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
+ if((options.mode==='royale'||options.mode==='boxfight'&&options.recurring)&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
  const room=pool.findRoom(options,p.members.length),summary=room.summary(),creating=room.reserve(p,u);
  const launch={id:randomUUID(),code:room.code,options,creating,hostRun:true,recurring:true,rewardPublic:false,spectator:false,visibility:'public',created:Date.now()};
  p.launch=launch;p.state='queueing';u.ready=true;

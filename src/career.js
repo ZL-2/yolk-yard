@@ -1,5 +1,5 @@
 const count=n=>Number.isFinite(Number(n))?Math.max(0,Math.floor(Number(n))):0;
-export const CAREER_MODES={all:'All deployments',royale:'Frontier Royale',ffa:'Free For All',zombies:'Zombies / Blacktide Relay'};
+export const CAREER_MODES={all:'All deployments',royale:'Frontier Royale',ffa:'Free For All',boxfight:'Box Fights',zombies:'Zombies / Blacktide Relay'};
 export const CAREER_MODE_LABELS={...CAREER_MODES,teams:'Team Scramble (retired)'};
 export const CAREER_GRADES=[{name:'Recruit',score:0},{name:'Scout',score:1000},{name:'Operator',score:3500},{name:'Specialist',score:8000},{name:'Vanguard',score:16000},{name:'Commander',score:30000}];
 export function recordCareerReceipt(stats,receipt){

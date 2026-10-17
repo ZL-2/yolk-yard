@@ -3,7 +3,8 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import WebSocket from 'ws';
 import {chromium} from 'playwright';
 import {Network} from '../src/network.js';
-import {Simulation} from '../src/simulation.js';
+import {BoxFightSimulation} from '../src/box-fights.js';
+import {buildingTick,editBuilding} from '../src/building.js';
 import {zombieClients} from './zombies-clients.mjs';
 import {VERSION,safeProfile} from '../src/data.js';
 
@@ -20,7 +21,7 @@ await wait(async()=>{
  try{[published,health]=await Promise.all([get(front+'version.json?t='+Date.now()),get(relay+'/health')]);return published.build===expected&&health.build===expected&&published.appVersion===version&&health.gameVersion===VERSION&&health.deployment?.updating===false&&health.socialAvailable;}
  catch(e){lastError=e.message;return false;}
 },'Website and relay must finish the same release'+(lastError||''),360000);
-assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,1);
+assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,1);assert.equal(health.boxFightRevision,1);assert.ok(health.privateModes.includes('boxfight'));
 const history=await get(front+'release-history.json?t='+Date.now());assert.equal(history.build,expected);assert.equal(history.releases[0].number,published.release);
 const board=await get(relay+'/leaderboards');assert.ok(Array.isArray(board.kills.rows)&&Array.isArray(board.wins.rows));
 
@@ -28,7 +29,7 @@ const board=await get(relay+'/leaderboards');assert.ok(Array.isArray(board.kills
 // public match, changing its host, or creating public scores.
 globalThis.window={YOLK_NETWORK:{relay:relay.replace('https:','wss:')+'/game'}};
 globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:new URL(front).origin});}};
-const errors=[],sim=new Simulation({mode:'ffa',bots:0}),suffix=Date.now().toString(36).slice(-5);
+const errors=[],sim=new BoxFightSimulation({fill:false,teamSize:1,scoreLimit:1}),suffix=Date.now().toString(36).slice(-5);
 sim.addPlayer('host',safeProfile({name:'Release Host '+suffix}));
 let state,clock,browser,page,zclients,zclock;
 const host=new Network({getCheckpoint:()=>sim.checkpoint(),getState:()=>sim.snapshot(),onJoin:(id,p,a)=>!!sim.admitPlayer(id,p,a),onInput:(id,i)=>sim.setInput(id,i,true),onError:e=>errors.push(String(e))});
@@ -36,10 +37,11 @@ const guest=new Network({onState:s=>state=s,onError:e=>errors.push(String(e))});
 try{
  const code=await host.host();host.setVisibility('private');host.broadcast(sim.snapshot());
  clock=setInterval(()=>host.broadcast(sim.snapshot()),100);
- await guest.join(code,safeProfile({name:'Release Guest '+suffix}));await wait(()=>state?.players.length===2,'Live private admission');assert.equal(state.phase,'lobby');
+ await guest.join(code,safeProfile({name:'Release Guest '+suffix}));await wait(()=>state?.players.length===2,'Live private admission');assert.equal(state.phase,'lobby');assert.equal(state.options.mode,'boxfight');
  sim.startRound();for(const p of sim.players.values())sim.spawn(p);await wait(()=>state?.phase==='playing','Manual private start');
  guest.input({seq:1,crouch:true,dt:1/60});await wait(()=>sim.inputs.get(guest.id)?.crouch,'Guest input reaches live host');sim.tick(1/60);
  await wait(()=>state.players.find(p=>p.id===guest.id)?.crouching,'Authoritative crouch reaches guest');assert.notEqual(guest.serverAuthority,true);
+ const builder=sim.players.get('host');Object.assign(builder,{x:0,y:0,z:-6,yaw:0,pitch:0});buildingTick(sim,builder,{buildMode:true,buildType:'wall',buildMaterial:'wood',fire:true});assert.equal(sim.builds.length,1);assert.ok(editBuilding(sim,builder,'build-edit-16-'+sim.builds[0].id));await wait(()=>state.royale.builds?.[0]?.mask===16,'Live Box window edit');sim.boxEnd=sim.time;sim.tick(1/30);assert.equal(sim.boxStage,'fight');sim.damage(sim.players.get(guest.id),builder,10000,'scatter');sim.tick(1/30);await wait(()=>state.phase==='results'&&state.boxfight.seriesWinner===builder.team,'Live Box series result');
  clearInterval(clock);guest.destroy();host.destroy();
  zclients=zombieClients(relay.replace('https:','wss:'),new URL(front).origin);
  const za=await zclients.user('Z Lead '+suffix),zb=await zclients.user('Z Mate '+suffix);await zclients.invite(za,zb);await za.ask('select',{mode:'zombies',teamSize:2,access:'private'});await zb.ask('ready',{value:true});await za.ask('queue');await wait(()=>za.launches.length&&zb.launches.length,'Live Zombies reservations');const [zg,zh]=await Promise.all([zclients.launch(za),zclients.launch(zb)]);assert.equal(zg.net.serverAuthority,true);assert.equal(zh.state.players.length,2);assert.equal(zh.state.options.mode,'zombies');zg.net.authorityCommand({type:'start'});zclock=setInterval(()=>{zg.send();zh.send();},100);await wait(()=>zh.state?.zombies?.enemies.length>0,'Live authoritative first Zombies wave',25000);assert.equal(zg.state.matchId,zh.state.matchId);assert.deepEqual(zg.errors,[]);assert.deepEqual(zh.errors,[]);clearInterval(zclock);await zclients.close();
@@ -53,7 +55,7 @@ try{
  await page.locator('#menu [data-action=settings]:visible').first().click();await page.locator('[data-settings-tab=comfort]').click();await page.locator('#reducedMotion').check();
  await page.screenshot({path:out+'/desktop-settings.png'});
  assert.deepEqual(errors,[]);
- const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,privateZombiesCoop:true,serverZombiesWave:true,publicMatchUntouched:true,leaderboards:true,desktopLobby:true,mapStorage:health.mapStorage};
+ const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,privateBoxFight:true,boxBuildEdit:true,boxSeriesResult:true,privateZombiesCoop:true,serverZombiesWave:true,publicMatchUntouched:true,leaderboards:true,desktopLobby:true,mapStorage:health.mapStorage};
  await writeFile(out+'/result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 }catch(e){await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/failure.json',JSON.stringify({error:String(e),errors},null,2));throw e;}
 finally{clearInterval(clock);clearInterval(zclock);guest.destroy();host.destroy();await zclients?.close();await browser?.close();}
