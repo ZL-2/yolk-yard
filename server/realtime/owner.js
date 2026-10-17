@@ -59,7 +59,7 @@ export class OwnerService {
       if(req.url==='/owner/requests'&&req.method==='POST'){
         const body=await readBody(req);if(!this.authorized(req,body)){json(res,401,{error:'Owner access expired. Unlock Owner Access again.'},origin);return;}
         const store=relay.parties?.store;if(!store){json(res,503,{error:'Feature inbox unavailable'},origin);return;}
-        const data=store.featureInbox(body.action||'list',body.id,body.showCleared===true);if(body.action&&body.action!=='list')await store.flush();json(res,200,data,origin);return;
+        const data=store.featureInbox(body.action||'list',body.id,body.showCleared===true,body.text);if(body.action&&body.action!=='list'){await store.flush();const r=store.featureRequests.find(r=>r.id===body.id);if(r)relay.parties.send(relay.parties.users.get(r.player),{type:'feature-updates',updates:store.featureUpdates(r.player)});}json(res,200,data,origin);return;
       }
       if(req.url==='/owner/maps'&&req.method==='POST'){
         const body=await readBody(req,1_100_000);
@@ -110,6 +110,6 @@ export class OwnerService {
           past:this.past.slice(-100).reverse(),historyPersistent:Boolean(this.storePath),at:Date.now()},origin);return;
       }
       json(res,404,{error:'Not found'},origin);
-    }catch(error){json(res,error.status||400,{error:req.url?.startsWith('/owner/map')?error.message:'Invalid request'},origin);}
+    }catch(error){json(res,error.status||400,{error:req.url?.startsWith('/owner/map')||req.url==='/owner/requests'?error.message:'Invalid request'},origin);}
   }
 }

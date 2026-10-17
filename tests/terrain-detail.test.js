@@ -39,7 +39,7 @@ test('chunk-edge normals are globally continuous, finite and smoothly shaded',()
 test('terrain keeps one PBR material, the same draw/triangle budgets and less vertex memory',()=>{
  const d=terrainDetailDiagnostics(world);assert.equal(new Set(terrain.map(m=>m.material)).size,1);assert.equal(terrain[0].material.isMeshStandardMaterial,true);
  assert.equal(d.chunks,64);assert.equal(d.triangles,131072);assert.equal(d.vertices,69696);assert.ok(d.geometryBytes<4000000);assert.ok(d.geometryBytes<d.triangles*3*9*4*.28);
- assert.equal(d.controlBytes,1024*1024*4);assert.equal(d.atlasBytes,768*512*4);
+ assert.equal(d.controlBytes,2048*2048*2);assert.equal(d.atlasBytes,768*512*4);
  assert.equal(terrain.filter(m=>m.userData.ownedMaterial).length,1);assert.deepEqual(TERRAIN_DETAIL_BUDGET.atlasSize,[768,512]);
 });
 

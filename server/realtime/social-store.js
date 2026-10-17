@@ -15,6 +15,7 @@ function validate(data){
  const ids=new Set(),codes=new Set(),tokens=new Set();
  for(const u of data.identities){if(!u||typeof u.id!=='string'||!/^[a-f0-9-]{36}$/.test(u.id)||!/^[A-HJ-NP-Z2-9]{10}$/.test(u.code)||!/^[a-f0-9]{64}$/.test(u.tokenHash)||typeof u.profile?.name!=='string'||ids.has(u.id)||codes.has(u.code)||tokens.has(u.tokenHash))throw Error('Invalid social identity');ids.add(u.id);codes.add(u.code);tokens.add(u.tokenHash);}
  for(const r of data.requests)if(!r||typeof r.id!=='string'||!ids.has(r.from)||!ids.has(r.to)||r.from===r.to)throw Error('Invalid friend request');
+ for(const r of data.featureRequests||[])if(r.replies!==undefined&&(!Array.isArray(r.replies)||r.replies.length>50||r.replies.some(x=>!x||typeof x.id!=='string'||!['reply','completed'].includes(x.kind)||typeof x.body!=='string'||x.body.length>1000||!Number.isFinite(x.created)||typeof x.read!=='boolean')))throw Error('Invalid feature responses');
  if(data.featureRequests!==undefined&&(!Array.isArray(data.featureRequests)||data.featureRequests.length>1000||data.featureRequests.some(r=>!r||typeof r.id!=='string'||!ids.has(r.player)||typeof r.text!=='string'||r.text.length>1000||!['open','read','completed','dismissed'].includes(r.status)||!Number.isFinite(r.created))))throw Error('Invalid feature inbox');
  for(const key of ['friends','blocks']){const seen=new Set();for(const row of data[key]){if(!Array.isArray(row)||row.length!==2||!ids.has(row[0])||seen.has(row[0])||!Array.isArray(row[1])||row[1].some(id=>!ids.has(id)||id===row[0]))throw Error('Invalid social relationship');seen.add(row[0]);}}
  if(data.nicknames!==undefined&&(!Array.isArray(data.nicknames)||data.nicknames.some(row=>!Array.isArray(row)||row.length!==2||!ids.has(row[0])||!Array.isArray(row[1])||row[1].some(entry=>!Array.isArray(entry)||entry.length!==2||!ids.has(entry[0])||typeof entry[1]!=='string'||!validatePlayerName(entry[1],{nickname:true}).ok))))throw Error('Invalid friend nicknames');
@@ -74,16 +75,28 @@ export class SocialStore{
   this.available();text=typeof text==='string'?text.normalize('NFKC').trim().replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,''):'';
   if(text.length<5||text.length>1000)throw Error('Describe your feature in 5 to 1,000 characters.');
   if(!this.identities.has(player))throw Error('Choose a player name first.');
-  if(this.featureRequests.length>=1000){const old=this.featureRequests.findIndex(r=>['completed','dismissed'].includes(r.status));if(old<0)throw Error('The feature inbox is full. Please try again later.');this.featureRequests.splice(old,1);}
+  if(this.featureRequests.length>=1000){const old=this.featureRequests.findIndex(r=>['completed','dismissed'].includes(r.status)&&(r.replies||[]).every(x=>x.read));if(old<0)throw Error('The feature inbox is full. Please try again later.');this.featureRequests.splice(old,1);}
   const r={id:randomUUID(),player,name:this.identities.get(player).profile.name,text,created:Date.now(),status:'open'};this.featureRequests.push(r);this.save();return {id:r.id,created:r.created};
  }
- featureInbox(action='list',id,showCleared=false){
+ featureUpdates(player){return this.featureRequests.filter(r=>r.player===player).flatMap(r=>(r.replies||[]).filter(reply=>!reply.read).map(reply=>({...reply,requestId:r.id,request:r.text.slice(0,180),status:r.status}))).sort((a,b)=>a.created-b.created).slice(0,50);}
+ acknowledgeFeatures(player,ids){
+  if(!Array.isArray(ids)||ids.length>50||ids.some(id=>typeof id!=='string'))throw Error('Invalid notification selection');
+  const selected=new Set(ids);for(const r of this.featureRequests)if(r.player===player)for(const reply of r.replies||[])if(selected.has(reply.id))reply.read=true;
+  this.save();return this.featureUpdates(player);
+ }
+ featureInbox(action='list',id,showCleared=false,text=''){
   this.available();if(action!=='list'){
-   if(!['read','completed','dismissed','open','clear','restore'].includes(action))throw Error('Invalid inbox action');
+   if(!['read','completed','dismissed','open','clear','restore','reply'].includes(action))throw Error('Invalid inbox action');
    const r=this.featureRequests.find(r=>r.id===id);if(!r)throw Error('Request not found');
+   if(action==='reply'||action==='completed'&&r.status!=='completed'){
+    const message=action==='completed'?'Your feature request has been completed.':typeof text==='string'?text.normalize('NFKC').replace(/[\u0000-\u001f]/g,' ').trim():'';
+    if(!message||message.length>1000)throw Error('Write a response of 1 to 1,000 characters.');
+    r.replies??=[];if(r.replies.length>=50){const read=r.replies.findIndex(x=>x.read);if(read<0)throw Error('This player has 50 unread updates. Wait for them to read these before replying again.');r.replies.splice(read,1);}
+    r.replies.push({id:randomUUID(),kind:action,body:message,created:Date.now(),read:false});
+   }
    if(action==='clear'){r.clearedAt=Date.now();r.status='dismissed';}
    else if(action==='restore'){delete r.clearedAt;r.status='open';}
-   else r.status=action;r.updated=Date.now();this.save();
+   else if(action!=='reply')r.status=action;r.updated=Date.now();this.save();
   }
   return {requests:this.featureRequests.filter(r=>showCleared?!!r.clearedAt:!r.clearedAt).slice().reverse(),open:this.featureRequests.filter(r=>!r.clearedAt&&r.status==='open').length,cleared:this.featureRequests.filter(r=>r.clearedAt).length};
  }

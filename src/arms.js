@@ -27,6 +27,7 @@ export const ARM_POSES = {
 ARM_POSES.peeper = ARM_POSES.needle;
 ARM_POSES.doubleyolk = ARM_POSES.scatter;
 ARM_POSES.comet = ARM_POSES.sprinter;
+export const RELOAD_STYLES=Object.freeze({sprinter:'rifle',zipper:'compact',anchor:'heavy',duet:'bullpup',pip:'pistol',needle:'bolt-rifle',peeper:'marksman',scatter:'break-action',doubleyolk:'tube-fed',thumper:'rocket',comet:'energy-cell'});
 const smooth = t => {t=clamp(t,0,1);return t*t*(3-2*t);};
 function path(points, t) {
   if(t<=points[0][0]) return [...points[0][1]];
@@ -45,19 +46,29 @@ export function reloadProgress(player, time) {
 export function armPose(id, progress=-1, empty=false) {
   const c=ARM_POSES[id]||ARM_POSES.sprinter;
   const t=clamp(progress,0,1),active=progress>=0;
-  let left=[...c.left],right=[...c.right],partOffset=[0,0,0];
+  let left=[...c.left],right=[...c.right],partOffset=[0,0,0],partRotation=0,partVisible=true,tokenVisible=false,breakAngle=0;
+  const style=RELOAD_STYLES[id]||'rifle',shell=style==='break-action'||style==='tube-fed',seated=.74;
   if(active) {
-    left=path([[0,c.left],[.16,c.socket],[.38,c.drop],[.5,c.drop],[.72,c.socket],[1,c.left]],t);
-    if(id==='scatter'||id==='doubleyolk') left=path([[0,c.left],[.15,c.drop],[.32,c.socket],[.45,c.drop],[.62,c.socket],[.78,[-.13,-.15,-.23]],[1,c.left]],t);
-    if(id==='thumper') left=path([[0,c.left],[.25,c.drop],[.45,[-.25,-.25,-.57]],[.75,c.socket],[1,c.left]],t);
-    // Tactical reload retains the chambered round. An empty reload visibly
-    // operates the action after seating ammunition, on the same host clock.
-    if(empty&&id!=='thumper')right=path([[0,c.right],[.7,c.right],[.80,[.23,-.04,.06]],[.89,[.24,-.04,.23]],[1,c.right]],t);
-    if(id!=='scatter'&&id!=='doubleyolk') partOffset=left.map((v,i)=>(v-c.socket[i])*(t>=.16&&t<=.72?1:0));
+    const pouch=[c.drop[0],style==='pistol'?-.56:style==='heavy'?-.65:-.61,style==='bullpup'?.23:.03],extract=[c.socket[0],c.socket[1]-.17,c.socket[2]],grasp=style==='compact'?.12:.16;
+    left=path([[0,c.left],[grasp,c.socket],[.28,extract],[.4,pouch],[.48,pouch],[.62,extract],[seated,c.socket],[.82,c.socket],[1,c.left]],t);
+    if(!shell&&style!=='rocket'){
+     partOffset=left.map((v,i)=>(v-c.socket[i])*(t>=grasp&&t<=seated?1:0));
+     partVisible=t<.40||t>=.48;partRotation=Math.sin(Math.PI*clamp((t-grasp)/(seated-grasp),0,1))*(style==='bullpup'?-.18:style==='pistol'?.08:.13);
+     if(empty){const action=style==='pistol'?[-.10,.065,.09]:style==='bullpup'?[-.19,.05,.27]:[-.15,.06,.04];
+      if(style==='bolt-rifle')right=path([[0,c.right],[.78,c.right],[.84,[.23,-.025,.02]],[.92,[.24,-.025,.19]],[1,c.right]],t);
+      else if(t>.78)left=path([[.78,c.socket],[.85,action],[.92,[action[0],action[1],action[2]+.10]],[1,c.left]],t);
+     }
+    }
+    if(shell){const socket=style==='break-action'?[-.10,.035,-.22]:c.socket;
+     left=path([[0,c.left],[.16,pouch],[.32,socket],[.40,socket],[.49,pouch],[.64,socket],[.71,socket],[.83,c.left],[1,c.left]],t);
+     tokenVisible=t>.18&&t<.34||t>.51&&t<.66;
+     if(style==='break-action')breakAngle=-.43*smooth(t/.14)*(1-smooth((t-.73)/.14));
+    }
+    if(style==='rocket'){left=path([[0,c.left],[.22,pouch],[.43,[-.25,-.25,-.62]],[.72,c.socket],[.84,c.socket],[1,c.left]],t);tokenVisible=t>.24&&t<.76;}
   }
   // Smoothly ease the model into and out of the reload pose.
   const lean=active?Math.sin(Math.PI*t):0;
-  return {left,right,partOffset,rotation:c.tilt.map(v=>v*lean),dip:lean*.08,progress};
+  return {left,right,partOffset,partRotation,partVisible,tokenVisible,breakAngle,style,rotation:c.tilt.map(v=>v*lean),dip:lean*.055,progress};
 }
 // Sculpted, shared hand shapes; each arm is a single deforming surface.
 // No separate elbow balls or cylinder seams are visible when the arm bends.
@@ -168,7 +179,7 @@ export function updateArms(rig,progress,blaster=null,recoil=0,draw=1,menu=null,e
   const pose=armPose(rig.userData.id,progress,empty);
   rig.userData.progress=progress;
   for(const limb of rig.userData.limbs) {
-    const target=new THREE.Vector3(...(limb.side<0?pose.left:pose.right));
+    const target=(limb.target??=new THREE.Vector3()).fromArray(limb.side<0?pose.left:pose.right);
     target.z+=recoil*.015;
     if(limb.side<0 && draw<1){
       const reach=1-smooth(clamp(draw/.8,0,1));
@@ -181,15 +192,17 @@ export function updateArms(rig,progress,blaster=null,recoil=0,draw=1,menu=null,e
   const part=blaster?.userData.reloadPart;
   if(part) {
     part.userData.restPosition ||= part.position.clone();
-    const target=part.userData.restPosition.clone();
-    if(progress>=.16&&progress<=.72)target.add(new THREE.Vector3(...pose.partOffset));
+    const target=(part.userData.target??=new THREE.Vector3()).copy(part.userData.restPosition);
+    target.x+=pose.partOffset[0];target.y+=pose.partOffset[1];target.z+=pose.partOffset[2];
     if(menu)part.position.lerp(target,menu.blend);else part.position.copy(target);
+    part.visible=pose.partVisible;part.userData.restQuaternion??=part.quaternion.clone();part.quaternion.copy(part.userData.restQuaternion);part.rotateZ(pose.partRotation);
   }
   const token=blaster?.userData.reloadToken;
   if(token) {
-    token.visible=progress>.16&&progress<.7;
+    token.visible=pose.tokenVisible;
     token.position.set(...pose.left);token.position.x+=.1;
   }
+  if(blaster?.userData.breakAction)blaster.userData.breakAction.rotation.x=pose.breakAngle;
   for(const [name,distance] of [['bolt',.13],['pump',.14]]){const moving=blaster?.userData[name];if(!moving)continue;moving.userData.restPosition??=moving.position.clone();moving.position.copy(moving.userData.restPosition);moving.position.z+=progress>=0?(empty?Math.sin(Math.PI*clamp((progress-.74)/.2,0,1))*distance:0):Math.min(1,recoil)*distance*.3;}
   return pose;
 }

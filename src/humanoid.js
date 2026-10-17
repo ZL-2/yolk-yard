@@ -1,4 +1,5 @@
 import {emotePose} from './emotes.js';
+import {groundAt} from './terrain.js';
 import * as T from 'three';
 import {mergeGeometries,mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -173,7 +174,7 @@ function solveChain(h,upper,lower,end,target,pole,blend=1){
  function aim(bone,rest,dest){const parentQ=bone.parent.getWorldQuaternion(new T.Quaternion()),modelQ=h.mesh.getWorldQuaternion(new T.Quaternion());const local=dest.applyQuaternion(modelQ).applyQuaternion(parentQ.invert()).normalize();const q=new T.Quaternion().setFromUnitVectors(rest.clone().normalize(),local);bone.quaternion.slerp(q,blend);bone.updateWorldMatrix(true,false);}
  aim(a,b.userData.rest,elbow.clone().sub(start));aim(b,c.userData.rest,start.clone().addScaledVector(dir,len).sub(elbow));
 }
-export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0}={}){
+export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0,map=null}={}){
  const h=model.userData.human;if(!h)return;h.clock+=dt;
  // 60 Hz nearby, 20 Hz at distance, 10 Hz far away. Animation clocks continue.
  const interval=distance>90?.1:distance>40?.05:0;if(h.clock<h.nextUpdate){h.skipped=(h.skipped||0)+dt;return;}dt=Math.min(.12,dt+(h.skipped||0));h.skipped=0;h.nextUpdate=h.clock+interval;
@@ -181,6 +182,12 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  // quaternion accumulated a permanent sideways twist (especially at low FPS).
  const b=h.bones;for(const bone of Object.values(b)){bone.position.copy(bone.userData.rest);bone.quaternion.identity();}
  const vx=p.vx||0,vz=p.vz||0,speed=Math.min(16,Math.hypot(vx,vz)),grounded=p.grounded!==false;
+ const terrainContact=!menu&&grounded&&!p.vehicleId&&map?.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.16;
+ const placeFoot=foot=>{if(!terrainContact)return;const cs=Math.cos(model.rotation.y),sn=Math.sin(model.rotation.y),x=model.position.x+cs*foot.x+sn*foot.z,z=model.position.z-sn*foot.x+cs*foot.z;
+  // Sample the sole, not just the capsule center: uphill toes otherwise cut
+  // through elevated ground even when the physical player is above the mesh.
+  const floor=Math.max(groundAt(map,x,z),groundAt(map,x-sn*.15,z-cs*.15),groundAt(map,x+sn*.1,z+cs*.1));foot.y+=T.MathUtils.clamp(floor-model.position.y+.015,-.3,.45);
+ };
  h.speed+=(speed-h.speed)*(1-Math.exp(-dt*10));const gait=strideProfile(h.speed,p),cycleDistance=p.lobbyPatrol?.cycleDistance||gait.distance;h.phase+=speed*dt/cycleDistance*Math.PI*2;
  if(grounded&&!h.grounded)h.land=T.MathUtils.clamp(-(h.lastVy||0)/10,.15,1.5);h.lastVy=p.vy||0;h.grounded=grounded;h.land*=Math.exp(-dt*9);
  const airborne=['dive','glide','launch'].includes(p.flight),dead=p.health!==undefined&&p.health<=0;
@@ -255,7 +262,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  // Raise the pelvis on passing steps and lower only enough to reach the
  // planted ankle. The old permanent squat kept both knees deeply bent.
  if(walking&&!p.crouching){let height=b.hips.position.y;for(const leg of legs){const reach=Math.hypot(leg.foot.x-leg.sideSign*.115,leg.foot.z);height=Math.min(height,leg.foot.y+.03+Math.sqrt(Math.max(.40,.802**2-reach**2)));}b.hips.position.y=Math.max(.75,height);}
- for(const {S,sideSign,bootRoll,foot} of legs){const yaw=b.hips.rotation.y,pole=V(sideSign*.115-Math.sin(yaw)*.7,.5,-Math.cos(yaw)*.7);
+ for(const {S,sideSign,bootRoll,foot} of legs){placeFoot(foot);const yaw=b.hips.rotation.y,pole=V(sideSign*.115-Math.sin(yaw)*.7,.5,-Math.cos(yaw)*.7);
   solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,pole);const footBone=b['foot'+S];footBone.quaternion.copy(footBone.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(h.mesh.getWorldQuaternion(new T.Quaternion())));footBone.rotateY(patrol?Math.PI-(p.yaw||Math.PI):yaw*.8);footBone.rotateX(bootRoll);
  }
  if(emote){const pose=emotePose(emote.id,emote.t,1);b.hips.position.x+=pose.sway;b.hips.position.y+=pose.bob;b.chest.rotation.z=pose.sway*.5;}
@@ -288,6 +295,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
    if(last&&!(contact&&old)){const delta=worldFoot.clone().sub(last),limit=(6+speed)*dt;if(delta.length()>limit){worldFoot.copy(last).add(delta.setLength(limit));const dx=worldFoot.x-model.position.x,dz=worldFoot.z-model.position.z;foot.set(cs*dx-sn*dz,worldFoot.y,sn*dx+cs*dz);contact=false;}}
    h['lastMotionFoot'+S]=worldFoot;
    h['plant'+S]=contact?{x:model.position.x+cs*foot.x+sn*foot.z,z:model.position.z-sn*foot.x+cs*foot.z}:null;
+   placeFoot(foot);
    const pole=b['shin'+S].getWorldPosition(V()).applyMatrix4(inverse),footQ=b['foot'+S].getWorldQuaternion(new T.Quaternion());
    solveChain(h,'thigh'+S,'shin'+S,'foot'+S,foot,pole);
    b['foot'+S].quaternion.copy(b['foot'+S].parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(footQ));

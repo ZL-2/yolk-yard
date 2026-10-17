@@ -76,6 +76,7 @@ export function chooseObjective(sim,p,brain,skill,target){
  const underFire=sim.time-(brain.attackedAt??-100)<2.5,threat=!!target&&(target.visible||underFire)&&(!royale||dist(p,target)<=ROYALE_BOT_RANGE.engage);
  const unarmed=royale&&!p.inventory.some(i=>i?.weapon&&(i.ammo>0||p.bank[ammoType(i.id)]>0));
  if(storm?.urgent)return storm;
+ if(royale&&p.health<40&&!underFire){const slot=recoverySlot(p);if(slot>=1)return {kind:'heal',goal:{x:p.x,y:p.y,z:p.z},slot};const recovery=lootObjective(sim,p,brain,()=>true,false,true);if(recovery)return recovery;}
  // A landed bot needs a gun before taking fights or following a distant squad.
  // Visibility of an opponent must never block a reachable first gun pickup.
  if(unarmed){

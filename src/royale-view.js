@@ -39,17 +39,18 @@ function repeatedProp(group,p,kit){
 
 export function bake(group,chunked=false,colored=chunked){for(const _ of bakeSteps(group,chunked,colored)){} }
 function* bakeSteps(group,chunked=false,colored=chunked){
- group.updateMatrixWorld(true);const batches=new Map();
+ group.updateMatrixWorld(true);const batches=new Map(),duplicates=new Set();
  for(const o of [...group.children])if(o.isMesh&&!o.userData.ownedMaterial&&!o.userData.keepDynamic){
   const architecture=o.material.userData.architectureSurface,surface=o.material.userData.environmentSurface,foliage=!!o.material.userData.environmentFoliage;
-  const key=(colored?(architecture?'architecture':surface?'environment:'+foliage:'color'):o.material.uuid)+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');if(!batches.has(key))batches.set(key,{mat:colored?(architecture?architectureAtlasMaterial():surface?environmentAtlasMaterial(foliage):bakedMaterial):o.material,parts:[],ranges:[],vertices:0});
+  const duplicate=[o.geometry.uuid,o.material.uuid,o.userData.objectId||'',...o.matrix.elements].join(':');if(duplicates.has(duplicate)){group.remove(o);continue;}duplicates.add(duplicate);
+  const detail=!!o.userData.architectureDetail,key=(colored?(architecture?'architecture':surface?'environment:'+foliage:'color'):o.material.uuid)+(detail?':surface-detail':'')+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');if(!batches.has(key)){let mat=colored?(architecture?architectureAtlasMaterial():surface?environmentAtlasMaterial(foliage):bakedMaterial):o.material;if(detail){const source=mat;mat=source.clone();mat.onBeforeCompile=source.onBeforeCompile;mat.customProgramCacheKey=source.customProgramCacheKey;mat.polygonOffset=true;mat.polygonOffsetFactor=-1;mat.polygonOffsetUnits=-2;mat.userData={...mat.userData,shared:false};}batches.set(key,{mat,parts:[],ranges:[],vertices:0,detail});}
   const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();unpackEnvironmentGeometry(g);g.applyMatrix4(o.matrix);
   if(colored){if(architecture)architectureUV(g,architecture);else if(surface)environmentUV(g,surface);else g.deleteAttribute('uv');if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3),c=o.material.color;for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}else if(surface||architecture){const a=g.attributes.color,c=o.material.color;for(let i=0;i<a.count;i++)a.setXYZ(i,a.getX(i)*c.r,a.getY(i)*c.g,a.getZ(i)*c.b);}}
   const batch=batches.get(key);if(o.userData.objectId)batch.ranges.push({id:o.userData.objectId,start:batch.vertices,count:g.attributes.position.count});batch.vertices+=g.attributes.position.count;batch.parts.push(g);group.remove(o);
   if(o.geometry.type==='CylinderGeometry'&&!o.geometry.userData.shared)o.geometry.dispose();
   yield;
  }
- for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.userData.environmentAtlas=!!b.mat.userData.environmentAtlas;geometry.userData.architectureAtlas=!!b.mat.userData.architectureAtlas;packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;mesh.updateMatrix();mesh.matrixAutoUpdate=false;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);yield;}
+ for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.userData.environmentAtlas=!!b.mat.userData.environmentAtlas;geometry.userData.architectureAtlas=!!b.mat.userData.architectureAtlas;packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;mesh.updateMatrix();mesh.matrixAutoUpdate=false;if(b.detail)mesh.userData.ownedMaterial=true;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);yield;}
 }
 export function islandLabel(text,size=1){
  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=96;

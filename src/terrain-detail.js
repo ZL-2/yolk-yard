@@ -7,16 +7,17 @@ import {modelEnvironment} from './model-surfaces.js';
 // 32x32-cell chunk replaces six duplicated vertices per cell. Every chunk uses
 // the same globally computed normals, material and road control map.
 export const TERRAIN_DETAIL_REVISION=159;
-export const TERRAIN_DETAIL_BUDGET=Object.freeze({chunkCells:32,controlSize:1024,atlasSize:[768,512],coastSize:256,oceanTriangles:2});
+export const TERRAIN_DETAIL_BUDGET=Object.freeze({chunkCells:32,controlSize:2048,atlasSize:[768,512],coastSize:256,oceanTriangles:2});
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a));return t*t*(3-2*t);};
 const hash=(x,y)=>{let n=Math.imul(x+71,374761393)^Math.imul(y+37,668265263);n=Math.imul(n^(n>>>13),1274126177);return (n>>>0)/4294967295;};
 const noise=(x,y)=>{const ix=Math.floor(x),iy=Math.floor(y),u=smooth(0,1,x-ix),v=smooth(0,1,y-iy);return T.MathUtils.lerp(T.MathUtils.lerp(hash(ix,iy),hash(ix+1,iy),u),T.MathUtils.lerp(hash(ix,iy+1),hash(ix+1,iy+1),u),v);};
 const roadIndices=new WeakMap();
+const roadControlCache=new WeakMap(),normalCache=new WeakMap();
 let detailAtlas;
 
-function dataTexture(data,w,h,{repeat=false,srgb=false,mipmaps=true}={}){
- const texture=new T.DataTexture(data,w,h,T.RGBAFormat,T.UnsignedByteType);
+function dataTexture(data,w,h,{repeat=false,srgb=false,mipmaps=true,type=T.UnsignedByteType}={}){
+ const texture=new T.DataTexture(data,w,h,T.RGBAFormat,type);
  texture.wrapS=texture.wrapT=repeat?T.RepeatWrapping:T.ClampToEdgeWrapping;
  texture.magFilter=T.LinearFilter;texture.minFilter=mipmaps?T.LinearMipmapLinearFilter:T.LinearFilter;
  texture.generateMipmaps=mipmaps;texture.colorSpace=srgb?T.SRGBColorSpace:T.NoColorSpace;
@@ -69,37 +70,45 @@ function roadIndex(map){
  const cached=roadIndices.get(map);if(cached)return cached;
  const cell=24,cells=new Map(),buildings=new Map();
  const insert=(target,item,minX,maxX,minZ,maxZ)=>{for(let z=Math.floor(minZ/cell);z<=Math.floor(maxZ/cell);z++)for(let x=Math.floor(minX/cell);x<=Math.floor(maxX/cell);x++){const key=x+':'+z;if(!target.has(key))target.set(key,[]);target.get(key).push(item);}};
- for(const road of map.roads||[])for(let i=1;i<road.points.length;i++){
-  const [ax,az]=road.points[i-1],[bx,bz]=road.points[i],dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz);if(length<.001)continue;
-  const segment={ax,az,dx,dz,length,inverseLength:1/length,width:road.width||5,kind:road.kind||'road'},r=segment.width*.5+1;
+ for(const road of map.roads||[]){let offset=0;const points=road.kind==='runway'||road.kind==='taxiway'?road.points:roundedRoadPoints(road.points,Math.min(3,(road.width||5)*.45));for(let i=1;i<points.length;i++){
+  const [ax,az]=points[i-1],[bx,bz]=points[i],dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz);if(length<.001)continue;
+  const segment={road,offset,ax,az,dx,dz,length,inverseLength:1/length,width:road.width||5,kind:road.kind||'road'},r=segment.width*.5+1;offset+=length;
   insert(cells,segment,Math.min(ax,bx)-r,Math.max(ax,bx)+r,Math.min(az,bz)-r,Math.max(az,bz)+r);
- }
+ }}
  for(const b of map.buildings||[])insert(buildings,b,b.x-b.w*.5-.4,b.x+b.w*.5+.4,b.z-b.d*.5-.4,b.z+b.d*.5+.4);
  const result={cell,cells,buildings};roadIndices.set(map,result);return result;
+}
+export function roundedRoadPoints(points,radius=2.5){
+ if(points.length<3)return points;const out=[points[0]];
+ for(let i=1;i<points.length-1;i++){const a=points[i-1],b=points[i],c=points[i+1],ab=Math.hypot(b[0]-a[0],b[1]-a[1]),bc=Math.hypot(c[0]-b[0],c[1]-b[1]);if(ab<.01||bc<.01)continue;
+  const r=Math.min(radius,ab*.25,bc*.25),start=[b[0]+(a[0]-b[0])*r/ab,b[1]+(a[1]-b[1])*r/ab],end=[b[0]+(c[0]-b[0])*r/bc,b[1]+(c[1]-b[1])*r/bc];
+  for(let n=0;n<=6;n++){const t=n/6,u=1-t;out.push([u*u*start[0]+2*u*t*b[0]+t*t*end[0],u*u*start[1]+2*u*t*b[1]+t*t*end[1]]);}
+ }out.push(points.at(-1));return out;
 }
 
 function sampleRoad(index,x,z){
  const key=Math.floor(x/index.cell)+':'+Math.floor(z/index.cell);
  for(const b of index.buildings.get(key)||[])if(Math.abs(x-b.x)<b.w*.5+.4&&Math.abs(z-b.z)<b.d*.5+.4)return {road:0,path:0,white:0,yellow:0};
- let road=0,path=0,white=0,yellow=0;
+ let road=0,path=0,white=0,yellow=0,best=Infinity,chosen=null,intersection=false;
  for(const r of index.cells.get(key)||[]){
   const along=clamp(((x-r.ax)*r.dx+(z-r.az)*r.dz)*r.inverseLength,0,r.length),t=along*r.inverseLength;
   const distance=Math.hypot(x-r.ax-t*r.dx,z-r.az-t*r.dz),half=r.width*.5,coverage=1-smooth(half-.2,half+.45,distance);if(!coverage)continue;
   if(r.kind==='path'){path=Math.max(path,coverage);continue;}
   road=Math.max(road,coverage);
-  // Paint is restricted to straight portions, leaving junctions and rounded
-  // endpoints unobstructed; no floating road/marking meshes or z fighting.
-  if(along<2.5||along>r.length-2.5)continue;
+  if(chosen&&chosen.road!==r.road&&distance<half-.7&&Math.abs(chosen.dx*r.dx+chosen.dz*r.dz)*chosen.inverseLength*r.inverseLength<.85)intersection=true;
+  if(distance/half>=best)continue;best=distance/half;chosen=r;white=yellow=0;
+  // A continuous distance clock carries dashes around bends. Select the
+  // nearest carriageway rather than drawing every overlapping segment edge.
   const edge=(1-smooth(.13,.32,Math.abs(distance-(half-.45))))*coverage;
   const center=1-smooth(r.kind==='runway'?.27:.09,r.kind==='runway'?.52:.25,distance);
   if(r.kind==='taxiway')yellow=Math.max(yellow,center*.84);
   else if(r.kind==='runway'){
-   const stripe=(along%12)<6?1:0;white=Math.max(white,edge*.9,center*stripe*.94);
+   const stripe=((r.offset+along)%12)<6?1:0;white=Math.max(white,edge*.9,center*stripe*.94);
   }else{
-   const stripe=(along%9)<4.4?1:0;white=Math.max(white,edge*.65);yellow=Math.max(yellow,center*stripe*.72);
+   const stripe=((r.offset+along)%9)<4.4?1:0;white=edge*.85;yellow=center*stripe*.94;
   }
  }
- return {road,path:path*(1-road),white,yellow};
+ return {road,path:path*(1-road),white:intersection?0:white,yellow:intersection?0:yellow};
 }
 
 // Efficient, renderer-independent classification for bounded decorative
@@ -117,16 +126,21 @@ export function createTerrainSurfaceSampler(map){
 }
 
 function* createRoadControl(map){
- const size=TERRAIN_DETAIL_BUDGET.controlSize,worldSize=map.terrain.size*2,data=new Uint8Array(size*size*4),index=roadIndex(map);
+ const size=Math.min(TERRAIN_DETAIL_BUDGET.controlSize,Math.max(512,2**Math.ceil(Math.log2(map.terrain.size*8)))),worldSize=map.terrain.size*2,cached=roadControlCache.get(map.terrain);
+ if(cached?.roads===map.roads&&cached.buildings===map.buildings&&cached.layout===map.layoutKey)return dataTexture(cached.data,size,size,{mipmaps:true,type:T.UnsignedShort4444Type});
+ const data=new Uint16Array(size*size),index=roadIndex(map);
  for(let y=0;y<size;y++){
   const z=(y+.5)/size*worldSize-map.terrain.size;
   for(let x=0;x<size;x++){
-   const wx=(x+.5)/size*worldSize-map.terrain.size,s=sampleRoad(index,wx,z),i=(y*size+x)*4;
-   data[i]=Math.round(s.road*255);data[i+1]=Math.round(s.path*255);data[i+2]=Math.round(s.white*255);data[i+3]=Math.round(s.yellow*255);
+   const wx=(x+.5)/size*worldSize-map.terrain.size,s=sampleRoad(index,wx,z),i=y*size+x;
+   // Coverage needs four channels, not 32-bit color precision. RGBA4 doubles
+   // road resolution using only 8 MiB and half the bandwidth of RGBA8.
+   data[i]=(Math.round(s.road*15)<<12)|(Math.round(s.path*15)<<8)|(Math.round(s.white*15)<<4)|Math.round(s.yellow*15);
   }
   if(y%16===15)yield;
  }
- return dataTexture(data,size,size,{mipmaps:true});
+ roadControlCache.set(map.terrain,{roads:map.roads,buildings:map.buildings,layout:map.layoutKey,data});
+ return dataTexture(data,size,size,{mipmaps:true,type:T.UnsignedShort4444Type});
 }
 
 const TERRAIN_VERTEX_DECL=`varying vec3 vTerrainWorld;varying vec3 vTerrainNormal;`;
@@ -186,21 +200,24 @@ function terrainMaterial(map,control){
 }
 
 function* sharedNormals(terrain){
+ const cached=normalCache.get(terrain.heights);if(cached)return cached;
  const {n,heights:h,cell}=terrain,normals=new Float32Array(n*n*3);
  for(let z=0;z<n-1;z++){
   for(let x=0;x<n-1;x++){
    const a=z*n+x,b=a+n,c=a+1,d=b+1;
-   // Same winding/diagonal as groundAt: [a,b,c] and [c,b,d].
-   const triangles=[[a,b,c],[c,b,d]];
-   for(const tri of triangles){
-    const [i,j,k]=tri,ix=i%n,iz=Math.floor(i/n),jx=j%n,jz=Math.floor(j/n),kx=k%n,kz=Math.floor(k/n),ux=(jx-ix)*cell,uy=h[j]-h[i],uz=(jz-iz)*cell,vx=(kx-ix)*cell,vy=h[k]-h[i],vz=(kz-iz)*cell;
-    const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
-    for(const vertex of tri){normals[vertex*3]+=nx;normals[vertex*3+1]+=ny;normals[vertex*3+2]+=nz;}
-   }
+   // Same triangle-weighted normals without 196k temporary triangle arrays.
+   const nx=-cell*(h[c]-h[a]),nz=-cell*(h[b]-h[a]),mx=-cell*(h[d]-h[b]),mz=-cell*(h[d]-h[c]),ny=cell*cell;
+   normals[a*3]+=nx;normals[a*3+1]+=ny;normals[a*3+2]+=nz;
+   normals[b*3]+=nx;normals[b*3+1]+=ny;normals[b*3+2]+=nz;
+   normals[c*3]+=nx;normals[c*3+1]+=ny;normals[c*3+2]+=nz;
+   normals[c*3]+=mx;normals[c*3+1]+=ny;normals[c*3+2]+=mz;
+   normals[b*3]+=mx;normals[b*3+1]+=ny;normals[b*3+2]+=mz;
+   normals[d*3]+=mx;normals[d*3+1]+=ny;normals[d*3+2]+=mz;
   }
   if(z%16===15)yield;
  }
  for(let i=0;i<n*n;i++){const j=i*3,length=Math.hypot(normals[j],normals[j+1],normals[j+2])||1;normals[j]/=length;normals[j+1]/=length;normals[j+2]/=length;}
+ normalCache.set(terrain.heights,normals);
  return normals;
 }
 

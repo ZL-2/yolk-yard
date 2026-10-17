@@ -6,11 +6,12 @@ import {randomUUID} from 'node:crypto';
 import {safeProfile,VERSION} from '../../src/data.js';
 import {validatePlayerName} from '../../src/player-name.js';
 import {SocialStore,normalizeFriendCode} from './social-store.js';
+import {LobbyChat} from './lobby-chat.js';
 const displayCode=c=>c.slice(0,5)+'-'+c.slice(5);
 export const PARTY_LIMIT=4,RECONNECT_GRACE=30000,HEARTBEAT_TIMEOUT=45000,INVITE_TTL=60000;
 // Durable identity, lobby membership and one-match admission are separate records.
 export class PartyService{
- constructor(relay,{store=new SocialStore()}={}){this.relay=relay;this.store=store;this.users=new Map();this.parties=new Map();this.invites=new Map();this.tickets=new Map();this.timer=setInterval(()=>this.sweep(),5000);this.timer.unref?.();}
+ constructor(relay,{store=new SocialStore()}={}){this.relay=relay;this.store=store;this.users=new Map();this.parties=new Map();this.invites=new Map();this.tickets=new Map();this.lobbyChat=new LobbyChat(this);this.timer=setInterval(()=>this.sweep(),5000);this.timer.unref?.();}
  connected(u){return !!u&&[...u.sessions.keys()].some(ws=>ws.readyState===1);}
  send(u,message){if(!u)return;const raw=JSON.stringify(message);if(message.type==='launch'){if(u.ws?.readyState===1)u.ws.send(raw);return;}for(const ws of u.sessions.keys())if(ws.readyState===1&&ws.bufferedAmount<65536)ws.send(raw);}
  create(u){const p={id:randomUUID(),leader:u.id,members:[u.id],privacy:'invite',selection:{...publicMatchOptions(),access:'public'},state:'idle'};this.parties.set(p.id,p);u.party=p.id;return p;}
@@ -59,7 +60,7 @@ export class PartyService{
    queue=queue.then(async()=>{if(ws.readyState!==1)return;try{
     if(!user){if(m.type!=='hello'||m.version!==VERSION)throw Error('Refresh Ravelfront to connect.');const checked=validatePlayerName(m.profile?.name);if(!checked.ok)throw Error(checked.message);const profile=safeProfile({...m.profile,name:checked.name});const {identity,token}=this.store.identify(m.token,profile);const credited=creditReferral(this.store,identity,m.referral,!m.token);await this.store.flush();if(credited)this.send(this.users.get(credited.id),{type:'referrals',referrals:referralSummary(credited)});if(ws.readyState!==1)return;user=this.users.get(identity.id);if(!user){user={id:identity.id,profile:identity.profile,ready:false,sessions:new Map(),seen:Date.now()};this.users.set(user.id,user);this.create(user);}user.profile=identity.profile;user.sessions.set(ws,{seen:Date.now(),visible:m.visible!==false,activeAt:m.visible!==false?Date.now():0});identity.lastOnline=Date.now();this.store.save();if(!user.ws||m.visible!==false||!user.sessions.get(user.ws)?.visible)user.ws=ws;user.seen=Date.now();delete user.disconnectedAt;clearTimeout(timeout);this.send(user,{type:'hello',id:user.id,token,code:displayCode(identity.code),referrals:referralSummary(identity)});if(this.relay.deployment)this.send(user,{type:'deployment',deployment:this.relay.deployment.snapshot()});this.send(user,{type:'public-match',match:this.relay.authority?.publicSummary()||null});this.send(user,{type:'mode-counts',counts:this.modeCounts()});this.sync(this.parties.get(user.party));return;}
     const session=user.sessions.get(ws);if(!session)return;session.seen=user.seen=Date.now();const result=await this.command(user,m,ws);
-    if(['feature-request','profile','friend-nickname','friend-send','friend-accept','friend-decline','friend-cancel','friend-remove','block','unblock'].includes(m.type))await this.store.flush();
+    if(['feature-request','feature-ack','profile','friend-nickname','friend-send','friend-accept','friend-decline','friend-cancel','friend-remove','block','unblock'].includes(m.type))await this.store.flush();
     if(m.request&&ws.readyState===1)ws.send(JSON.stringify({type:'reply',request:m.request,result:result??true}));
    }catch(e){if(user&&ws.readyState===1)ws.send(JSON.stringify({type:'reply',request:m?.request,error:e.message}));else{if(ws.readyState===1&&e.code==='identity-missing')ws.send(JSON.stringify({type:'identity-unavailable',code:e.code,message:e.message}));ws.close(1008,String(e.message).slice(0,100));}}});
   });
@@ -72,6 +73,10 @@ export class PartyService{
    case 'ping':return {presence:this.presence(u.id)};
    case 'presence':{const session=u.sessions.get(ws);if(session){if(typeof m.visible==='boolean')session.visible=m.visible;if(session.visible){session.activeAt=Date.now();u.ws=ws;}if(['lobby','in-match','spectating'].includes(m.activity)){session.activity=m.activity;session.mode=['royale','ffa','training'].includes(m.mode)?m.mode:null;}}if(!session?.visible&&u.ws===ws){const active=[...u.sessions].filter(([w,s])=>w.readyState===1&&s.visible).sort((a,b)=>(b[1].activeAt||0)-(a[1].activeAt||0))[0];if(active)u.ws=active[0];}this.sync(p);return {presence:this.presence(u.id)};}
    case 'feature-request':this.limit(u,'features',3,15*60000);return this.store.featureRequest(u.id,m.text);
+   case 'feature-updates':this.limit(u,'feature-read',30,60000);return this.store.featureUpdates(u.id);
+   case 'feature-ack':this.limit(u,'feature-read',30,60000);return this.store.acknowledgeFeatures(u.id,m.ids);
+   case 'lobby-chat':return this.lobbyChat.submit(u,m);
+   case 'lobby-history':this.limit(u,'chat-history',30,60000);return this.lobbyChat.history(u,m);
    case 'profile':{const checked=validatePlayerName(m.profile?.name);if(!checked.ok)throw Error(checked.message);const profile=safeProfile({...m.profile,name:checked.name});u.profile=profile;this.store.identities.get(u.id).profile=u.profile;this.store.save();this.relay.progression.leaderboardCache=null;this.sync(p);return;}
    case 'leaderboards':this.limit(u,'leaderboards',30,60000);this.relay.progression.restoreLeaderboardViewer(m.progressToken,u.id);return this.relay.progression.leaderboards(u.id,{offset:m.offset});
    case 'social':this.limit(u,'browse',30,60000);return this.social(u,m);

@@ -5,6 +5,7 @@ import {FieldOperationsUI,fieldOrdersHTML,fieldStatsHTML} from './field-operatio
 import {CombatConfirmation,CONFIRM_LABEL,DamageDirections} from './combat-feedback.js';
 import {preferencesFromSettings,inventoryPreferencesHTML,USE_CANCEL_REASONS} from './inventory-policy.js';
 import {COMFORT_DEFAULTS,ActionToggles,comfortHTML,applyComfort,sensitivityFor} from './comfort-settings.js';
+import {LobbyComms} from './lobby-comms.js';
 import './expansion.css';
 import {bindCrownStore,attachCrown} from './crowns.js';
 import {grappleAim} from './grappler.js';
@@ -240,6 +241,7 @@ async function openOwnerMapEditor(overview){
 }
 let briefingsComplete=false;
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
+const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerConsole=new OwnerConsole({onMapEditor:openOwnerMapEditor,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 startAnonymousVisits(()=>screen==='game'?(state?.royale?'royale':state?.options?.mode==='teams'?'teams':'ffa'):screen==='lobby'?'lobby':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
@@ -1279,9 +1281,11 @@ function initializeParty(){
  if(party){party.updateProfile(profile);return;}
  party=new PartyClient(profile,{
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
-  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
+  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
+  'lobby-chat':m=>lobbyComms.receive(m.message),
+  'feature-updates':m=>lobbyComms.setUpdates(m.updates),
   'social-changed':scheduleSocialRefresh,
   'mode-counts':counts=>{for(const badge of document.querySelectorAll('[data-mode-population]')){const template=document.createElement('template');template.innerHTML=modePopulationMarkup(badge.dataset.modePopulation,counts);badge.replaceWith(template.content.firstElementChild);}},
   'party-notice':m=>toast(m.message),
@@ -1572,6 +1576,7 @@ function pressControl(code) {
 
   if(settings.keybinds.chat.includes(code)&&net?.ready&&screen!=="menu"){chat.open();return;}
   keys.add(code);
+  if(settings.keybinds.jump.includes(code)&&state?.players.find(p=>p.id===localId)?.crouching)actionToggles.active.delete('crouch');
   for(const action of ['sprint','crouch','aim','interact'])if(settings.keybinds[action].includes(code))actionToggles.press(action,settings);
   if(settings.keybinds.marker.includes(code))sendMarker('normal');
   if(settings.keybinds.danger.includes(code))sendMarker('danger');
@@ -1910,7 +1915,7 @@ function loop(now) {
 
   matchConnectionUI.update(net,screen==='game',now);
   pumpNetworkInput(now);
-  if(state?.royale){view.buildMap=getMap(state.options.map);applyBuildState(view.buildMap,state.royale);}
+  if(state){view.buildMap=getMap(state.options.map);if(state.royale)applyBuildState(view.buildMap,state.royale);}
 
   const elapsedFrame=Math.max(0,(now-lastTime)/1000),dt=Math.min(0.1,elapsedFrame);
   const simulate=!(paused&&!net&&screen==='game'&&!['royale-inventory','royale-map'].includes(dialogType));
@@ -2014,6 +2019,7 @@ function loop(now) {
   damageFlash = Math.max(0, damageFlash - renderDt * 1.5);
   $("#damage").style.opacity = damageFlash*(settings.reducedMotion?.25:1);
   referralRewards.update(now);
+  lobbyComms.update();
   updateFrontMessage($("#notice"),now < noticeUntil);
   updateFrontMessage($("#elimination-notice"),screen==='game'&&now<eliminationUntil);
   updateFrontMessage($("#toast"),now < toastUntil);
@@ -2040,6 +2046,11 @@ try {
 // Development-only diagnostics. Vite removes this branch from the published bundle.
 if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
+    startFixture:opts=>{options=matchOptions({...opts,session:'offline'});beginSim();return launchRound();},
+    social:(type,data)=>party.request(type,data),
+    repairView:()=>({map:view.buildMap?.id,camera:view.camera.position.toArray(),boom:view.cameraBoom?.distance,third:view.thirdPersonDistance,pixelRatio:view.renderer.getPixelRatio(),renderScale:view.renderScale,renderMs:view.updateMilliseconds,memory:{...view.renderer.info.memory},calls:view.renderer.info.render.calls}),
+    setPerspective:value=>{settings.perspective=value;},
+    watch:id=>{spectateTarget=id;const p=sim.players.get(localId);p.health=0;p.spectating=true;p.killerId=id;},
     framePacing:()=>({limit:framePacer.limit,frames:framePacer.frames,elapsedMs:framePacer.elapsedMs}),
     perspective:()=>({mode:settings.perspective,active:view.thirdPersonEnabled,blend:view.thirdPersonState,position:view.camera.position.toArray(),body:!!view.models.get(localId)?.visible,pose:view.models.get(localId)?.userData.animationState,opacity:view.models.get(localId)?.userData.cameraFade,firstPersonWeapon:view.gunGroup.visible,coverBlocked:view.coverBlocked,utility:view.models.get(localId)?.userData.utilityKey}),
     editor:()=>mapEditor,

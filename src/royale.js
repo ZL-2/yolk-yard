@@ -464,7 +464,9 @@ export class RoyaleSimulation extends Simulation {
   dt=clamp(dt,0,1/30);this.time+=dt;
   if(this.options.recurring){
    if(this.phase==='results'){this.publicRestartAt??=this.time+PUBLIC_ROYALE.restartSeconds;if(this.time>=this.publicRestartAt){this.startRound();this.publicRestartAt=null;}}
-   else if(!isWarmup(this.stage)&&!this.humanContestants().length&&!this.recoveringHumans()){this.phase='results';this.startRound();this.publicRestartAt=null;}
+   // Eliminated contestants are still watching their death/killer. Only recycle
+   // an abandoned match; a death must never teleport its last viewer to warmup.
+   else if(!isWarmup(this.stage)&&![...this.players.values()].some(p=>!p.bot&&p.connected!==false&&p.contestant&&!p.lateSpectator)&&!this.recoveringHumans()){this.phase='results';this.startRound();this.publicRestartAt=null;}
   }
   if(this.phase!=='playing'){for(const p of this.players.values()){if(p.emote)emoteInput(this,p,this.inputs.get(p.id)||{});if(this.phase==='results'&&this.time-(this.finishedAt??-100)<2&&p.health>0&&!p.spectating&&!p.boss&&!p.henchman){const input=this.inputs.get(p.id)||{},before={x:p.x,z:p.z};movePlayer(p,{...input,fire:false,aim:false,jump:false,sprint:false},this.map,dt*.25);p.vx=(p.x-before.x)/dt;p.vz=(p.z-before.z)/dt;p.moving=Math.hypot(p.vx,p.vz)>.01;}}return;}
   if(isWarmup(this.stage)&&!this.options.training)this.prepareBattleWorld();
@@ -574,7 +576,8 @@ export class RoyaleSimulation extends Simulation {
  }
  botInput(p){
   if(p.boss||p.henchman)return bossInput(this,p);
-  const rescue=rescueBotInput(this,p);if(rescue){suspendBotInput(this,p);return rescue;}
+  const inStorm=this.storm?.active&&Math.hypot(p.x-this.storm.x,p.z-this.storm.z)>this.storm.radius;
+  const rescue=!inStorm&&rescueBotInput(this,p);if(rescue){suspendBotInput(this,p);return rescue;}
   if(p.flight!=='ground'){suspendBotInput(this,p);return this.thinkBot(p);}
   return scheduledBotInput(this,p,()=>this.thinkBot(p),{combat:.16,roam:.25});
  }

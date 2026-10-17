@@ -49,7 +49,7 @@ export function botInput(sim,p){
  if(p.use){brain.wasUsing=true;brain.utility=null;if(visible||now-(brain.attackedAt??-100)<.6)sim.cancelUse?.(p);else return {yaw:p.yaw,pitch:p.pitch,slot:p.use.slot,forward:0,strafe:0,swapSlot:-1};}
  if(!p.use&&brain.wasUsing){brain.wasUsing=false;brain.decision=0;brain.commitUntil=0;}
  // A chest search is a committed hold, including the ticks between tactical scans.
- if(p.chestId&&p.chestProgress>0&&(!visible||dist(p,target)>8)&&now-(brain.attackedAt??-100)>1){
+ if(!evacuation?.urgent&&p.chestId&&p.chestProgress>0&&(!visible||dist(p,target)>8)&&now-(brain.attackedAt??-100)>1){
   const chest=itemById(sim,'chests',p.chestId);
   if(chest&&!chest.opened&&sim.accessible(p,chest,3.3))return {yaw:p.yaw,pitch:p.pitch,slot:p.slot,forward:0,strafe:0,interact:true,swapSlot:-1};
  }
@@ -70,6 +70,7 @@ export function botInput(sim,p){
   else return {yaw:p.yaw,pitch:p.pitch,slot:task.slot,forward:0,strafe:0,fire:!p.useLatch,swapSlot:-1};
  }
  const move=task.kind==='uplink'&&dist(p,goal)<5?{mx:0,mz:0,jump:false}:navigate(sim,p,brain,goal,skill),distance=target?dist(p,target):Infinity;
+ if(move.breach){const a=move.breach,d=Math.hypot(a.x-p.x,a.z-p.z),yaw=Math.atan2(p.x-a.x,p.z-a.z),pitch=Math.atan2(a.y-p.y-eyeHeight(p),d);return {slot:0,yaw,pitch,desiredYaw:yaw,desiredPitch:pitch,breaching:true,fire:true,forward:0,strafe:0,swapSlot:-1};}
  let yaw=Math.atan2(-move.mx,-move.mz),pitch=0,fire=false,popper=false,interact=move.interact&&!p.interactLatch;
  if(!move.mx&&!move.mz)yaw=p.yaw+(target?0:Math.sin(now*.35+(p.botSeed||0))*.03);
  if(task.kind==='loot'&&(unarmed||!visible&&now-(brain.attackedAt??-100)>2)){
@@ -86,7 +87,7 @@ export function botInput(sim,p){
   if(!box||sim.worldDamage?.[task.id]?.destroyed||enough){brain.decision=0;fire=false;}
   else{const aim=task.aim,d=Math.hypot(p.x-aim.x,p.z-aim.z);slot=0;yaw=Math.atan2(p.x-aim.x,p.z-aim.z);pitch=Math.atan2(aim.y-p.y-eyeHeight(p),d);fire=d<3.1;if(fire)move.mx=move.mz=0;}
  }
- if(visible){
+ if(visible&&!evacuation?.urgent){
   if(!p.inventory){const error=botAim(brain,p,skill,distance,now,clamp(now-brain.turnAt,0,.1),false,w.stableScope);brain.errorX=error.x;brain.errorY=error.y;brain.height=1.16;}
   const aim=p.inventory?{yaw:Math.atan2(p.x-target.x,p.z-target.z),pitch:Math.atan2(target.y+bodyHeight(target)*.63-p.y-eyeHeight(p),distance)}:botTargetAim(brain,p,target,w,skill,distance,now,clamp(now-brain.turnAt,0,.1));
   yaw=aim.yaw+(brain.errorX||0);pitch=aim.pitch+(brain.errorY||0);
@@ -113,7 +114,7 @@ export function botInput(sim,p){
  const movement=smoothArenaCombatMovement(brain,move,yaw,now,arenaCombat);
  const moving=Math.hypot(move.mx,move.mz)>.1;
  const topUp=!visible&&now-(brain.attackedAt??-100)>2.5&&p.ammo[slot]<w.magazine*.65;
- return {yaw,pitch,botBurstReady:visible&&botCombatReady(brain,p,skill,now)&&Math.abs(wrapAngle(desiredYaw-yaw))<=.12,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,moveTarget:move.mx||move.mz?move.moveTarget:null,utilityItem:!!brain.utility,combatAim:visible&&!brain.utility&&task.kind!=='melee'}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:(p.ammo[slot]===0||topUp)&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow','uplink'].includes(task.kind)};
+ return {yaw,pitch,botBurstReady:visible&&botCombatReady(brain,p,skill,now)&&Math.abs(wrapAngle(desiredYaw-yaw))<=.12,...(p.inventory?{desiredYaw:rawYaw,desiredPitch,worldMoveX:move.mx,worldMoveZ:move.mz,moveTarget:move.mx||move.mz?move.moveTarget:null,utilityItem:!!brain.utility,combatAim:visible&&!evacuation?.urgent&&!brain.utility&&task.kind!=='melee'}:{}),forward:movement.forward,strafe:movement.strafe,fire,aim:visible&&!evacuation?.urgent&&!popper&&(w.optic==='scope'||w.optic==='prism'||sim.options.difficulty>=2),reload:!evacuation?.urgent&&(p.ammo[slot]===0||topUp)&&p.reserve[slot]>0,jump:move.jump,popper,slot,swapSlot:-1,interact,sprint:!!p.inventory&&!fire&&(!visible||task.kind==='rotate'&&task.urgent)&&moving&&['rotate','rotate-poi','search-room','follow','uplink'].includes(task.kind)};
 }
 import {teammates} from './teams.js';
 import {ammoType,ITEMS} from './royale-data.js';

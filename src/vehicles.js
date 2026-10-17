@@ -13,6 +13,13 @@ export const ATV_SITES=Object.freeze([
 ]);
 function fits(map,v){const d=direction(v.yaw);for(const offset of [-.72,0,.72])if(!canOccupy(map,{x:v.x+d.x*offset,y:v.y+.38,z:v.z+d.z*offset},1.05,.66))return false;return true;}
 function floorAt(map,v){let y=groundAt(map,v.x,v.z);for(const b of candidates(map,v)){const top=boxTop(b,v.x,v.z,.5);if(top<=v.y+.52)y=Math.max(y,top);}return y;}
+export const ATV_WHEELS=Object.freeze([[-.85,-.76],[.85,-.76],[-.85,.76],[.85,.76]]);
+export function vehicleLocal(v,x,y,z){const cr=Math.cos(v.roll||0),sr=Math.sin(v.roll||0),cp=Math.cos(v.pitch||0),sp=Math.sin(v.pitch||0),cy=Math.cos(v.yaw),sy=Math.sin(v.yaw),xx=x*cr-y*sr,yy=(x*sr+y*cr)*cp-z*sp,zz=(x*sr+y*cr)*sp+z*cp;return {x:xx*cy+zz*sy,y:yy,z:-xx*sy+zz*cy};}
+export function vehicleSupportHeight(map,v){
+ let height=floorAt(map,v);
+ for(const [x,z]of ATV_WHEELS){const q=vehicleLocal(v,x,.53,z);height=Math.max(height,floorAt(map,{x:v.x+q.x,y:v.y,z:v.z+q.z})-q.y+.55);}
+ return height;
+}
 export function initializeVehicles(sim){
  sim.vehicles=[];for(const p of sim.players.values()){p.vehicleId=null;p.vehicleSeat=null;p.vehicleLock=0;}
  if(sim.map.id!=='sunnybreak')return;
@@ -22,7 +29,7 @@ export function initializeVehicles(sim){
   sim.vehicles.push({id:'atv-'+index,site:site.id,name:site.name,...spot,vx:0,vz:0,vy:0,speed:0,steering:0,boost:100,boosting:false,health:ATV.health,seats:[null,null],grounded:true,pitch:0,roll:0,revision:0});
  }
 }
-export function seatPose(v,seat=0){const d=direction(v.yaw),offset=seat===0?.32:-.44;return {x:v.x+d.x*offset,y:v.y+.08,z:v.z+d.z*offset};}
+export function seatPose(v,seat=0){const q=vehicleLocal(v,0,.08,seat===0?-.32:.44);return {x:v.x+q.x,y:v.y+q.y,z:v.z+q.z};}
 export function seatPlayer(p,v){Object.assign(p,seatPose(v,p.vehicleSeat));p.vehicleYaw=v.yaw;p.vx=v.vx;p.vz=v.vz;p.vy=v.vy;p.grounded=v.grounded;p.flight='ground';p.sliding=p.sprinting=p.crouching=false;p.fall={apex:p.y,immune:true,source:'vehicle'};p.landing=null;}
 export function exitVehicle(sim,p,{force=false}={}){
  const v=sim.vehicles?.find(v=>v.id===p.vehicleId);if(!v){p.vehicleId=null;p.vehicleSeat=null;return true;}
@@ -69,11 +76,12 @@ export function stepVehicle(v,input,map,dt){
    if(Math.abs(q.x)>map.size-2||Math.abs(q.z)>map.size-2||!fits(map,q)){wall=true;break;}v.x=q.x;v.y=q.y;v.z=q.z;
   }
   v.impactBoost=wall&&v.boosting;v.impactSpeed=wall?Math.abs(v.speed):0;if(wall){v.speed*=.12;v.boosting=false;}
-  const floor=floorAt(map,v);if(v.grounded&&v.y-floor<.52){v.y=floor;v.vy=0;}else{v.vy-=22*step;if(v.boosting)v.vy+=Math.sin(clamp(input.pitch||0,-.55,.9))*22*step;const q={...v,y:v.y+v.vy*step};if(fits(map,q))v.y=q.y;else v.vy=0;}
+  const floor=vehicleSupportHeight(map,v);if(v.grounded&&v.y-floor<.52){v.y=floor;v.vy=0;}else{v.vy-=22*step;if(v.boosting)v.vy+=Math.sin(clamp(input.pitch||0,-.55,.9))*22*step;const q={...v,y:v.y+v.vy*step};if(fits(map,q))v.y=q.y;else v.vy=0;}
   v.grounded=v.y<=floor+.02;if(v.grounded){v.y=floor;v.vy=0;}
   const ahead={...v,x:v.x+d.x*.8,z:v.z+d.z*.8},behind={...v,x:v.x-d.x*.8,z:v.z-d.z*.8},right={...v,x:v.x+Math.cos(v.yaw)*.65,z:v.z-Math.sin(v.yaw)*.65},left={...v,x:v.x-Math.cos(v.yaw)*.65,z:v.z+Math.sin(v.yaw)*.65};
   const pitch=v.grounded?Math.atan2(floorAt(map,ahead)-floorAt(map,behind),1.6):clamp((input.pitch||0)*.4,-.35,.5),roll=v.grounded?Math.atan2(floorAt(map,left)-floorAt(map,right),1.3):steer*.12;
   v.pitch+=(clamp(pitch,-.65,.65)-v.pitch)*Math.min(1,step*12);v.roll+=(clamp(roll,-.45,.45)-v.roll)*Math.min(1,step*12);
+  if(v.grounded)v.y=vehicleSupportHeight(map,v);
   v.vx=d.x*v.speed;v.vz=d.z*v.speed;
  }
 }

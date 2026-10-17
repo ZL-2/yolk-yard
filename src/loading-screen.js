@@ -1,11 +1,11 @@
 // Artwork is presentation only. Never change match admission, physics or timings.
 export const LOADING_ART=Object.freeze({
- startup:Object.freeze({id:'startup',file:'loading/kestrel-airstrip.webp',location:'FORWARD AIRFIELD',eyebrow:'SEASON 1 / OPERATION BREAKWATER',title:'HOLD THE<br>FRONT.',story:'Beyond the coast, the storm is closing in. Stay together. Move with purpose. Make every shot count.',position:'67% center'}),
+ startup:Object.freeze({id:'startup',file:'loading/season-one-172.webp',location:'OPERATION BREAKWATER',eyebrow:'SEASON 1 / OPERATION BREAKWATER',title:'RAVELFRONT<br>SEASON ONE.',story:'Beyond the coast, the storm is closing in. Stay together. Move with purpose. Make every shot count.',position:'67% center'}),
  matches:Object.freeze([
-  Object.freeze({id:'coast',file:'season/breakwater.webp',location:'RAVEL COAST',eyebrow:'SEASON 1 / OPERATION BREAKWATER',title:'ONE<br>FRONTIER.',story:'From Aster Command to the coast, every route is a new opportunity. Choose your landing. Watch the storm.',position:'62% center'}),
-  Object.freeze({id:'docks',file:'loading/breakwater-docks.webp',location:'BREAKWATER DOCKS',eyebrow:'RAVEL COAST / CARGO DISTRICT',title:'BREAKWATER<br>DOCKS.',story:'Cargo gantries, warehouse cover and open waterfront sightlines. Cross the harbor with a plan.',position:'68% center'}),
-  Object.freeze({id:'quarry',file:'loading/ironwake-quarry.webp',location:'IRONWAKE QUARRY',eyebrow:'RAVEL COAST / INDUSTRIAL DISTRICT',title:'IRONWAKE<br>QUARRY.',story:'Terraced stone, steel headframes and elevated routes. Take the high ground without losing your way out.',position:'68% center'}),
-  Object.freeze({id:'woods',file:'loading/sable-woods.webp',location:'SABLE WOODS',eyebrow:'RAVEL COAST / RECON DISTRICT',title:'SABLE<br>WOODS.',story:'Timber lodges, ruined checkpoints and woodland cover. Stay together when visibility closes in.',position:'64% center'}),
+  Object.freeze({id:'coast',file:'loading/season-one-172.webp',location:'RAVEL COAST',eyebrow:'SEASON 1 / OPERATION BREAKWATER',title:'ONE<br>FRONTIER.',story:'From Aster Command to the coast, every route is a new opportunity. Choose your landing. Watch the storm.',position:'62% center'}),
+  Object.freeze({id:'docks',file:'loading/harbor-172.webp',location:'BREAKWATER DOCKS',eyebrow:'RAVEL COAST / CARGO DISTRICT',title:'BREAKWATER<br>DOCKS.',story:'Cargo gantries, warehouse cover and open waterfront sightlines. Cross the harbor with a plan.',position:'68% center'}),
+  Object.freeze({id:'quarry',file:'loading/recon-172.webp',location:'IRONWAKE QUARRY',eyebrow:'RAVEL COAST / INDUSTRIAL DISTRICT',title:'IRONWAKE<br>QUARRY.',story:'Terraced stone, steel headframes and elevated routes. Take the high ground without losing your way out.',position:'68% center'}),
+  Object.freeze({id:'woods',file:'loading/recon-172.webp',location:'SABLE WOODS',eyebrow:'RAVEL COAST / RECON DISTRICT',title:'SABLE<br>WOODS.',story:'Timber lodges, ruined checkpoints and woodland cover. Stay together when visibility closes in.',position:'64% center'}),
  ]),
 });
 // A shuffled bag gives every match illustration a turn; boundaries never repeat.

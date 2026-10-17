@@ -1,5 +1,5 @@
 import {nearbyPlayers} from './bot-work.js';
-import {wallDistance,dist,candidates,canStand} from './physics.js';
+import {wallDistance,worldHit,dist,candidates,canStand} from './physics.js';
 import {groundAt} from './terrain.js';
 const clear=(sim,p,q)=>{const dx=q.x-p.x,dz=q.z-p.z,d=Math.hypot(dx,dz)||1;return Math.abs(q.y-p.y)<.45&&wallDistance(sim.map,{x:p.x,y:p.y+.7,z:p.z},{x:dx/d,y:0,z:dz/d},d)>=d-.1;};
 const sight=new WeakMap();
@@ -37,6 +37,11 @@ function pathBudget(sim,p){
 }
 export function navigate(sim,p,brain,goal,skill){
  if(!goal)return {mx:0,mz:0,jump:false};
+ const breach=brain.breach;
+ if(breach){const box=breach.box,alive=sim.map.boxes.includes(box)&&!sim.worldDamage?.[box.objectId]?.destroyed;
+  if(alive&&sim.time<breach.until&&Math.hypot(p.x-breach.point.x,p.z-breach.point.z)<3.1)return {mx:0,mz:0,jump:false,breach:breach.point};
+  brain.breach=null;brain.pathAt=0;
+ }
  const now=sim.time,arrived=dist(p,goal)<1.3;
  if(arrived){if(brain.task?.id)brain.visited[brain.task.id]=now;if(p.inventory||brain.task?.kind!=='fight')brain.decision=Math.min(brain.decision,now+.2);}
  // Brake before the exact peek point so smoothed combat movement cannot overshoot and oscillate.
@@ -68,6 +73,12 @@ export function navigate(sim,p,brain,goal,skill){
   const stuck=Math.hypot(p.x-brain.lastX,p.z-brain.lastZ)<.4&&!arrived;
   if(stuck){brain.failures=(brain.failures||0)+1;brain.commitUntil=0;brain.tactic=null;if(pathBudget(sim,p)){p.botPath=localRoute(sim,p,goal);brain.pathAt=now+2;brain.side*=-1;}if(brain.failures>=2){const id=brain.task?.uid??brain.task?.id;if(id!==undefined){brain.unreachable??={};brain.unreachable[id]=now+12;brain.visited[id]=now;}brain.decision=0;brain.task=null;brain.failures=0;p.botPath=[];}}
   else brain.failures=0;
+  if(stuck&&p.inventory){
+   const length=Math.hypot(goal.x-p.x,goal.z-p.z)||1,dx=(goal.x-p.x)/length,dz=(goal.z-p.z)/length;
+   for(const d of [{x:dx,y:0,z:dz},{x:-dz,y:0,z:dx},{x:dz,y:0,z:-dx}]){const hit=worldHit(sim.map,{x:p.x,y:p.y+1,z:p.z},d,2.8),b=hit?.box;
+    if(b&&(b.objectId||b.buildId)&&!b.doorId&&!b.vaultId&&b.kind!=='boundary'&&!sim.worldDamage?.[b.objectId]?.destroyed){brain.breach={box:b,point:hit.point,until:now+10};break;}
+   }
+  }
   brain.lastX=p.x;brain.lastZ=p.z;brain.checkAt=now+Math.max(.7,skill.decision*.6);
  }
  for(const other of nearbyPlayers(sim,p,1.5)){const d=Math.hypot(p.x-other.x,p.z-other.z);if(d>.01&&d<1.5){avoid=true;mx+=(p.x-other.x)/d*(1.5-d);mz+=(p.z-other.z)/d*(1.5-d);}}

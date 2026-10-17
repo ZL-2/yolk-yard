@@ -261,7 +261,10 @@ export function makeBlaster(id,wrap='') {
       const rib=box(details,side*.079,curved?-.285:0,curved?z+dz-.035:dz,.014,curved?.25:h*.79,.015,c,.003,false,'metal');if(curved)rib.rotation.x=-.17;
     }
     box(details,0,curved?-.44:-h/2,curved?z-.08:0,.174,.027,.215,black,.008,false,'rubber');
-    bakeAssembly(details,`${id}-magazine`);g.userData.reloadPart=m;return m;
+    const top=curved?-.1:h/2,front=curved?z:0;
+    for(const side of [-1,1])box(details,side*.06,top+.008,front,.022,.035,.16,steel,.004,false,'metal');
+    tube(details,0,top+.012,front,.021,.13,0xb59a59);
+    bakeAssembly(details,`${id}-magazine`);m.geometry.computeBoundingBox();const pivot=new THREE.Group(),center=m.geometry.boundingBox.getCenter(new THREE.Vector3()).multiply(m.scale).add(m.position);pivot.position.copy(center);m.position.sub(center);g.add(pivot);pivot.add(m);g.userData.reloadPart=pivot;return pivot;
   };
   const rail=(z,length)=>{box(g,0,.164,z,.135,.035,length,dark,.008);for(let i=0;i<Math.floor(length/.055);i++)box(g,0,.19,z-length/2+i*.055,.16,.025,.024,steel,.004);};
   const muzzleModel=(z,r=.06)=>{bore(g,0,0,z,r);for(const side of [-1,1])box(g,side*(r-.001),0,z+.047,.004,r*.30,.028,black,.002,false,'metal');};
@@ -282,11 +285,15 @@ export function makeBlaster(id,wrap='') {
   }else if(id==='scatter'){
     // A classic side-by-side break-action silhouette with walnut fore-end.
     plate(g,[[.32,-.1],[-.24,-.12],[-.29,.05],[-.17,.135],[.26,.14]],.31,c);grip(g,.17);stock(g,wood,.31);
+    const frontStart=g.children.length;
     for(const x of [-.085,.085]){tube(g,x,.015,-.47,.075,.84,steel,true);bore(g,x,.015,-.9,.077,.08);}
     plate(g,[[-.22,-.05],[-.68,-.06],[-.7,-.13],[-.57,-.2],[-.3,-.21]],.255,wood);
     for(let j=0;j<7;j++)box(g,0,-.185,-.28-j*.047,.255,.024,.021,0x67442f,.006);
+    const front=g.children.slice(frontStart),hinge=new THREE.Group();hinge.position.set(0,-.1,-.19);g.add(hinge);for(const part of front){part.position.sub(hinge.position);hinge.add(part);}g.userData.breakAction=hinge;
+    const sightStart=g.children.length;
     box(g,0,.14,.16,.035,.035,.17,steel,.012);optic(g,'iron',-.78);
     box(g,0,.091,-.53,.052,.012,.58,steel,.003,true);
+    for(const part of g.children.slice(sightStart))if(part.position.z<-.2){part.position.sub(hinge.position);hinge.add(part);}
     for(const side of [-1,1]){screw(g,side*.163,-.012,-.18,.021);plate(g,[[.2,-.045],[-.17,-.04],[-.18,.06],[.22,.065]],.005,steel,side*.165,'metal');}
     const lock=box(g,.035,.163,.16,.038,.025,.11,dark,.009,true);lock.rotation.y=-.2;
     ring(g,0,.016,-.22,.045,.009,steel);

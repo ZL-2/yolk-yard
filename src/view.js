@@ -149,7 +149,7 @@ export class View {
     this.settings = settings;
     this.renderer = makeRenderer({
       canvas,
-      antialias: false,
+      antialias: settings.quality !== 'low',
       powerPreference: "high-performance",
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -261,8 +261,8 @@ export class View {
     this.renderer.setPixelRatio(
       Math.min(
         devicePixelRatio || 1,
-        this.settings.quality === "low" ? 1 : 1.25,
-        Math.sqrt(1500000 / Math.max(1, innerWidth * innerHeight)),
+        this.settings.quality === "low" ? 1 : this.settings.quality==='high'?2:1.5,
+        Math.sqrt((this.settings.quality==='low'?1500000:this.settings.quality==='high'?3200000:2300000) / Math.max(1, innerWidth * innerHeight)),
       ) * (this.renderScale || 1),
     );
     this.renderer.setSize(innerWidth, innerHeight, false);
@@ -337,7 +337,7 @@ export class View {
     this.scene.background = new THREE.Color(map.sky);
     this.scene.fog = new THREE.Fog(map.theme==='royale'?0xc1e6f0:map.sky, map.theme==='royale'?280:72, map.theme==='royale'?1050:175);
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;
-    this.camera.near=map.theme==='royale'?.15:.025;
+    this.camera.near=map.theme==='royale'?.15:.12;
     this.camera.updateProjectionMatrix();this.scopeCamera.updateProjectionMatrix();
     if(id==='sunnybreak'&&this.preparedBattle){
       const pending=this.preparedBattle;
@@ -388,7 +388,7 @@ export class View {
   }
   placeCameraBehind(state,p,origin,back,length,dt,mode){
     if(this.cameraBoom&&Math.hypot(p.x-this.cameraBoom.x,p.y-this.cameraBoom.y,p.z-this.cameraBoom.z)>8)this.cameraBoom=null;
-    const distance=cameraDistance(this.buildMap||getMap(state.options.map),origin,back,length);
+    const distance=cameraDistance(this.buildMap?.id===state.options.map?this.buildMap:getMap(state.options.map),origin,back,length);
     this.cameraBoom=smoothCameraDistance(this.cameraBoom,distance,dt,`${state.round}:${state.options.map}:${p.id}:${mode}`);
     Object.assign(this.cameraBoom,{x:p.x,y:p.y,z:p.z});
     this.camera.position.copy(origin).addScaledVector(back,this.cameraBoom.distance);
@@ -768,15 +768,16 @@ export class View {
     this.isRoyale=!!state?.royale;this.localPlayer=local;this.thirdPersonEnabled=false;this.coverBlocked=false;this.renderLocalActor=null;
     if(!playing&&this.eliminations.active.length)this.eliminations.clear();
     // Reduce GPU work when rendering itself delays input and socket processing.
-    this.frameAverage=(this.frameAverage||1/60)*.9+dt*.1;
+    const updateStarted=performance.now();
+    this.frameAverage=(this.frameAverage||1/60)*.9+Math.min(.1,dt)*.1;
     const frameBudget=1/Math.min(60,fpsLimit(this.settings.fpsLimit)||60);
     this.detailPressure=this.frameAverage>frameBudget*1.25;
     this.budgetClock=(this.budgetClock||0)+dt;
     if(this.budgetClock>1){
       this.budgetClock=0;const previous=this.renderScale||1;
-      if(this.frameAverage>frameBudget*60/55){this.renderScale=playing?Math.max(.85,previous-.05):1;this.renderer.shadowMap.enabled=false;}
-      else if(this.frameAverage<frameBudget*60/59)this.renderScale=Math.min(1,previous+.025);
-      this.renderScale=playing?Math.max(.85,this.renderScale||1):1;
+      if(this.frameAverage>frameBudget*1.18){this.slowFrames=(this.slowFrames||0)+1;this.fastFrames=0;if(this.slowFrames>=2){this.renderScale=playing?Math.max(.8,previous-.05):1;this.renderer.shadowMap.enabled=false;}}
+      else if(this.frameAverage<frameBudget*1.04){this.slowFrames=0;this.fastFrames=(this.fastFrames||0)+1;if(this.fastFrames>=3)this.renderScale=Math.min(1,previous+.025);if(this.fastFrames>=8&&previous>=.99)this.renderer.shadowMap.enabled=this.settings.quality!=='low';}
+      this.renderScale=playing?Math.max(.8,this.renderScale||1):1;
       if(this.renderScale!==previous)this.resize();
     }
     this.clock += dt;
@@ -848,7 +849,7 @@ export class View {
       if(this.thirdPersonEnabled){
         const previous=this.thirdPersonState,same=previous?.key===key&&Math.hypot(p.x-previous.x,p.y-previous.y,p.z-previous.z)<8;
         const blend=same?previous.blend+(Number(aiming)-previous.blend)*(1-Math.exp(-THIRD_PERSON.transition*dt)):Number(aiming);
-        p.viewBlend=blend;const map=this.buildMap||getMap(state.options.map),raw=cameraPose(map,p,{unclampedBoom:true});
+        p.viewBlend=blend;const map=this.buildMap?.id===state.options.map?this.buildMap:getMap(state.options.map),raw=cameraPose(map,p,{unclampedBoom:true});
         const fraction=same&&raw.fraction>previous.fraction?previous.fraction+(raw.fraction-previous.fraction)*(1-Math.exp(-8*dt)):raw.fraction;
         p.viewBoom=fraction;const pose=cameraPose(map,p);this.camera.position.copy(pose.origin);cameraBoom=true;
         this.thirdPersonState={key,blend,fraction,x:p.x,y:p.y,z:p.z};this.thirdPersonDistance=pose.length*fraction;
@@ -923,7 +924,7 @@ export class View {
           this.placeCameraBehind(state,p,origin,back,length,dt,'flight');cameraBoom=true;this.camera.rotation.set(Math.min(p.pitch,-.18),p.yaw,0,'YXZ');
         }
       }
-      const near=cameraBoom?cameraNearPlane(this.camera.fov,this.camera.aspect):(getMap(state.options.map).theme==='royale'?.15:.025);
+      const near=cameraBoom?cameraNearPlane(this.camera.fov,this.camera.aspect):(getMap(state.options.map).theme==='royale'?.15:.12);
       if(this.camera.near!==near){this.camera.near=near;this.camera.updateProjectionMatrix();}
       if(!cameraBoom)this.cameraBoom=null;
     }
@@ -1036,7 +1037,7 @@ export class View {
         if(model.userData.nameplate)model.userData.nameplate.position.y=bodyHeight(p)+.3;
         if(p.boss||p.henchman)updateBossAlert(model,p,state.time,bodyHeight(p),distance);
         updateCelebration(model,p,state.time,g=>this.disposeGroup(g));
-        if(poseDue)animateHumanoid(model,{...p,...(state.phase==='results'?{vx:0,vz:0,moving:false}:{}),throwProgress:(this.clock-(model.userData.throwStart??-100))/.78,shotRecoil:model.userData.armRecoil||0},poseDt,state.phase==='results'&&!p.emote?this.clock:state.time,{distance:0});
+        if(poseDue)animateHumanoid(model,{...p,...(state.phase==='results'?{vx:0,vz:0,moving:false}:{}),throwProgress:(this.clock-(model.userData.throwStart??-100))/.78,shotRecoil:model.userData.armRecoil||0},poseDt,state.phase==='results'&&!p.emote?this.clock:state.time,{distance:0,map:this.buildMap});
         if(p.id===local?.id&&this.thirdPersonEnabled)this.fadeLocalActor(model,Math.max(0,Math.min(1,(this.thirdPersonDistance-.35)/.5)));
         else if(model.userData.cameraFade!==undefined)this.fadeLocalActor(model,1);
 
@@ -1214,6 +1215,7 @@ export class View {
     this.renderer.info.autoReset=false;this.renderer.info.reset();
     this.renderer.render(this.scene, this.camera);
     if(playing&&!this.thirdPersonEnabled&&(this.gunGroup.visible||this.outgoing?.group.visible)){this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.viewmodelScene,this.viewmodelCamera);this.renderer.autoClear=true;}
+    this.updateMilliseconds=performance.now()-updateStarted;
   }
 }
 import {teammates,teamStyle} from './teams.js';

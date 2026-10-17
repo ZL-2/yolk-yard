@@ -1,5 +1,15 @@
 # Ravelfront loading artwork
 
+## Update 172 — Season One replacement art
+
+Three original images generated with the built-in image tool, encoded as WebP at quality 86. These replace every boot and match-loading artwork selection. No UI text is baked into the images.
+
+- `public/loading/season-one-172.webp`: panoramic Season One coastal military key art. Four realistic human Ravelfront operators: olive tactical soldier with amber glasses, violet-hooded recon woman, navy-and-amber maritime operator, black-and-gold commander. Detailed gear, natural anatomy, dramatic coast, storm and transport aircraft. Subjects on the right, quieter left side for live loading text; no eggs, logos or writing.
+- `public/loading/harbor-172.webp`: original cinematic harbor combat scene with the same human operator design language, cargo cranes, container cover, coastal infrastructure and warm sunset against blue storm light. Three operators, believable hands and weapon handling, crop-safe composition and calmer left overlay space.
+- `public/loading/recon-172.webp`: original cinematic reconnaissance scene joining pine woodland and a coastal quarry. Three human operators in Season One tactical equipment, layered terrain and atmospheric storm light. Natural proportions and detailed materials; no text, logos, eggs or UI.
+
+These descriptions record the image direction. The following earlier assets remain in the repository but are no longer selected by the loading-screen rotation.
+
 Created with the built-in image-generation tool; existing Season 1 key art was used as a style reference. Optimized WebP copies below are the assets consumed by the game. Original generated PNGs are preserved separately.
 
 ## startup

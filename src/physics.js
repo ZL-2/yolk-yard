@@ -205,8 +205,16 @@ function movePlayerStep(p, input, map, dt, time) {
   if (p.health <= 0) return;
   const movementStand=p.phasedBuilds?.length?(m,q,margin=RADIUS)=>canOccupy(m,q,HEIGHT,margin,p.phasedBuilds):canStand;
   const movementOccupy=p.phasedBuilds?.length?(m,q,height,margin)=>canOccupy(m,q,height,margin,p.phasedBuilds):canOccupy;
-  const freshJump=(input.jumpPress||0)>(p.lastJumpPress||0)||input.jump&&!p.jumpHeld;
+  let freshJump=(input.jumpPress||0)>(p.lastJumpPress||0)||input.jump&&!p.jumpHeld;
   if(p.jumpHeld!==!!input.jump)p.jumpHeld=!!input.jump;
+  if(!input.crouch)p.standFromJump=false;
+  if(!input.jump)p.uncrouchJumpHeld=false;
+  if(freshJump&&p.grounded&&(p.crouching||p.sliding)&&!p.downed){
+    p.standFromJump=true;p.uncrouchJumpHeld=true;p.jumpBuffer=0;p.sliding=false;freshJump=false;
+  }
+  // Consume the entire press, including buffered/substepped and held packets.
+  // Clearance still decides whether the body can actually stand under a roof.
+  if(p.standFromJump||p.uncrouchJumpHeld)input={...input,crouch:!!input.crouch&&!p.standFromJump,jump:!!input.jump&&!p.uncrouchJumpHeld};
   if(freshJump)p.jumpBuffer=.14;else if(p.jumpBuffer>0)p.jumpBuffer=Math.max(0,p.jumpBuffer-dt);
   if(p.mantleCooldown>0)p.mantleCooldown=Math.max(0,p.mantleCooldown-dt);
   if ((input.jumpPress || 0) > (p.lastJumpPress || 0)) {

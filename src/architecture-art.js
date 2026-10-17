@@ -33,7 +33,7 @@ export function detailBuilding(g,b,s,raw={}){
   }
   // Thin tread nosings sit on the existing stair surface, without a new step.
   const run=d-4,sx=x-w/2+1.8;
-  for(let j=0;j<12;j++)box(g,sx,fy+(j+1)*.35-.012,z-run/2+j*run/12+.04,3.18,.024,.065,industrial?0xa9b4b0:0x8d7b61,industrial?'metal':'timber');
+  for(let j=0;j<12;j++)box(g,sx,fy+(j+1)*.35+.012,z-run/2+j*run/12+.04,3.18,.024,.065,industrial?0xa9b4b0:0x8d7b61,industrial?'metal':'timber');
   // Wall-mounted service plates and a recessed vent, clear of the central window.
   const vx=x+w/2+.2,vz=z-d*.27,vy=fy+2.85;
   box(g,vx,vy,vz,.08,.46,1.1,0x465652,'metal');
