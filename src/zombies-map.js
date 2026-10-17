@@ -48,7 +48,7 @@ export const Z_STATIONS=[
  at('log-0','log','Maintenance tape',-38,39,0,{index:0}),
  at('log-1','log','Evacuation tape',38,29,2,{index:1}),
  at('log-2','log','Final transmission',-22,-36,4,{index:2,y:2.4}),
- at('secret','secret','Sealed archive',-39,-23,4),
+ at('secret','secret','Sealed archive',-18,-39,4,{y:2.4}),
  at('trial','trial','Station trial',21,8,2),
 ];
 export const Z_CACHE_SITES=[at('cache-0','cache','Signal Cache',-23,35,0),at('cache-1','cache','Signal Cache',32,18,2),at('cache-2','cache','Signal Cache',-22,-8,4),at('cache-3','cache','Signal Cache',22,-36,5)];
@@ -74,6 +74,9 @@ export function makeZombiesMap(){
  for(const x of [18,40])for(const z of [24,40])boxes.push(box(x,z,.65,.65,5.2,0,'column'));
  // Central machines have generous loops around them; no accidental one-exit camp.
  boxes.push(box(0,-20,5,7,3,0,'reactor'),box(0,24,4,7,2.5,0,'pump'),box(29,26,5,5,1.8,0,'cargo'),box(-31,20,4,3,1.15,0,'cargo'),box(-24,-12,4,3,1.2,0,'console'));
+ // A recessed archive above the gallery; its west opening remains navigable.
+ boxes.push(box(-18.3,-42,6.4,.4,2.8,2.4,'archive'),box(-15.4,-39,.4,6,2.8,2.4,'archive'),box(-18.3,-36,6.4,.4,2.8,2.4,'archive'),box(-21.4,-41.3,.4,1.4,2.8,2.4,'archive'),box(-21.4,-36.5,.4,1,2.8,2.4,'archive'));
+ for(const t of Z_STATIONS){if(t.kind==='wall')continue;const [w,d,h]=t.kind==='forge'?[2.2,1.3,2.2]:t.kind==='perk'?[.82,.68,1.8]:t.kind==='core'?[.45,.45,1.3]:t.kind==='log'?[.6,.35,1.35]:[1.1,.7,1.5];boxes.push({...box(t.x,t.z,w,d,h,t.y,'station'),zStation:t.id});}
  return {id:'blacktide',name:'Blacktide Relay',tag:'ZOMBIES / COASTAL QUARANTINE',theme:'zombies',sky:0x152830,ground:0x405257,accent:0xf2b96a,size:44,revision:1,boxes,lanes:[],props:[],pickups:[],bases:[[-29,30],[-29,34]],spawns:[[-31,31],[-27,31],[-31,35],[-27,35]],navMax:3};
 }
 export const ZOMBIES_MAP=makeZombiesMap();
@@ -83,3 +86,5 @@ export const zombieClientMap=()=>clientMap||applyZombiesState(null);
 export function zCollisionMap(open=[]){const unlocked=new Set(open);return {...ZOMBIES_MAP,boxes:[...ZOMBIES_MAP.boxes,...Z_DOORS.filter(d=>!unlocked.has(d.id)).map(d=>({...box(d.x,d.z,d.w,d.d,5.2),zDoor:d.id}))],geometryRevision:open.length};}
 export function zUnlocked(open=[]){const zones=new Set([0]),ids=new Set(open);let changed=true;while(changed){changed=false;for(const d of Z_DOORS)if(ids.has(d.id)&&(zones.has(d.a)||zones.has(d.b))){const size=zones.size;zones.add(d.a);zones.add(d.b);changed||=zones.size!==size;}}return zones;}
 
+
+export const zInteractionMap=(map,id)=>({...map,boxes:map.boxes.filter(b=>b.zStation!==id)});

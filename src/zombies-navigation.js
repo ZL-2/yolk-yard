@@ -4,7 +4,7 @@ import {zZoneAt} from './zombies-map.js';
 export class ZombieNavigation{
  constructor(map,zones){this.map=map;this.zones=zones;this.n=88;this.cell=1;this.origin=-43.5;const length=this.n*this.n;this.walk=new Uint8Array(length);this.height=new Float32Array(length);this.queue=new Int32Array(length);this.fields=new Map();
   for(let i=0;i<length;i++){const x=i%this.n+this.origin,z=Math.floor(i/this.n)+this.origin;if(!zones.has(zZoneAt(x,z)))continue;let y=0;for(const b of map.boxes)if(b.h+b.y<=2.5&&Math.abs(x-b.x)<b.w/2+.37&&Math.abs(z-b.z)<b.d/2+.37)y=Math.max(y,boxTop(b,x,z,.37));this.height[i]=y;if(canStand(map,{x,y:y+.04,z},.37))this.walk[i]=1;}
-  this.neighbors=Array.from({length},()=>[]);for(let i=0;i<length;i++)if(this.walk[i])for(const k of [i-1,i+1,i-this.n,i+this.n])if(k>=0&&k<length&&this.walk[k]&&Math.abs(k%this.n-i%this.n)<=1&&Math.abs(this.height[k]-this.height[i])<=.65)this.neighbors[i].push(k);
+  this.neighbors=Array.from({length},()=>[]);for(let i=0;i<length;i++)if(this.walk[i])for(const k of [i-1,i+1,i-this.n,i+this.n])if(k>=0&&k<length&&this.walk[k]&&Math.abs(k%this.n-i%this.n)<=1&&Math.abs(this.height[k]-this.height[i])<=2.5)this.neighbors[i].push(k);
  }
  index(x,z){const ix=Math.max(0,Math.min(this.n-1,Math.round(x-this.origin))),iz=Math.max(0,Math.min(this.n-1,Math.round(z-this.origin)));return iz*this.n+ix;}
  nearest(p){const at=this.index(p.x,p.z);if(this.walk[at]&&Math.abs(this.height[at]-(p.y||0))<1.3)return at;let best=-1,score=Infinity;const cx=at%this.n,cz=Math.floor(at/this.n);for(let dz=-5;dz<=5;dz++)for(let dx=-5;dx<=5;dx++){const x=cx+dx,z=cz+dz,i=z*this.n+x;if(x<0||x>=this.n||z<0||z>=this.n||!this.walk[i])continue;const d=dx*dx+dz*dz+4*(this.height[i]-(p.y||0))**2;if(d<score){score=d;best=i;}}return best;}

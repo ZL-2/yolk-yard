@@ -28,7 +28,7 @@ export function buildBlacktide(parent){
   box(zone.x,.03,zone.z+zone.d/2-1,zone.w-2,.018,.16,0xb29b59);
   label(parent,zone.name,zone.x,4.1,zone.z+zone.d/2-.6,7);
  }
- for(const b of ZOMBIES_MAP.boxes){
+ for(const b of ZOMBIES_MAP.boxes){if(b.zStation)continue;
   const c=b.kind==='roof'?0x354950:b.kind==='cargo'?0x79674e:b.kind==='reactor'?0x203d48:b.kind==='pump'?0x3d6267:b.kind==='step'||b.kind==='platform'?0x5e6a68:b.kind==='column'?0x374950:0x657173;
   box(b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,c);
   if(['wall','boundary'].includes(b.kind)){
@@ -52,7 +52,7 @@ export function buildBlacktide(parent){
  // Practical floodlights: emissive fixtures and pooled light, no per-fixture shadows.
  for(const zone of Z_ZONES){for(const dx of [-9,9])box(zone.x+dx,4.6,zone.z,1,.12,.5,0xe1bf83);}
  for(const [x,z]of [[-29,22],[0,25],[28,-25]]){const light=new THREE.PointLight(0xffc78b,22,28,2);light.position.set(x,4.5,z);parent.add(light);}
- const doors=new Map();for(const d of Z_DOORS){const mesh=new THREE.Mesh(new THREE.BoxGeometry(d.w,5.1,d.d),material(0x6b5b48));mesh.position.set(d.x,2.55,d.z);parent.add(mesh);doors.set(d.id,mesh);const sign=label(parent,d.name+' / '+d.cost,d.x,3.1,d.z+(d.d>1?0:.53),4);if(d.w<d.d)sign.rotation.y=Math.PI/2;}
+ const doors=new Map();for(const d of Z_DOORS){const mesh=new THREE.Mesh(new THREE.BoxGeometry(d.w,5.1,d.d),material(0x6b5b48));mesh.position.set(d.x,2.55,d.z);parent.add(mesh);doors.set(d.id,mesh);for(const face of [-1,1]){const along=d.w<d.d,sign=label(parent,d.name+' / '+d.cost,d.x+(along?face*.53:0),3.1,d.z+(along?0:face*.53),4);if(along)sign.rotation.y=Math.PI/2;}}
  const stationGroups=new Map();for(const t of [...Z_STATIONS,...Z_CACHE_SITES]){
   const group=new THREE.Group();group.position.set(t.x,t.y,t.z);parent.add(group);stationGroups.set(t.id,group);
   const add=(x,y,z,w,h,d,c)=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material(c));mesh.position.set(x,y,z);group.add(mesh);return mesh;};
@@ -102,7 +102,7 @@ export class ZombiesView{
  update(state,dt,camera,playing){
   const z=playing&&state?.zombies;this.group.visible=!!z;if(!z){for(const r of this.rigs)r.id=null;return;}const time=state.time,art=this.world.userData.blacktide;
   if(art){for(const [id,mesh]of art.doors)mesh.visible=!z.open.includes(id);for(const [id,g]of art.shutters)g.children.forEach((c,i)=>{if(i<3)c.visible=i<(z.shutters[id]?.health||0);});art.aerial.rotation.z+=dt*(z.power?.3:.04);for(const [id,g]of art.stationGroups){if(id.startsWith('cache-'))g.visible=id===Z_CACHE_SITES[z.cache.site].id;if(id.startsWith('core-'))g.visible=!z.quest.cores.includes(Number(id.slice(-1))-1);if(g.userData.rotor)g.userData.rotor.rotation.y+=dt;if(g.userData.lid)g.userData.lid.position.y=z.cache.claimUntil>time?1.5:1;}
-   const cache=art.stationGroups.get(Z_CACHE_SITES[z.cache.site].id);if(this.cacheWeapon!==z.cache.weapon||this.cacheSite!==z.cache.site){if(this.cacheModel){this.cacheModel.parent?.remove(this.cacheModel);this.cacheModel.traverse(o=>{if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();});}this.cacheWeapon=z.cache.weapon;this.cacheSite=z.cache.site;this.cacheModel=z.cache.weapon?makeBlaster(z.cache.weapon):null;if(this.cacheModel){this.cacheModel.position.y=1.9;cache.add(this.cacheModel);}}if(this.cacheModel){this.cacheModel.visible=time>=z.cache.busyUntil;this.cacheModel.rotation.y+=dt;}
+   const cache=art.stationGroups.get(Z_CACHE_SITES[z.cache.site].id);if(this.cacheWeapon!==z.cache.weapon||this.cacheSite!==z.cache.site){if(this.cacheModel){this.cacheModel.parent?.remove(this.cacheModel);this.cacheModel.traverse(o=>{if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();if(o.userData.ownedMaterial&&o.material&&!o.material.userData.shared){o.material.map?.dispose();o.material.dispose();}});}this.cacheWeapon=z.cache.weapon;this.cacheSite=z.cache.site;this.cacheModel=z.cache.weapon?makeBlaster(z.cache.weapon):null;if(this.cacheModel){this.cacheModel.position.y=1.9;cache.add(this.cacheModel);}}if(this.cacheModel){this.cacheModel.visible=time>=z.cache.busyUntil;this.cacheModel.rotation.y+=dt;}
   }
   const ids=new Set(z.enemies.map(e=>e.id));for(const r of this.rigs)if(!ids.has(r.id))r.id=null;const counts={round:0,box:0,glow:0};
   for(const e of z.enemies){let r=this.rigs.find(r=>r.id===e.id);if(!r){r=this.rigs.find(r=>r.id===null);if(!r)continue;r.id=e.id;r.root.position.set(e.x,e.y,e.z);r.root.rotation.set(0,e.yaw,0);r.cycle=e.phase;r.blend=0;}const type=Z_TYPES[e.type],speed=Math.hypot(e.vx,e.vz),smooth=1-Math.exp(-18*dt),dead=e.health<=0,death=dead?clamp((time-e.deadAt)/.7,0,1):0,emerge=clamp((e.emergeUntil-time)/1.4,0,1);
@@ -116,6 +116,7 @@ export class ZombiesView{
     if(e.type==='disruptor'){r.arms.forEach((a,i)=>{a.arm.rotation.z=(i?1:-1)*(.6+attack*.4);a.elbow.rotation.x=.7;});r.head.rotation.z=Math.sin(time*1.7)*.12;}
     if((e.type==='heavy'||e.type==='boss')&&e.state==='attack'){r.arms.forEach(a=>{a.arm.rotation.x=1+attack*1.8;a.elbow.rotation.x=.4;});r.spine.rotation.x=.2+attack*.2;}
     if(e.type==='elite'&&e.state==='attack'){r.spine.rotation.x=.4;r.arms[0].arm.rotation.x=1.7;}
+    if(e.state==='climb'){r.spine.rotation.x=.3;r.arms.forEach((a,i)=>{a.arm.rotation.x=2.6+Math.sin(time*8+i*Math.PI)*.25;a.elbow.rotation.x=.6;});r.legs.forEach((a,i)=>{a.thigh.rotation.x=.7+Math.sin(time*8+i*Math.PI)*.35;a.knee.rotation.x=-1.1;});}
     if(e.state==='emerge'){r.spine.rotation.x=.45;r.arms.forEach(a=>a.arm.rotation.x=1.4);}
 
    }

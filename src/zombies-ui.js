@@ -1,6 +1,6 @@
 import {gun,weapon,clamp} from './data.js';
 import {Z_PERKS,Z_POWERUPS,Z_UPGRADE_COST,Z_TYPES} from './zombies-config.js';
-import {Z_STATIONS,Z_DOORS,Z_CACHE_SITES,Z_ENTRANCES,Z_LOGS,Z_ZONES,zZoneAt} from './zombies-map.js';
+import {Z_STATIONS,Z_DOORS,Z_CACHE_SITES,Z_ENTRANCES,Z_LOGS,Z_ZONES,zZoneAt,zInteractionMap} from './zombies-map.js';
 import {wallDistance} from './physics.js';
 import {getMap} from './maps.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -14,7 +14,7 @@ export function zombiesObjective(z){
 export function nearbyZombieStation(state,p){
  if(!state?.zombies||!p||p.downed||p.health<=0||p.spectating)return null;const z=state.zombies;
  const candidates=[...Z_DOORS.filter(d=>!z.open.includes(d.id)&&(z.zones.includes(d.a)||z.zones.includes(d.b))),...Z_STATIONS.filter(t=>z.zones.includes(t.zone)),Z_CACHE_SITES[z.cache.site],...Z_ENTRANCES.filter(t=>z.zones.includes(t.zone)&&(z.shutters[t.id]?.health||0)<3)];
- return candidates.filter(t=>{if(dist(t,p)>3.4)return false;if(t.w)return true;const o={x:p.x,y:p.y+1,z:p.z},v={x:t.x-p.x,y:(t.y||0)-p.y,z:t.z-p.z},n=Math.hypot(v.x,v.y,v.z);return n<.01||wallDistance(getMap('blacktide'),o,{x:v.x/n,y:v.y/n,z:v.z/n},n)>=n-.3;}).sort((a,b)=>dist(a,p)-dist(b,p))[0]||null;
+ return candidates.filter(t=>{if(dist(t,p)>3.4)return false;if(t.w)return true;const o={x:p.x,y:p.y+1,z:p.z},v={x:t.x-p.x,y:(t.y||0)-p.y,z:t.z-p.z},n=Math.hypot(v.x,v.y,v.z);return n<.01||wallDistance(zInteractionMap(getMap('blacktide'),t.id),o,{x:v.x/n,y:v.y/n,z:v.z/n},n)>=n-.3;}).sort((a,b)=>dist(a,p)-dist(b,p))[0]||null;
 }
 export function zombiesStationMenu(t,state,p){
  const z=state.zombies,w=gun(p),offer=(choice,label,cost=0,scrap=false,disabled=false)=>`<button class="z-offer" data-z-action="z:${t.id}${choice?':'+choice:''}" ${disabled?'disabled':''}><strong>${esc(label)}</strong><span>${cost?cost.toLocaleString()+' '+(scrap?'SCRAP':'CHARGE'):'INTERACT'} →</span></button>`,text=s=>`<p class="z-description">${esc(s)}</p>`;let body='';
