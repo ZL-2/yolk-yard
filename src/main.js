@@ -2071,7 +2071,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
     resume:()=>resume(false),
     startFixture:opts=>{options=matchOptions({...opts,session:'offline'});beginSim();return launchRound();},
     social:(type,data)=>party.request(type,data),
-    zombiesView:()=>({rigs:view.zombiesView.rigs.filter(r=>r.id!==null).length,drawCalls:view.renderer.info.render.calls,triangles:view.renderer.info.render.triangles,memory:{...view.renderer.info.memory},renderMs:view.updateMilliseconds}),
+    zombiesView:()=>({rigs:view.zombiesView.rigs.filter(r=>r.id!==null).length,drawCalls:view.renderer.info.render.calls,triangles:view.renderer.info.render.triangles,memory:{...view.renderer.info.memory},renderMs:view.updateMilliseconds,camera:{position:view.camera.position.toArray(),rotation:view.camera.rotation.toArray(),fov:view.camera.fov,near:view.camera.near,far:view.camera.far},world:{map:view.mapId,visible:view.world.visible,children:view.world.children.length,matrix:view.world.matrixWorld.elements.slice(),blacktide:!!view.world.userData.blacktide},actor:view.renderLocalActor?{x:view.renderLocalActor.x,y:view.renderLocalActor.y,z:view.renderLocalActor.z,yaw:view.renderLocalActor.yaw,pitch:view.renderLocalActor.pitch}:null}),
     repairView:()=>({map:view.buildMap?.id,camera:view.camera.position.toArray(),boom:view.cameraBoom?.distance,third:view.thirdPersonDistance,pixelRatio:view.renderer.getPixelRatio(),renderScale:view.renderScale,renderMs:view.updateMilliseconds,memory:{...view.renderer.info.memory},calls:view.renderer.info.render.calls}),
     setPerspective:value=>{settings.perspective=value;},
     watch:id=>{spectateTarget=id;const p=sim.players.get(localId);p.health=0;p.spectating=true;p.killerId=id;},
