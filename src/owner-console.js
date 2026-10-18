@@ -1,3 +1,4 @@
+import {ownerFetch} from './owner-request.js';
 import './owner-console.css';
 import {esc,modes,modeName,num,date,duration,bytes,empty,pill,metric,table,pager,modeOptions,options,definition,card,chart,bars,icon,download,csv} from './owner-ui.js';
 const gesture='RAVELFRONT'.split('').map(c=>'Key'+c),DAY=86400000;
@@ -17,7 +18,7 @@ export class OwnerConsole{
  open(force=false){if(!force&&this.token&&this.expires>Date.now()){void this.refresh();return;}this.modal('RAVELFRONT / OWNER ACCESS',`<div class="oc-login-mark">${icon('access')}</div><h3>Your control room.</h3><p class="oc-help">Analytics, live operations, player support, and permanent history in one private workspace.</p><form id="owner-form"><label for="owner-code">Private access code</label><input id="owner-code" type="password" inputmode="numeric" pattern="[0-9]{12,32}" minlength="12" maxlength="32" autocomplete="off" required><button class="oc-primary" type="submit">Unlock control room</button></form><p id="owner-error" role="alert"></p><p class="oc-help">Verified by the server. Your code and session are never saved in browser storage.</p>`,'owner');this.dialog.querySelector('#owner-code')?.focus();}
  async request(path,opts={}){
   const url=ownerApi();if(!url)throw Error('Game server unavailable');let response;
-  try{response=await fetch(url+path,{...opts,headers:{...(opts.body?{'Content-Type':'text/plain;charset=UTF-8'}:{}),...opts.headers},cache:'no-store',signal:opts.signal||AbortSignal.timeout(path==='/backup'||path==='/import'?120000:30000)});}catch{throw Error('Could not reach the game server. Your saved history is still on the server. Try again.');}
+  response=await ownerFetch(url+path,{...opts,headers:{...(opts.body?{'Content-Type':'text/plain'}:{}),...opts.headers}},path==='/backup'||path==='/import'?120000:30000);
   if(!response.ok){let message='Owner service unavailable';try{message=(await response.json()).error||message;}catch{}if(response.status===401&&path!=='/login'){this.token=null;this.expires=0;}throw Object.assign(Error(message),{status:response.status});}
   if(this.token&&path!=='/login')this.expires=Date.now()+30*60000;
   return path==='/backup'?response.blob():response.json();

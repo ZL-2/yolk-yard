@@ -1,6 +1,11 @@
+// Apply redactions to previously published entries as well as current source notes.
+export function redactOwnerAccessHistory(history){
+ const instructions=/(?:Access from the menu by typing [^.]+\.|Seven presses on [^.]+\.|A hidden menu gesture [^.]+\.)\s*/gi;
+ return {...history,releases:history.releases.map(r=>({...r,changes:r.changes.map(c=>c.replace(instructions,'').trim()).filter(Boolean)}))};
+}
 export function migrateReleaseBranding(history){
  const old=/\beggs?\b|yolk|shell|hatch|waddle|cartoon|albumen/i;
- return {...history,releases:history.releases.map(r=>old.test(JSON.stringify(r))?{number:r.number,title:'Archived quality update',changes:['Historical improvements to combat, customization and multiplayer. These systems are superseded by Ravelfront: A New Frontier.']}:r)};
+ return {...history,releases:redactOwnerAccessHistory(history).releases.map(r=>old.test(JSON.stringify(r))?{number:r.number,title:'Archived quality update',changes:['Historical improvements to combat, customization and multiplayer. These systems are superseded by Ravelfront: A New Frontier.']}:r)};
 }
 // Published releases, not CI attempts, are the source of the next number.
 export function nextReleaseHistory(build, notes, previous) {

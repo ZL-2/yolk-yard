@@ -1,0 +1,5 @@
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+const base='https://zl-2.github.io/yolk-yard/',expected=process.env.GITHUB_SHA;assert.ok(expected);
+let version,history;const start=Date.now();while(Date.now()-start<180000){[version,history]=await Promise.all(['version.json','release-history.json'].map(path=>fetch(base+path+'?t='+Date.now(),{cache:'no-store'}).then(r=>{assert.ok(r.ok);return r.json();})));if(version.build===expected&&history.build===expected)break;await new Promise(r=>setTimeout(r,3000));}
+assert.equal(version.build,expected);assert.equal(history.build,expected);assert.doesNotMatch(JSON.stringify(history),/seven presses on|seven times|typing RAVELFRONT|hidden menu gesture/i);assert.ok(history.releases.some(r=>r.number==='178'));await mkdir('test-results/release-live',{recursive:true});await writeFile('test-results/release-live/history.json',JSON.stringify({result:'PASS',build:expected,release:version.release,ownerInstructionsRemoved:true}));console.log('PASS published history: owner menu instructions removed from current and historical entries');
