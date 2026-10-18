@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {performance} from 'node:perf_hooks';
 import {BoxFightSimulation} from '../src/box-fights.js';
 import {BOX_RULES as R,constrainBoxMovement} from '../src/box-fight-rules.js';
 import {buildingTick,editBuilding,validPlacement,damageObject,applyBuildState} from '../src/building.js';
@@ -9,7 +8,7 @@ import {publicMatchOptions,publicPoolKey} from '../src/public-royale.js';
 import {rewardFrame} from '../src/rewards.js';
 import {predictionCopy,predictMovement} from '../src/guest-movement.js';
 
-function setup(options={}){const s=new BoxFightSimulation({fill:false,...options});s.addPlayer('a',{name:'Alpha'});s.addPlayer('b',{name:'Bravo'});s.startRound();return s;}
+function setup(options={},count=2){const s=new BoxFightSimulation({fill:false,...options});s.addPlayer('a',{name:'Alpha'});s.addPlayer('b',{name:'Bravo'});for(let i=2;i<count;i++)s.addPlayer(String.fromCharCode(97+i),{name:'Player '+i});s.startRound();return s;}
 function advance(s,seconds){for(let i=0;i<Math.ceil(seconds*30);i++)s.tick(1/30);}
 function fight(s){s.boxEnd=s.time;s.tick(1/30);assert.equal(s.boxStage,'fight');}
 function kill(s,victim,attacker){s.damage(s.players.get(victim),s.players.get(attacker),10000,'scatter');s.tick(1/30);}
@@ -32,7 +31,7 @@ test('actual builds and owner edits work; ceiling and opposing ownership are enf
  const client=new BoxFightSimulation(s.options).map;applyBuildState(client,s.snapshot().royale);assert.equal(client.boxPrep,true);assert.ok(client.boxes.some(b=>b.buildId===piece.id));
 });
 test('team elimination bypasses DBNO, prevents friendly damage, and applies bounded siphon',()=>{
- const s=setup({teamSize:2,fill:true}),a=s.players.get('a'),mate=[...s.players.values()].find(p=>p.id!==a.id&&p.team===a.team),enemy=s.players.get('b');fight(s);s.damage(a,mate,999,'scatter');assert.equal(a.health+a.shield,200);
+ const s=setup({teamSize:2},4),a=s.players.get('a'),mate=[...s.players.values()].find(p=>p.id!==a.id&&p.team===a.team),enemy=s.players.get('b');fight(s);s.damage(a,mate,999,'scatter');assert.equal(a.health+a.shield,200);
  a.health=60;a.shield=30;a.materials.wood=450;s.damage(enemy,a,999,'scatter');assert.equal(enemy.health,0);assert.equal(enemy.downed,false);assert.equal(enemy.spectating,true);assert.equal(a.health,100);assert.equal(a.shield,40);assert.equal(a.materials.wood,500);assert.equal(a.boxRoundKills,1);s.damage(enemy,a,999,'scatter');assert.equal(a.shield,40);s.playerAction(enemy.id,'respawn');assert.equal(enemy.health,0);
 });
 test('round transition resets construction, gear and inputs; alternates sides and wins the series',()=>{
@@ -45,11 +44,11 @@ test('simultaneous eliminations draw once; storm resolves camping within the rou
  const storm=setup();fight(storm);advance(storm,99);assert.ok(storm.roundHistory.length>=1);assert.ok(storm.events.some(e=>e.type==='box-cue'&&e.cue==='storm'));
  const capped=setup({scoreLimit:3});fight(capped);capped.roundWins={0:1};capped.boxRound=22;capped.endBoxRound(null,'time');assert.equal(capped.phase,'results');assert.equal(capped.seriesWinner,0,'A sole leading team wins the bounded series after repeated draws');
 });
-test('late joining humans keep the current bot alive, spectate and replace it next round',()=>{
- const s=new BoxFightSimulation({teamSize:1,fill:true});s.addPlayer('a',{name:'Alpha'});s.startRound();fight(s);const p=s.admitPlayer('late',{name:'Late Arrival'},{partyId:'late',partySize:1});assert.ok(p);assert.equal(s.players.size,3);assert.equal(p.health,0);assert.equal(p.waitingRound,true);s.tick(1/30);assert.equal(s.boxStage,'fight');assert.equal(s.players.get('box-bot-0').health,100);assert.equal(s.admitPlayer('overflow',{name:'No Room'}),null);s.endBoxRound(0);s.boxEnd=s.time;s.tick(1/30);assert.equal(s.players.size,2);assert.equal(p.health,100);assert.equal(p.spectating,false);assert.equal(p.waitingRound,false);
+test('late humans spectate the active round and join an empty seat at the next boundary',()=>{
+ const s=setup({teamSize:2});fight(s);const p=s.admitPlayer('late',{name:'Late Arrival'},{partyId:'late',partySize:1});assert.ok(p);assert.equal(s.players.size,3);assert.equal(p.health,0);assert.equal(p.waitingRound,true);s.tick(1/30);assert.equal(s.boxStage,'fight');assert.ok([...s.players.values()].every(p=>!p.bot));assert.ok(s.admitPlayer('fourth',{name:'Fourth Player'}));assert.equal(s.admitPlayer('overflow',{name:'No Room'}),null);s.endBoxRound(0);s.boxEnd=s.time;s.tick(1/30);assert.equal(s.players.size,4);assert.equal(p.health,100);assert.equal(p.spectating,false);assert.equal(p.waitingRound,false);
 });
 test('parties fit one team, oversized private parties can split, incomplete parties wait together',()=>{
- const s=new BoxFightSimulation({teamSize:2,fill:true});const a=s.addPlayer('a',{name:'Leader'});s.assignTeam(a,{partyId:'pair',partySize:2});s.startRound();assert.equal(a.health,0);const b=s.admitPlayer('b',{name:'Partner'},{partyId:'pair',partySize:2});assert.equal(a.team,b.team);assert.notEqual(a.teamSlot,b.teamSlot);s.beginBoxRound();assert.equal(a.health,100);assert.equal(b.health,100);
+ const s=new BoxFightSimulation({teamSize:2,fill:true});const a=s.addPlayer('a',{name:'Leader'});s.assignTeam(a,{partyId:'pair',partySize:2});s.startRound();assert.equal(a.health,0);const b=s.admitPlayer('b',{name:'Partner'},{partyId:'pair',partySize:2});assert.equal(a.team,b.team);assert.notEqual(a.teamSlot,b.teamSlot);s.addPlayer('c',{name:'Opponent'});s.beginBoxRound();assert.equal(a.health,100);assert.equal(b.health,100);
  const duel=new BoxFightSimulation({teamSize:1,fill:false});for(const id of ['one','two']){const p=duel.addPlayer(id,{name:id});duel.assignTeam(p,{partyId:'friends',partySize:2});}duel.startRound();assert.equal(duel.boxStage,'prepare');assert.equal(new Set([...duel.players.values()].map(p=>p.team)).size,2);
 });
 test('checkpoint restoration preserves round, edited structures, inventory, storm and series identity',()=>{
@@ -57,9 +56,16 @@ test('checkpoint restoration preserves round, edited structures, inventory, stor
  const copy=new BoxFightSimulation(s.options).restore(s.checkpoint());assert.equal(copy.matchId,s.matchId);assert.equal(copy.boxStage,'fight');assert.deepEqual(copy.roundWins,s.roundWins);assert.equal(copy.builds[0].mask,18);assert.equal(copy.players.get('a').inventory[1].ammo,2);assert.deepEqual(copy.storm,s.storm);assert.equal(copy.map.id,s.map.id);assert.ok(!copy.map.boxes.some(b=>b.objectId==='box-divider'));copy.tick(1/30);assert.equal(copy.boxRound,1);
 });
 test('FFA opponents, map rotation and public series restart retain distinct rewards identity',()=>{
- const s=setup({boxFormat:'ffa',scoreLimit:1,boxArena:'rotate',recurring:true});s.queueEnds=0;s.tick(1/30);fight(s);kill(s,'b','a');assert.equal(s.seriesWinner,'a');const frame=rewardFrame(s.snapshot(),'a',{});assert.equal(frame.mode,'boxfight');assert.equal(frame.round,1);assert.equal(frame.winnerId,'a');const id=s.matchId;s.time=s.publicRestartAt;s.tick(1/30);assert.notEqual(s.matchId,id);assert.equal(s.boxStage,'waiting');
+ const s=setup({boxFormat:'ffa',scoreLimit:1,boxArena:'rotate',recurring:true});s.tick(1/30);s.time=s.queueEnds;s.tick(1/30);fight(s);kill(s,'b','a');assert.equal(s.seriesWinner,'a');const frame=rewardFrame(s.snapshot(),'a',{});assert.equal(frame.mode,'boxfight');assert.equal(frame.round,1);assert.equal(frame.winnerId,'a');const id=s.matchId;s.time=s.publicRestartAt;s.tick(1/30);assert.notEqual(s.matchId,id);assert.equal(s.boxStage,'waiting');
  const rotate=setup({boxArena:'rotate'});fight(rotate);rotate.endBoxRound(0);rotate.beginBoxRound();fight(rotate);rotate.endBoxRound(0);rotate.beginBoxRound();assert.equal(rotate.map.id,'box-relay');
 });
-test('eight-seat bot practice builds, edits, eliminates and keeps simulation cost bounded',()=>{
- const s=new BoxFightSimulation({teamSize:4,fill:true});s.addPlayer('a',{name:'Practice'});s.startRound();const times=[];let built=false,edited=false;for(let i=0;i<2700;i++){const t=performance.now();s.tick(1/30);times.push(performance.now()-t);built||=s.builds.length>0;edited||=s.builds.some(b=>b.mask>0);}assert.ok(built);assert.ok(edited);assert.ok([...s.players.values()].some(p=>p.kills>0));assert.ok(s.boxRound>1);times.sort((a,b)=>a-b);assert.ok(times[Math.floor(times.length*.95)]<15,'8-operator tick stays under a 30 Hz budget');
+test('one player or one team waits without creating bots or awarding wins',()=>{
+ for(const recurring of [false,true]){const s=new BoxFightSimulation({teamSize:2,fill:true,bots:7,recurring});const p=s.addPlayer('a',{name:'Human'});s.startRound();advance(s,30);assert.equal(s.players.size,1);assert.equal(s.boxRound,0);assert.equal(s.boxStage,'waiting');assert.equal(s.queueEnds,0);assert.deepEqual(s.roundWins,{});assert.equal(s.addPlayer('bot',{name:'Legacy bot'},true),null);s.addBots();assert.equal(s.players.size,1);const q=s.addPlayer('b',{name:'Opponent'});s.tick(1/30);assert.ok(s.queueEnds>s.time);s.time=s.queueEnds;s.tick(1/30);assert.equal(s.boxStage,'prepare');s.leavePlayer(q.id);s.tick(1/30);assert.equal(s.boxStage,'waiting');assert.equal(p.health,100);assert.equal(s.queueEnds,0);assert.deepEqual(s.roundWins,{});}
+});
+test('disconnect after a round leaves a human-only waiting room until opponents return',()=>{
+ const s=setup({teamSize:2});fight(s);kill(s,'b','a');const wins={...s.roundWins};s.leavePlayer('b');s.boxEnd=s.time;s.tick(1/30);assert.equal(s.boxStage,'waiting');advance(s,20);assert.deepEqual(s.roundWins,wins);assert.equal(s.players.size,1);s.admitPlayer('new',{name:'Next Opponent'});s.tick(1/30);s.time=s.queueEnds;s.tick(1/30);assert.equal(s.boxStage,'prepare');assert.equal(s.players.get('new').health,100);
+});
+
+test('a party survivor can continue future rounds after a teammate leaves',()=>{
+ const s=new BoxFightSimulation({teamSize:2});for(const [id,partyId] of [['a','one'],['b','two'],['c','one'],['d','two']]){const p=s.addPlayer(id,{name:'Operator '+id});s.assignTeam(p,{partyId,partySize:2});}s.startRound();fight(s);s.endBoxRound(0);s.leavePlayer('c');s.boxEnd=s.time;s.tick(1/30);assert.equal(s.boxStage,'prepare');assert.equal(s.players.get('a').health,100);assert.equal(s.players.size,3);assert.ok([...s.players.values()].every(p=>!p.bot));
 });

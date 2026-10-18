@@ -1,4 +1,4 @@
-import {rankingMode} from './ranking-modes.js';
+import {rankingMode,syncRankingSelection} from './ranking-modes.js';
 import './zone-wars.css';
 import {ZoneWarsSimulation} from './zone-wars.js';
 import {ZoneWarsUI,zoneRoomMarkup,zoneResultsMarkup} from './zone-wars-ui.js';
@@ -191,7 +191,7 @@ const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(k
 let progressMatch='';
 let crownStatus=read('ravelfront-crown-status',{season:1,wins:0,owned:false,unlocked:false}),crownStatusKey='';
 let menuSection=['locker','shop','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
-let privateMatchDrafts={},leaderboardOverrides={},leaderboardDataMode='',leaderboards=null,leaderboardTab='kills',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
+let privateMatchDrafts={},leaderboardSelection={playMode:null,mode:'royale'},leaderboardDataMode='',leaderboards=null,leaderboardTab='kills',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
 const menuShopStates={};
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
 let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
@@ -307,9 +307,9 @@ function titleBar() {
 let socialActivityKey='';
 function syncSocialActivity(me){if(!party?.ready)return;const activity=screen==='game'&&state?.phase==='playing'?(me?.spectating||me?.health<=0?'spectating':'in-match'):'lobby',mode=activity!=='lobby'?(state?.options.training?'training':state?.options.mode):null,key=activity+':'+mode+':'+party.id;if(key===socialActivityKey)return;socialActivityKey=key;party.request('presence',{activity,mode,visible:!document.hidden&&document.hasFocus()}).catch(()=>{socialActivityKey='';});}
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();if(screen==='menu')renderMenu();}});
-function currentLeaderboardMode(){return rankingMode(leaderboardOverrides[leaderboardTab]||party?.party?.selection?.mode);}
+function currentLeaderboardMode(){leaderboardSelection=syncRankingSelection(leaderboardSelection,party?.party?.selection?.mode);return leaderboardSelection.mode;}
 function trainingBoard(){const p={rank:1,name:profile.name,kills:stats.training?.kills||0,wins:stats.training?.wins||0,you:true};return {mode:'training',...Object.fromEntries(['kills','wins'].map(k=>[k,{total:1,offset:0,rows:[p],self:p,hasMore:false}]))};}
-function menuModel(){const selected=currentLeaderboardMode();if(leaderboardDataMode!==selected){leaderboards=selected==='training'?trainingBoard():null;leaderboardPageBoards=leaderboards;leaderboardDataMode=selected;leaderboardFetchedAt=0;leaderboardOffset=0;}return {leaderboardMode:selected,leaderboardAuto:!leaderboardOverrides[leaderboardTab],profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
+function menuModel(){const selected=currentLeaderboardMode();if(leaderboardDataMode!==selected){leaderboards=selected==='training'?trainingBoard():null;leaderboardPageBoards=leaderboards;leaderboardDataMode=selected;leaderboardFetchedAt=0;leaderboardOffset=0;}return {leaderboardMode:selected,profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
 function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}installLeaderboardScrollbars();}
 async function refreshLeaderboards(force=false){
  if(screen!=='menu'||menuSection!=='play'&&dialogType!=='leaderboards'||!party?.ready||leaderboardPending||!force&&leaderboards&&performance.now()-leaderboardFetchedAt<15000)return;
@@ -1262,9 +1262,9 @@ function playMenu(){modal('CHOOSE GAME MODE',modeMarkup(party?.party?.selection,
 async function selectExperience(id){
  const e=EXPERIENCES.find(e=>e.id===id);if(!e||e.soon)return;
  if(!party?.ready||party.party.leader!==party.id)return;
- if(e.mode==='training'){if(party.party.members.length>1)return toast('Leave your party to train solo.');closeDialog();actions.training();return;}
+ if(e.mode==='training'){if(party.party.members.length>1)return toast('Leave your party to train solo.');leaderboardSelection={playMode:party.party.selection.mode,mode:'training'};closeDialog();actions.training();return;}
  const previous=party.party.selection,teamSize=e.mode==='boxfight'?Math.max(1,party.party.members.length):e.mode==='zombies'?4:e.mode==='royale'?Math.max(previous.teamSize||1,party.party.members.length>2?4:party.party.members.length):1;
- if(await partyRequest('select',{mode:e.mode,teamSize,access:previous.access,teamFill:previous.teamFill,options:matchOptions({...previous,...(e.mode==='zonewars'?{scoreLimit:5,fill:true}:{}),...(e.mode==='boxfight'&&previous.mode!=='boxfight'?{scoreLimit:5,boxArena:'rotate',boxFormat:'teams',boxLoadout:'classic',fill:true}:{}),mode:e.mode,map:e.mode==='royale'?'sunnybreak':e.mode==='boxfight'?'box-foundry':'yard',teamSize,bots:e.mode==='zonewars'?15:e.mode==='royale'?47:7,capacity:e.mode==='zonewars'?16:e.mode==='royale'?48:8})})){closeDialog();renderMenu();}
+ if(await partyRequest('select',{mode:e.mode,teamSize,access:previous.access,teamFill:previous.teamFill,options:matchOptions({...previous,...(e.mode==='zonewars'?{scoreLimit:5,fill:false}:{}),...(e.mode==='boxfight'&&previous.mode!=='boxfight'?{scoreLimit:5,boxArena:'rotate',boxFormat:'teams',boxLoadout:'classic',fill:false}:{}),mode:e.mode,map:e.mode==='royale'?'sunnybreak':e.mode==='boxfight'?'box-foundry':'yard',teamSize,bots:['zonewars','boxfight'].includes(e.mode)?0:e.mode==='royale'?47:7,capacity:e.mode==='zonewars'?16:e.mode==='royale'?48:8})})){leaderboardSelection={playMode:e.mode,mode:e.mode};closeDialog();renderMenu();}
 }
 function lobbyOptionsMenu(draft=party?.party?.selection){
  if(!draft||!party?.ready)return toast('Matchmaking is connecting.');
@@ -1374,7 +1374,6 @@ const actions = {
  },
  'leaderboard-open':()=>{leaderboardOffset=0;leaderboardPageBoards=leaderboards;modal('FRONTIER LEADERS',`<section class="frontier-leaderboard frontier-leaderboard-expanded">${leaderboardMarkup({...menuModel(),expanded:true})}</section>`,'leaderboards');installLeaderboardScrollbars();void refreshLeaderboards(true);},
  'toggle-match-privacy':async()=>{const p=party?.party;if(!p||p.leader!==party.id||p.state!=='idle')return;const previous=p.selection,access=previous.access==='private'?'public':'private';if(previous.access==='private')privateMatchDrafts[previous.mode]={...previous};const next=access==='private'?{...previous,...privateMatchDrafts[previous.mode]}:previous;if(await partyRequest('select',{mode:previous.mode,teamSize:next.teamSize,teamFill:next.teamFill,access,options:next}))renderMenu();},
- 'leaderboard-follow':()=>{delete leaderboardOverrides[leaderboardTab];menuModel();renderLeaderboard();void refreshLeaderboards(true);},
  'leaderboard-refresh':()=>{void refreshLeaderboards(true);},
  'owner-map-editor':()=>ownerConsole.openMapEditor(),
  'owner-refresh':()=>ownerConsole.refresh(),
@@ -1796,7 +1795,7 @@ document.addEventListener('click',e=>{
 });
 // Pointer capture keeps mouse/touch drops working across the modal's inert backdrop.
 let inventoryDrag=null,inventoryDragSlot=null,inventoryDragPreview=null,suppressInventoryClickUntil=0;
-document.addEventListener('change',e=>{if(e.target.matches('[data-leaderboard-mode]')){leaderboardOverrides[leaderboardTab]=rankingMode(e.target.value);menuModel();renderLeaderboard();void refreshLeaderboards(true);}});
+document.addEventListener('change',e=>{if(e.target.matches('[data-leaderboard-mode]')){currentLeaderboardMode();leaderboardSelection.mode=rankingMode(e.target.value);menuModel();renderLeaderboard();void refreshLeaderboards(true);}});
 dialog.addEventListener('change',e=>{if(e.target.matches('[data-training-weapon]')&&sim?.options.training)sim.playerAction(localId,'training-weapon-'+e.target.value);});
 dialog.addEventListener('click',e=>{const drop=e.target.closest('[data-supply-drop]');if(drop){const action='inventory-supply-'+drop.dataset.supplyDrop;if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});}});
 const applyInventoryDrag=(x,y)=>{const target=inventoryDropTarget(dialog,x,y),from=inventoryDragSlot;if(!Number.isInteger(from)||from<1||from>5)return;if(target?.kind==='drop')inventoryAction('drop',from);else if(target?.kind==='swap'&&target.slot>0&&target.slot!==from)inventoryAction('swap',target.slot,from);};

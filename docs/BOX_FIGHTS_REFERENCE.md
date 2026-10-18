@@ -14,9 +14,9 @@ Research checked 17 October 2026. These are design references for an original Ra
 
 ## Complete match loop
 
-Choose Box Fights → public matchmaking or private room → reserve the whole party → fill optional practice seats → prepare behind barriers → fight → last surviving team/operator earns one round → clear all structures and dropped items → restore equal gear and swap sides → repeat until the target → series results → rematch or public automatic restart.
+Choose Box Fights → public matchmaking or private room → reserve the whole party → wait for human opponents → prepare behind barriers → fight → last surviving team/operator earns one round → clear all structures and dropped items → restore equal gear and swap sides → repeat until the target → series results → rematch or public automatic restart.
 
-Public settings: 1v1, 2v2, 3v3 or 4v4; first to five; Classic kit; arena rotation; intermediate bots fill empty seats after a 15-second queue. Queue admission closes when preparation begins. Private codes may join in progress and wait for the next round. Public parties fit together; a larger private party may deliberately split across teams. Private FFA has eight seats. Private targets are 3, 5, 7 or 10; Classic and Pressure kits; four bot difficulties or humans only.
+Public settings: 1v1, 2v2, 3v3 or 4v4; first to five; Classic kit; arena rotation; human opponents start a 15-second queue, or start immediately when all seats are occupied. Queue admission closes when preparation begins. Private codes may join in progress and wait for the next round. Public parties fit together; a larger private party may deliberately split across teams. Private FFA has eight seats. Private targets are 3, 5, 7 or 10; Classic and Pressure kits; humans only in every format.
 
 All players start with 100 health and 100 shield. Classic uses the existing epic pump shotgun and rare assault rifle definitions (internal IDs `scatter`/`sprinter`); Pressure uses the existing double shotgun and SMG. Equipment uses the game's existing rarity, spread, reload and damage rules. Eliminations grant 50 health/shield siphon and 100 wood, capped at 100/100 vitals and 500 wood. Friendly fire is disabled; there are no knockdowns, mid-round respawns or floor weapon spawners.
 
@@ -24,13 +24,13 @@ The storm starts closing at 45 seconds, reaches zero radius at 85, and damages a
 
 ## Implementation boundaries
 
-The existing host-authoritative shooting, six-slot inventory, material spending, construction health, destruction/support, placement solver, window/door/other edits, repair, revision checks, prediction and spectator systems are reused. New arena bounds prevent building outside the walls or above the ceiling. Host and guest apply identical preparation movement constraints. Practice bots construct cover, edit team structures, breach enemy builds, strafe, reload and heal. They are explicitly labeled bots; they are not a ranked skill system.
+The existing host-authoritative shooting, six-slot inventory, material spending, construction health, destruction/support, placement solver, window/door/other edits, repair, revision checks, prediction and spectator systems are reused. New arena bounds prevent building outside the walls or above the ceiling. Host and guest apply identical preparation movement constraints. Bot admission, bot fill and practice AI are disabled for this mode in both public and private rooms.
 
 Checkpoints carry phase, clocks, map, scores, build revisions, player inventory and late-arrival state through host migration. No account authentication, purchased rankings, persistent competitive ladder, new currency or third-party integration is introduced.
 
 ## Verification
 
-`tests/box-fights.test.js`: equipment, protection, ownership edits, bounds, friendly fire, siphon, reset/side swaps, simultaneous draws, storm, late joins, complete parties, checkpoints, FFA, rotation, rewards identity and an eight-operator simulation budget.
+`tests/box-fights.test.js`: equipment, protection, ownership edits, bounds, friendly fire, siphon, reset/side swaps, simultaneous draws, storm, late joins, complete parties, checkpoints, FFA, rotation, rewards identity human-only waiting, departure handling and bot rejection.
 
 `tests/box-fights-network.test.js`: real relay matchmaking, separate pools, ready party reservations, guest edits and elected host recovery.
 

@@ -10,7 +10,7 @@ Research reviewed October 18, 2026. The reference is Prettyboy's original solo T
 
 ## Implemented rules
 
-Sixteen solo contestants, parties entering together as rivals, one life per round, spectator cycling after elimination, an eight-second protected preparation period, random room assignment and a fresh randomized five-slot kit each round. Player nameplates remain visible. A public series is first to five; private rooms expose capacity, target score, human-only/bot fill and bot skill.
+Sixteen solo contestants, parties entering together as rivals, one life per round, spectator cycling after elimination, an eight-second protected preparation period, random room assignment and a fresh randomized five-slot kit each round. Player nameplates remain visible. A public series is first to five; private rooms expose capacity and target score. Both public and private rooms require human opponents and never fill seats with bots.
 
 The district has nine enterable multi-storey landmarks: brick and twin apartments, an office tower, corner shops, construction, pawn shop, diner, south apartments and a clock tower. Streets, crosswalks, cars, interior partitions, furniture, roof equipment, stairs, basketball court and surrounding hills form the playable urban space. Windows, floors and stairways use real collision geometry. Sixteen separated spawn cells occupy multiple building floors. Builds, world damage, inventory and loot reset between rounds.
 
@@ -20,10 +20,10 @@ The six moving circles close from radius 94 through 62, 40, 24, 13, 7 and 0. Sto
 
 ## Deliberate, disclosed differences
 
-This is an original, playable Tilted-style district built for Ravelfront's renderer and movement scale. It is **not a verified one-to-one reproduction** of Fortnite's terrain, geometry, artwork, weapons, UI, current seasonal loot or hidden probabilities. Public research cannot establish those unpublished internals. The numerical timings, dimensions, bot behavior, first-to-five target and kit probabilities above are explicit Ravelfront choices, rather than claims about Prettyboy's current island. The game retains its own item names, models and interface.
+This is an original, playable Tilted-style district built for Ravelfront's renderer and movement scale. It is **not a verified one-to-one reproduction** of Fortnite's terrain, geometry, artwork, weapons, UI, current seasonal loot or hidden probabilities. Public research cannot establish those unpublished internals. The numerical timings, dimensions, first-to-five target and kit probabilities above are explicit Ravelfront choices, rather than claims about Prettyboy's current island. The game retains its own item names, models and interface.
 
 ## Score semantics
 
 Public leaderboards track each mode independently. Zone Wars wins mean round wins; Box Fights wins mean series wins; Zombies wins mean successful extraction; Royale and Free For All count match victories. Private rooms do not feed competitive public rankings; existing career eligibility rules remain in place. Training displays this browser's practice eliminations and completed six-objective drills. There is no invented global training ranking.
 
-The relay persists cumulative mode totals independently from reward eligibility, deduplicates match/round updates and merges identities without mixing modes. Existing public Royale history is retained. Rankings follow the Play selection until the Kills or Wins filter is explicitly overridden; Follow Play removes that tab's override.
+The relay persists cumulative mode totals independently from reward eligibility, deduplicates match/round updates and merges identities without mixing modes. Existing public Royale history is retained. Rankings follow the Play selection until the rankings mode filter is explicitly overridden; Both Kills and Wins share the manual choice. The next Play mode choice resets both rankings automatically.
