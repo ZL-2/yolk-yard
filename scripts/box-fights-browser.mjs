@@ -13,7 +13,7 @@ const vite=await createServer({plugins:[{name:'box-local-relay',configureServer(
 globalThis.window={YOLK_NETWORK:{relay:base+'/game'}};globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin});}};
 let browser,page,guest,state,stage='load';const errors=[],checks={};
 // Keep the desktop layout while reducing SwiftShader raster cost on hosted CI.
-const record=s=>{stage=s;console.log(s);},shot=name=>page?.screenshot({path:out+'/'+name+'.png',animations:'disabled',timeout:90000})||Promise.resolve();
+const record=s=>{stage=s;console.log(s);},shot=name=>process.env.PVP_RULES_ONLY==='true'&&!['options','private-room','series-results','failure'].includes(name)?Promise.resolve():page?.screenshot({path:out+'/'+name+'.png',animations:'disabled',timeout:90000})||Promise.resolve();
 const until=async(fn,label)=>{const end=Date.now()+15000;while(!fn()){assert.ok(Date.now()<end,label);await new Promise(r=>setTimeout(r,20));}};
 const frame=async()=>{await page.locator('#loading-screen').waitFor({state:'hidden'});await page.evaluate(async()=>{if(document.pointerLockElement)await new Promise(resolve=>{document.addEventListener('pointerlockchange',resolve,{once:true});document.exitPointerLock();});await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));window.__yolkTest.resume();const q=window.__yolkTest.read(),p=q.state.players.find(p=>p.id===q.localId);window.__yolkTest.look(Math.atan2(p.x,p.z),0);});await page.waitForFunction(()=>!window.__yolkTest.read().paused);};
 try{
