@@ -12,8 +12,8 @@ export const Z_FIELDS={pulse:{name:'Repulsor',description:'Damage and slow the n
 export const Z_STORY=[
  {name:'Safe Harbor',description:'Complete three contracts and extract with the evacuation supplies.',kind:'contracts',goal:3},
  {name:'The Missing Convoy',description:'Recover all three field recordings and extract the evidence.',kind:'logs',goal:3},
- {name:'Black Wake',description:'Complete a sabotage contract in Freight Exchange or Pine Ridge, then extract.',kind:'sabotage',goal:1},
- {name:'The Last Transmission',description:'Enter the Lattice breach, defeat its guardian, and extract.',kind:'rift',goal:1},
+ {name:'Black Wake',description:'Complete a sabotage contract, align the Lattice cipher using the recordings, then extract.',kind:'sabotage',goal:1},
+ {name:'The Last Transmission',description:'Charge all three resonators, enter the Lattice breach, defeat its guardian, and extract.',kind:'rift',goal:1},
  {name:'Silence the Coast',description:'Defeat the Bellwether in the Observatory and extract its signal core.',kind:'boss',goal:1},
 ];
 export const Z_SCHEMATICS={tool1:{name:'Improved calibration',cooldown:300},chill:{name:'Frost cartridge',cooldown:300},medkit:{name:'Trauma kit',cooldown:180},tool2:{name:'Rare calibration',cooldown:600},crystal1:{name:'Resonance cell',cooldown:900},self:{name:'Self-recovery kit',cooldown:900},arcLoom:{name:'Arc Loom case',cooldown:1800},riftDriver:{name:'Rift Driver case',cooldown:2400},cinderLance:{name:'Cinder Lance case',cooldown:1800}};

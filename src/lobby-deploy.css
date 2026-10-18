@@ -50,6 +50,7 @@
 #dialog .lobby-discover .yard-mode-card[aria-pressed=true]{border-color:#f5e35c;box-shadow:0 0 0 1px #f5e35c}
 .lobby-discover .yard-mode-card img{display:block;width:100%;aspect-ratio:1.7;object-fit:cover}
 .mode-card-art{position:relative;display:block;width:100%;flex:none}
+.mode-development{position:absolute;inset:50% 0 auto;transform:translateY(-50%);padding:11px 5px;border-block:1px solid #ffc766;background:#17120bed;color:#ffcf76;font-size:clamp(12px,1.15vw,16px);font-weight:900;line-height:1.25;letter-spacing:.065em;text-align:center;text-shadow:0 1px 2px #000;pointer-events:none}
 .mode-population{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid #b7d8e366;border-radius:6px;background:#081b2bed;color:#fff;box-shadow:0 2px 8px #0005;font-size:12px;font-variant-numeric:tabular-nums}
 .mode-population svg{width:13px;height:13px;fill:currentColor}.mode-population span{font-size:8px;letter-spacing:.08em}.mode-population b{color:inherit!important}
 .lobby-discover .mode-card-copy{padding:14px;display:block}.lobby-discover .mode-card-copy strong{font-size:22px;line-height:1.1}.lobby-discover .mode-card-copy .eyebrow{margin:0;font-size:9px}.lobby-discover .mode-card-copy p{font-size:12px;line-height:1.5;min-height:36px}.lobby-discover .mode-card-copy small{font-size:10px}

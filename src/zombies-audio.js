@@ -47,8 +47,11 @@ export const ZOMBIE_SOUNDS={
 };
 export function updateZombiesAudio(sound,state,me){
  const z=state.zombies;if(!z){sound.loop('blacktide-sea',0);sound.loop('blacktide-lattice',0);return;}
+ const rover=z.vehicles?.find(v=>v.id===me.zVehicle),transport=z.evacs?.find(e=>['approaching','landed','departing'].includes(e.status)&&Math.hypot(e.x-me.x,e.z-me.z)<90);
+ sound.loop('blacktide-rover',rover?.5+Math.min(.5,Math.abs(rover.speed)/24):0,{freq:rover?65+Math.abs(rover.speed)*6:65,volume:.065,noise:false});sound.loop('blacktide-rotor',transport?Math.max(0,1-Math.hypot(transport.x-me.x,transport.z-me.z)/90)*(.6+Math.sin(sound.clock*23)*.2):0,{freq:110,volume:.1,noise:false});
  const nearby=z.enemies.filter(e=>e.health>0&&Math.hypot(e.x-me.x,e.z-me.z)<22).sort((a,b)=>Math.hypot(a.x-me.x,a.z-me.z)-Math.hypot(b.x-me.x,b.z-me.z));
  sound.loop('blacktide-sea',.45,{freq:270,volume:.055});sound.loop('blacktide-lattice',z.power?.28:.12,{freq:z.power?73.4:49,volume:.04,noise:false});
+ if(sound.clock>=(sound.zFootAt||0)){sound.zFootAt=sound.clock+.3;const e=nearby.find(e=>Math.hypot(e.vx||0,e.vz||0)>.5);if(e)sound.cue(e.type==='armored'||e.type==='colossus'?'step-metal':'step-soil',e,.3);}
  if(sound.clock>=(sound.zNextVoice||0)){sound.zNextVoice=sound.clock+2.3+(Math.floor(sound.clock)%3)*.5;const e=nearby[Math.floor(sound.clock)%Math.min(nearby.length,4)];if(e)sound.cue(e.type==='boss'?'z-boss-voice':'z-'+e.type,e,.9);}
  if(sound.clock>=(sound.zNextPulse||0)){sound.zNextPulse=sound.clock+(nearby.length>6?2.4:5);const intensity=nearby.length>6?.05:.025;for(const [f,at]of [[73.4,0],[110,.3],[146.8,.9]])sound.layer(tone(f,1.8,intensity,0,at),null,'score',1);}
 }

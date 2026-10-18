@@ -797,7 +797,7 @@ export class View {
     for(const egg of this.partyEggs||[])egg.visible=!playing;
     this.actors.visible = playing;
     this.effects.visible = playing;
-    this.gunGroup.visible = playing && !local?.vehicleId && !this.cinematic?.victory && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
+    this.gunGroup.visible = playing && !local?.vehicleId && !local?.zVehicle && !this.cinematic?.victory && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
     if (!playing) {
       this.clearOutgoing(this);
       this.preview(profile);
@@ -830,25 +830,25 @@ export class View {
       );
       this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
       let cameraBoom=false;
-      if (killer || local.downed || local.emote || hold || victory || p.vehicleId) {
+      if (killer || local.downed || local.emote || hold || victory || p.vehicleId || p.zVehicle) {
         const cameraYaw=victory?p.yaw+Math.PI+.35:local.emote?(this.emoteLook?.yaw??p.yaw):p.yaw;
-        const back = this.cameraBack??=new THREE.Vector3();back.set(Math.sin(cameraYaw)*Math.cos(p.vehicleId?p.pitch*.55:0),p.vehicleId?.4-Math.sin(p.pitch*.55):local.emote?.2:.35,Math.cos(cameraYaw)*Math.cos(p.vehicleId?p.pitch*.55:0)).normalize();
+        const back = this.cameraBack??=new THREE.Vector3();back.set(Math.sin(cameraYaw)*Math.cos((p.vehicleId||p.zVehicle)?p.pitch*.55:0),(p.vehicleId||p.zVehicle)?.4-Math.sin(p.pitch*.55):local.emote?.2:.35,Math.cos(cameraYaw)*Math.cos((p.vehicleId||p.zVehicle)?p.pitch*.55:0)).normalize();
         const origin = this.cameraOrigin??=new THREE.Vector3();origin.set(p.x,p.y+Math.min(1.6,eyeHeight(p)),p.z);
-        this.placeCameraBehind(state,p,origin,back,p.vehicleId?6.2:victory?5.2:hold?4.8:local.emote?4.2:3.5,dt,p.vehicleId?'vehicle':victory?'victory':hold?'elimination':local.emote?'emote':'spectator');cameraBoom=true;
-        if(p.vehicleId){const aim=direction(p.yaw,p.pitch);this.camera.lookAt(p.x+aim.x*30,p.y+eyeHeight(p)+aim.y*30,p.z+aim.z*30);}else this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
+        this.placeCameraBehind(state,p,origin,back,(p.vehicleId||p.zVehicle)?6.2:victory?5.2:hold?4.8:local.emote?4.2:3.5,dt,(p.vehicleId||p.zVehicle)?'vehicle':victory?'victory':hold?'elimination':local.emote?'emote':'spectator');cameraBoom=true;
+        if(p.vehicleId||p.zVehicle){const aim=direction(p.yaw,p.pitch);this.camera.lookAt(p.x+aim.x*30,p.y+eyeHeight(p)+aim.y*30,p.z+aim.z*30);}else this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
       }
       const draw=equipPose(local,state.time);
       this.drawPresentation=draw;
-      this.setWeapon(local,draw);if(local.zombieKit)setResonance(this.localModel,gun(local).tier);
+      this.setWeapon(local,draw);if(local.zombieKit)setResonance(this.localModel,gun(local).tier,gun(local).grade,gun(local).attachments);
       this.lowerOutgoing(this,draw,local.health>0);
       this.gunGroup.visible=this.gunGroup.visible&&draw.visible;
       const w = gun(local),
         scoped = w.optic === "scope" || w.optic === "prism";
-      const aiming = !!(canFight(local) && !p.sprinting && !p.use && !p.reviving && !p.traversal && !local.building && !local.editing && !p.building && !p.editing && !local.vehicleId && !local.emote && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
+      const aiming = !!(canFight(local) && !p.sprinting && !p.use && !p.reviving && !p.traversal && !local.building && !local.editing && !p.building && !p.editing && !local.vehicleId && !local.zVehicle && !local.emote && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
       if(!Number.isFinite(this.aimBlend))this.aimBlend=0;
       this.aimBlend += (Number(aiming) - this.aimBlend) * (1-Math.exp(-Math.log(20)*dt/w.adsTime));
       p.aim=aiming;
-      this.thirdPersonEnabled=!killer&&!hold&&!victory&&thirdPersonActive(p);
+      this.thirdPersonEnabled=!killer&&!hold&&!victory&&!p.zVehicle&&thirdPersonActive(p);
       const key=`${state.round}:${state.options.map}:${p.id}:${this.thirdPersonEnabled}`;
       if(this.thirdPersonEnabled){
         const previous=this.thirdPersonState,same=previous?.key===key&&Math.hypot(p.x-previous.x,p.y-previous.y,p.z-previous.z)<8;
@@ -946,7 +946,7 @@ export class View {
         // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;
         if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.16)) || p.awaitingEntry)continue;
-        if(p.id===local?.id&&p.health>0&&!this.thirdPersonEnabled&&!p.vehicleId&&!this.cinematic?.victory&&!p.emote&&!p.downed&&(!p.inventory||p.flight==='ground'||p.flight==='transport')){const cached=this.models.get(p.id);if(cached){seen.add(p.id);cached.visible=false;}continue;}
+        if(p.id===local?.id&&p.health>0&&!this.thirdPersonEnabled&&!p.vehicleId&&!p.zVehicle&&!this.cinematic?.victory&&!p.emote&&!p.downed&&(!p.inventory||p.flight==='ground'||p.flight==='transport')){const cached=this.models.get(p.id);if(cached){seen.add(p.id);cached.visible=false;}continue;}
         seen.add(p.id);
         this.actorBounds.center.set(p.x,p.y+.9,p.z);
         if(playing&&!this.actorFrustum.intersectsSphere(this.actorBounds)){const hidden=this.models.get(p.id);if(hidden)hidden.visible=false;continue;}
@@ -1002,7 +1002,7 @@ export class View {
         const harvesting=!!p.inventory?.[p.slot]?.pickaxe;
         if(harvesting&&!model.userData.shopTool){const tool=shopItem(p.pickaxe)?makeShopPickaxe(p.pickaxe):this.royaleView.itemModel({id:'pickaxe',pickaxe:true},false);tool.scale.setScalar(.5);tool.position.set(-.05,-.12,-.2);model.userData.held.add(tool);model.userData.shopTool=tool;}
         if(model.userData.shopTool)model.userData.shopTool.visible=harvesting;
-        model.userData.blaster.visible=!harvesting;if(p.zombieKit)setResonance(model.userData.blaster,gun(p).tier);
+        model.userData.blaster.visible=!harvesting;if(p.zombieKit)setResonance(model.userData.blaster,gun(p).tier,gun(p).grade,gun(p).attachments);
         model.userData.draw=draw;
         model.userData.drawProfile=itemDrawProfile(p.inventory?.[p.slot]||{id:gun(p).id,weapon:true});
         const deathAge=p.health<=0?state.time-(p.eliminatedAt??p.respawnAt-3):0;
@@ -1013,7 +1013,7 @@ export class View {
           if(harvesting&&model.userData.shopTool)animatePickaxe(model.userData.shopTool,model.userData.arms,p.pickaxe,state.time-(p.swingAt??-100));
           const throwT=(this.clock-(model.userData.throwStart??-Infinity))/.78;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1)throwArms(model.userData.arms,throwT);
-          model.userData.held.visible=draw.visible&&canFight(p)&&!p.emote&&(!p.vehicleId||p.vehicleSeat===1);
+          model.userData.held.visible=draw.visible&&canFight(p)&&!p.emote&&(!p.vehicleId||p.vehicleSeat===1)&&(!p.zVehicle||p.zVehicleSeat>0);
           model.userData.held.rotation.set(p.pitch + hands.rotation[0] + recoil * .045 + draw.rotation[0], hands.rotation[1]+draw.rotation[1], hands.rotation[2]+draw.rotation[2]);
           model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
           const sprint=p.sprintBlend||0;model.userData.held.position.y-=sprint*.3;model.userData.held.position.x+=sprint*.08;model.userData.held.rotation.x+=sprint*.65;model.userData.held.rotation.z+=sprint*.2;
@@ -1030,7 +1030,7 @@ export class View {
         const lag = (this.actorLag ||=new THREE.Vector3()).copy(base).sub(targetPosition).clampLength(0, 0.04);
         base.copy(targetPosition).add(lag);
         model.position.copy(p.id===local?.id?targetPosition:base);
-        const bodyYaw=p.vehicleId&&p.vehicleSeat===0?(state.royale.vehicles.find(v=>v.id===p.vehicleId)?.yaw??p.yaw):p.yaw;let delta = bodyYaw - model.rotation.y;
+        const bodyYaw=p.zVehicle?(state.zombies?.vehicles.find(v=>v.id===p.zVehicle)?.yaw??p.yaw):p.vehicleId&&p.vehicleSeat===0?(state.royale.vehicles.find(v=>v.id===p.vehicleId)?.yaw??p.yaw):p.yaw;let delta = bodyYaw - model.rotation.y;
         delta = Math.atan2(Math.sin(delta), Math.cos(delta));
         model.rotation.y = p.id===local?.id ? bodyYaw : model.rotation.y + delta * Math.min(1, dt * 18);
         model.scale.setScalar(1);model.rotation.x=model.rotation.z=0;

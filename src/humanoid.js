@@ -156,6 +156,17 @@ function template(profile){
  for(const side of [-1,1])for(let row=0;row<6;row++)panel(side*.155,1.075+row*.025,-.112,.003,.015,.003,seam,'spine','cloth');
  if(!item?.model){panel(0,1.19,-.169,.009,.27,.005,colors.dark,'spine','metal');panel(0,1.324,-.175,.016,.025,.006,colors.trim,'chest','metal');}
  if(profile.infectedType){for(const x of [-.044,.044])ellipsoid(x,1.695,-.121,.012,.005,.002,'#dec992','head',8,'glass');for(let n=0;n<4;n++)panel(-.073+n*.009,1.64+n*.014,-.106,.006,.033,.007,'#66483e','head','skin');for(let n=0;n<6;n++)panel(.1,1.19+n*.025,-.203,.08,.01,.01,'#514c39','chest','cloth');if(['armored','heavy','elite','boss','colossus'].includes(profile.infectedType)){panel(0,1.3,-.2,.39,.3,.09,'#52615a','chest','metal');for(const side of [-1,1])panel(side*.27,1.43,0,.18,.1,.23,'#616b5d','arm'+(side<0?'L':'R'),'metal');}if(['disruptor','boss','mimic'].includes(profile.infectedType))for(const side of [-1,1])ellipsoid(side*.19,1.44,.1,.07,.15,.07,'#677f78','chest',8,'skin');}
+ if(profile.infectedType){
+  const type=profile.infectedType;
+  if(type==='armored'){panel(0,1.39,-.25,.42,.46,.08,'#526f6a','chest','metal');panel(0,1.7,-.135,.21,.1,.08,'#65766a','head','metal');}
+  if(type==='runner'){for(const side of [-1,1])panel(side*.18,1.32,-.18,.045,.23,.02,'#d6a365','chest','cloth');}
+  if(type==='heavy'||type==='colossus'){for(const side of [-1,1]){ellipsoid(side*.31,1.43,0,.15,.16,.17,'#657367','arm'+(side<0?'L':'R'),10,'skin');panel(side*.43,.97,0,.17,.2,.18,'#475956','forearm'+(side<0?'L':'R'),'metal');}panel(0,1.62,.17,.3,.46,.14,'#586d60','chest','metal');}
+  if(type==='leaper'){for(const side of [-1,1]){panel(side*.12,.55,-.06,.11,.15,.07,'#59655e','shin'+(side<0?'L':'R'),'cloth');for(let n=0;n<3;n++)panel(side*(.425+n*.018),.79,-.015,.012,.09,.02,'#b7baa0','hand'+(side<0?'L':'R'),'metal');}}
+  if(type==='disruptor'||type==='boss'){for(let n=0;n<5;n++)ellipsoid(-.14+n*.07,1.45,.19,.035,.11+n%2*.06,.055,'#80b2ac','chest',8,'glass');}
+  if(type==='elite'){panel(0,1.72,-.13,.25,.2,.06,'#6d4041','head','metal');panel(0,1.46,.18,.32,.45,.1,'#743d43','chest','cloth');}
+  if(type==='mimic'){ellipsoid(0,1.36,.19,.21,.24,.13,'#866866','chest',10,'skin');for(const side of [-1,1])panel(side*.44,.88,-.06,.1,.2,.09,'#6f655b','hand'+(side<0?'L':'R'),'skin');}
+  if(type==='boss'){for(const side of [-1,1])panel(side*.32,1.48,0,.2,.25,.3,'#3e5960','arm'+(side<0?'L':'R'),'metal');panel(0,1.76,.01,.25,.1,.24,'#a2aa86','head','metal');}
+ }
  const geo=mergeGeometries(parts);parts.forEach(g=>g.dispose());geo.computeBoundingSphere();geo.userData.shared=true;geo.userData.artRevision=166;geo.userData.surfaceKinds=[...finishes];geometries.set(key,geo);return geo;
 }
 export function makeHumanoid(profile={}){
@@ -191,7 +202,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   h.plantL=h.plantR=h.releaseL=h.releaseR=h.lastMotionFootL=h.lastMotionFootR=h.footTargetL=h.footTargetR=null;h.releasedL=h.releasedR=false;h.contactHeight=undefined;
  }
  const contactTransform=h.contactTransform??={};contactTransform.x=model.position.x;contactTransform.y=model.position.y;contactTransform.z=model.position.z;contactTransform.scale=scale;contactTransform.menu=menu;
- const terrainContact=!menu&&grounded&&!p.vehicleId&&map?.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.16;
+ const terrainContact=!menu&&grounded&&!(p.vehicleId||p.zVehicle)&&map?.terrain&&Math.abs(p.y-groundAt(map,p.x,p.z))<.16;
  const placeFoot=foot=>{if(!terrainContact)return;const cs=Math.cos(model.rotation.y),sn=Math.sin(model.rotation.y),x=model.position.x+cs*foot.x+sn*foot.z,z=model.position.z-sn*foot.x+cs*foot.z;
   // Sample the sole, not just the capsule center: uphill toes otherwise cut
   // through elevated ground even when the physical player is above the mesh.
@@ -254,7 +265,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   if(h.slide>.01)foot.lerp(V(sideSign*.17,.12,-.67),h.slide);
   if(h.down>.01)foot.lerp(V(sideSign*.2,.12,.43+Math.sin(phase)*.10*moving),h.down);
   if(h.revive>.01)foot.lerp(V(sideSign*.15,sideSign<0?.10:.13,sideSign<0?-.32:.25),h.revive);
-  if(p.vehicleId)foot=V(sideSign*.4,.43,-.35);
+  if(p.vehicleId||p.zVehicle)foot=V(sideSign*.4,.43,-.35);
   if(dead)foot=V(sideSign*.23,.12,-.12);
   if(emote)foot=V(...emotePose(emote.id,emote.t,sideSign).foot);
   // Contact locks in world space through aim turns and velocity changes.
@@ -329,7 +340,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   if(motion?.freeHands||motion&&!held?.visible&&!model.userData.utility&&!airborne&&!p.traversal&&!p.mantle&&!p.vehicleId&&!p.building&&!p.use&&!throwing)continue;
   if(emote)target=V(...emotePose(emote.id,emote.t,sideSign).hand);
   else if(throwing){const t=p.throwProgress,wind=Math.sin(Math.min(1,t/.4)*Math.PI*.5),release=Math.min(1,Math.max(0,(t-.35)/.3));target=sideSign>0?V(.28,1.35+wind*.35-lower,.25*wind-release*.9):V(-.3,1.05-lower,-.25);}
-  else if(p.vehicleId&&p.vehicleSeat===0)target=V(sideSign*.36,1.2,-.58);
+  else if(p.vehicleId&&p.vehicleSeat===0||p.zVehicle&&p.zVehicleSeat===0)target=V(sideSign*.36,1.2,-.58);
   else if(p.mantle)target=V(sideSign*.28,1.68,-.38);
   else if(p.traversal)target=V(sideSign*.24,1.95,-.08);
   else if(airborne)target=p.flight==='glide'?V(sideSign*.33,1.93,-.06):V(sideSign*.70,1.47+Math.sin(time*2.1+sideSign)*.012,-.10);

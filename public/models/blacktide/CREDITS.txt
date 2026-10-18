@@ -22,7 +22,11 @@ No endorsement by the creator is implied.
 
 Zombie Sound Pack, artisticdude (2011), CC0 1.0.
 https://opengameart.org/content/zombies-sound-pack
-Changes: selected 12 recordings, loudness normalization, mono Ogg conversion.
+Changes: selected 24 recordings, loudness normalization, mono Ogg conversion.
 
 All map layout, mission text, game rules, UI and original sound cues are
 Ravelfront work. No Call of Duty assets, dialogue or soundtrack are included.
+
+Additional leap, turn, charge, guard and heavy-attack poses are original
+Ravelfront procedural animation. Optional field-record playback uses the
+browser device speech voice; transcripts remain available without narration.

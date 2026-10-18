@@ -1,3 +1,4 @@
+import {applyAttachments,attachmentIds} from './zombies-attachments.js';
 // Original, mode-local tuning. None of these values mutate the PvP definitions.
 export const ZOMBIES = Object.freeze({map:'blacktide',capacity:24,maxAlive:48,maxCorpses:8,maxDrops:12,maxEffects:32,intermission:12,bleedOut:45,revive:4,spawnGrace:8,startPoints:650,perkSlots:9,maxPoints:999999,lateJoinRound:10,deployment:1500,shutdown:300,lateJoinSeconds:600,contractsGoal:3});
 export const Z_TYPES = Object.freeze({
@@ -39,10 +40,10 @@ export function zombieDifficulty(round,players=1){
 }
 const statCache=new Map();
 export function zombiesGun(base,item={},perks=[]){
- const tier=Math.max(0,Math.min(3,item.tier||0)),grade=Math.max(0,Math.min(4,item.grade||0)),quick=perks.includes('quickhands'),eye=perks.includes('deadeye'),key=`${base.id}:${tier}:${grade}:${quick}:${eye}:${item.mod||''}:${item.attachment||''}`;
+ const tier=Math.max(0,Math.min(3,item.tier||0)),grade=Math.max(0,Math.min(4,item.grade||0)),quick=perks.includes('quickhands'),eye=perks.includes('deadeye'),key=`${base.id}:${tier}:${grade}:${quick}:${eye}:${item.mod||''}:${attachmentIds(item).sort().join(',')}`;
  if(!statCache.has(key)){const special=Z_SPECIALS.find(w=>w.id===base.id),damage=(special?.damage??base.damage*1.7)*Z_UPGRADE_DAMAGE[tier]*Z_GRADE_DAMAGE[grade];
   statCache.set(key,{...base,...special,damage,projectile:false,hitscan:true,burst:0,range:Math.max(60,base.range||60),name:(tier?['','RESONANT ','HARMONIC ','ASCENDANT '][tier]:'')+base.name,magazine:Math.round((special?.magazine??base.magazine)*(1+tier*.25)),reserve:Math.round((special?.reserve??base.reserve)*(1+tier*.3)),critical:(base.critical||1.7)*(eye?1.35:1),reload:base.reload*(quick?.68:1),reloadEmpty:base.reloadEmpty*(quick?.68:1),spread:base.spread*(eye?.8:1),adsSpread:base.adsSpread*(eye?.8:1),tier,grade,mod:item.mod||null});
- }const value=statCache.get(key);if(!item.attachment)return value;return {...value,...(item.attachment==='extended'?{magazine:Math.round(value.magazine*1.3),reload:value.reload*1.12}:item.attachment==='stabilizer'?{spread:value.spread*.7,adsSpread:value.adsSpread*.7}:item.attachment==='suppressor'?{damage:value.damage*.95,adsSpread:value.adsSpread*.65}:item.attachment==='optic'?{zoom:(value.zoom||1.5)*1.3}:{})};
+ }const value=statCache.get(key);if(!value.attachments){const tuned=applyAttachments(value,item);statCache.set(key,tuned);if(statCache.size>512)statCache.delete(statCache.keys().next().value);return tuned;}return value;
 }
 export const zHas=(p,key)=>p.zPerks?.includes(key);
 

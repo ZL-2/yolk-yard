@@ -21,7 +21,7 @@ await wait(async()=>{
  try{[published,health]=await Promise.all([get(front+'version.json?t='+Date.now()),get(relay+'/health')]);return published.build===expected&&health.build===expected&&published.appVersion===version&&health.gameVersion===VERSION&&health.deployment?.updating===false&&health.socialAvailable;}
  catch(e){lastError=e.message;return false;}
 },'Website and relay must finish the same release'+(lastError||''),360000);
-assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,2);assert.equal(health.boxFightRevision,1);assert.ok(health.privateModes.includes('boxfight'));
+assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,3);assert.equal(health.boxFightRevision,1);assert.ok(health.privateModes.includes('boxfight'));
 const history=await get(front+'release-history.json?t='+Date.now());assert.equal(history.build,expected);assert.equal(history.releases[0].number,published.release);
 const board=await get(relay+'/leaderboards');assert.ok(Array.isArray(board.kills.rows)&&Array.isArray(board.wins.rows));
 
@@ -52,10 +52,11 @@ try{
  await page.locator('#menu [data-action=settings]:visible').first().waitFor();
  assert.match(await page.locator('body').innerText(),/FRONTIER LEADERS/i);
  await page.screenshot({path:out+'/desktop.png'});
+ await page.locator('[data-action=choose-mode]').click();await page.locator('[data-experience=zombies] .mode-development').waitFor({state:'visible'});assert.equal(await page.locator('[data-experience=zombies] .mode-development').innerText(),'IN MAJOR DEVELOPMENT');await page.screenshot({path:out+'/zombies-development.png'});await page.locator('#dialog .close-btn').click();
  await page.locator('#menu [data-action=settings]:visible').first().click();await page.locator('[data-settings-tab=comfort]').click();await page.locator('#reducedMotion').check();
  await page.screenshot({path:out+'/desktop-settings.png'});
  assert.deepEqual(errors,[]);
- const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,privateBoxFight:true,boxBuildEdit:true,boxSeriesResult:true,privateZombiesCoop:true,serverZombiesExtraction:true,publicMatchUntouched:true,leaderboards:true,desktopLobby:true,mapStorage:health.mapStorage};
+ const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,privateBoxFight:true,boxBuildEdit:true,boxSeriesResult:true,privateZombiesCoop:true,serverZombiesExtraction:true,publicMatchUntouched:true,leaderboards:true,desktopLobby:true,zombiesDevelopmentBanner:true,mapStorage:health.mapStorage};
  await writeFile(out+'/result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 }catch(e){await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/failure.json',JSON.stringify({error:String(e),errors},null,2));throw e;}
 finally{clearInterval(clock);clearInterval(zclock);guest.destroy();host.destroy();await zclients?.close();await browser?.close();}

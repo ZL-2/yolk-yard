@@ -1,3 +1,4 @@
+import {makeBlacktideTerrain,furnishBlacktide} from './zombies-terrain.js';
 // Physics, navigation, map UI and art share this authored open-world layout.
 export const Z_WORLD_SIZE=180;
 export const Z_ZONES=[
@@ -36,6 +37,10 @@ export const Z_STATIONS=[
  ...[[-93,95],[20,82],[129,80],[-84,16],[18,17],[84,-14],[-83,-90],[18,-82],[120,-120]].map(([x,z],i)=>at('arsenal-'+i,'arsenal','Weapon Calibration',x,z)),
  ...[[-142,126],[0,146],[147,126],[-147,0],[0,40],[145,0],[-147,-141],[0,-147],[142,-126]].map(([x,z],i)=>at('ammo-'+i,'ammo','Ammunition Cache',x,z)),
  ...Z_EXFILS,at('trap-freight','trap','Freight induction grid',-108,0,{cost:700,radius:9}),at('trap-reactor','trap','Coolant discharge',0,-108,{cost:1000,radius:10}),
+ ...[[-120,-18],[100,-24]].map(([x,z],index)=>at('stabilizer-'+index,'fuse','Recover stabilizer '+(index+1),x,z,{index})),
+ at('cipher','cipher','Lattice cipher console',-12,15),
+ ...[[-12,34],[34,-10],[-32,-38]].map(([x,z],index)=>at('resonator-'+index,'resonator','Resonator '+(index+1),x,z,{index})),
+ ...[[96,-143],[120,-143]].map(([x,z],index)=>at('boss-anchor-'+index,'boss-anchor','Grounding anchor '+(index+1),x,z,{index})),
  at('story-terminal','story','Operation Safe Harbor',-125,112),at('rift','rift','Lattice breach',0,-20),at('story-finale','final-operation','Silence the Coast',108,-108),at('doghouse','companion','Rescue containment hound',-120,-100,{cost:2000}),
  at('log-0','log','Harbor manifest',-133,110,{index:0}),at('log-1','log','Medical report',94,-17,{index:1}),at('log-2','log','Final transmission',84,-123,{index:2}),at('secret','secret','Experimental archive',94,-125),
 ];
@@ -48,9 +53,9 @@ export const Z_LOOT_SITES=Z_BUILDINGS.flatMap((b,i)=>[at('loot-'+i+'-0','loot',b
 export const Z_VEHICLE_SITES=[[-144,120],[-6,142],[137,125],[-140,-5],[138,-5],[-140,-141],[0,-144]].map(([x,z],i)=>at('vehicle-'+i,'vehicle','Field rover',x,z));
 export const Z_ENTRANCES=Z_ZONES.flatMap(zone=>Array.from({length:8},(_,i)=>at(`entry-${zone.id}-${i}`,'entry','Infected approach',zone.x+Math.cos(i*Math.PI/4)*43,zone.z+Math.sin(i*Math.PI/4)*43)));
 export const Z_LOGS=[
- 'HARBOR / A civilian evacuation convoy vanished after a signal from the inland observatory. Recover its supplies and restore communications so we can locate survivors.',
- 'HOSPITAL / The infection follows the lattice frequency. Medical teams traced its source to the reactor. Cutting the coolant relays should expose the core.',
- 'OBSERVATORY / The Bellwether is transmitting through the missing staff. Recover the research, close the breach, and bring the evidence home. Your extraction is the mission.',
+ 'HARBOR / Cipher position two is HARBOR. A civilian evacuation convoy vanished after a signal from the inland observatory. Recover its supplies and restore communications so we can locate survivors.',
+ 'HOSPITAL / Cipher position three is WARD. The infection follows the lattice frequency. Medical teams traced its source to the reactor. Cutting the coolant relays should expose the core.',
+ 'OBSERVATORY / Begin the cipher with BEACON. The Bellwether is transmitting through the missing staff. Recover the research, close the breach, and bring the evidence home. Your extraction is the mission.',
 ];
 const box=(x,z,w,d,h,y=0,kind='wall',extra={})=>({x,z,w,d,h,y,kind,color:'concrete',...extra});
 export function makeZombiesMap(){
@@ -65,7 +70,9 @@ export function makeZombiesMap(){
  for(let i=0;i<5;i++)boxes.push(box(-102+i%2*12,-35+Math.floor(i/2)*10,8,3,2.4,0,'container'));
  for(const x of [-5,5])boxes.push(box(x,-116,5,8,5,0,'reactor'));
  for(const t of Z_STATIONS){if(['wall','exfil','story','rift','log'].includes(t.kind))continue;boxes.push(box(t.x,t.z,t.kind==='forge'?2:.8,t.kind==='forge'?1.3:.65,t.kind==='perk'?1.8:1.2,t.y,'station',{zStation:t.id}));}
- return {id:'blacktide',name:'Blacktide Exclusion Coast',tag:'ZOMBIES / EXTRACTION',theme:'zombies',sky:0xa5b5b6,ground:0x768275,accent:0xf2b96a,size:Z_WORLD_SIZE,revision:2,boxes,buildings:Z_BUILDINGS,districts:Z_ZONES,lanes:[],props:[],pickups:[],bases:[[-143,131],[-139,131]],spawns:[[-143,131],[-139,131],[-143,135],[-139,135]],navMax:3};
+ boxes.push(...furnishBlacktide(Z_BUILDINGS,[...Z_STATIONS,...Z_LOOT_SITES,...Z_CACHE_SITES]));
+ const terrain=makeBlacktideTerrain(Z_BUILDINGS,[...Z_STATIONS,...Z_CONTRACTS,...Z_LOOT_SITES,...Z_EXFILS,...Z_ENTRANCES,...Z_VEHICLE_SITES],Z_ZONES);
+ return {terrain,id:'blacktide',name:'Blacktide Exclusion Coast',tag:'ZOMBIES / EXTRACTION',theme:'zombies',sky:0xa5b5b6,ground:0x768275,accent:0xf2b96a,size:Z_WORLD_SIZE,revision:2,boxes,buildings:Z_BUILDINGS,districts:Z_ZONES,lanes:[],props:[],pickups:[],bases:[[-143,131],[-139,131]],spawns:[[-143,131],[-139,131],[-143,135],[-139,135]],navMax:3};
 }
 export const ZOMBIES_MAP=makeZombiesMap();
 export const zCollisionMap=()=>ZOMBIES_MAP;

@@ -3,6 +3,7 @@ import {BoxFightSimulation} from './box-fights.js';
 import {BoxFightUI,boxRoomMarkup,boxResultsMarkup,boxScoresMarkup} from './box-fight-ui.js';
 import {boxFormat} from './box-fight-rules.js';
 import './zombies.css';
+import {narrateBlacktide,stopBlacktideNarration} from './zombies-narration.js';
 import {zombiesLoadout} from './zombies-loadout.js';
 import {ZombiesSimulation} from './zombies-expedition.js';
 import {applyZombiesState} from './zombies-map.js';
@@ -914,7 +915,7 @@ function pauseMenu() {
   );
 }
 function leave(confirm = false,notifyParty=true) {
-  lastPreferenceSync='';actionToggles.reset();zombiesUI.clear();boxUI.clear();
+  lastPreferenceSync='';actionToggles.reset();stopBlacktideNarration();zombiesUI.clear();boxUI.clear();
   const returningFromMatch=screen==='game';
   if(returningFromMatch)showLoading('RETURNING TO LOBBY','Closing the match connection and preparing your operator in the lobby.',{kind:'exit'});else hideLoading(true);
   if(notifyParty){activeLaunch=null;void partyRequest("returned");}
@@ -1055,7 +1056,7 @@ function processEvents() {
       const distance = me
         ? Math.hypot(e.origin.x - me.x, e.origin.z - me.z)
         : 0;
-      sound.shot(e.weapon, distance, e.origin);
+      sound.shot(e.weapon, distance, e.origin,!!(state.zombies&&gun(state.players.find(p=>p.id===e.player)||me)?.suppressed));
     }
     if (e.type === "launch"&&!echoed) sound.shot(e.popper?"pip":e.weapon, me&&e.origin?Math.hypot(me.x-e.origin.x,me.z-e.origin.z):0,e.origin);
     if (e.type === "explosion")
@@ -1641,6 +1642,7 @@ function pressControl(code) {
   scoreHeld = actionDown('scores');
 }
 dialog.addEventListener('click', e => {
+  const narration=e.target.closest('[data-z-narrate]');if(narration){if(narration.dataset.zNarrate==='stop')stopBlacktideNarration();else if(!narrateBlacktide(Number(narration.dataset.zNarrate),sound.enabled?sound.volume*sound.effectsVolume:0))toast('Audio narration is unavailable on this browser. The transcript is shown above.');return;}
   const zButton=e.target.closest('[data-z-action]');if(zButton){sendPlayerAction(zButton.dataset.zAction);resume();return;}
   const reset = e.target.closest('[data-reset-slider]');
   if (reset) {
@@ -1934,7 +1936,7 @@ function pumpNetworkInput(now=performance.now()) {
         predicted.moving = Math.abs(i.forward) + Math.abs(i.strafe) > 0.1;
         {
           const shot=state.boxfight&&state.boxfight.stage!=='fight'?null:guestFire.step(predicted,i,Math.max(state.time,guestPresentation.time),now/1000,state.round);
-          if(shot){view.event(shot,localId);sound.shot(shot.weapon,0,shot.origin);}
+          if(shot){view.event(shot,localId);sound.shot(shot.weapon,0,shot.origin,!!gun(predicted).suppressed);}
         }
         pendingInputs.push(i);
         if (pendingInputs.length > 180) pendingInputs.shift();

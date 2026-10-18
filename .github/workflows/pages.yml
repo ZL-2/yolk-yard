@@ -163,7 +163,7 @@ jobs:
           zombies_update=zombies_files<=zombies_allowed and {'src/zombies.js','server/realtime/zombies-service.js','tests/zombies.test.js','tests/zombies-network.test.js'}<=zombies_files
           extraction_files=set(subprocess.check_output(['git','diff','--name-only','0885f3b9df6afa3f62803abcc29b38aaa7c75026','HEAD'],text=True).splitlines())
           extraction_allowed=zombies_allowed|set(['docs/UPDATE_175.md','docs/BLACKTIDE_EXTRACTION_DESIGN.md','scripts/extraction-performance.mjs','scripts/extraction-art-check.mjs','scripts/bake-zombie-motion.mjs','scripts/prepare-blacktide-models.mjs','scripts/prepare-zombie-audio.mjs','src/guest-movement.js','src/humanoid.js','src/zombies-actors.js','src/zombies-contracts.js','src/zombies-expedition-config.js','src/zombies-expedition-map.js','src/zombies-expedition.js','src/zombies-loadout.js','src/zombies-motion.js','src/zombies-motion-data.js','src/zombies-samples.js','src/zombies-world.js','tests/zombies-expedition.test.js','tests/box-fights-network.test.js'])
-          extraction_allowed.add('tests/helpers/public-match.js')
+          extraction_allowed.update(['tests/helpers/public-match.js','docs/UPDATE_176.md','src/lobby-deploy.css','src/character-motion.js','src/zombies-atmosphere.js','src/zombies-attachments.js','src/zombies-dom.js','src/zombies-enemy-tactics.js','src/zombies-narration.js','src/zombies-operations.js','src/zombies-terrain.js','src/zombies-vehicles.js','scripts/extraction-session-check.mjs','tests/zombies-completion.test.js'])
           extraction_assets=all(f.startswith(('public/audio/blacktide/','public/models/blacktide/')) for f in extraction_files-extraction_allowed)
           extraction_update=extraction_assets and {'src/zombies-expedition.js','src/zombies-contracts.js','server/realtime/zombies-service.js','tests/zombies-expedition.test.js','tests/zombies-network.test.js'}<=extraction_files
           zombies_update=zombies_update or extraction_update
@@ -274,7 +274,7 @@ jobs:
           node --test --test-name-pattern='glider deployment' tests/gameplay-overhaul.test.js
       - name: Extraction authority, parties, Box Fights isolation and reconnect regressions
         if: needs.scope.outputs.zombies_update == 'true'
-        run: node --test --test-concurrency=2 tests/zombies.test.js tests/zombies-network.test.js tests/box-fights.test.js tests/box-fights-network.test.js tests/snapshot-codec.test.js tests/career.test.js tests/chat.test.js tests/private-social.test.js tests/public-pools.test.js tests/public-disconnect.test.js tests/weapon-balance.test.js tests/realtime-resume.test.js tests/arms.test.js tests/equip.test.js
+        run: node --test --test-concurrency=2 tests/zombies-completion.test.js tests/zombies-expedition.test.js tests/character-motion.test.js tests/zombies.test.js tests/zombies-network.test.js tests/box-fights.test.js tests/box-fights-network.test.js tests/snapshot-codec.test.js tests/career.test.js tests/chat.test.js tests/private-social.test.js tests/public-pools.test.js tests/public-disconnect.test.js tests/weapon-balance.test.js tests/realtime-resume.test.js tests/arms.test.js tests/equip.test.js
       - name: Ten-minute 24-operator crowd and snapshot performance budget
         if: needs.scope.outputs.zombies_update == 'true'
         run: node --expose-gc scripts/zombies-performance.mjs

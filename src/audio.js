@@ -149,10 +149,10 @@ export class Sound {
   preset.forEach(p=>this.layer(p,position?{...position,radius}:null,category,scale));
  }
  tone(freq,duration=.09,type='sine',volume=.15,end=0){this.layer(note(freq,duration,volume,type,end));}
- shot(id,distance=0,position=null){
+ shot(id,distance=0,position=null,suppressed=false){
   if(!this.ctx||!this.enabled||this.voices.size>=56||distance>190)return;
   if(distance<7)this.score.activity();
-  const spec=FIREARM_SOUNDS[id]||FIREARM_SOUNDS.sprinter,sp=this.spatial(position?{...position,radius:id==='thumper'?190:['needle','anchor','peeper'].includes(id)?170:125}:null),volume=.5*this.effectsVolume*sp.gain/(position?1:1+distance/15);if(volume<.0002)return;
+  const spec=FIREARM_SOUNDS[id]||FIREARM_SOUNDS.sprinter,sp=this.spatial(position?{...position,radius:id==='thumper'?190:['needle','anchor','peeper'].includes(id)?170:125}:null),volume=(suppressed?.19:.5)*this.effectsVolume*sp.gain/(position?1:1+distance/15);if(volume<.0002)return;
   this.shotBuffers??=new Map();const variant=(this.shotCounter=(this.shotCounter||0)+1)%3,key=id+':'+variant;
   if(!this.shotBuffers.has(key)){const wave=synthesizeShot(id,this.ctx.sampleRate,variant),buffer=this.ctx.createBuffer(1,wave.length,this.ctx.sampleRate);buffer.getChannelData(0).set(wave);this.shotBuffers.set(key,buffer);}
   const source=this.ctx.createBufferSource(),gain=this.ctx.createGain(),pan=this.ctx.createStereoPanner(),filter=this.ctx.createBiquadFilter();source.buffer=this.shotBuffers.get(key);
