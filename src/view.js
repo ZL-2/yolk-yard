@@ -952,7 +952,7 @@ export class View {
         this.actorBounds.center.set(p.x,p.y+.9,p.z);
         if(playing&&!this.actorFrustum.intersectsSphere(this.actorBounds)){const hidden=this.models.get(p.id);if(hidden)hidden.visible=false;continue;}
         const sig =
-          p.color +
+          p.name + (!!state.zonewars) + p.color +
           p.hat + JSON.stringify([p.pattern,p.finish,p.eyewear,p.accent,p.outfit,p.wrap,p.backbling,p.pickaxe]) +
           (p.team+":"+p.teamSlot) +
           mode(state.options.mode).teams;
@@ -974,9 +974,11 @@ export class View {
             teammates(state.options,p,local)
               ? teamStyle(state.players,p).color
               : p.boss?"#ffda82":"#ffffff",
+            !!state.zonewars,
           );
           name.position.y = 2.15;model.userData.nameplate=name;
           name.visible = p.id!==local?.id&&(!!p.boss||!!state.zonewars||!state.royale||teammates(state.options,p,local));
+          if(state.zonewars){name.material.depthTest=false;name.material.depthWrite=false;name.material.sizeAttenuation=false;name.renderOrder=1000;}
           model.add(name);
           this.actors.add(model);
           this.models.set(p.id, model);
@@ -1040,7 +1042,13 @@ export class View {
         aura.material.color.setHex(p.damageUntil>state.time?0xff625f:0x83e6ff);
         aura.material.opacity=.13+Math.sin(this.clock*5)*.025;
         if(p.inventory&&poseDue)this.royaleView.animateActor(model,p,this.clock,poseDt);
-        if(model.userData.nameplate)model.userData.nameplate.position.y=bodyHeight(p)+.3;
+        if(model.userData.nameplate){
+          const name=model.userData.nameplate;name.position.y=bodyHeight(p)+.3;
+          name.visible=p.id!==local?.id&&p.health>0&&!p.spectating&&(!!p.boss||!!state.zonewars||!state.royale||teammates(state.options,p,local));
+          // Constant readable text size throughout the district, including
+          // behind walls and while aiming. No extra DOM or per-frame textures.
+          if(state.zonewars){const h=56*Math.tan(this.camera.fov*Math.PI/360)/Math.max(1,this.canvas.clientHeight);name.scale.set(h*512/96,h,1);}
+        }
         if(p.boss||p.henchman)updateBossAlert(model,p,state.time,bodyHeight(p),distance);
         updateCelebration(model,p,state.time,g=>this.disposeGroup(g));
         if(poseDue)animateHumanoid(model,{...p,...(state.phase==='results'?{vx:0,vz:0,moving:false}:{}),throwProgress:(this.clock-(model.userData.throwStart??-100))/.78,shotRecoil:model.userData.armRecoil||0},poseDt,state.phase==='results'&&!p.emote?this.clock:state.time,{distance:0,map:this.buildMap});

@@ -15,9 +15,11 @@ const pick=(r,a)=>a[Math.min(a.length-1,Math.floor(r()*a.length))];
 export function zoneLoadout(random){
  const rarity=()=>pick(random,[2,2,3,3,4]),weapon=id=>({id,weapon:true,count:1,rarity:rarity()});
  // Slot roles are guaranteed; randomizing each role cannot create an unusable kit.
- return [weapon(pick(random,['scatter','scatter','doubleyolk'])),weapon(pick(random,['sprinter','sprinter','duet'])),random()<.65?weapon(pick(random,['zipper','needle','anchor','peeper'])):{id:'impulse',count:2,rarity:3},pick(random,[{id:'mini',count:6,rarity:1},{id:'flask',count:3,rarity:2},{id:'splash',count:4,rarity:2}]),pick(random,[{id:'medkit',count:2,rarity:1},{id:'splash',count:4,rarity:2},{id:'impulse',count:2,rarity:3},{id:'launchpad',count:1,rarity:3}])].map(i=>({...i}));
+ return [weapon(pick(random,['sprinter','sprinter','duet'])),weapon(pick(random,['scatter','scatter','doubleyolk'])),random()<.65?weapon(pick(random,['zipper','needle','anchor','peeper'])):{id:'impulse',count:2,rarity:3},pick(random,[{id:'mini',count:6,rarity:1},{id:'flask',count:3,rarity:2},{id:'splash',count:4,rarity:2}]),pick(random,[{id:'medkit',count:2,rarity:1},{id:'splash',count:4,rarity:2},{id:'impulse',count:2,rarity:3},{id:'launchpad',count:1,rarity:3}])].map(i=>({...i}));
 }
-export function constrainZoneMovement(p,map,prep=false){if(!map.zoneWars||p.spectating)return;const edge=map.size-.6;p.x=Math.max(-edge,Math.min(edge,p.x));p.z=Math.max(-edge,Math.min(edge,p.z));if(prep&&p.boxSpawn){const s=p.boxSpawn;p.x=Math.max(s.x-1.5,Math.min(s.x+1.5,p.x));p.z=Math.max(s.z-1.5,Math.min(s.z+1.5,p.z));p.y=s.y;p.vy=0;p.grounded=true;}if(p.y>72){p.y=72;p.vy=Math.min(0,p.vy);}}
+// A straight, floor-supported pickup lane in the direction the player faces.
+export function zoneSpawnLootPoints(spawn){return Array.from({length:5},(_,i)=>({x:spawn.x-Math.sin(spawn.yaw)*(1+i*.8),y:spawn.y,z:spawn.z-Math.cos(spawn.yaw)*(1+i*.8)}));}
+export function constrainZoneMovement(p,map,prep=false){if(!map.zoneWars||p.spectating)return;const edge=map.size-.6;p.x=Math.max(-edge,Math.min(edge,p.x));p.z=Math.max(-edge,Math.min(edge,p.z));if(prep&&p.boxSpawn){const s=p.boxSpawn,fx=-Math.sin(s.yaw),fz=-Math.cos(s.yaw),rx=-fz,rz=fx,dx=p.x-s.x,dz=p.z-s.z,forward=Math.max(-1.5,Math.min(4.7,dx*fx+dz*fz)),side=Math.max(-1.5,Math.min(1.5,dx*rx+dz*rz));p.x=s.x+fx*forward+rx*side;p.z=s.z+fz*forward+rz*side;p.y=s.y;p.vy=0;p.grounded=true;}if(p.y>72){p.y=72;p.vy=Math.min(0,p.vy);}}
 
 // Shared by authority and guest prediction. Fixed map bouncers are distinct
 // from inventory launch pads: a vertical rebound, safe landing, no forced glider.

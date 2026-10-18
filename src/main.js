@@ -1114,17 +1114,18 @@ function processEvents() {
       $("#respawn-by").textContent = e.action === "respawn" ? "Returning to a fresh spawn" : "";
     }
     if (e.type === "spawn" && e.player === localId) {
-      input.slot = state.boxfight?1:0;
+      input.slot = state.boxfight&&!state.zonewars?1:0;
       const p = state.players.find((p) => p.id === localId);
       if (p) {
         if (p.health > 0 && performance.now() < spawnIntentUntil && !dialog.open) void resume();
         spawnIntentUntil = 0;
         input.yaw = Number.isFinite(e.yaw)?e.yaw:p.yaw;
-        input.pitch = 0;
+        input.pitch = state.zonewars?-.35:0;
       }
       pendingInputs = [];
       predicted = null;
     }
+    if(state.zonewars&&e.type==='royale-cue'&&e.player===localId&&e.cue?.startsWith('pickup-')&&input.slot===0&&e.slot>0&&e.slot<=5)input.slot=e.slot;
   }
   const confirmation=combatConfirmation.takeSound();if(confirmation&&confirmation!=='elimination')sound.hit(confirmation);
 }
@@ -1893,7 +1894,7 @@ function frameInput() {
   if(buildUI.edit&&active){const me=localBuildPose();if(me)buildUI.sample(me,actionDown('fire')||touch.fire,!!settings.confirmEditOnRelease);}
   if(buildUI.edit&&!active)buildUI.down=false;
 
-  if(state?.boxfight&&input.roundSeen!==state.round){const p=state.players.find(p=>p.id===localId);input.roundSeen=state.round;if(p?.boxSpawn){input.yaw=p.boxSpawn.yaw;input.pitch=0;input.slot=1;pendingInputs=[];predicted=null;}}
+  if(state?.boxfight&&input.roundSeen!==state.round){const p=state.players.find(p=>p.id===localId);input.roundSeen=state.round;if(p?.boxSpawn){input.yaw=p.boxSpawn.yaw;input.pitch=state.zonewars?-.35:0;input.slot=state.zonewars?0:1;pendingInputs=[];predicted=null;}}
   const nextInput = {
     seq: ++seq,
     round:state?.round,
@@ -2114,6 +2115,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
     social:(type,data)=>party.request(type,data),
     zombiesView:()=>({rigs:view.zombiesView.rigs.filter(r=>r.id!==null).length+view.zombiesView.actors.pool.filter(r=>r.id!==null).length,drawCalls:view.renderer.info.render.calls,triangles:view.renderer.info.render.triangles,memory:{...view.renderer.info.memory},renderMs:view.updateMilliseconds,camera:{position:view.camera.position.toArray(),rotation:view.camera.rotation.toArray(),fov:view.camera.fov,near:view.camera.near,far:view.camera.far},world:{map:view.mapId,visible:view.world.visible,children:view.world.children.length,matrix:view.world.matrixWorld.elements.slice(),blacktide:!!view.world.userData.blacktide},actor:view.renderLocalActor?{x:view.renderLocalActor.x,y:view.renderLocalActor.y,z:view.renderLocalActor.z,yaw:view.renderLocalActor.yaw,pitch:view.renderLocalActor.pitch}:null}),
     repairView:()=>({map:view.buildMap?.id,camera:view.camera.position.toArray(),boom:view.cameraBoom?.distance,third:view.thirdPersonDistance,pixelRatio:view.renderer.getPixelRatio(),renderScale:view.renderScale,renderMs:view.updateMilliseconds,memory:{...view.renderer.info.memory},calls:view.renderer.info.render.calls}),
+    nameplates:()=>[...view.models].map(([id,m])=>({id,visible:!!(m.visible&&m.userData.nameplate?.visible),throughWalls:m.userData.nameplate?.material.depthTest===false,fixedSize:m.userData.nameplate?.material.sizeAttenuation===false})),
     setPerspective:value=>{settings.perspective=value;},
     watch:id=>{spectateTarget=id;const p=sim.players.get(localId);p.health=0;p.spectating=true;p.killerId=id;},
     framePacing:()=>({limit:framePacer.limit,frames:framePacer.frames,elapsedMs:framePacer.elapsedMs}),

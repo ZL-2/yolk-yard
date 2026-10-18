@@ -158,7 +158,8 @@ export class RoyaleView{
    const item=itemById(r,'loot',id),distance=item?Math.hypot(item.x-observer.x,item.z-observer.z):Infinity;
    if(distance>150){mesh.removeFromParent();this.view.disposeGroup(mesh);this.loot.delete(id);continue;}
    mesh.visible=distance<lootRadius;if(!mesh.visible)continue;
-   mesh.position.set(item.x,lootHeight(item,time)+.24+Math.sin(t*1.65+item.uid)*.055,item.z);mesh.rotation.y=Math.sin(t*.55+item.uid)*.16;
+   mesh.scale.setScalar(item.zoneSlot ? (item.weapon ? .42 : .72) : 1);
+   mesh.position.set(item.x,lootHeight(item,time)+(item.zoneSlot ? .1 : .24)+Math.sin(t*1.65+item.uid)*.055,item.z);mesh.rotation.y=Math.sin(t*.55+item.uid)*.16;
    if(!item.motion&&item.spawnFrom&&time-item.spawnAt<.6){const age=Math.max(0,(time-item.spawnAt)/.6),ease=1-(1-age)**3;mesh.position.x=THREE.MathUtils.lerp(item.spawnFrom.x,item.x,ease);mesh.position.z=THREE.MathUtils.lerp(item.spawnFrom.z,item.z,ease);mesh.position.y=THREE.MathUtils.lerp(item.spawnFrom.y,item.y+.24,ease)+Math.sin(age*Math.PI)*.6;}
   }
   for(const id of this.itemQuery.chests){if(this.chests.has(id))continue;const chest=itemById(r,'chests',id);if(!chest)continue;if(created>=3||performance.now()>deadline)break;const mesh=this.chestModel(chest.supply,chest.epic);this.chests.set(id,mesh);this.root.add(mesh);created++;

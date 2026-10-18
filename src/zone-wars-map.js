@@ -77,7 +77,7 @@ function createZoneMap(){
  const bouncePads=[{id:'roof-west',x:29,y:12,z:20,size:3.6},{id:'roof-east',x:43,y:12,z:20,size:3.6},{id:'street-south',x:8,y:0,z:46,size:3.6},{id:'street-north',x:-10,y:0,z:-46,size:3.6},{id:'street-east',x:47,y:0,z:7,size:3.6},{id:'street-west',x:-46,y:0,z:8,size:3.6}];
  for(const pad of bouncePads){const support=pad.y>0&&boxes.find(b=>b.part==='floor'&&Math.abs(b.y+b.h-pad.y)<.01&&Math.abs(pad.x-b.x)<=b.w/2&&Math.abs(pad.z-b.z)<=b.d/2);pad.objectId=block(pad.x,pad.y,pad.z,pad.size,.13,pad.size,0x4385af,{part:'bouncer',surface:'metal',material:'metal',indestructible:!support,buildBlocking:true,...(support?{objectId:support.objectId}: {})}).objectId;}
  const spawn=(id,x,z,levels)=>{const b=buildings.find(b=>b.id===id);for(const y of levels)spawnRooms.push({x,y:y+(y===0?.14:.02),z,yaw:Math.PI,building:buildings.indexOf(b),roomName:b.name});};
- spawn('central',-4,8,[0,4,8]);spawn('central',-5,-7,[16]);
+ spawn('central',-4,7,[0,4,8]);spawn('central',-5,-7,[16]);
  spawn('north-apartments',-37,-27,[0,4,8,12]);spawn('brick-apartments',23,-27,[0,4,8,12]);
  spawn('courtyard-west',23,35,[0,4]);spawn('courtyard-east',43,35,[0,4]);
  const cliffs=[];

@@ -255,14 +255,14 @@ export class RoyaleSimulation extends Simulation {
   while(!stackOnly&&item.count>0){
    slot=vacantSlot(p,item);if(slot<0&&!merged){slot=p.slot===0?1:p.slot;if(this.dropSlot(p,slot)===false)return false;}
    if(slot>=0){
-   const {uid,x,y,z,motion,spawnFrom,spawnAt,vaultId,droppedBy,pickupAfter,landAt,...entry}=item;
+   const {uid,x,y,z,motion,spawnFrom,spawnAt,vaultId,droppedBy,pickupAfter,landAt,zoneSpawn,zoneSlot,...entry}=item;
    const count=Math.min(maximum,item.count);p.inventory[slot]={...entry,count};item.count-=count;merged+=count;
    if(!p.inventory[p.slot] || p.inventory.filter(i=>i&&!i.pickaxe).length===1)p.slot=slot;
    beginEquip(p,this.time,true);
    }else break;
   }
   if(!merged)return false;if(!item.count)this.removeLoot(item);else this.lootVersion++;
-  if(!stackOnly){this.cancelUse(p,'swap');p.reloadEnd=0;}if(p.bot&&p.brain)p.brain.decision=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'pickup-'+(item.rarity||0),item:item.id});return true;
+  if(!stackOnly){this.cancelUse(p,'swap');p.reloadEnd=0;}if(p.bot&&p.brain)p.brain.decision=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'pickup-'+(item.rarity||0),item:item.id,slot:p.slot});return true;
  }
  openChest(p,chest){
   if(!this.chests.includes(chest)||!canFight(p)||p.flight!=='ground'||chest.opened||!vaultOpen(this,chest.vaultId)||!this.accessible(p,chest,3.3))return false;
