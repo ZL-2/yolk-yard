@@ -16,7 +16,7 @@ function kill(s,victim,attacker){s.damage(s.players.get(victim),s.players.get(at
 test('Box rules normalize private formats, public pools, loadouts and human-only seats',()=>{
  const p=publicMatchOptions({mode:'boxfight',teamSize:3,scoreLimit:1,boxFormat:'ffa',building:false});assert.equal(p.capacity,6);assert.equal(p.scoreLimit,5);assert.equal(p.boxFormat,'teams');assert.equal(p.building,true);assert.notEqual(publicPoolKey(p),publicPoolKey({...p,teamSize:2}));
  const o=matchOptions({mode:'boxfight',boxFormat:'ffa',teamSize:4,fill:false,bots:7});assert.equal(o.capacity,8);assert.equal(o.bots,0);
- const s=setup(),a=s.players.get('a'),b=s.players.get('b');for(const p of [a,b]){assert.equal(p.health,100);assert.equal(p.shield,100);assert.equal(p.materials.wood,500);assert.equal(p.inventory[1].id,'scatter');assert.equal(p.inventory[2].id,'sprinter');assert.equal(p.inventory[3].count,2);assert.equal(p.bank.shells,60);}assert.notEqual(a.team,b.team);
+ const s=setup(),a=s.players.get('a'),b=s.players.get('b');for(const p of [a,b]){assert.equal(p.health,100);assert.equal(p.shield,100);assert.equal(p.materials.wood,500);assert.equal(p.inventory[1].id,'sprinter');assert.equal(p.inventory[2].id,'scatter');assert.equal(p.slot,1);assert.equal(p.inventory[3].count,2);assert.equal(p.bank.shells,60);}assert.notEqual(a.team,b.team);
 });
 test('prep protects health, world and spawn sides; host and prediction share limits',()=>{
  const s=setup(),a=s.players.get('a'),b=s.players.get('b');s.damage(a,b,999,'scatter');assert.equal(a.health+a.shield,200);assert.equal(s.fire(a),false);assert.equal(s.map.boxPrep,true);

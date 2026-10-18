@@ -1,29 +1,46 @@
-# Zone Wars reference and implementation boundaries
+# Tilted Zone Wars: dry reference reconstruction
 
-Research reviewed October 18, 2026. The reference is Prettyboy's original solo Tilted Zone Wars, island **3729-0643-9775**. There are separate names-off, all-weapons, duos, trios, squads and zero-build islands; those are not interchangeable rulesets.
+Reviewed October 18, 2026. Target: Prettyboy's original solo island **3729-0643-9775**, using the user's 17.691-second H.264/MP4 screen recording and both supplied reference stills. The full recording was decoded and reviewed at four frames per second, with larger views of the aerial and street sequences. The video is a trailer, not a complete match or an export of the original map.
 
-## Primary references
+## Visual evidence
 
-- [Prettyboy's official island listing](https://www.fortnite.com/@prettyboy/3729-0643-9775) describes the original as solo Zone Wars with name tags enabled. Its creator posts show ongoing changes to the loot pool, including seasonal items. The listing does not expose exact map coordinates, server scripts or item drop probabilities.
-- [Fortnite's Tilted Zone Wars promotion](https://www.youtube.com/watch?v=6GFbSjJrp2k) describes random building spawns, randomized equipment and last-player-standing combat.
-- [Epic's Zone Wars design example](https://dev.epicgames.com/documentation/en-us/fortnite/zone-wars-in-fortnite-creative) explains randomized spawns and inventory, an advanced storm controller with six beacons, changing storm centers, escalating damage and a final zero-radius storm. Its example configuration is a general design guide, not Prettyboy's unpublished configuration.
+| Trailer section | Visible evidence used |
+| --- | --- |
+| 0–3.3 s | Dry aerial orbit: four clock towers surrounding one stepped central high-rise, corner apartments, split low courtyard block, elevated fenced basketball court, tight orange rock bowl. |
+| 3.3–5.7 s | Builds extend across rooftops; storm wall moves through the city; overhead view confirms the clock cross and corner building footprints. |
+| 5.7–7.5 s | Enterable gray interiors, blue floor covering, multiple windows and randomized equipment. |
+| 7.5–10.5 s | Street-level masonry, arched shop openings, green/striped awnings, street tree planters, the clock's bell openings and circular faces. |
+| 10.5–12.9 s | High view of the same street plan, then the shop/replay area. |
+| 12.9–16.5 s | Flood event and building combat above water. Flooding is deliberately excluded; roof positions remain useful visual evidence. |
+| 16.5–17.69 s | Title card and island code confirm the reference. |
 
-## Implemented rules
+The stills provide higher-resolution evidence of tile sidewalks, flat dark roofs, rooftop vents, four clocks, yellow/turquoise/dark/pink cars, rounded tree canopies, exterior court stairs and blue bounce pads. The older still includes pitched clock caps; the uploaded trailer's flat copper-colored clock roofs are the implementation target.
 
-Sixteen solo contestants, parties entering together as rivals, one life per round, spectator cycling after elimination, an eight-second protected preparation period, random room assignment and a fresh randomized five-slot kit each round. Player nameplates remain visible. A public series is first to five; private rooms expose capacity and target score. Both public and private rooms require human opponents and never fill seats with bots.
+## Additional primary research
 
-The district has nine enterable multi-storey landmarks: brick and twin apartments, an office tower, corner shops, construction, pawn shop, diner, south apartments and a clock tower. Streets, crosswalks, cars, interior partitions, furniture, roof equipment, stairs, basketball court and surrounding hills form the playable urban space. Windows, floors and stairways use real collision geometry. Sixteen separated spawn cells occupy multiple building floors. Builds, world damage, inventory and loot reset between rounds.
+- [Official island listing](https://www.fortnite.com/@prettyboy/3729-0643-9775): identifies the solo, free-for-all, name-tags-on island and its changing loot pool.
+- [Prettyboy: Original Version of Tilted Zone Wars](https://communities.epicgames.com/thread/original-version-of-tilted-zone-wars/ymnq/1?lang=en-US): distinguishes the original name-tags-on rules from names-off, all-weapons and team variants. Those separate variants are not combined into this map.
+- [Prettyboy: Shop Events](https://communities.epicgames.com/thread/tilted-zone-wars-shop-events/IkYj): identifies flooding and mass destruction as separate events. The user requested the dry city; neither event is enabled here.
+- [Fortnite's earlier promotion](https://www.youtube.com/watch?v=6GFbSjJrp2k): corroborating official reference identity. Public page metadata was available; the uploaded local trailer supplies the actual visual evidence for this update.
+- [Epic: Zone Wars design](https://dev.epicgames.com/documentation/en-us/fortnite/zone-wars-in-fortnite-creative): supports randomized room spawns/gear, phased moving storms, rising storm damage and a final zero-radius circle. This is general design guidance, not Prettyboy's private numerical settings.
+- [Epic: Trap Items](https://dev.epicgames.com/documentation/fortnite/using-trap-items-in-fortnite-creative) and [Bouncer API](https://dev.epicgames.com/documentation/fortnite/verse-api/fortnitedotcom/devices/bouncer_device?lang=en-US): distinguish bouncers from launch pads and describe traversal launch behavior. Launch velocity here is adapted to Ravelfront's physics.
 
-Equipment guarantees a shotgun, assault rifle, support weapon or mobility item, shields, and healing or utility. It uses Ravelfront's weapon, rarity, ammunition, healing, impulse and launch-pad systems. Contestants receive 100 health, 100 shield and 500 of each material. Eliminations grant 50 health/shield siphon plus bounded materials and ammunition. Loadout choices and weighting are explicit in `src/zone-wars-rules.js`.
+## Implemented map
 
-The six moving circles close from radius 94 through 62, 40, 24, 13, 7 and 0. Storm damage steps through 5, 5, 8, 10, 10 and 15 per second. The final circle closes at 186 seconds; the round has a hard limit of 210 seconds. Storm paths and spawn/loadout randomness survive host transfer.
+The previous nine generic city landmarks are replaced. Ten authored structures form the dry layout: a seven-storey central core and three-storey shop wing, two four-storey corner apartment buildings, two three-storey L-shaped courtyard buildings, four narrow clock towers, and a one-storey elevated basketball court. The central facade has tall arched window strips, green storefronts, roof parapets and ventilation equipment. Clock chambers, roofs and apartment floors are reachable by actual stairs.
 
-## Deliberate, disclosed differences
+The road and pale sidewalk network, court markings/hoops/fencing, external court staircase, car colors, circular and square tree planters, orange cliff enclosure and ridge pines follow the supplied views. Six fixed bouncers occupy street and roof positions. Shared host/guest movement triggers them on contact, grants safe landing for that jump, and does not force a glider. Rooftop pads disappear with their supporting roof tile; a new round restores the full map. Minimap footprints match the stepped and L-shaped collision geometry.
 
-This is an original, playable Tilted-style district built for Ravelfront's renderer and movement scale. It is **not a verified one-to-one reproduction** of Fortnite's terrain, geometry, artwork, weapons, UI, current seasonal loot or hidden probabilities. Public research cannot establish those unpublished internals. The numerical timings, dimensions, first-to-five target and kit probabilities above are explicit Ravelfront choices, rather than claims about Prettyboy's current island. The game retains its own item names, models and interface.
+Sixteen separate interior spawn cells span several floors. Every participant receives a fresh randomized five-slot kit, 100 health, 100 shield, and 500 of each building material. The existing one-life rounds, 50 siphon, elimination spectators, build edits, damage, round reset, first-to-five public series and configurable private target remain. Public and private matches require human opponents; bots are never admitted or spawned.
 
-## Score semantics
+Storm radii remain 94 → 62 → 40 → 24 → 13 → 7 → 0 with six moving phases. Centers are confined to ±38 metres so the final zone cannot settle inside the new perimeter cliffs. The circle closes at 186 seconds; the hard round limit is 210 seconds. Storm damage is 5, 5, 8, 10, 10 and 15 per second. These are explicit Ravelfront tuning values.
 
-Public leaderboards track each mode independently. Zone Wars wins mean round wins; Box Fights wins mean series wins; Zombies wins mean successful extraction; Royale and Free For All count match victories. Private rooms do not feed competitive public rankings; existing career eligibility rules remain in place. Training displays this browser's practice eliminations and completed six-objective drills. There is no invented global training ranking.
+## Accuracy limits
 
-The relay persists cumulative mode totals independently from reward eligibility, deduplicates match/round updates and merges identities without mixing modes. Existing public Royale history is retained. Rankings follow the Play selection until the rankings mode filter is explicitly overridden; Both Kills and Wins share the manual choice. The next Play mode choice resets both rankings automatically.
+This is a reference-based reconstruction within Ravelfront's existing engine, not an asset-identical Fortnite port. The reference establishes the visible arrangement and architecture; it does not provide exact coordinates, complete hidden interiors, server scripts, loot probabilities or a complete match's timings. Dimensions and hidden interior connections are authored to remain playable at the game's movement/building scale. Existing Ravelfront weapon models, items, UI and supported mobility remain; the trailer's Fortnite-specific Baller and event shop are not imported. No flooded variant is included.
+
+## Verification and rankings
+
+The map preview script renders eight desktop views using the actual map builder and game materials. Tests cover sixteen clear spawns, every building's stair-to-roof route, exterior court access, bouncer prediction, damage/reset, storm paths, human-only public/private admission, real guest synchronization and host transfer. Desktop match checks cover building/editing, moving storm, results and rematch.
+
+Public rankings remain separate per mode: Zone Wars wins count rounds; Box Fights wins count series. Kills and Wins share the same rankings mode. Selecting a Play mode resets that filter; manually choosing another rankings mode persists until the next Play mode selection. There is no Follow Play button. Private matches remain outside competitive public rankings.

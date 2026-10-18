@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {performance} from 'node:perf_hooks';
 import {ZoneWarsSimulation} from '../src/zone-wars.js';
 import {BoxFightSimulation} from '../src/box-fights.js';
-import {ZONE_RULES,ZONE_PHASES,zoneStormPath,zoneStormAt,zoneLoadout} from '../src/zone-wars-rules.js';
+import {ZONE_RULES,ZONE_PHASES,zoneStormPath,zoneStormAt,zoneLoadout,bounceZonePad} from '../src/zone-wars-rules.js';
 import {ZONE_BUILDINGS} from '../src/zone-wars-map.js';
 import {matchOptions} from '../src/match-options.js';
 import {publicMatchOptions,publicPoolKey} from '../src/public-royale.js';
-import {buildingTick,editBuilding} from '../src/building.js';
+import {buildingTick,editBuilding,rebuildMap} from '../src/building.js';
 import {predictionCopy,predictMovement} from '../src/guest-movement.js';
 import {rewardFrame} from '../src/rewards.js';
 import {movePlayer} from '../src/physics.js';
@@ -18,7 +18,7 @@ test('Zone Wars has a distinct public pool and configurable private solo rooms',
  const s=new ZoneWarsSimulation({fill:false});s.addPlayer('a',{name:'Alfa'});assert.equal(s.configure({capacity:4,scoreLimit:7,fill:false}),true);assert.equal(s.options.mode,'zonewars');assert.equal(s.options.capacity,4);assert.equal(s.options.bots,0);assert.equal(s.map.id,'tilted-district');assert.equal(matchOptions({mode:'zonewars',capacity:500}).capacity,16);
 });
 test('sixteen randomized spawns, balanced random kit roles and intact interior floors',()=>{
- const s=setup({},16);assert.equal(s.players.size,16);assert.equal(s.players.get('a').name,'Alpha');assert.equal(s.players.get('b').name,'Bravo');assert.ok(s.map.roads.every(r=>r.points.length===2&&r.width>0));const poses=new Set(),kits=new Set();for(const p of s.players.values()){poses.add([p.x,p.y,p.z].join(','));kits.add(p.inventory.slice(1).map(i=>i.id).join(','));assert.equal(p.health+p.shield,200);assert.deepEqual(p.materials,{wood:500,brick:500,metal:500});assert.equal(p.inventory.length,6);assert.ok(p.inventory[1].weapon&&p.inventory[2].weapon);assert.ok(!p.inventory[4].weapon);assert.ok(p.inventory[1].ammo>0);const start=p.y;movePlayer(p,{yaw:p.yaw},s.map,1/30,s.time);assert.ok(Math.abs(p.y-start)<.1,'Spawn stands on a real floor');}assert.equal(poses.size,16);assert.ok(kits.size>5);assert.equal(s.map.buildings.length,9);assert.ok(s.map.buildings.some(b=>b.clock));assert.ok(s.map.buildings.some(b=>b.unfinished));
+ const s=setup({},16);assert.equal(s.players.size,16);assert.equal(s.players.get('a').name,'Alpha');assert.equal(s.players.get('b').name,'Bravo');assert.ok(s.map.roads.every(r=>r.points.length===2&&r.width>0));const poses=new Set(),kits=new Set();for(const p of s.players.values()){poses.add([p.x,p.y,p.z].join(','));kits.add(p.inventory.slice(1).map(i=>i.id).join(','));assert.equal(p.health+p.shield,200);assert.deepEqual(p.materials,{wood:500,brick:500,metal:500});assert.equal(p.inventory.length,6);assert.ok(p.inventory[1].weapon&&p.inventory[2].weapon);assert.ok(!p.inventory[4].weapon);assert.ok(p.inventory[1].ammo>0);const start=p.y;movePlayer(p,{yaw:p.yaw},s.map,1/30,s.time);assert.ok(Math.abs(p.y-start)<.1,'Spawn stands on a real floor');}assert.equal(poses.size,16);assert.ok(kits.size>5);assert.equal(s.map.buildings.filter(b=>b.clock).length,4);assert.equal(s.map.buildings.find(b=>b.id==='central').footprints.length,2);assert.equal(s.map.buildings.filter(b=>b.style==='courtyard').length,2);assert.equal(s.map.court.y,4);assert.ok(s.map.cliffs.length>=24);assert.equal(s.map.bouncePads.length,6);
  const first=[...s.players.values()].map(p=>p.boxSpawn);s.beginBoxRound();assert.notDeepEqual([...s.players.values()].map(p=>p.boxSpawn),first);for(let i=0;i<50;i++){const kit=zoneLoadout(Math.random);assert.equal(kit.length,5);assert.ok(kit.every(i=>i.id&&i.count>0));}
 });
 test('prep protection confines both host and guest to their spawn and releases on cue',()=>{
@@ -49,4 +49,27 @@ test('both competitive modes reject bot settings, bot admission and legacy check
   for(const recurring of [false,true]){const s=new Type({bots:15,fill:true,difficulty:4,teamFill:true,recurring});assert.equal(s.options.bots,0);assert.equal(s.options.fill,false);assert.equal(s.options.teamFill,false);assert.equal(s.addPlayer('bot',{name:'Practice'},true),null);s.addPlayer('a',{name:'Human Alpha'});s.startRound();for(let i=0;i<600;i++)s.tick(1/30);assert.equal(s.players.size,1);assert.equal(s.boxRound,0);assert.equal(s.boxStage,'waiting');assert.equal(s.snapshot().boxfight.waitingForOpponents,true);}
   const original=new Type();original.addPlayer('a',{name:'Human Alpha'});original.addPlayer('b',{name:'Human Bravo'});original.startRound();const checkpoint=original.checkpoint();checkpoint.players[1].bot=true;checkpoint.options.bots=15;checkpoint.options.fill=true;const restored=new Type().restore(checkpoint);assert.equal(restored.players.size,1);assert.equal(restored.options.bots,0);assert.equal(restored.options.fill,false);assert.equal(restored.boxStage,'waiting');assert.equal(restored.snapshot().royale.queueEnds,0);
  }
+});
+
+test('every building stair reaches its first floor and roof, and the court has exterior access',()=>{
+ const s=setup(),p=s.players.get('a');fight(s);
+ for(const b of s.map.buildings.filter(b=>b.stairs))for(const f of [0,b.floors-1]){
+  Object.assign(p,{x:b.stairs.x,y:f*4+.14,z:b.stairs.north+.55,yaw:Math.PI,grounded:true,vy:0,mantle:null,fall:null});
+  for(let i=0;i<180;i++)movePlayer(p,{yaw:Math.PI,forward:.5},s.map,1/30,i/30);
+  assert.ok(p.y>=f*4+3.9,`${b.id} floor ${f} has a climbable exit`);
+ }
+ Object.assign(p,{x:-30,y:0,z:50.4,yaw:0,grounded:true,vy:0,mantle:null,fall:null});
+ for(let i=0;i<180;i++)movePlayer(p,{yaw:0,forward:.5},s.map,1/30,i/30);
+ assert.ok(p.y>=3.9&&p.z<42,'The wide stair opens onto the basketball court');
+});
+test('fixed ground and roof bouncers agree with guest prediction and protect the resulting fall',()=>{
+ const s=setup(),p=s.players.get('a');fight(s);
+ for(const pad of s.map.bouncePads){
+  Object.assign(p,{x:pad.x,y:pad.y+.13,z:pad.z,grounded:true,vy:0,mantle:null,fall:null,flight:'ground',health:100,shield:100});
+  const q=predictionCopy(p),input={yaw:0};s.moveWithCommands(p,input,1/30);predictMovement(q,input,s.map,1/30,s.snapshot().royale,s.time);
+  assert.equal(p.vy,25,pad.id+' launches');assert.equal(q.vy,p.vy,'Guest launches on the same frame');assert.equal(p.fall.immune,true);assert.equal(p.forceGlider,false);assert.equal(p.redeploy,false);
+ }
+ const roofPad=s.map.bouncePads.find(p=>p.y>0);s.worldDamage[roofPad.objectId]={destroyed:true};rebuildMap(s);Object.assign(p,{x:roofPad.x,y:roofPad.y+.13,z:roofPad.z,vy:0});assert.equal(bounceZonePad(p,s.map),false,'A destroyed roof cannot leave an active floating pad');
+ const before=s.map.bouncePads.map(p=>p.objectId);s.beginBoxRound();assert.deepEqual(s.map.bouncePads.map(p=>p.objectId),before,'Pads reset with the map');
+ const cp=new ZoneWarsSimulation(s.options).restore(s.checkpoint());assert.equal(cp.map.revision,2);assert.equal(cp.map.bouncePads.length,6);
 });

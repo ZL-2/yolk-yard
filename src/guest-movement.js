@@ -1,3 +1,4 @@
+import {bounceZonePad} from './zone-wars-rules.js';
 import {constrainBoxMovement} from './box-fight-rules.js';
 import {emoteInput} from './emotes.js';
 import {launchPlayer} from './airborne.js';
@@ -31,5 +32,5 @@ export function predictMovement(player,input,map,dt,royale,time=0){
  }
  input=emoteInput({time},player,input);
  movePlayer(player,input,map,dt,time);
- if(map.boxArena||map.zoneWars)constrainBoxMovement(player,map,['waiting','prepare'].includes(royale?.boxfightStage));
+ if(map.boxArena||map.zoneWars){const prepared=['waiting','prepare'].includes(royale?.boxfightStage);constrainBoxMovement(player,map,prepared);bounceZonePad(player,map,prepared);}
 }
