@@ -148,7 +148,7 @@ export class RoyaleView{
   const low=this.view.settings.quality==='low',lootRadius=low?45:70,chestRadius=low?70:100;
   if(!observer)return;
   if(!this.itemQuery||t>=this.itemQuery.at||this.itemQuery.version!==r.lootVersion||Math.hypot(observer.x-this.itemQuery.x,observer.z-this.itemQuery.z)>3||this.itemQuery.low!==low){
-   const nearest=(a,b)=>(a.x-observer.x)**2+(a.z-observer.z)**2-(b.x-observer.x)**2-(b.z-observer.z)**2;
+   const nearest=(a,b)=>(a.x-observer.x)**2+(a.y-observer.y)**2+(a.z-observer.z)**2-(b.x-observer.x)**2-(b.y-observer.y)**2-(b.z-observer.z)**2;
    this.itemQuery={at:t+.1,version:r.lootVersion,x:observer.x,z:observer.z,low,loot:nearbyItems(r,'loot',observer,lootRadius).sort(nearest).map(i=>i.uid),chests:[...new Set([...nearbyItems(r,'chests',observer,chestRadius).sort(nearest).map(c=>c.id),...r.chests.filter(c=>c.supply).map(c=>c.id)])]};
   }
   // Close objects arrive first, with bounded geometry work each frame.

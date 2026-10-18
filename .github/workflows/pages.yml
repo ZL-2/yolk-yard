@@ -397,6 +397,7 @@ jobs:
         if: needs.scope.outputs.zone_wars_update == 'true'
         env:
           PVP_RULES_ONLY: ${{ needs.scope.outputs.human_pvp_update == 'true' || needs.scope.outputs.tilted_map_update == 'true' || needs.scope.outputs.zone_spawn_update == 'true' }}
+          ZONE_GAME_ONLY: ${{ needs.scope.outputs.zone_spawn_update == 'true' && '1' || '' }}
         run: node scripts/zone-wars-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always() && needs.scope.outputs.zone_wars_update == 'true'

@@ -2123,7 +2123,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
     editor:()=>mapEditor,
     grappler:()=>({held:view.heldItemKey,model:view.heldItem?.name,ropes:[...(view.royaleView.grappleMeshes||[])].map(([id,m])=>({id,visible:m.visible,uuid:m.uuid,points:m.children[0].geometry.attributes.position.count})),doorMeshes:view.royaleView.doorMeshes?.size||0}),
     notify:text=>toast(text),
-    scenery:()=>({labels:(()=>{let n=0;view.world.traverse(m=>{if(m.isSprite)n++;});return n;})(),loot:view.royaleView.loot.size,chests:view.royaleView.chests.size}),
+    scenery:()=>({labels:(()=>{let n=0;view.world.traverse(m=>{if(m.isSprite)n++;});return n;})(),loot:view.royaleView.loot.size,visibleLoot:[...view.royaleView.loot].filter(([,m])=>m.visible).map(([id])=>id),chests:view.royaleView.chests.size}),
     bossAlerts:()=>[...view.models].filter(([id])=>state?.players.find(p=>p.id===id)?.boss).map(([id,m])=>({id,visible:!!(m.visible&&m.userData.bossAlert?.visible),symbol:m.userData.bossAlert?.userData.symbol,color:m.userData.bossAlert?.userData.color,nameY:m.userData.nameplate?.position.y,alertY:m.userData.bossAlert?.position.y})),
     bossVoiceAudio:()=>({...sound.bossAudio.debug,active:sound.bossAudio.active.size,loaded:!!sound.bossAudio.buffer}),
     frontline:()=>({score:{scene:sound.score.scene,voices:sound.score.voices.size,musicVolume:sound.musicVolume},motion:view.weaponMotionState?.out,uplink:!!view.royaleView.operationMesh?.visible,drawCalls:view.renderer.info.render.calls}),
