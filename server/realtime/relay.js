@@ -110,6 +110,7 @@ export class RealtimeRelay {
       if(!address.test(peer.id))throw Error('Not a room');
       const r=m.room;
       if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!['royale','ffa','zonewars','boxfight'].includes(r.mode)||!Number.isInteger(r.players)||r.players<0||r.players>MAX_HUMANS+MAX_SPECTATORS))throw Error('Invalid room');
+      if(r&&(!peer.listing||peer.listing.mode!==r.mode)&&!this.publicHost.roomByAddress(peer.id))this.owner?.assertAdmission(this.progression.accounts.get(peer.progressId)?.socialId,r.mode,'private');
       if(this.publicHost.enabled&&!!this.publicHost.roomByAddress(peer.id)&&!this.publicHost.publish(peer,r))throw Error('Invalid public host state');
       peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:r.mode,players:r.players,capacity:Math.max(2,Math.min(MAX_HUMANS,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(MAX_CONTESTANTS,Number(r.contestantCapacity)||8)),teamSize:(r.mode==='boxfight'?[2,3,4]:[2,4]).includes(r.teamSize)?r.teamSize:1,boxFormat:r.mode==='boxfight'&&r.boxFormat==='ffa'?'ffa':'teams',public:!!this.publicHost.roomByAddress(peer.id),hostRun:true,recurring:!!this.publicHost.roomByAddress(peer.id),phase:r.phase}:null;
       peer.listedAt=Date.now();return;
@@ -118,6 +119,8 @@ export class RealtimeRelay {
       if(typeof m.channel!=='string'||!/^[-a-z0-9]{36}$/.test(m.channel)||peer.links.size>=MAX_HUMANS+MAX_SPECTATORS)throw Error('Invalid channel');
       const other=this.peers.get(m.target);
       if(!other||other===peer||other.links.size>=MAX_HUMANS+MAX_SPECTATORS){this.send(peer,{type:'error',channel:m.channel,error:'peer-unavailable'});return;}
+      const identity=this.progression.accounts.get(peer.progressId)?.socialId,publicRoom=this.publicHost.roomFor(peer);
+      if(other.listing){if(publicRoom?.members.has(peer.id)&&publicRoom===this.publicHost.roomByAddress(other.id))this.owner?.assertPlayer(identity);else this.owner?.assertAdmission(identity,other.listing.mode,other.listing.public===false?'private':'public');}
       if(peer.links.has(m.channel)||other.links.has(m.channel))throw Error('Duplicate channel');
       peer.links.set(m.channel,other);other.links.set(m.channel,peer);
       if(!this.authority.connect(peer,other,m.channel))this.send(other,{type:'incoming',channel:m.channel,peer:peer.id});return;

@@ -104,6 +104,7 @@ import './menu-refresh.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
+import {OwnerRuntime} from './owner-runtime.js';
 import { CONTROLS, migratePerspectiveBindings, normalizeBindings, bindingDown, bindingLabel, wheelIntent } from "./keybinds.js";
 import { RELEASES, RELEASE } from "./releases.js";
 import { UpdateWatcher } from "./updates.js";
@@ -258,8 +259,9 @@ async function openOwnerMapEditor(overview){
 let briefingsComplete=false;
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
-const ownerConsole=new OwnerConsole({onMapEditor:openOwnerMapEditor,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
-startAnonymousVisits(()=>screen==='game'?(state?.royale?'royale':state?.options?.mode==='teams'?'teams':'ffa'):screen==='lobby'?'lobby':'menu');
+const ownerRuntime=new OwnerRuntime();
+const ownerConsole=new OwnerConsole({identity:()=>party?.id,onMapEditor:openOwnerMapEditor,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
+startAnonymousVisits(()=>screen==='game'?(state?.options?.training?'training':state?.options?.mode||options.mode||'royale'):screen==='lobby'?'lobby':screen==='editor'?'editor':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(eggWallet.value.balance);if(eggShop?.root?.isConnected)eggShop.render();if(screen==='menu'&&menuSection==='career')renderMenu(true);}});
 const streakUI=new StreakUI(document.querySelector('#hud'));
@@ -1329,6 +1331,10 @@ function initializeParty(){
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   'lobby-chat':m=>lobbyComms.receive(m.message),
+  'lobby-chat-cleared':m=>lobbyComms.clear(m.channel),
+  'owner-controls':m=>ownerRuntime.set(m.controls),
+  'owner-grants':m=>{void eggWallet.syncOwnerGrants(m.record).then(r=>{if(r.amount){toast(r.amount.toLocaleString()+' Marks received from the owner.');if(screen==='menu')renderMenu();}}).catch(()=>toast('Your owner grant is saved online. Reconnect when browser storage is available.'));},
+  'owner-session-ended':m=>{if(net||screen==='game')leave(false,false);toast(m.message);},
   'feature-updates':m=>lobbyComms.setUpdates(m.updates),
   'social-changed':scheduleSocialRefresh,
   'mode-counts':counts=>{for(const badge of document.querySelectorAll('[data-mode-population]')){const template=document.createElement('template');template.innerHTML=modePopulationMarkup(badge.dataset.modePopulation,counts);badge.replaceWith(template.content.firstElementChild);}},
@@ -1390,7 +1396,7 @@ const actions = {
  'z-journal':openZombiesJournal,
  'quick-rematch':()=>{if(net?.officialPublic)return toast('The next public round starts automatically.');if(sim&&(!sim.remote||state?.zombies)&&state?.phase==='results'&&(!net||net.isHost)){launchRound();}},
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
- 'start-training':()=>{if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
+ 'start-training':()=>{try{ownerRuntime.admission('training');}catch(error){return toast(error.message);}if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
  'career':()=>selectMenuSection('career'),
  'find-public':()=>lobbyOptionsMenu(),
  'choose-mode':playMenu,

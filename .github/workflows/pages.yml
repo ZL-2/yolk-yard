@@ -25,6 +25,7 @@ jobs:
       zombies_update: ${{ steps.scope.outputs.zombies_update }}
       box_fights_update: ${{ steps.scope.outputs.box_fights_update }}
       zone_wars_update: ${{ steps.scope.outputs.zone_wars_update }}
+      owner_suite_update: ${{ steps.scope.outputs.owner_suite_update }}
       built_world_update: ${{ steps.scope.outputs.built_world_update }}
       environment_only: ${{ steps.scope.outputs.environment_only }}
       visual_only: ${{ steps.scope.outputs.visual_only }}
@@ -175,8 +176,11 @@ jobs:
           zone_allowed=set(['.github/workflows/pages.yml', 'docs/UPDATE_177.md', 'docs/ZONE_WARS_REFERENCE.md', 'package-lock.json', 'package.json', 'scripts/box-fights-browser.mjs', 'scripts/release-live-check.mjs', 'scripts/zone-wars-browser.mjs', 'server/realtime/authority.js', 'server/realtime/index.js', 'server/realtime/leaderboards.js', 'server/realtime/match-launch.js', 'server/realtime/parties.js', 'server/realtime/progression.js', 'server/realtime/public-host.js', 'server/realtime/relay.js', 'server/realtime/zombies-service.js', 'src/box-fight-rules.js', 'src/box-fight-ui.js', 'src/box-fights.js', 'src/building.js', 'src/career.js', 'src/data.js', 'src/guest-movement.js', 'src/leaderboard-ui.js', 'src/lobby-comms.js', 'src/lobby-ui.js', 'src/main.js', 'src/maps.js', 'src/match-options.js', 'src/menu-refresh.css', 'src/mode-activity.js', 'src/network.js', 'src/physics.js', 'src/presence-ui.js', 'src/public-royale.js', 'src/ranking-modes.js', 'src/releases.js', 'src/rewards.js', 'src/royale-ui.js', 'src/royale.js', 'src/season-progress.js', 'src/view.js', 'src/zone-wars-map.js', 'src/zone-wars-rules.js', 'src/zone-wars-ui.js', 'src/zone-wars-view.js', 'src/zone-wars.css', 'src/zone-wars.js', 'tests/box-fights.test.js', 'tests/helpers/public-match.js', 'tests/leaderboards.test.js', 'tests/public-pools.test.js', 'tests/zone-wars-network.test.js', 'tests/zone-wars.test.js'])
           zone_allowed.add('src/loading-screen.js')
           zone_wars_update=zone_files<=zone_allowed and {'src/zone-wars.js','tests/zone-wars.test.js','tests/zone-wars-network.test.js','scripts/zone-wars-browser.mjs'}<=zone_files
+          owner_files=set(subprocess.check_output(['git','diff','--name-only','d085c44a2be1e9138d9aad402162a0a5ea942323','HEAD'],text=True).splitlines())
+          owner_allowed=set(['.github/workflows/pages.yml', 'docs/OWNER_HISTORY_RECOVERY.md', 'docs/UPDATE_178.md', 'package-lock.json', 'package.json', 'scripts/owner-browser-check.mjs', 'scripts/owner-live-check.mjs', 'server/realtime/index.js', 'server/realtime/lobby-chat.js', 'server/realtime/match-launch.js', 'server/realtime/owner-store.js', 'server/realtime/owner.js', 'server/realtime/parties.js', 'server/realtime/progression.js', 'server/realtime/public-host.js', 'server/realtime/relay.js', 'server/realtime/social-store.js', 'server/realtime/zombies-service.js', 'src/data.js', 'src/egg-wallet.js', 'src/lobby-comms.js', 'src/main.js', 'src/owner-console.css', 'src/owner-console.js', 'src/owner-runtime.js', 'src/owner-ui.js', 'src/party-client.js', 'src/releases.js', 'tests/owner-network.test.js', 'tests/owner.test.js'])
+          owner_suite_update=owner_files<=owner_allowed and {'server/realtime/owner-store.js','src/owner-console.js','tests/owner.test.js','tests/owner-network.test.js','scripts/owner-browser-check.mjs','scripts/owner-live-check.mjs'}<=owner_files
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('mixamo_update',mixamo_update),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('field_repair_update',field_repair),('zombies_update',zombies_update),('box_fights_update',box_fights_update),('zone_wars_update',zone_wars_update),('focused',zone_wars_update or box_fights_update or zombies_update or field_repair or scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh or mixamo_update)]: out.write(key+'='+str(value).lower()+'\n')
+            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('mixamo_update',mixamo_update),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('field_repair_update',field_repair),('zombies_update',zombies_update),('box_fights_update',box_fights_update),('zone_wars_update',zone_wars_update),('owner_suite_update',owner_suite_update),('focused',owner_suite_update or zone_wars_update or box_fights_update or zombies_update or field_repair or scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh or mixamo_update)]: out.write(key+'='+str(value).lower()+'\n')
           print('Focused release:',{'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
   build:
@@ -295,6 +299,9 @@ jobs:
       - name: Zone Wars simulation, parties, migration, mode rankings and shared gameplay
         if: needs.scope.outputs.zone_wars_update == 'true'
         run: node --test --test-concurrency=2 tests/zone-wars.test.js tests/zone-wars-network.test.js tests/box-fights.test.js tests/box-fights-network.test.js tests/leaderboards.test.js tests/public-pools.test.js tests/building.test.js tests/building-overhaul.test.js tests/mobility-storm.test.js tests/spectator-status.test.js tests/rewards-afk.test.js tests/career.test.js tests/chat.test.js tests/snapshot-codec.test.js tests/private-social.test.js tests/zombies-network.test.js tests/public-disconnect.test.js tests/realtime-resume.test.js
+      - name: Owner persistence, authentication, live controls, grants, support, and affected regressions
+        if: needs.scope.outputs.owner_suite_update == 'true'
+        run: npm run test:owner
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -340,6 +347,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Desktop owner workflows, durable exports, controls, and game integration
+        if: needs.scope.outputs.owner_suite_update == 'true'
+        run: node scripts/owner-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.owner_suite_update == 'true'
+        with:
+          name: owner-suite-evidence
+          path: test-results/owner
+          retention-days: 14
       - name: Desktop Zone Wars, city, privacy toggle, mode rankings, chat, menus and live guest
         if: needs.scope.outputs.zone_wars_update == 'true'
         run: node scripts/zone-wars-browser.mjs
@@ -599,7 +615,7 @@ jobs:
       - uses: actions/deploy-pages@v4
         id: deployment
   verify-live:
-    needs: deploy
+    needs: [scope, deploy]
     if: always() && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -611,7 +627,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+        if: needs.scope.outputs.owner_suite_update != 'true'
+      - name: Published owner suite, persistent disk, private endpoints, and matching builds
+        if: needs.scope.outputs.owner_suite_update == 'true'
+        run: node scripts/owner-live-check.mjs
       - name: Matching website/relay build, private PvP and Zombies co-op, live lobby
+        if: needs.scope.outputs.owner_suite_update != 'true'
         run: node scripts/release-live-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()

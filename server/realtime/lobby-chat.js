@@ -15,6 +15,8 @@ export class LobbyChat {
  history(u,m){const scope=this.scope(u,m),now=Date.now();return {channel:scope.channel,to:scope.to,messages:(this.rooms.get(scope.key)||[]).filter(x=>now-x.at<30*60000&&!this.service.store.blocked(u.id,x.sender))};}
  submit(u,m){
   const s=this.service;if(['in-match','spectating'].includes(s.presence(u.id)))throw Error('Return to the lobby to send lobby chat.');
+  s.relay.owner?.assertChat(u.id);
+  const slow=s.relay.owner?.controls.chatSlowSeconds||0;if(slow&&u.lastLobbyChat&&Date.now()-u.lastLobbyChat.at<slow*1000)throw Error('Chat slow mode: wait '+Math.ceil(slow-(Date.now()-u.lastLobbyChat.at)/1000)+' seconds.');
   s.limit(u,'lobby-chat',5,10000);const scope=this.scope(u,m);
   if(typeof m.text!=='string'||m.text.length>CHAT_LIMIT)throw Error('Write a shorter message.');
   const result=moderateText(m.text);if(!result.ok)throw Error('Please keep chat friendly and avoid personal information.');

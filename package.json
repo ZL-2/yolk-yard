@@ -1,6 +1,6 @@
 {
   "name": "ravelfront",
-  "version": "6.3.0",
+  "version": "6.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -26,7 +26,8 @@
     "test:capacity-load": "node scripts/capacity-check.mjs",
     "test:private-social": "node --test tests/private-social.test.js tests/deployment.test.js tests/server-authority.test.js tests/snapshot-codec.test.js tests/social-persistence.test.js tests/input-clock.test.js tests/relay-liveness.test.js && node scripts/social-squads-check.mjs",
     "test:recurring-royale": "node --test tests/recurring-royale.test.js tests/royale-teammate-bots.test.js tests/snapshot-codec.test.js tests/career.test.js && node scripts/recurring-royale-browser-check.mjs",
-    "test:host-royale": "node --test tests/royale-teammate-bots.test.js tests/private-social.test.js tests/server-authority.test.js tests/capacity.test.js && node --test --test-name-pattern='Duo knock|revive stops|final active|finishing' tests/field-systems.test.js && node scripts/host-royale-browser-check.mjs"
+    "test:host-royale": "node --test tests/royale-teammate-bots.test.js tests/private-social.test.js tests/server-authority.test.js tests/capacity.test.js && node --test --test-name-pattern='Duo knock|revive stops|final active|finishing' tests/field-systems.test.js && node scripts/host-royale-browser-check.mjs",
+    "test:owner": "node --test --test-concurrency=2 tests/owner.test.js tests/owner-network.test.js tests/social-persistence.test.js tests/private-social.test.js tests/public-pools.test.js tests/rewards-afk.test.js tests/leaderboards.test.js tests/map-editor.test.js"
   },
   "dependencies": {
     "compromise": "14.17.0",

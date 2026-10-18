@@ -8,7 +8,7 @@ import {publicWindow} from '../../src/season-one.js';
 export class PublicRoom {
  constructor(relay,code=PUBLIC_ROYALE.code,options=publicMatchOptions()){this.code=code;this.options=options;this.relay=relay;this.enabled=false;this.members=new Map();this.joinSerial=0;this.order=0;this.key=`yolk-yard-v${VERSION}-${code}`;}
  enable(){this.enabled=true;return this;}
- report(action,reason){console.info(JSON.stringify({event:'public-match',code:this.code,pool:publicPoolKey(this.options),action,reason,members:this.members.size,round:this.state?.round||0,stage:this.state?.stage,alive:this.state?.alive,stalledMs:this.host?Date.now()-this.host.advancedAt:undefined}));}
+ report(action,reason){this.relay.owner?.systemEvent('match-'+action,reason||action,this.code,{mode:this.options.mode,members:this.members.size,round:this.state?.round||0});console.info(JSON.stringify({event:'public-match',code:this.code,pool:publicPoolKey(this.options),action,reason,members:this.members.size,round:this.state?.round||0,stage:this.state?.stage,alive:this.state?.alive,stalledMs:this.host?Date.now()-this.host.advancedAt:undefined}));}
  successor(){return [...this.members.values()].filter(x=>x.peer!==this.host?.peer&&x.peer!==this.host?.address&&x.ready&&Date.now()-x.readyAt<8000&&x.readyMatch===this.state?.matchId&&!x.admission.friendSpectator&&this.relay.peers.get(x.peer)?.ws?.readyState===1).sort((a,b)=>a.order-b.order)[0];}
  pendingCount(spectator=false){return [...this.relay.parties.tickets.values()].filter(t=>t.recurring&&t.code===this.code&&!!t.spectator===spectator&&!this.members.has(t.peer)&&t.expires>Date.now()).length;}
  reserve(p,u){

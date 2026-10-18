@@ -75,8 +75,8 @@ export class SocialStore{
   this.available();text=typeof text==='string'?text.normalize('NFKC').trim().replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,''):'';
   if(text.length<5||text.length>1000)throw Error('Describe your feature in 5 to 1,000 characters.');
   if(!this.identities.has(player))throw Error('Choose a player name first.');
-  if(this.featureRequests.length>=1000){const old=this.featureRequests.findIndex(r=>['completed','dismissed'].includes(r.status)&&(r.replies||[]).every(x=>x.read));if(old<0)throw Error('The feature inbox is full. Please try again later.');this.featureRequests.splice(old,1);}
-  const r={id:randomUUID(),player,name:this.identities.get(player).profile.name,text,created:Date.now(),status:'open'};this.featureRequests.push(r);this.save();return {id:r.id,created:r.created};
+  if(this.featureRequests.length>=1000){const old=this.featureRequests.findIndex(r=>['completed','dismissed'].includes(r.status)&&(r.replies||[]).every(x=>x.read));if(old<0)throw Error('The feature inbox is full. Please try again later.');this.ownerArchive?.(this.featureRequests[old]);this.featureRequests.splice(old,1);}
+  const r={id:randomUUID(),player,name:this.identities.get(player).profile.name,text,created:Date.now(),status:'open'};this.featureRequests.push(r);this.ownerArchive?.(r);this.save();return {id:r.id,created:r.created};
  }
  featureUpdates(player){return this.featureRequests.filter(r=>r.player===player).flatMap(r=>(r.replies||[]).filter(reply=>!reply.read).map(reply=>({...reply,requestId:r.id,request:r.text.slice(0,180),status:r.status}))).sort((a,b)=>a.created-b.created).slice(0,50);}
  acknowledgeFeatures(player,ids){
@@ -91,12 +91,12 @@ export class SocialStore{
    if(action==='reply'||action==='completed'&&r.status!=='completed'){
     const message=action==='completed'?'Your feature request has been completed.':typeof text==='string'?text.normalize('NFKC').replace(/[\u0000-\u001f]/g,' ').trim():'';
     if(!message||message.length>1000)throw Error('Write a response of 1 to 1,000 characters.');
-    r.replies??=[];if(r.replies.length>=50){const read=r.replies.findIndex(x=>x.read);if(read<0)throw Error('This player has 50 unread updates. Wait for them to read these before replying again.');r.replies.splice(read,1);}
+    r.replies??=[];if(r.replies.length>=50){const read=r.replies.findIndex(x=>x.read);if(read<0)throw Error('This player has 50 unread updates. Wait for them to read these before replying again.');this.ownerArchive?.(r);r.replies.splice(read,1);}
     r.replies.push({id:randomUUID(),kind:action,body:message,created:Date.now(),read:false});
    }
    if(action==='clear'){r.clearedAt=Date.now();r.status='dismissed';}
    else if(action==='restore'){delete r.clearedAt;r.status='open';}
-   else if(action!=='reply')r.status=action;r.updated=Date.now();this.save();
+   else if(action!=='reply')r.status=action;r.updated=Date.now();this.ownerArchive?.(r);this.save();
   }
   return {requests:this.featureRequests.filter(r=>showCleared?!!r.clearedAt:!r.clearedAt).slice().reverse(),open:this.featureRequests.filter(r=>!r.clearedAt&&r.status==='open').length,cleared:this.featureRequests.filter(r=>r.clearedAt).length};
  }

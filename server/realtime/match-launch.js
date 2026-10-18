@@ -12,6 +12,10 @@ export function queueMatch(service,u,m){
  if(service.relay.deployment?.snapshot().updating)throw Error('Ravelfront is updating. Matchmaking will reopen when publishing finishes.');
  if(p.members.some(id=>!service.connected(service.users.get(id))))throw Error('Wait for your party members to reconnect.');
  if(p.members.some(id=>id!==u.id&&!service.users.get(id).ready))throw Error('Every party member must ready up.');
+ const destination=m.code?service.relay.peers.get(address(m.code))?.listing:null;
+ const selectedMode=destination?.mode||(!m.code&&m.custom?m.options?.mode:null)||p.selection.mode;
+ const access=destination?destination.public===false?'private':'public':m.code?'private':m.custom?'private':p.selection.access||'public';
+ for(const id of p.members)service.relay.owner?.assertAdmission(id,selectedMode,access);
  if(p.selection.mode==='zombies'||m.code&&authority?.rooms.get(address(m.code))?.zombies)return queueZombies(service,u,m);
  if(m.publicRoyale||m.code===PUBLIC_ROYALE.code||!m.code&&!m.custom&&p.selection.access!=='private')return queuePublicMatch(service,u,m);
  if(m.code&&isPublicCode(m.code))throw Error('Use Play to join public matchmaking, or Spectate Friend to watch a friend.');
@@ -56,6 +60,7 @@ export function spectateFriend(service,u,m){
  const friend=service.users.get(m.id),location=service.matchLocation(friend);
  if(!location||friend.spectateLaunch)throw Error('Your friend is no longer in a match.');
  const room=location.room,capacity=service.relay.authority?.capacity,key=location.key;
+ service.relay.owner?.assertAdmission(u.id,location.listing.mode,location.listing.public===false?'private':'public');
  if(room&&capacity){const plan=room.recurring?{ok:capacity.spectators(room)+capacity.pending(key,true)<MAX_SPECTATORS,reason:'The public spectator seats are full. Try again shortly.'}:capacity.plan(room.sim.options,{key,humans:capacity.humans(room)+capacity.pending(key),spectators:capacity.spectators(room)+capacity.pending(key,true)+1,botLimit:room.sim.botLimit});if(!plan.ok)throw Error(plan.reason);}
  const publicRoom=service.relay.publicHost?.roomByAddress(key);if(publicRoom&&publicRoom.summary().availableSpectators<1)throw Error('The public spectator seats are full.');
  const id=randomUUID(),token=randomUUID(),launch={id,code:location.listing.code,host:false,hostRun:!room,recurring:!!location.listing.recurring,spectator:true,watchId:location.watchId,ticket:token};
