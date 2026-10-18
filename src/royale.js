@@ -50,7 +50,7 @@ const movementItemKinds=new Set(['jumpRig','shadowstep','winch','impulse','launc
 
 export class RoyaleSimulation extends Simulation {
  constructor(options={}){
-  super({...options,mode:options.mode==='boxfight'?'boxfight':'royale',deferNavigation:!options.training});this.map=this.battleMap();resetBuilding(this);this.nav=options.training?navigation(getMap('sunnybreak',this.mapLayouts)):{path:()=>[]};this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.maxPlayers=this.options.capacity;
+  super({...options,mode:['boxfight','zonewars'].includes(options.mode)?options.mode:'royale',deferNavigation:!options.training});this.map=this.battleMap();resetBuilding(this);this.nav=options.training?navigation(getMap('sunnybreak',this.mapLayouts)):{path:()=>[]};this.markers=[];this.markerId=0;for(const p of this.players.values()){p.pingTimes=[];p.lastPingAt=-100;}this.matchId=globalThis.crypto.randomUUID();this.maxPlayers=this.options.capacity;
   this.loot=[];this.chests=[];this.pads=[];this.lootId=0;this.lootVersion=0;this.lootSpatialVersion=0;this.chestSpatialVersion=0;this.startedAt=0;this.elapsed=0;this.alive=0;this.placements=[];this.supplyAt=135;this.queueEnds=0;this.doors={};this.vault=null;this.vaults=[];this.vehicles=[];this.operations=null;this.stage=RP.WAITING;this.route=makeFlight(this.random);this.stormSteps=makeStorm(this.random,this.options.storm);this.storm=stormAt(this.stormSteps,0);
  }
  emit(type,data={}){const event=super.emit(type,data);operationsEvent(this,type,event);return event;}

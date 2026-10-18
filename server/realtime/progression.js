@@ -1,3 +1,4 @@
+import {rankingMode} from '../../src/ranking-modes.js';
 import {progressionDataPath} from './data-path.js';
 import {createHash,randomUUID} from 'node:crypto';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
@@ -5,7 +6,7 @@ import {dirname} from 'node:path';
 import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from '../../src/activity.js';
 import {calculateReward,participation} from '../../src/rewards.js';
 import {MAX_CONTESTANTS,MAX_SPECTATORS} from '../../src/royale-phases.js';
-import {publicTotals,rankPublicPlayers,publicLeaderboardView} from './leaderboards.js';
+import {modeTotals,publicTotals,rankPublicPlayers,publicLeaderboardView} from './leaderboards.js';
 const warmup=new Set(['waiting','spawn-island','starting']);
 const bounded=(v,max=1e7)=>Number.isFinite(v)?Math.min(max,Math.max(-max,v)):0;
 export class ProgressionService{
@@ -14,18 +15,18 @@ export class ProgressionService{
  identity(token){return typeof token==='string'&&/^[a-f0-9]{32,64}$/.test(token)?createHash('sha256').update(token).digest('hex'):null;}
  async register(peer,token){peer.progressId=this.identity(token)||randomUUID();await this.ready;for(const receipt of this.account(peer.progressId).receipts.slice(-30))this.relay.send(peer,{type:'reward',receipt});}
  account(id){if(!this.accounts.has(id))this.accounts.set(id,{receipts:[],pairs:[],earned:[],encounters:[]});return this.accounts.get(id);}
- bindPublicPlayer(peer,socialId,{participant=false}={}){const identity=this.relay.parties?.store.identities.get(socialId);if(!identity||!peer.progressId)return;const a=this.account(peer.progressId);if(a.socialId===socialId&&a.publicName===identity.profile.name&&(!participant||a.publicParticipant))return;a.socialId=socialId;a.publicName=identity.profile.name;if(participant)a.publicParticipant=true;this.dirty=true;this.leaderboardCache=null;}
+ bindPublicPlayer(peer,socialId,{participant=false,mode='royale'}={}){const identity=this.relay.parties?.store.identities.get(socialId);if(!identity||!peer.progressId)return;const a=this.account(peer.progressId);if(a.socialId===socialId&&a.publicName===identity.profile.name&&(!participant||(mode==='royale'?a.publicParticipant:a.modeParticipants?.[mode])))return;a.socialId=socialId;a.publicName=identity.profile.name;if(participant){if(mode==='royale')a.publicParticipant=true;a.modeParticipants??={};a.modeParticipants[mode]=true;}this.dirty=true;this.leaderboardCache=null;}
  restoreLeaderboardViewer(token,socialId){const progressId=this.identity(token);if(progressId&&this.accounts.has(progressId))this.bindPublicPlayer({progressId},socialId);}
  recordPublicStat(p,metric){if(p.bot)return;const a=this.account(p.identity),totals=publicTotals(a);totals[metric]++;this.dirty=true;this.leaderboardCache=null;}
  recordPublicRound(p,m,won=false){
   if(p.bot||!p.identity||p.afkRemoved||p.raw?.lateSpectator||p.raw?.contestant===false)return;
-  const a=this.account(p.identity),totals=publicTotals(a),id=m.key.slice(m.room.length+1);a.publicRounds??=[];
-  let round=a.publicRounds.find(r=>r.id===id);if(!round){round={id,kills:0,wins:0};a.publicRounds.push(round);a.publicRounds=a.publicRounds.slice(-128);}
-  const kills=Math.min(MAX_CONTESTANTS-1,Math.max(p.kills||0,Number.isInteger(p.raw?.kills)?p.raw.kills:0)),wins=Number(won),deltaKills=Math.max(0,kills-round.kills),deltaWins=Math.max(0,wins-round.wins),first=!a.publicParticipant;
+  const a=this.account(p.identity),totals=modeTotals(a,m.mode),id=m.key.slice(m.room.length+1);a.publicRounds??=[];
+  let round=a.publicRounds.find(r=>r.id===id&&(r.mode||'royale')===(m.mode||'royale'));if(!round){round={id,mode:m.mode||'royale',kills:0,wins:0};a.publicRounds.push(round);a.publicRounds=a.publicRounds.slice(-128);}
+  const kills=Math.min(m.mode==='royale'?MAX_CONTESTANTS-1:10000,Math.max(0,Number.isInteger(p.raw?.kills)?p.raw.kills:p.kills||0)),wins=Number(won),deltaKills=Math.max(0,kills-round.kills),deltaWins=Math.max(0,wins-round.wins),first=!(m.mode==='royale'?a.publicParticipant:a.modeParticipants?.[m.mode]);
   if(!deltaKills&&!deltaWins&&!first)return;
-  round.kills+=deltaKills;round.wins+=deltaWins;totals.kills+=deltaKills;totals.wins+=deltaWins;a.publicParticipant=true;this.dirty=true;this.leaderboardCache=null;
+  round.kills+=deltaKills;round.wins+=deltaWins;totals.kills+=deltaKills;totals.wins+=deltaWins;if(m.mode==='royale')a.publicParticipant=true;a.modeParticipants??={};a.modeParticipants[m.mode||'royale']=true;this.dirty=true;this.leaderboardCache=null;
  }
- leaderboards(socialId,options){const now=this.clock();if(!this.leaderboardCache||now-this.leaderboardCache.time>30)this.leaderboardCache={time:now,ranks:rankPublicPlayers(this.accounts,this.relay.parties?.store.identities)};return {updatedAt:this.leaderboardCache.time,...publicLeaderboardView(this.leaderboardCache.ranks,socialId,options)};}
+ leaderboards(socialId,options={}){const now=this.clock(),mode=rankingMode(options.mode);if(!this.leaderboardCache||this.leaderboardCache.mode!==mode||now-this.leaderboardCache.time>30)this.leaderboardCache={time:now,mode,ranks:rankPublicPlayers(this.accounts,this.relay.parties?.store.identities,mode)};return {mode,updatedAt:this.leaderboardCache.time,...publicLeaderboardView(this.leaderboardCache.ranks,socialId,options)};}
  unbindInput(peer,key){const targets=this.inputTargets.get(peer);if(!targets)return;targets.delete(key);if(!targets.size)this.inputTargets.delete(peer);}
  bindInput(match,p,peer){
   if(p.peer&&p.peer!==peer)this.unbindInput(p.peer,match.key);
@@ -49,9 +50,9 @@ export class ProgressionService{
   const room=peer.id,now=this.clock(),key=room+':'+String(s.matchId).slice(0,64)+':'+s.round;
   if(warmup.has(s.stage))return;
   let m=this.matches.get(key);
-  if(!m){if(s.phase!=='playing'&&!(peer.rewardPublic===true&&s.mode==='royale'))return;m={id:randomUUID(),key,room,started:now,last:now-.5,event:-1,players:new Map(),eliminations:[],hits:new Map(),custom:peer.rewardPublic!==true,mode:s.mode==='royale'?'royale':['ffa','teams','boxfight'].includes(s.mode)?s.mode:'arena',difficulty:Math.max(1,Math.min(4,s.difficulty||1)),hostIdentity:peer.progressId};this.matches.set(key,m);}
+  if(!m){if(s.phase!=='playing'&&!(peer.rewardPublic===true&&['royale','boxfight','zonewars','ffa'].includes(s.mode)))return;m={id:randomUUID(),key,room,started:now,last:now-.5,event:-1,players:new Map(),eliminations:[],hits:new Map(),custom:peer.rewardPublic!==true,mode:s.mode==='royale'?'royale':['ffa','teams','boxfight','zonewars'].includes(s.mode)?s.mode:'arena',difficulty:Math.max(1,Math.min(4,s.difficulty||1)),hostIdentity:peer.progressId};this.matches.set(key,m);}
   if(m.finished)return;
-  const scoreChanged=!m.custom&&m.mode==='royale'&&s.players.some(p=>!p.bot&&Number.isInteger(p.kills)&&p.kills>(m.players.get(p.id)?.raw?.kills||0));
+  const scoreChanged=!m.custom&&['royale','boxfight','zonewars','ffa'].includes(m.mode)&&s.players.some(p=>!p.bot&&Number.isInteger(p.kills)&&p.kills>(m.players.get(p.id)?.raw?.kills||0));
   if(s.phase!=='results'&&now-m.last<.35&&!scoreChanged)return;
   const recovered=now-m.last>5,dt=Math.min(1.5,Math.max(0,now-m.last));m.last=now;m.state=s;
   if(recovered)for(const p of m.players.values())p.activity.last=now;
@@ -75,7 +76,7 @@ export class ProgressionService{
    if(e.type==='elimination'&&target&&target!==p&&now-(target.lastEliminated??-999)>2){target.lastEliminated=now;p.kills++;m.eliminations.push({attacker:p.id,target:target.id,time:now});for(const [id,t]of m.hits.get(target.id)||[])if(id!==p.id&&now-t<12){const helper=m.players.get(id);if(helper)helper.assists++;}m.hits.delete(target.id);}
    const activity=activityEvent(e);if(p.controlled&&activity&&meaningfulActivity(p.activity,'action',activity.signature+':'+Math.round(p.raw.x/3)+','+Math.round(p.raw.z/3),now)&&activity.contribution)p.activity.contributions++;
   }
-  if(!m.custom&&m.mode==='royale')for(const p of m.players.values())this.recordPublicRound(p,m);
+  if(!m.custom&&['royale','boxfight','zonewars','ffa'].includes(m.mode))for(const p of m.players.values())this.recordPublicRound(p,m);
   if(s.phase==='results')this.settle(m);
  }
  settle(m){
@@ -86,8 +87,8 @@ export class ProgressionService{
    const kills=m.eliminations.filter(e=>e.attacker===p.id).map(e=>{const victim=m.players.get(e.target),repeat=account.pairs.filter(x=>x.target===victim.identity).length;account.pairs.push({target:victim.identity,time:now});return {bot:victim.bot,difficulty:victim.difficulty,repeat,...(!victim.bot&&!participation({...victim.activity,elapsed:victim.activity.elapsed??elapsed,afkRemoved:victim.afkRemoved})?{repeat:9}:{})};});
    const ranked=all.filter(o=>!o.raw?.lateSpectator).sort((a,b)=>b.kills-a.kills||(a.raw?.deaths||0)-(b.raw?.deaths||0));
    const place=m.mode==='royale'?p.raw?.place:ranked.indexOf(p)+1;
-   const won=m.mode==='boxfight'?(m.state.boxFormat==='ffa'?m.state.winnerId===p.id:m.state.winnerTeam!=null&&m.state.winnerTeam===p.raw?.team):m.mode==='royale'?place===1&&(m.state.winnerId===undefined||m.state.winnerId===p.id||m.state.teamSize>1&&m.state.winnerId!=null&&m.state.winnerTeam===p.raw?.team):m.mode==='teams'?(m.state.scores?.[p.raw?.team]||0)>(m.state.scores?.[1-p.raw?.team]||0):place===1&&p.kills>0;
-   if(won&&!m.custom&&m.mode==='royale')this.recordPublicRound(p,m,true);
+   const won=m.mode==='zonewars'?m.state.winnerId===p.id:m.mode==='boxfight'?(m.state.boxFormat==='ffa'?m.state.winnerId===p.id:m.state.winnerTeam!=null&&m.state.winnerTeam===p.raw?.team):m.mode==='royale'?place===1&&(m.state.winnerId===undefined||m.state.winnerId===p.id||m.state.teamSize>1&&m.state.winnerId!=null&&m.state.winnerTeam===p.raw?.team):m.mode==='ffa'&&m.state.winnerId!==undefined?m.state.winnerId===p.id:m.mode==='teams'?(m.state.scores?.[p.raw?.team]||0)>(m.state.scores?.[1-p.raw?.team]||0):place===1&&p.kills>0;
+   if(won&&!m.custom&&['royale','boxfight','zonewars','ffa'].includes(m.mode))this.recordPublicRound(p,m,true);
    const result=calculateReward({player:{...p.activity,afkRemoved:p.afkRemoved},opponents:enemy.map(o=>({...o.activity,bot:o.bot,difficulty:o.difficulty,familiarity:account.encounters.filter(e=>e.target===o.identity).length,afkRemoved:o.afkRemoved})),elapsed,custom:m.custom,mode:m.mode,place,won,eliminations:kills,assists:p.assists,hourEarned:account.earned.reduce((n,e)=>n+e.amount,0)});
    const receipt={id:m.id+':'+p.identity.slice(0,12),amount:result.amount,label:won?'Frontier secured':'Match complete',mode:m.mode,place,won,kills:result.eligible?p.kills:0,assists:result.eligible?p.assists:0,eligible:result.eligible,reason:result.reason,time:now,challenge:result.challenge,population:result.population,custom:m.custom};
    for(const o of enemy)if(!o.bot&&result.eligible)account.encounters.push({target:o.identity,time:now});

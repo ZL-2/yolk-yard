@@ -256,7 +256,7 @@ export function constructionTick(sim){
 }
 // Remote prediction and rendering use their own map; simulation maps never mutate the authored island.
 export function applyBuildState(map,r){
- if(map.boxArena)map.boxPrep=['waiting','prepare'].includes(r.boxfightStage);
+ if(map.boxArena||map.zoneWars)map.boxPrep=['waiting','prepare'].includes(r.boxfightStage);
  updateDoorCollisions(map,r.doors,r.time??0);
  const revision=Number.isFinite(r.buildVersion)?r.matchId+':'+r.round+':'+r.buildVersion:null;
  if(revision!==null&&map.appliedBuildRevision===revision)return;

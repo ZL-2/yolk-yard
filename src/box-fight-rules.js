@@ -1,3 +1,4 @@
+import {constrainZoneMovement} from './zone-wars-rules.js';
 // Original Ravel Front rules, informed by docs/BOX_FIGHTS_REFERENCE.md.
 export const BOX_RULES=Object.freeze({prepare:7,between:3,queue:15,stormWait:45,stormClose:40,roundLimit:100,siphon:50,wood:500,woodReward:100,woodCap:500,restart:8,buildLimit:240});
 export const BOX_ARENAS=[
@@ -16,6 +17,7 @@ export function boxSpawn(map,index,total,team,slot,round,ffa=false){
 }
 // Host and guest use the same prep limits, including FFA's individual cells.
 export function constrainBoxMovement(p,map,prep=false){
+ if(map.zoneWars){constrainZoneMovement(p,map,prep);return;}
  if(!map.boxArena||p.spectating)return;
  const a=map.boxArena,margin=.42;
  p.x=Math.max(-a.width/2+margin,Math.min(a.width/2-margin,p.x));p.z=Math.max(-a.depth/2+margin,Math.min(a.depth/2-margin,p.z));

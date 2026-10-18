@@ -36,6 +36,7 @@ export function settleZombiesPlayer(relay,room,p,peer){
  else if(extracted){const owned=(p.zLoadout?.items||[]).slice(),carried=(p.zBag||[]).slice();for(const item of owned){const at=carried.indexOf(item);if(at>=0){carried.splice(at,1);gear.stash.push(item);}}gear.stash=gear.stash.slice(-30);if(p.zLoadout?.contraband)gear.contraband=[...gear.contraband,p.zLoadout.weapon].slice(-8);}
  else{gear.insuredUntil=now+1800;gear.containment=Math.max(0,(gear.containment||0)-3);if(eligible&&p.zInsuranceKeep)gear.stash=[...gear.stash,...(p.zBag||[])].slice(-30);}
  const receipt={id,amount,label:extracted?'Blacktide extraction complete':'Blacktide deployment ended',mode:'zombies',won:extracted,eligible,reason:eligible?'Server-verified expedition contribution':'Complete a contract and contribute to combat to earn progression.',kills:eligible?s.kills:0,assists:eligible?p.assists:0,zombies:eligible?record:null,time:now,custom:room.visibility==='private'};
+ if(room.visibility!=='private'&&!p.afkRemoved)relay.progression.recordPublicRound({identity:peer.progressId,kills:s.kills,raw:{contestant:true,kills:s.kills}}, {mode:'zombies',room:room.key,key:room.key+':'+room.sim.matchId},extracted);
  if(eligible){account.zombies??={};for(const [k,v]of Object.entries(record))account.zombies[k]=(account.zombies[k]||0)+v;}
  account.receipts.push(receipt);account.receipts=account.receipts.slice(-60);if(amount)account.earned.push({time:now,amount});relay.progression.dirty=true;if(peer.ws)relay.send(peer,{type:'reward',receipt});void relay.progression.save();
 }

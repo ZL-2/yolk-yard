@@ -38,7 +38,7 @@ export function queueMatch(service,u,m){
 function queuePublicMatch(service,u){
  const p=service.parties.get(u.party),pool=service.relay.publicHost;
  if(!pool?.enabled)throw Error('Public matchmaking is unavailable.');
- if(!['royale','ffa','boxfight'].includes(p.selection.mode))throw Error('Choose an available game mode.');
+ if(!['royale','ffa','zonewars','boxfight'].includes(p.selection.mode))throw Error('Choose an available game mode.');
  const options=publicMatchOptions(p.selection);
  if((options.mode==='royale'||options.mode==='boxfight'&&options.recurring)&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
  const room=pool.findRoom(options,p.members.length),summary=room.summary(),creating=room.reserve(p,u);

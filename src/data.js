@@ -5,7 +5,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Shared camera targeting and remote commands require matching host/client releases.
-export const VERSION = 62;
+export const VERSION = 63;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -139,6 +139,7 @@ for(const w of [...WEAPONS,...ROYALE_WEAPONS]){
 }
 const royaleStats = new Map();
 export const MODES = [
+ {id:"zonewars",name:"Zone Wars",short:"ZONE WARS",description:"Random loadouts. City rooftops. Moving storms. Last operator standing.",limit:5,teams:false},
  {id:"boxfight",name:"Box Fights",short:"BOX FIGHTS",description:"Build, edit and clutch. First to five round wins.",limit:5,teams:true},
  {id:'zombies',name:'Zombies',short:'ZOMBIES',description:'Explore Blacktide, complete contracts and extract. Public worlds or private 1–4 operator expeditions.',limit:0,teams:true},
  {id:"royale",name:"Frontier Royale",short:"ROYALE",description:"Drop in, loot up, outrun the storm. Last operator standing.",limit:1,teams:false},

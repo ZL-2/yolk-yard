@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {fixture,until,pause} from './helpers/public-match.js';
+test('Zone Wars party arrives as individual competitors, snapshots and host migration preserve city and storm',async()=>{
+ const f=await fixture();try{
+  const a=await f.user('Zone Captain'),b=await f.user('Zone Challenger');await a.ask('privacy',{value:'open'});await b.ask('join',{id:a.party.id});await a.ask('select',{mode:'zonewars',options:{capacity:2,fill:false}});await b.ask('ready',{value:true});await a.ask('queue');const host=await f.game(a);const guest=await f.game(b);assert.equal(host.net.code,guest.net.code);assert.equal(guest.state.options.mode,'zonewars');assert.equal(guest.state.options.capacity,16);host.sim.beginBoxRound();host.sim.boxEnd=host.sim.time;host.sim.tick(1/30);host.sim.boxStarted=host.sim.time-67;host.sim.tick(1/30);host.sim.roundWins[guest.net.id]=2;const match=host.sim.matchId,path=structuredClone(host.sim.zonePath);host.net.broadcast(host.sim.snapshot());await until(()=>guest.state.zonewars?.stage==='fight','Guest plays in city');assert.equal(guest.state.options.map,'tilted-district');assert.ok(guest.state.royale.storm.active);assert.equal(host.sim.players.get('host').team,-1);assert.equal(host.sim.players.get(guest.net.id).team,-1);await pause(650);host.net.destroy();await a.ask('returned');await until(()=>guest.net.isHost&&guest.sim,'Guest elected',15000);assert.equal(guest.sim.matchId,match);assert.equal(guest.sim.options.mode,'zonewars');assert.deepEqual(guest.sim.zonePath,path);assert.equal(guest.sim.roundWins[guest.net.id],2);assert.ok(guest.net.maxConnections>=15);assert.deepEqual(guest.errors,[]);
+ }finally{await f.close();}
+});
+test('Zone Wars supports more than eight real participants in a private room',async()=>{
+ const f=await fixture();try{const a=await f.user('Zone Room Host');await a.ask('select',{mode:'zonewars',access:'private',options:{capacity:12,fill:false,scoreLimit:7}});await a.ask('queue');const host=await f.game(a);host.net.maxConnections=15;host.net.publishRoom();await until(()=>f.app.relay.peers.get(host.net.peer.id)?.listing,'Listing');for(let i=0;i<9;i++){const u=await f.user('Zone Join '+i);await u.ask('queue',{code:host.net.code});const g=await f.game(u);assert.equal(g.state.options.mode,'zonewars');assert.equal(g.state.options.scoreLimit,7);}assert.equal([...host.sim.players.values()].filter(p=>!p.bot).length,10);assert.deepEqual(f.games.flatMap(g=>g.errors),[]);
+ }finally{await f.close();}
+});

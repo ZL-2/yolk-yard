@@ -109,7 +109,7 @@ export class RealtimeRelay {
       if(this.authority.rooms.has(peer.id))return;
       if(!address.test(peer.id))throw Error('Not a room');
       const r=m.room;
-      if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!['royale','ffa','boxfight'].includes(r.mode)||!Number.isInteger(r.players)||r.players<0||r.players>MAX_HUMANS+MAX_SPECTATORS))throw Error('Invalid room');
+      if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!['royale','ffa','zonewars','boxfight'].includes(r.mode)||!Number.isInteger(r.players)||r.players<0||r.players>MAX_HUMANS+MAX_SPECTATORS))throw Error('Invalid room');
       if(this.publicHost.enabled&&!!this.publicHost.roomByAddress(peer.id)&&!this.publicHost.publish(peer,r))throw Error('Invalid public host state');
       peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:r.mode,players:r.players,capacity:Math.max(2,Math.min(MAX_HUMANS,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(MAX_CONTESTANTS,Number(r.contestantCapacity)||8)),teamSize:(r.mode==='boxfight'?[2,3,4]:[2,4]).includes(r.teamSize)?r.teamSize:1,boxFormat:r.mode==='boxfight'&&r.boxFormat==='ffa'?'ffa':'teams',public:!!this.publicHost.roomByAddress(peer.id),hostRun:true,recurring:!!this.publicHost.roomByAddress(peer.id),phase:r.phase}:null;
       peer.listedAt=Date.now();return;

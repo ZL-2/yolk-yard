@@ -38,7 +38,7 @@ export class PublicRoom {
   const reserved=[...this.relay.parties.tickets.values()].some(t=>t.code===this.code&&t.peer===peer.id&&t.member===admission.memberId&&t.expires>Date.now()&&!!t.spectator===spectator);
   if((spectator?status.availableSpectators:status.availableSeats)<(reserved?0:1))return null;
   const record={...admission,spectator:!!spectator,publicSpectator:!!spectator,crownRecord:crownRecord(this.relay.progression.account(peer.progressId).crowns)};
-  this.relay.progression.bindPublicPlayer?.(peer,record.memberId,{participant:!spectator});
+  this.relay.progression.bindPublicPlayer?.(peer,record.memberId,{participant:!spectator,mode:this.options.mode});
   this.members.set(peer.id,{peer:peer.id,id:peer.id===this.host?.peer?this.host.id:peer.id,order:++this.order,admission:record});
   peer.publicMember=true;if(!spectator){this.joinSerial++;const player=this.relay.parties.store?.identities.get(record.memberId);this.lastJoin={serial:this.joinSerial,name:player?.profile?.name||'A player',at:Date.now()};}return record;
  }
@@ -46,7 +46,7 @@ export class PublicRoom {
  publish(peer,r){
   if(!this.isTarget(peer)||!r?.recurring||r.hostId!==this.host.id||(r.mode&&r.mode!==this.options.mode)||(r.teamSize&&r.teamSize!==this.options.teamSize))return false;
   const s=r.publicState;
-  if(!s||!(this.options.mode==='boxfight'?['box-waiting','box-prepare','box-fight','box-intermission','finished']:this.options.mode==='ffa'?['arena','finished']:['spawn-island','starting','battle-bus','drop','active','ending','finished']).includes(s.stage)||!['playing','results'].includes(s.phase)||!Number.isFinite(s.time))return false;
+  if(!s||!(['boxfight','zonewars'].includes(this.options.mode)?['box-waiting','box-prepare','box-fight','box-intermission','finished']:this.options.mode==='ffa'?['arena','finished']:['spawn-island','starting','battle-bus','drop','active','ending','finished']).includes(s.stage)||!['playing','results'].includes(s.phase)||!Number.isFinite(s.time))return false;
   const now=Date.now();this.host.at=now;
   if(s.time!==this.host.time){this.host.time=s.time;this.host.advancedAt=now;}
   const count=(n,max)=>Math.max(0,Math.min(max,Math.floor(n)||0));
@@ -56,7 +56,7 @@ export class PublicRoom {
   return true;
  }
  summary(){
-  const s=this.state,warmup=!s||this.options.mode==='boxfight'&&s.stage==='box-waiting'||this.options.mode==='ffa'||['spawn-island','starting'].includes(s.stage),recovering=!this.host&&(!!this.members.size||!!this.pending)||!!(s&&this.host&&Date.now()-this.host.advancedAt>15000);
+  const s=this.state,warmup=!s||['boxfight','zonewars'].includes(this.options.mode)&&s.stage==='box-waiting'||this.options.mode==='ffa'||['spawn-island','starting'].includes(s.stage),recovering=!this.host&&(!!this.members.size||!!this.pending)||!!(s&&this.host&&Date.now()-this.host.advancedAt>15000);
   const members=[...this.members.values()],humanPlayers=members.filter(x=>!x.admission.spectator).length,spectators=members.length-humanPlayers;
   const countdownSeconds=warmup&&s?.queueEnds?Math.max(0,Math.ceil(s.queueEnds-s.time)):0;
   return {availability:publicWindow(Date.now()),code:this.code,mode:this.options.mode,teamSize:this.options.teamSize,version:VERSION,hosting:'player',hostReady:!!this.host&&!!s,recovering,joinSerial:this.joinSerial,lastJoin:this.lastJoin,round:s?.round||0,matchId:s?.matchId||null,stage:s?.stage||'spawn-island',phase:s?.phase||'playing',capacity:this.options.capacity,difficulty:2,humanPlayers,spectators,botPlayers:s?.botPlayers??this.options.capacity,alive:warmup?this.options.capacity:s.alive,joinable:warmup&&!recovering,countdownStarted:countdownSeconds>0,countdownSeconds,estimatedSeconds:s?.estimatedSeconds||0,restartSeconds:s?.phase==='results'?s.estimatedSeconds:0,availableSeats:Math.max(0,this.options.capacity-humanPlayers-this.pendingCount()),availableSpectators:Math.max(0,16-spectators-this.pendingCount(true))};

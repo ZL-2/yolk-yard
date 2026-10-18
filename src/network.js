@@ -596,7 +596,7 @@ export class Network {
     const checkpoint=this.lastCheckpoint;
     this.chatRoom.sequence=Math.max(checkpoint.chat?.sequence||0,this.snapshot?.network?.chatSequence||0);this.chatRoom.enabled=this.chatEnabled=checkpoint.chat?.enabled!==false;
     this.chatMuted=checkpoint.chat?.muted||[];this.chatRoom.muted=new Set(this.chatMuted);this.chatRoom.members=new Map(checkpoint.chat?.members||[]);this.chatRoom.reports=new Set(checkpoint.chat?.reports||[]);this.kicked=new Set(checkpoint.kicked||[]);
-    this.maxConnections=(checkpoint.simulation.options.mode==='royale'?Math.min(checkpoint.simulation.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
+    this.maxConnections=(['royale','zonewars'].includes(checkpoint.simulation.options.mode)?Math.min(checkpoint.simulation.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     this.callbacks.onHost?.(checkpoint.simulation,[...this.failedHosts]);
     this.callbacks.onHostRecovery?.(10000);
     this.lastPublish=0;this.lastCheckpointSent=0;this.claimRoomAddress();

@@ -1,4 +1,5 @@
 import {RADIUS,HEIGHT,canStand,boxTop,playerBoxOverlap} from './physics.js';
+import {ZONE_MAP} from './zone-wars-map.js';
 import {BOX_MAPS} from './box-fight-map.js';
 import {ZOMBIES_MAP,zombieClientMap} from './zombies-map.js';
 import {SPAWN_ISLAND} from './spawn-island.js';
@@ -7,7 +8,7 @@ import {groundAt} from './terrain.js';
 import {createRavelArenas} from './ravel-arenas.js';
 import {compileLayout,validateLayout,layoutKey,MAP_LIMITS} from './map-layout.js';
 export const MAPS=createRavelArenas();
-export const BASE_MAPS=[ROYALE_MAP,SPAWN_ISLAND,ZOMBIES_MAP,...BOX_MAPS,...MAPS];
+export const BASE_MAPS=[ROYALE_MAP,SPAWN_ISLAND,ZOMBIES_MAP,ZONE_MAP,...BOX_MAPS,...MAPS];
 export const baseMap=id=>BASE_MAPS.find(m=>m.id===id)||MAPS[0];
 const emptyBundle=Object.freeze({});
 let publishedLayouts=emptyBundle,matchLayouts=null,matchKey='';

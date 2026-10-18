@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {ProgressionService} from '../server/realtime/progression.js';
 import {publicTotals,rankPublicPlayers,publicLeaderboardView} from '../server/realtime/leaderboards.js';
+import {rewardFrame} from '../src/rewards.js';
 import {leaderboardMarkup} from '../src/leaderboard-ui.js';
 import {lobbyMarkup} from '../src/lobby-ui.js';
 
@@ -108,7 +109,7 @@ test('totals and authenticated display identity survive a process restart beyond
 });
 test('two usable leaderboard tabs escape names and sit below the party, above the update footer',()=>{
  const profile={name:'Operator'},markup=lobbyMarkup({profile,balance:0,id:'self',online:true}),box=markup.indexOf('class="frontier-leaderboard"');assert.ok(markup.indexOf('YOUR PARTY')<box);assert.ok(box<markup.indexOf('QUALITY UPDATE'));assert.equal(markup.includes('CUSTOM PRIVATE MATCH'),false);
- const board={rows:[{rank:1,name:'<img onerror=bad>',kills:17,wins:3,you:true}],self:null},html=leaderboardMarkup({profile,leaderboardTab:'wins',leaderboards:{wins:board}});assert.match(html,/data-leaderboard-tab="kills"/);assert.match(html,/data-leaderboard-tab="wins"[^>]*aria-selected="true"/);assert.match(html,/&lt;img onerror=bad&gt;/);assert.equal(html.includes('<img onerror=bad>'),false);assert.match(html,/PUBLIC WINS/);
+ const board={rows:[{rank:1,name:'<img onerror=bad>',kills:17,wins:3,you:true}],self:null},html=leaderboardMarkup({profile,leaderboardTab:'wins',leaderboards:{wins:board}});assert.match(html,/data-leaderboard-tab="kills"/);assert.match(html,/data-leaderboard-tab="wins"[^>]*aria-selected="true"/);assert.match(html,/&lt;img onerror=bad&gt;/);assert.equal(html.includes('<img onerror=bad>'),false);assert.match(html,/Public Frontier Royale totals/);
 });
 
 test('the lobby restores prior public totals with the existing private progression credential before another match',async()=>{
@@ -117,3 +118,21 @@ test('the lobby restores prior public totals with the existing private progressi
  service.restoreLeaderboardViewer('b'.repeat(32),'other-social');assert.equal(service.leaderboards('other-social').kills.self,null);assert.equal(service.accounts.size,1,'unknown credentials do not create new accounts');
  service.restoreLeaderboardViewer(token,'saved-social');const board=service.leaderboards('saved-social');assert.equal(board.kills.self.kills,14);assert.equal(board.wins.self.wins,1);assert.equal(board.kills.self.name,'Returning Operator');service.dirty=false;service.restoreLeaderboardViewer(token,'saved-social');assert.equal(service.dirty,false,'unchanged polling does not rewrite the progression file');await service.close();
 });
+
+test('all competitive modes keep independent persistent kills and wins, even with matching round IDs',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'mode-boards-')),path=join(dir,'boards.json'),identities=new Map([['member',{profile:{name:'Mode Scout'}}]]),relay={send(){},parties:{store:{identities}}};
+ try{const service=new ProgressionService(relay,{path});await service.ready;service.bindPublicPlayer({progressId:'player'},'member');let n=0;for(const mode of ['royale','boxfight','zonewars','zombies','ffa']){n++;const p={identity:'player',kills:n,raw:{kills:n,contestant:true}},m={mode,room:'room',key:'room:shared-id:1'};service.recordPublicRound(p,m,true);service.recordPublicRound(p,m,true);const b=service.leaderboards('member',{mode});assert.equal(b.kills.self.kills,n);assert.equal(b.wins.self.wins,1);}await service.close();const restored=new ProgressionService(relay,{path});await restored.ready;n=0;for(const mode of ['royale','boxfight','zonewars','zombies','ffa']){const b=restored.leaderboards('member',{mode});assert.equal(b.kills.self.kills,++n);assert.equal(b.wins.self.wins,1);}assert.equal(restored.leaderboards('member',{mode:'training'}).kills.total,0);await restored.close();}finally{await rm(dir,{recursive:true,force:true});}
+});
+test('Zone Wars counts each round once and does not contaminate Royale or Box Fights rankings',async()=>{
+ const {service,host,state,advance}=publicFixture();await service.ready;state.mode='zonewars';state.boxFormat='ffa';state.players[0].kills=2;service.frame(host,state);state.phase='results';state.winnerId='host';advance();service.frame(host,state);service.frame(host,state);assert.equal(service.leaderboards('host-social',{mode:'zonewars'}).wins.self.wins,1);state.round=2;state.phase='playing';state.winnerId=null;state.players[0].kills=0;advance();service.frame(host,state);state.players[0].kills=1;state.phase='results';state.winnerId='host';advance();service.frame(host,state);assert.equal(service.leaderboards('host-social',{mode:'zonewars'}).kills.self.kills,3);assert.equal(service.leaderboards('host-social',{mode:'zonewars'}).wins.self.wins,2);assert.equal(service.leaderboards('host-social').kills.self.kills,0);assert.equal(service.leaderboards('host-social',{mode:'boxfight'}).kills.self,null);await service.close();
+});
+test('each leaderboard offers every mode, labels personal practice and shows an override reset',()=>{
+ const html=leaderboardMarkup({profile:{name:'Scout'},leaderboardMode:'zonewars',leaderboardAuto:false});assert.equal((html.match(/<option value=/g)||[]).length,6);assert.match(html,/value="zonewars" selected/);assert.match(html,/FOLLOW PLAY/);assert.match(html,/data-leaderboard-mode/);const training=leaderboardMarkup({profile:{name:'Scout'},leaderboardMode:'training'});assert.match(training,/PERSONAL PRACTICE/);assert.match(training,/Personal practice record/);
+});
+
+test('a new FFA match ignores previous-match event history and draws award no winner',async()=>{
+ const {service,host,state,advance}=publicFixture();await service.ready;state.mode='ffa';state.events=[{id:1,type:'elimination',player:'host',target:'bot-1'}];state.players[0].kills=1;service.frame(host,state);state.phase='results';state.winnerId='host';advance();service.frame(host,state);assert.equal(service.leaderboards('host-social',{mode:'ffa'}).wins.self.wins,1);
+ state.matchId='second-ffa';state.round=2;state.phase='playing';state.players[0].kills=0;state.winnerId=null;advance();service.frame(host,state);state.phase='results';advance();service.frame(host,state);const b=service.leaderboards('host-social',{mode:'ffa'});assert.equal(b.kills.self.kills,1);assert.equal(b.wins.self.wins,1);await service.close();
+});
+
+test('FFA reward frames identify the unique actual winner and preserve a tied result',()=>{const s={phase:'results',options:{mode:'ffa'},round:2,events:[],players:[{id:'one',kills:5,deaths:1},{id:'two',kills:5,deaths:9}]};assert.equal(rewardFrame(s,'one',{}).winnerId,null);s.players[1].kills=6;assert.equal(rewardFrame(s,'one',{}).winnerId,'two');s.phase='playing';assert.equal(rewardFrame(s,'one',{}).winnerId,null);});

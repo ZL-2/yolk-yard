@@ -59,7 +59,7 @@ export class MatchAuthority{
    const plan=room.recurring?{ok:!spectator||this.capacity.spectators(room)<MAX_SPECTATORS,reason:'The public spectator seats are full. Try again shortly.'}:this.capacity.plan(room.sim.options,{key:room.key,humans:this.capacity.humans(room)+this.capacity.pending(room.key)+(!spectator&&!reserved?added:0),spectators:this.capacity.spectators(room)+this.capacity.pending(room.key,true)+(spectator&&!reserved?added:0),botLimit:room.sim.botLimit});if(!plan.ok)return reject(plan.reason),true;
    if([...room.members.values()].some(o=>o!==peer&&o.ws&&o.progressId===peer.progressId))return reject('This saved player is already in the public match in another tab.'),true;
    const p=room.sim.admitPlayer(peer.id,profile,admission);if(!p)return reject('This room is full.'),true;
-   if(room.zombies){if(!room.owner||admission.memberId===room.leaderSocial)room.owner=p.id;room.startedWaitingAt??=room.age;if(peer.progressId&&!p.zAccount)room.sim.bindAccount(p,this.relay.progression.account(peer.progressId));}
+   if(room.zombies){this.relay.progression.bindPublicPlayer(peer,admission.memberId,{participant:room.visibility!=='private',mode:'zombies'});if(!room.owner||admission.memberId===room.leaderSocial)room.owner=p.id;room.startedWaitingAt??=room.age;if(peer.progressId&&!p.zAccount)room.sim.bindAccount(p,this.relay.progression.account(peer.progressId));}
    if(room.recurring)attachCrown(room.sim,p,peer.progressId);
    if(room.recurring&&!room.members.has(p.id))room.joinSerial=(room.joinSerial||0)+1;
    peer.authorityRoom=room.key;peer.authorityId=p.id;peer.controlReady=false;p.loading=true;room.members.set(p.id,peer);room.sim.setConnectedHumans?.([...room.members].filter(([,p])=>p.ws).map(([id])=>id));

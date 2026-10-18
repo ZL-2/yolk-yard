@@ -11,7 +11,7 @@ export class BoxFightUI{
  constructor(){this.root=document.createElement('section');this.root.id='boxfight-hud';this.root.hidden=true;document.querySelector('#hud').append(this.root);this.last='';this.cueKey='';}
  clear(){this.root.hidden=true;document.body.classList.remove('in-boxfight');this.last='';}
  update(state,p,paused,sound){
-  const b=state?.boxfight;document.body.classList.toggle('in-boxfight',!!b);this.root.hidden=!b||paused;if(!b||!p)return;
+  const b=state?.zonewars?null:state?.boxfight;document.body.classList.toggle('in-boxfight',!!b);this.root.hidden=!b||paused;if(!b||!p)return;
   const prep=b.stage==='prepare',waiting=b.stage==='waiting',between=b.stage==='intermission',sec=Math.max(0,Math.ceil((waiting?b.queueEnds:b.ends)-state.time)),cue=prep&&sec<=3?state.round+':'+sec:'';
   if(cue&&cue!==this.cueKey){this.cueKey=cue;sound?.cue('countdown');}
   const ffa=b.format==='ffa',my=boxTeam(state.options,p),op=state.players.filter(o=>o.contestant&&o.id!==p.id).sort((a,c)=>c.boxWins-a.boxWins)[0],alive=t=>state.players.filter(o=>o.contestant&&boxTeam(state.options,o)===t&&o.health>0&&!o.spectating).length;

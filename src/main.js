@@ -1,3 +1,7 @@
+import {rankingMode} from './ranking-modes.js';
+import './zone-wars.css';
+import {ZoneWarsSimulation} from './zone-wars.js';
+import {ZoneWarsUI,zoneRoomMarkup,zoneResultsMarkup} from './zone-wars-ui.js';
 import './box-fights.css';
 import {BoxFightSimulation} from './box-fights.js';
 import {BoxFightUI,boxRoomMarkup,boxResultsMarkup,boxScoresMarkup} from './box-fight-ui.js';
@@ -8,7 +12,7 @@ import {zombiesLoadout} from './zombies-loadout.js';
 import {ZombiesSimulation} from './zombies-expedition.js';
 import {applyZombiesState} from './zombies-map.js';
 import {ZombiesUI,nearbyDownedZombiePlayer,nearbyZombieStation,zombiesStationMenu,zombiesJournal,zombiesResults} from './zombies-ui.js';
-import {ZOMBIES_LOADING_ART,BOX_LOADING_ART} from './loading-screen.js';
+import {ZOMBIES_LOADING_ART,BOX_LOADING_ART,ZONE_LOADING_ART} from './loading-screen.js';
 import './field-operations.css';
 import {MatchConnectionUI} from './match-connection-ui.js';
 import {departureFeed,eliminationNotice} from './match-roster.js';
@@ -96,6 +100,7 @@ import './frontier-ui.css';
 import './field-refinement.css';
 import './field-stability.css';
 import './lobby-deploy.css';
+import './menu-refresh.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
@@ -185,7 +190,7 @@ const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(k
 let progressMatch='';
 let crownStatus=read('ravelfront-crown-status',{season:1,wins:0,owned:false,unlocked:false}),crownStatusKey='';
 let menuSection=['locker','shop','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
-let leaderboards=null,leaderboardTab='kills',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
+let privateMatchDrafts={},leaderboardOverrides={},leaderboardDataMode='',leaderboards=null,leaderboardTab='kills',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
 const menuShopStates={};
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
 let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
@@ -260,7 +265,7 @@ window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.v
 const streakUI=new StreakUI(document.querySelector('#hud'));
 const royaleUI = new RoyaleUI(item=>view.itemPreview(item));
 const matchEndUI=new MatchEndUI();
-const fieldUI=new FieldOperationsUI();const zombiesUI=new ZombiesUI();const boxUI=new BoxFightUI();
+const fieldUI=new FieldOperationsUI();const zombiesUI=new ZombiesUI();const boxUI=new BoxFightUI();const zoneUI=new ZoneWarsUI();
 const matchConnectionUI=new MatchConnectionUI();
 const buildControls={buildMode:false,buildType:'wall',buildMaterial:'wood',buildRotation:0,editing:false};
 document.addEventListener('build-edit-close',()=>{if(screen==='game'&&!paused&&!matchMedia('(pointer:coarse)').matches)view.renderer.domElement.requestPointerLock?.();});
@@ -300,12 +305,15 @@ function titleBar() {
 let socialActivityKey='';
 function syncSocialActivity(me){if(!party?.ready)return;const activity=screen==='game'&&state?.phase==='playing'?(me?.spectating||me?.health<=0?'spectating':'in-match'):'lobby',mode=activity!=='lobby'?(state?.options.training?'training':state?.options.mode):null,key=activity+':'+mode+':'+party.id;if(key===socialActivityKey)return;socialActivityKey=key;party.request('presence',{activity,mode,visible:!document.hidden&&document.hasFocus()}).catch(()=>{socialActivityKey='';});}
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();if(screen==='menu')renderMenu();}});
-function menuModel(){return {profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
+function currentLeaderboardMode(){return rankingMode(leaderboardOverrides[leaderboardTab]||party?.party?.selection?.mode);}
+function trainingBoard(){const p={rank:1,name:profile.name,kills:stats.training?.kills||0,wins:stats.training?.wins||0,you:true};return {mode:'training',...Object.fromEntries(['kills','wins'].map(k=>[k,{total:1,offset:0,rows:[p],self:p,hasMore:false}]))};}
+function menuModel(){const selected=currentLeaderboardMode();if(leaderboardDataMode!==selected){leaderboards=selected==='training'?trainingBoard():null;leaderboardPageBoards=leaderboards;leaderboardDataMode=selected;leaderboardFetchedAt=0;leaderboardOffset=0;}return {leaderboardMode:selected,leaderboardAuto:!leaderboardOverrides[leaderboardTab],profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
 function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}installLeaderboardScrollbars();}
 async function refreshLeaderboards(force=false){
  if(screen!=='menu'||menuSection!=='play'&&dialogType!=='leaderboards'||!party?.ready||leaderboardPending||!force&&leaderboards&&performance.now()-leaderboardFetchedAt<15000)return;
+ const mode=currentLeaderboardMode();if(mode==='training'){leaderboards=leaderboardPageBoards=trainingBoard();leaderboardDataMode=mode;renderLeaderboard();return;}
  const offset=dialog.open&&dialogType==='leaderboards'?leaderboardOffset:0;
- leaderboardPending=true;renderLeaderboard();try{let progressToken;try{progressToken=localStorage.getItem('ravelfront-progress-token');}catch{}const result=await party.request('leaderboards',{progressToken,offset});if(!offset)leaderboards=result;leaderboardPageBoards=result;leaderboardError='';}catch(error){leaderboardError=error.message;}finally{leaderboardPending=false;leaderboardFetchedAt=performance.now();renderLeaderboard();}
+ leaderboardPending=true;renderLeaderboard();try{let progressToken;try{progressToken=localStorage.getItem('ravelfront-progress-token');}catch{}const result=await party.request('leaderboards',{progressToken,offset,mode});if(mode!==currentLeaderboardMode())return;if(!offset)leaderboards=result;leaderboardPageBoards=result;leaderboardError='';}catch(error){leaderboardError=error.message;}finally{leaderboardPending=false;leaderboardFetchedAt=mode===currentLeaderboardMode()?performance.now():0;renderLeaderboard();if(mode!==currentLeaderboardMode())void refreshLeaderboards(true);}
 }
 setInterval(()=>{void refreshLeaderboards();},15000);
 const lobbyNews=new LobbyNews();
@@ -441,6 +449,7 @@ function helpMenu() {
   );
 }
 function ruleSummary(o) {
+  if(o.mode==='zonewars')return `Solo · First to ${o.scoreLimit} rounds · 16 building spawns · 50 siphon`;
   if(o.mode==='boxfight')return `${boxFormat(o)} · First to ${o.scoreLimit} rounds · 500 wood · 50 siphon`;
   if(o.mode==='zombies')return `${o.capacity} cooperative seats · Blacktide Exclusion Coast · 25-minute expedition · Complete 3 contracts, then extract`;
   if(o.mode==='royale')return `${o.teamSize===4?'Squads':o.teamSize===2?'Duos':'Solo'} · ${o.capacity} contestants · ${o.fill?"Fill with bots":o.bots+" bots"} · ${o.storm==='quick'?'Quick':'Normal'} storm · One life`;
@@ -452,7 +461,7 @@ function setupMenu(editing = false, draft = null) {
   const nextRound = editing && state.phase === "results";
   const select = (id,label,items,value) => `<label>${label}<select class="field" id="setup-${id}">${items.map(([key,text])=>`<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
   modal(nextRound ? "Set up the next round" : editing ? "Match settings" : "Custom Private Match",
-    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your rules and invite friends. This private match runs on your computer; keep this tab open."}</p><div class="split-actions"><button data-match-preset="quick">QUICK ROYALE</button><button data-match-preset="zero">ZERO BUILD</button><button data-match-preset="precision">PRECISION ARENA</button></div><div class="form-grid match-rules">${select("visibility","VISIBILITY",net?.serverAuthority?[["public","Public matchmaking"]]:[["private","Private · invite code only"]],net?.serverAuthority?"public":"private")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.filter(m=>!['zombies','boxfight'].includes(m.id)).map(m=>[m.id,m.name]),o.mode)}${select("teamSize","ROYALE TEAM MODE",[[1,"Solo"],[2,"Duos"],[4,"Squads"]],o.teamSize||1)}${select("teamFill","TEAMMATES",[["on","Fill"],["off","No Fill"]],o.teamFill===false?"off":"on")}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[2,4,8,16,24,32,48].map(n=>[n,String(n)]),o.capacity||MAX_CONTESTANTS)}${select("building","BUILDING",[["on","Building enabled"],["off","Zero Build"]],o.building===false?"off":"on")}${select("weaponPool","ARENA WEAPONS",[["all","All weapons"],["precision","Precision practice"],["close","Close quarters"]],o.weaponPool||"all")}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===4?'Last squad standing wins. Eight contestant positions minimum.':o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Choose your contestant limit; friends replace bots. Fill teams get bot teammates in any remaining positions at departure. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
+    `<p>${editing ? "The host sets the rules for everyone. Changes apply before the next round starts." : "Choose your rules and invite friends. This private match runs on your computer; keep this tab open."}</p><div class="split-actions"><button data-match-preset="quick">QUICK ROYALE</button><button data-match-preset="zero">ZERO BUILD</button><button data-match-preset="precision">PRECISION ARENA</button></div><div class="form-grid match-rules">${select("visibility","VISIBILITY",net?.serverAuthority?[["public","Public matchmaking"]]:[["private","Private · invite code only"]],net?.serverAuthority?"public":"private")}${select("map","ARENA",(o.mode==='royale'?[getMap('sunnybreak')]:MAPS).map(m=>[m.id,m.name]),o.map)}${select("mode","GAME MODE",MODES.filter(m=>!['zombies','boxfight','zonewars'].includes(m.id)).map(m=>[m.id,m.name]),o.mode)}${select("teamSize","ROYALE TEAM MODE",[[1,"Solo"],[2,"Duos"],[4,"Squads"]],o.teamSize||1)}${select("teamFill","TEAMMATES",[["on","Fill"],["off","No Fill"]],o.teamFill===false?"off":"on")}${select("bots","BOTS",Array.from({length:o.mode==='royale'?MAX_CONTESTANTS:8},(_,n)=>[n,String(n)]),o.bots)}${select("difficulty","BOT DIFFICULTY",BOT_DIFFICULTIES.map((name,i)=>[i+1,name]),o.difficulty)}<label>TIME LIMIT (MINUTES)<input class="field" id="setup-minutes" type="number" min="1" max="60" step="1" required value="${o.minutes}"></label><label><span id="target-label">${targetLabel(o.mode)}</span><input class="field" id="setup-scoreLimit" type="number" min="1" max="1000" step="1" required value="${o.scoreLimit}"></label>${select("capacity","ROYALE CONTESTANTS",[2,4,8,16,24,32,48].map(n=>[n,String(n)]),o.capacity||MAX_CONTESTANTS)}${select("building","BUILDING",[["on","Building enabled"],["off","Zero Build"]],o.building===false?"off":"on")}${select("weaponPool","ARENA WEAPONS",[["all","All weapons"],["precision","Precision practice"],["close","Close quarters"]],o.weaponPool||"all")}${select("storm","STORM PACE",[["normal","Normal"],["quick","Quick"]],o.storm||"normal")}${select("fill","FILL EMPTY SEATS",[["off","Use chosen bot count"],["on","Fill to contestant limit"]],o.fill?"on":"off")}</div><p class="hint">${o.mode==='royale'?`${o.teamSize===4?'Last squad standing wins. Eight contestant positions minimum.':o.teamSize===2?'Last Duo standing wins. Four contestant positions minimum.':'Last operator standing wins. Two contestants minimum.'} All loot is found on Ravel Coast.`:'The round ends at the time limit or score target.'} ${o.mode==='royale'?'Choose your contestant limit; friends replace bots. Fill teams get bot teammates in any remaining positions at departure. Spawn Island waits up to 30 seconds, departing early when humans fill every contestant seat. Arrivals after departure spectate.':'Up to 8 players including bots; friends replace bots when full.'}</p><button class="primary" style="margin-top:22px" data-action="${nextRound ? "apply-rematch" : editing ? "save-match-settings" : "create-room"}">${nextRound ? "START NEXT ROUND" : editing ? "SAVE SETTINGS" : "CREATE MATCH"}</button>${!editing?'<button class="plain" data-action="join" style="margin-top:10px">JOIN AN EXISTING CUSTOM MATCH</button>':""}`, "setup");
   $('#setup-visibility').disabled=true;
   const royale=o.mode==='royale';
   if(!editing)$('#setup-mode').disabled=false;
@@ -480,10 +489,10 @@ function saveMatchSettings(start = false) {
   if(humans>(next.mode==='royale'?next.capacity:8)){toast('Choose enough contestant seats for everyone in this room.');return;}
   if(sim.remote){sim.configure(next);if(start)sim.startRound();closeDialog();return;}
   if((sim.options.mode==='royale')!==(next.mode==='royale')){
-    const old=sim;sim=next.mode==='boxfight'?new BoxFightSimulation(next):next.mode==='zombies'?new ZombiesSimulation(next):next.mode==='royale'?new RoyaleSimulation(next):new Simulation(next);
+    const old=sim;sim=next.mode==='zonewars'?new ZoneWarsSimulation(next):next.mode==='boxfight'?new BoxFightSimulation(next):next.mode==='zombies'?new ZombiesSimulation(next):next.mode==='royale'?new RoyaleSimulation(next):new Simulation(next);
     for(const p of old.players.values())if(!p.bot)sim.admitPlayer(p.id,p,p.friendSpectator?{...p,spectator:true}:null);sim.round=old.round;sim.phase=old.phase;
   }else if(!sim.configure(next))return;
-  if(net)net.maxConnections=(next.mode==='royale'?Math.min(next.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
+  if(net)net.maxConnections=(['royale','zonewars'].includes(next.mode)?Math.min(next.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
   if(autoQueue&&next.mode==='royale'&&!start)sim.queueEnds=sim.time+WARMUP_SECONDS;
   options=sim.options;
   net?.setVisibility($("#setup-visibility").value);
@@ -609,7 +618,7 @@ function callbacks() {
     getCheckpoint:()=>sim?.checkpoint(),
     getHostInput:()=>sim?.inputs.get(net?.id),
     onHost:(checkpoint,departed)=>{
-      sim=checkpoint.options.mode==='boxfight'?new BoxFightSimulation(checkpoint.options):checkpoint.options.mode==='zombies'?new ZombiesSimulation(checkpoint.options):checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options);if(net.officialPublic&&checkpoint.options.mode==='royale')bindPublicCrowns(sim);sim.restore(checkpoint);
+      sim=checkpoint.options.mode==='zonewars'?new ZoneWarsSimulation(checkpoint.options):checkpoint.options.mode==='boxfight'?new BoxFightSimulation(checkpoint.options):checkpoint.options.mode==='zombies'?new ZombiesSimulation(checkpoint.options):checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options);if(net.officialPublic&&checkpoint.options.mode==='royale')bindPublicCrowns(sim);sim.restore(checkpoint);
       if(sim instanceof RoyaleSimulation)for(const p of sim.players.values())if(!p.bot)p.connected=p.id===net.id;
       for(const id of departed)sim.leavePlayer(id);
       state=sim.snapshot();localId=net.id;pendingInputs=[];predicted=null;
@@ -666,7 +675,7 @@ function callbacks() {
 }
 function beginSim() {
   chat.reset();
-  sim = options.mode==='boxfight'?new BoxFightSimulation(options):options.mode==='zombies'?new ZombiesSimulation(options):options.mode==='royale'?new RoyaleSimulation(options):new Simulation(options);
+  sim = options.mode==='zonewars'?new ZoneWarsSimulation(options):options.mode==='boxfight'?new BoxFightSimulation(options):options.mode==='zombies'?new ZombiesSimulation(options):options.mode==='royale'?new RoyaleSimulation(options):new Simulation(options);
   sim.addPlayer("host", profile);
   localId = "host";
   lastEvent = 0;
@@ -695,7 +704,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
     "connecting",
   );
   const attempt = new Network(callbacks());
-  attempt.maxConnections=(options.mode==='royale'?Math.min(options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
+  attempt.maxConnections=(['royale','zonewars'].includes(options.mode)?Math.min(options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
   net = attempt;
   try {
     await attempt.host(launch?.code,launch?.recurring?launch.ticket:null);
@@ -793,6 +802,7 @@ function renderLobby() {
   const queue = $("#royale-queue");
   if (queue) queue.textContent = queueText;
   if (key === lobbyRenderKey) return;
+  if(o.mode==='zonewars'){lobbyRenderKey=key;$('#lobby').innerHTML=titleBar()+zoneRoomMarkup(state,localId,net?.isHost,formatCode(net?.code||'--------'));return;}
   if(o.mode==='boxfight'){lobbyRenderKey=key;$('#lobby').innerHTML=titleBar()+boxRoomMarkup(state,localId,net?.isHost,formatCode(net?.code||'--------'));return;}
   if(o.mode==='zombies'){
    lobbyRenderKey=key;$('#lobby').innerHTML=`${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility==='public'?'PUBLIC':'PRIVATE'} ZOMBIES</div><h2>BLACKTIDE EXTRACTION</h2><img class="z-room-art" src="./modes/blacktide-173.webp" alt="Blacktide Exclusion Coast"><p>Complete 3 contracts. Recover better gear. Call transport and extract.</p><div class="room-code">${formatCode(net?.code||'--------')}</div><div class="split-actions"><button data-action="copy-code">COPY CODE</button><button data-action="copy-link">COPY INVITE LINK</button></div><div class="roster">${roster.map(p=>`<div class="roster-row"><b>${esc(p.name)}${p.id===localId?' · YOU':''}</b><span>OPERATOR READY</span></div>`).join('')}</div><p>${roster.length} / ${o.capacity} operators · ${net?.visibility==='public'?'Deployment starts automatically.':'Your room leader starts the run.'}</p><p class="hint">25 minutes to explore, then 5 minutes to evacuate. Gold markers are contracts; green markers are extraction. Your squad can leave independently.</p>${zombiesLoadout(roster.find(p=>p.id===localId))}${net?.isHost?'<button class="primary" data-action="start-match">DEPLOY TO BLACKTIDE</button>':''}<button data-action="leave">BACK TO LOBBY</button></section>`;return;
@@ -811,7 +821,7 @@ function launchRound(){
 }
 function enterGame(capture = false) {
   const entering=state.players.find(p=>p.id===localId),watching=!!(entering?.friendSpectator||entering?.lateSpectator);
-  showLoading(watching?'PREPARING SPECTATOR VIEW':'DEPLOYING TO THE FRONT',watching?'Connecting to the action. Spectators cannot affect the match.':'Preparing the battlefield and your operator.',{kind:watching?'spectate':'enter',...(state.zombies?{art:ZOMBIES_LOADING_ART}:state.boxfight?{art:BOX_LOADING_ART}:{})});
+  showLoading(watching?'PREPARING SPECTATOR VIEW':'DEPLOYING TO THE FRONT',watching?'Connecting to the action. Spectators cannot affect the match.':'Preparing the battlefield and your operator.',{kind:watching?'spectate':'enter',...(state.zombies?{art:ZOMBIES_LOADING_ART}:state.zonewars?{art:ZONE_LOADING_ART}:state.boxfight?{art:BOX_LOADING_ART}:{})});
   guestFire.reset();
   connectionReport.network.reset();
   resultAt=0;$("#round-banner").hidden=true;matchEndUI.reset();
@@ -831,12 +841,12 @@ function enterGame(capture = false) {
   dialog.close();
   dialogType = "";
   // Join the match as an inactive operator; only the entry button requests a spawn.
-  resume(capture||state.options.mode==='boxfight'||state.options.mode==='royale'||state.options.mode==='zombies');
+  resume(capture||state.options.mode==='zonewars'||state.options.mode==='boxfight'||state.options.mode==='royale'||state.options.mode==='zombies');
 
 }
 function mouseCapturePrompt() {
   if(screen==='game' && !document.pointerLockElement && (state?.royale||state?.zombies))
-    modal(state?.boxfight?"Enter Box Fights":state?.zombies?"Enter Blacktide Extraction":"Enter Battle Royale", `<p>Click to capture your mouse and look around.</p><button class="primary" data-action="resume">ENTER GAME</button>`, "ready");
+    modal(state?.zonewars?"Enter Zone Wars":state?.boxfight?"Enter Box Fights":state?.zombies?"Enter Blacktide Extraction":"Enter Battle Royale", `<p>Click to capture your mouse and look around.</p><button class="primary" data-action="resume">ENTER GAME</button>`, "ready");
 }
 document.addEventListener('pointerlockerror',mouseCapturePrompt);
 async function resume(capture = true) {
@@ -904,7 +914,7 @@ function playerAction(action) {
 function openZombiesJournal(){if(state?.zombies)modal('BLACKTIDE / FIELD MAP',zombiesJournal(state,localId),'z-journal');}
 function pauseMenu() {
   if(screen!=='game')return;
-  if(state?.boxfight){modal('BOX FIGHTS / FIELD MENU',`<p>${net?'The match continues while this menu is open.':'Local practice is paused.'} ${ruleSummary(state.options)}. Eliminated players return next round.</p><button class="primary" data-action="resume">RESUME</button><div class="split-actions"><button data-action="scores">SCOREBOARD</button><button data-action="royale-inventory">INVENTORY</button><button data-action="settings">SETTINGS</button></div>${net?'<button data-action="chat-controls">PLAYER CONTROLS & CHAT</button><button data-action="copy-link">COPY INVITE LINK</button>':''}<button data-action="leave-confirm">LEAVE SERIES</button>`,'pause');return;}
+  if(state?.boxfight){modal(state.zonewars?'ZONE WARS / FIELD MENU':'BOX FIGHTS / FIELD MENU',`<p>${net?'The match continues while this menu is open.':'Local practice is paused.'} ${ruleSummary(state.options)}. Eliminated players return next round.</p><button class="primary" data-action="resume">RESUME</button><div class="split-actions"><button data-action="scores">SCOREBOARD</button><button data-action="royale-inventory">INVENTORY</button><button data-action="settings">SETTINGS</button></div>${net?'<button data-action="chat-controls">PLAYER CONTROLS & CHAT</button><button data-action="copy-link">COPY INVITE LINK</button>':''}<button data-action="leave-confirm">LEAVE SERIES</button>`,'pause');return;}
   if(state?.zombies){modal('BLACKTIDE / FIELD MENU',`<p>${net?'Your run continues while this menu is open.':'Local expedition is paused.'}</p><button class="primary" data-action="resume">RESUME</button><div class="split-actions"><button data-action="z-journal">MAP & FIELD JOURNAL</button><button data-action="settings">SETTINGS</button>${net?'<button data-action="chat-controls">TEAM CHAT</button>':''}</div><button data-action="leave-confirm">LEAVE RUN</button>`,'pause');return;}
   if(state?.royale){modal('FIELD MENU',`<p>${net?'The match keeps running while this menu is open.':'The local match is paused.'} One life per round. Eliminated players spectate the survivors.</p><button class="primary" data-action="resume">RESUME</button><div class="split-actions"><button data-action="royale-map">Island map</button><button data-action="royale-inventory">Inventory</button><button data-action="settings">Settings</button></div><div class="split-actions"><button data-action="field-orders">Field orders & report</button></div>${net?'<button class="plain" data-action="chat-controls">Player controls & quick chat</button>':''}${visibilityButton()}<button class="secondary" data-action="leave-confirm">Leave match</button>`,'pause');return;}
 
@@ -915,7 +925,7 @@ function pauseMenu() {
   );
 }
 function leave(confirm = false,notifyParty=true) {
-  lastPreferenceSync='';actionToggles.reset();stopBlacktideNarration();zombiesUI.clear();boxUI.clear();
+  lastPreferenceSync='';actionToggles.reset();stopBlacktideNarration();zombiesUI.clear();boxUI.clear();zoneUI.clear();
   const returningFromMatch=screen==='game';
   if(returningFromMatch)showLoading('RETURNING TO LOBBY','Closing the match connection and preparing your operator in the lobby.',{kind:'exit'});else hideLoading(true);
   if(notifyParty){activeLaunch=null;void partyRequest("returned");}
@@ -979,6 +989,7 @@ function playEmote(id){
  sendPlayerAction('emote-'+id);buildUI.cancel();buildControls.buildMode=false;void resume(state?.phase!=='results');
 }
 function resultsMenu() {
+  if(state?.zonewars){modal('ZONE WARS · SERIES RESULTS',zoneResultsMarkup(state,localId,!!sim||net?.isHost),'results');return;}
   if(state?.boxfight){modal('BOX FIGHTS · SERIES RESULTS',boxResultsMarkup(state,localId,!!sim||net?.isHost),'results');return;}
   if(state?.zombies){modal('BLACKTIDE / RUN COMPLETE',zombiesResults(state,localId,!!sim&&(!net||net.isHost),matchEarnings),'results');return;}
   if(state?.royale){matchEndUI.update(state,localId,true);return;}
@@ -1019,6 +1030,7 @@ function handleState() {
   for (const toggle of document.querySelectorAll('[data-action="toggle-visibility"]')) toggle.textContent = visibilityLabel();
 }
 function processEvents() {
+  if(state?.options.training){const me=state.players.find(p=>p.id===localId),id=state.royale.matchId;stats.training??={kills:0,wins:0,rounds:{}};const record=stats.training.rounds[id]??={kills:0,won:false},kills=me?.kills||0,done=['move','fire','slide','build','edit','boost'].every(k=>me?.tutorial?.[k]);if(kills>record.kills||done&&!record.won){stats.training.kills+=Math.max(0,kills-record.kills);record.kills=Math.max(kills,record.kills);if(done&&!record.won){record.won=true;stats.training.wins++;}stats.training.rounds=Object.fromEntries(Object.entries(stats.training.rounds).slice(-30));save('yolk-stats',stats);}}
   if (!state) return;
   const listener=state.players.find(p=>p.id===localId);
   sound.listener=listener?.spectating?state.players.find(p=>p.id===spectateTarget)||listener:listener;
@@ -1105,7 +1117,7 @@ function processEvents() {
       if (p) {
         if (p.health > 0 && performance.now() < spawnIntentUntil && !dialog.open) void resume();
         spawnIntentUntil = 0;
-        input.yaw = p.yaw;
+        input.yaw = Number.isFinite(e.yaw)?e.yaw:p.yaw;
         input.pitch = 0;
       }
       pendingInputs = [];
@@ -1124,7 +1136,7 @@ function hud() {
   const watched=p.spectating?state.players.find(k=>k.id===spectateTarget):null;
   if(state?.royale){const me=state.players.find(p=>p.id===localId);if(me)buildUI.update(state,localBuildPose(me),view.buildMap,controlLabel);}
   royaleUI.update(state,{...p,...localPerspective()},watched,controlLabel,paused);
-  fieldUI.update(state,p,!state.zombies&&!state.boxfight,paused,point=>view.projectMarker(point));zombiesUI.update(state,p,controlLabel,paused,point=>view.projectMarker(point));boxUI.update(state,p,paused,sound);
+  fieldUI.update(state,p,!state.zombies&&!state.boxfight,paused,point=>view.projectMarker(point));zombiesUI.update(state,p,controlLabel,paused,point=>view.projectMarker(point));boxUI.update(state,p,paused,sound);zoneUI.update(state,p,paused,sound);
   view.waypoint=royaleUI.waypoint;
   $("#hud-mode").textContent = m.name.toUpperCase();
   $("#hud-map").textContent = getMap(state.options.map).name;
@@ -1250,7 +1262,7 @@ async function selectExperience(id){
  if(!party?.ready||party.party.leader!==party.id)return;
  if(e.mode==='training'){if(party.party.members.length>1)return toast('Leave your party to train solo.');closeDialog();actions.training();return;}
  const previous=party.party.selection,teamSize=e.mode==='boxfight'?Math.max(1,party.party.members.length):e.mode==='zombies'?4:e.mode==='royale'?Math.max(previous.teamSize||1,party.party.members.length>2?4:party.party.members.length):1;
- if(await partyRequest('select',{mode:e.mode,teamSize,access:previous.access,teamFill:previous.teamFill,options:matchOptions({...previous,...(e.mode==='boxfight'&&previous.mode!=='boxfight'?{scoreLimit:5,boxArena:'rotate',boxFormat:'teams',boxLoadout:'classic',fill:true}:{}),mode:e.mode,map:e.mode==='royale'?'sunnybreak':e.mode==='boxfight'?'box-foundry':'yard',teamSize,bots:e.mode==='royale'?47:7,capacity:e.mode==='royale'?48:8})})){closeDialog();renderMenu();}
+ if(await partyRequest('select',{mode:e.mode,teamSize,access:previous.access,teamFill:previous.teamFill,options:matchOptions({...previous,...(e.mode==='zonewars'?{scoreLimit:5,fill:true}:{}),...(e.mode==='boxfight'&&previous.mode!=='boxfight'?{scoreLimit:5,boxArena:'rotate',boxFormat:'teams',boxLoadout:'classic',fill:true}:{}),mode:e.mode,map:e.mode==='royale'?'sunnybreak':e.mode==='boxfight'?'box-foundry':'yard',teamSize,bots:e.mode==='zonewars'?15:e.mode==='royale'?47:7,capacity:e.mode==='zonewars'?16:e.mode==='royale'?48:8})})){closeDialog();renderMenu();}
 }
 function lobbyOptionsMenu(draft=party?.party?.selection){
  if(!draft||!party?.ready)return toast('Matchmaking is connecting.');
@@ -1355,6 +1367,8 @@ const actions = {
   profile=safeProfile({...profile,name:checked.name});save('yolk-profile',profile);dialog.close();dialogType='';paused=false;initializeParty();renderMenu();nameChosen?.();nameChosen=null;
  },
  'leaderboard-open':()=>{leaderboardOffset=0;leaderboardPageBoards=leaderboards;modal('FRONTIER LEADERS',`<section class="frontier-leaderboard frontier-leaderboard-expanded">${leaderboardMarkup({...menuModel(),expanded:true})}</section>`,'leaderboards');installLeaderboardScrollbars();void refreshLeaderboards(true);},
+ 'toggle-match-privacy':async()=>{const p=party?.party;if(!p||p.leader!==party.id||p.state!=='idle')return;const previous=p.selection,access=previous.access==='private'?'public':'private';if(previous.access==='private')privateMatchDrafts[previous.mode]={...previous};const next=access==='private'?{...previous,...privateMatchDrafts[previous.mode]}:previous;if(await partyRequest('select',{mode:previous.mode,teamSize:next.teamSize,teamFill:next.teamFill,access,options:next}))renderMenu();},
+ 'leaderboard-follow':()=>{delete leaderboardOverrides[leaderboardTab];menuModel();renderLeaderboard();void refreshLeaderboards(true);},
  'leaderboard-refresh':()=>{void refreshLeaderboards(true);},
  'owner-map-editor':()=>ownerConsole.openMapEditor(),
  'owner-refresh':()=>ownerConsole.refresh(),
@@ -1456,7 +1470,7 @@ const actions = {
   leave: () => leave(),
   "leave-confirm": () => leave(true),
   scores: () => {
-    if(dialog.open&&state?.boxfight){modal('BOX FIGHTS / SCOREBOARD',boxScoresMarkup(state,localId)+'<button class="primary" data-action="resume">BACK TO MATCH</button>','box-scores');return;}
+    if(dialog.open&&state?.boxfight){modal(state.zonewars?'ZONE WARS / SCOREBOARD':'BOX FIGHTS / SCOREBOARD',boxScoresMarkup(state,localId)+'<button class="primary" data-action="resume">BACK TO MATCH</button>','box-scores');return;}
     scoreHeld = !scoreHeld;
   },
   "cancel-connect": () => leave(),
@@ -1491,7 +1505,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("button,[data-action]");
   if (!b) return;
   if(needsPlayerName(profile.name)&&b.dataset.action!=='save-player-name'){e.preventDefault();requiredNamePrompt();return;}
-  if(b.dataset.leaderboardTab){leaderboardTab=b.dataset.leaderboardTab==='wins'?'wins':'kills';renderLeaderboard(true);}
+  if(b.dataset.leaderboardTab){leaderboardTab=b.dataset.leaderboardTab==='wins'?'wins':'kills';menuModel();renderLeaderboard(true);void refreshLeaderboards(true);}
   if(b.dataset.leaderboardPage!==undefined&&!leaderboardPending&&dialogType==='leaderboards'){leaderboardOffset=Math.max(0,Number(b.dataset.leaderboardPage)||0);$('#dialog .frontier-board-ranks').scrollTop=0;void refreshLeaderboards(true);}
   if(b.dataset.socialTab){socialTab=b.dataset.socialTab;void socialMenu();}
   if(b.dataset.socialPage!==undefined){socialOffset=Number(b.dataset.socialPage);void socialMenu();}
@@ -1679,7 +1693,7 @@ function pointerPanelToggle(e){
 document.addEventListener('mousedown',pointerPanelToggle,true);
 document.addEventListener('wheel',pointerPanelToggle,{capture:true,passive:false});
 document.addEventListener("keydown", (e) => {
-  if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();leaderboardTab=e.key==='Home'?'kills':e.key==='End'?'wins':leaderboardTab==='kills'?'wins':'kills';renderLeaderboard(true);return;}
+  if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();leaderboardTab=e.key==='Home'?'kills':e.key==='End'?'wins':leaderboardTab==='kills'?'wins':'kills';menuModel();renderLeaderboard(true);void refreshLeaderboards(true);return;}
   if (chat.opened || e.target.matches("input,select,textarea,[contenteditable=true]")) return;
   const panel = screen==='game' && state?.royale && (!paused || ['royale-map','royale-inventory'].includes(dialogType))
     ? royalePanelAction(e.code, settings.keybinds, dialog.open ? dialogType : '') : null;
@@ -1776,6 +1790,7 @@ document.addEventListener('click',e=>{
 });
 // Pointer capture keeps mouse/touch drops working across the modal's inert backdrop.
 let inventoryDrag=null,inventoryDragSlot=null,inventoryDragPreview=null,suppressInventoryClickUntil=0;
+document.addEventListener('change',e=>{if(e.target.matches('[data-leaderboard-mode]')){leaderboardOverrides[leaderboardTab]=rankingMode(e.target.value);menuModel();renderLeaderboard();void refreshLeaderboards(true);}});
 dialog.addEventListener('change',e=>{if(e.target.matches('[data-training-weapon]')&&sim?.options.training)sim.playerAction(localId,'training-weapon-'+e.target.value);});
 dialog.addEventListener('click',e=>{const drop=e.target.closest('[data-supply-drop]');if(drop){const action='inventory-supply-'+drop.dataset.supplyDrop;if(sim)sim.playerAction(localId,action);else net?.send({type:'player-action',action});}});
 const applyInventoryDrag=(x,y)=>{const target=inventoryDropTarget(dialog,x,y),from=inventoryDragSlot;if(!Number.isInteger(from)||from<1||from>5)return;if(target?.kind==='drop')inventoryAction('drop',from);else if(target?.kind==='swap'&&target.slot>0&&target.slot!==from)inventoryAction('swap',target.slot,from);};
@@ -1873,8 +1888,10 @@ function frameInput() {
   if(buildUI.edit&&active){const me=localBuildPose();if(me)buildUI.sample(me,actionDown('fire')||touch.fire,!!settings.confirmEditOnRelease);}
   if(buildUI.edit&&!active)buildUI.down=false;
 
+  if(state?.boxfight&&input.roundSeen!==state.round){const p=state.players.find(p=>p.id===localId);input.roundSeen=state.round;if(p?.boxSpawn){input.yaw=p.boxSpawn.yaw;input.pitch=0;input.slot=1;pendingInputs=[];predicted=null;}}
   const nextInput = {
     seq: ++seq,
+    round:state?.round,
     ...localPerspective(),
     shotTime:sim?state?.time:guestPresentation.poses.targetTime(guestPresentation.time),
     yaw: input.yaw,

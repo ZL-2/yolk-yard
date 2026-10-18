@@ -7,6 +7,7 @@ import {startRealtimeServer} from '../../server/realtime/index.js';
 import {Network} from '../../src/network.js';
 import {Simulation} from '../../src/simulation.js';
 import {BoxFightSimulation} from '../../src/box-fights.js';
+import {ZoneWarsSimulation} from '../../src/zone-wars.js';
 import {RoyaleSimulation} from '../../src/royale.js';
 import {VERSION,safeProfile} from '../../src/data.js';
 import {PUBLIC_ROYALE,publicRoyaleOptions} from '../../src/public-royale.js';
@@ -58,7 +59,7 @@ export async function fixture(){
    onPlayerAction:(id,action)=>game.sim?.playerAction(id,action),
    onInput:(id,input)=>game.sim?.setInput(id,input,true),
    onHost:(checkpoint,departed)=>{
-    game.promotions++;game.sim=(checkpoint.options.mode==='boxfight'?new BoxFightSimulation(checkpoint.options):checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options)).restore(checkpoint);
+    game.promotions++;game.sim=(checkpoint.options.mode==='zonewars'?new ZoneWarsSimulation(checkpoint.options):checkpoint.options.mode==='boxfight'?new BoxFightSimulation(checkpoint.options):checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options)).restore(checkpoint);
     for(const p of game.sim.players.values())if(!p.bot)p.connected=p.id===game.net.id;
     for(const id of departed)game.sim.leavePlayer(id);
    }
@@ -68,7 +69,7 @@ export async function fixture(){
    game.sim.tick(.05);game.state=game.sim.snapshot();game.net.broadcast(game.state);
   },50);
   if(launch.host){
-   game.sim=launch.options.mode==='boxfight'?new BoxFightSimulation(launch.options):launch.options.mode==='royale'?new RoyaleSimulation(launch.options):new Simulation(launch.options);const player=game.sim.addPlayer('host',user.profile);game.sim.assignTeam(player,launch.admission);
+   game.sim=launch.options.mode==='zonewars'?new ZoneWarsSimulation(launch.options):launch.options.mode==='boxfight'?new BoxFightSimulation(launch.options):launch.options.mode==='royale'?new RoyaleSimulation(launch.options):new Simulation(launch.options);const player=game.sim.addPlayer('host',user.profile);game.sim.assignTeam(player,launch.admission);
    await game.net.host(launch.code,launch.ticket);game.net.visibility='public';game.sim.startRound();
    game.state=game.sim.snapshot();game.net.broadcast(game.state);await user.ask('host-ready',{id:launch.id});
   }else await game.net.join(launch.code,user.profile,launch.ticket);

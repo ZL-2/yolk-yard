@@ -3,6 +3,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import WebSocket from 'ws';
 import {chromium} from 'playwright';
 import {Network} from '../src/network.js';
+import {ZoneWarsSimulation} from '../src/zone-wars.js';
 import {BoxFightSimulation} from '../src/box-fights.js';
 import {buildingTick,editBuilding} from '../src/building.js';
 import {zombieClients} from './zombies-clients.mjs';
@@ -21,7 +22,7 @@ await wait(async()=>{
  try{[published,health]=await Promise.all([get(front+'version.json?t='+Date.now()),get(relay+'/health')]);return published.build===expected&&health.build===expected&&published.appVersion===version&&health.gameVersion===VERSION&&health.deployment?.updating===false&&health.socialAvailable;}
  catch(e){lastError=e.message;return false;}
 },'Website and relay must finish the same release'+(lastError||''),360000);
-assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,3);assert.equal(health.boxFightRevision,1);assert.ok(health.privateModes.includes('boxfight'));
+assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,3);assert.equal(health.boxFightRevision,2);assert.ok(health.privateModes.includes('boxfight'));assert.equal(health.zoneWarsRevision,1);assert.ok(health.privateModes.includes('zonewars'));assert.equal(health.leaderboardRevision,3);
 const history=await get(front+'release-history.json?t='+Date.now());assert.equal(history.build,expected);assert.equal(history.releases[0].number,published.release);
 const board=await get(relay+'/leaderboards');assert.ok(Array.isArray(board.kills.rows)&&Array.isArray(board.wins.rows));
 
@@ -31,7 +32,7 @@ globalThis.window={YOLK_NETWORK:{relay:relay.replace('https:','wss:')+'/game'}};
 globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:new URL(front).origin});}};
 const errors=[],sim=new BoxFightSimulation({fill:false,teamSize:1,scoreLimit:1}),suffix=Date.now().toString(36).slice(-5);
 sim.addPlayer('host',safeProfile({name:'Release Host '+suffix}));
-let state,clock,browser,page,zclients,zclock;
+let state,clock,browser,page,zclients,zclock,zwh,zwg;
 const host=new Network({getCheckpoint:()=>sim.checkpoint(),getState:()=>sim.snapshot(),onJoin:(id,p,a)=>!!sim.admitPlayer(id,p,a),onInput:(id,i)=>sim.setInput(id,i,true),onError:e=>errors.push(String(e))});
 const guest=new Network({onState:s=>state=s,onError:e=>errors.push(String(e))});
 try{
@@ -43,6 +44,10 @@ try{
  await wait(()=>state.players.find(p=>p.id===guest.id)?.crouching,'Authoritative crouch reaches guest');assert.notEqual(guest.serverAuthority,true);
  const builder=sim.players.get('host');Object.assign(builder,{x:0,y:0,z:-6,yaw:0,pitch:0});buildingTick(sim,builder,{buildMode:true,buildType:'wall',buildMaterial:'wood',fire:true});assert.equal(sim.builds.length,1);assert.ok(editBuilding(sim,builder,'build-edit-16-'+sim.builds[0].id));await wait(()=>state.royale.builds?.[0]?.mask===16,'Live Box window edit');sim.boxEnd=sim.time;sim.tick(1/30);assert.equal(sim.boxStage,'fight');sim.damage(sim.players.get(guest.id),builder,10000,'scatter');sim.tick(1/30);await wait(()=>state.phase==='results'&&state.boxfight.seriesWinner===builder.team,'Live Box series result');
  clearInterval(clock);guest.destroy();host.destroy();
+ const zws=new ZoneWarsSimulation({fill:false,scoreLimit:1});zws.addPlayer('host',safeProfile({name:'Zone Release '+suffix}));let zwstate;
+ zwh=new Network({getCheckpoint:()=>zws.checkpoint(),getState:()=>zws.snapshot(),onJoin:(id,p,a)=>!!zws.admitPlayer(id,p,a),onInput:(id,i)=>zws.setInput(id,i,true),onError:e=>errors.push(String(e))});zwg=new Network({onState:s=>zwstate=s,onError:e=>errors.push(String(e))});
+ const zwcode=await zwh.host();zwh.setVisibility('private');zwh.broadcast(zws.snapshot());clock=setInterval(()=>zwh.broadcast(zws.snapshot()),100);await zwg.join(zwcode,safeProfile({name:'Zone Guest '+suffix}));await wait(()=>zwstate?.players.length===2,'Live Zone guest admission');assert.equal(zwstate.options.mode,'zonewars');assert.equal(zwstate.options.map,'tilted-district');zws.startRound();await wait(()=>zwstate.zonewars?.stage==='prepare','Live Zone preparation');const zp=zws.players.get(zwg.id);assert.equal(zp.inventory.slice(1).filter(Boolean).length,5);zws.boxEnd=zws.time;zws.tick(1/30);zws.boxStarted=zws.time-65;zws.tick(1/30);await wait(()=>zwstate.royale.storm.active,'Live moving storm');zws.damage(zp,zws.players.get('host'),10000,'scatter');zws.tick(1/30);await wait(()=>zwstate.phase==='results'&&zwstate.zonewars.seriesWinner==='host','Live Zone victory');clearInterval(clock);zwg.destroy();zwh.destroy();
+ for(const mode of ['royale','boxfight','zonewars','zombies','ffa'])assert.equal((await get(relay+'/leaderboards?mode='+mode)).mode,mode);
  zclients=zombieClients(relay.replace('https:','wss:'),new URL(front).origin);
  const za=await zclients.user('Z Lead '+suffix),zb=await zclients.user('Z Mate '+suffix);await zclients.invite(za,zb);await za.ask('select',{mode:'zombies',teamSize:2,access:'private'});await zb.ask('ready',{value:true});await za.ask('queue');await wait(()=>za.launches.length&&zb.launches.length,'Live Zombies reservations');const [zg,zh]=await Promise.all([zclients.launch(za),zclients.launch(zb)]);assert.equal(zg.net.serverAuthority,true);assert.equal(zh.state.players.length,2);assert.equal(zh.state.options.mode,'zombies');zg.net.authorityCommand({type:'start'});zclock=setInterval(()=>{zg.send();zh.send();},100);await wait(()=>zh.state?.zombies?.enemies.length>0,'Live authoritative extraction director',25000);assert.equal(zg.state.matchId,zh.state.matchId);assert.equal(zh.state.zombies.format,'extraction');assert.equal(zh.state.zombies.stage,'expedition');assert.equal(zh.state.zombies.contracts.length,27);assert.equal(zh.state.zombies.evacs.length,3);assert.deepEqual(zg.errors,[]);assert.deepEqual(zh.errors,[]);clearInterval(zclock);await zclients.close();
  browser=await chromium.launch({executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH||undefined,headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
@@ -52,11 +57,11 @@ try{
  await page.locator('#menu [data-action=settings]:visible').first().waitFor();
  assert.match(await page.locator('body').innerText(),/FRONTIER LEADERS/i);
  await page.screenshot({path:out+'/desktop.png'});
- await page.locator('[data-action=choose-mode]').click();await page.locator('[data-experience=zombies] .mode-development').waitFor({state:'visible'});assert.equal(await page.locator('[data-experience=zombies] .mode-development').innerText(),'IN MAJOR DEVELOPMENT');await page.screenshot({path:out+'/zombies-development.png'});await page.locator('#dialog .close-btn').click();
+ await page.locator('[data-action=choose-mode]').click();await page.locator('[data-experience=zombies] .mode-development').waitFor({state:'visible'});assert.equal(await page.locator('[data-experience=zombies] .mode-development').innerText(),'IN MAJOR DEVELOPMENT');assert.deepEqual(await page.locator('[data-experience]').evaluateAll(nodes=>nodes.map(n=>n.dataset.experience)),['royale','box-fights','zone-wars','zombies','ffa','training']);await page.locator('[data-experience=zone-wars]').click();await page.waitForFunction(()=>document.querySelector('[data-leaderboard-mode]')?.value==='zonewars');assert.doesNotMatch(await page.locator('.lobby-options-button').innerText(),/Public|Private/);await page.locator('[data-action=choose-mode]').click();await page.screenshot({path:out+'/zone-wars-live.png'});await page.locator('#dialog .close-btn').click();
  await page.locator('#menu [data-action=settings]:visible').first().click();await page.locator('[data-settings-tab=comfort]').click();await page.locator('#reducedMotion').check();
  await page.screenshot({path:out+'/desktop-settings.png'});
  assert.deepEqual(errors,[]);
- const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,privateBoxFight:true,boxBuildEdit:true,boxSeriesResult:true,privateZombiesCoop:true,serverZombiesExtraction:true,publicMatchUntouched:true,leaderboards:true,desktopLobby:true,zombiesDevelopmentBanner:true,mapStorage:health.mapStorage};
+ const result={result:'PASS',build:expected,version,protocol:VERSION,release:published.release,matchingBuilds:true,updating:false,privateHostGuest:true,privateBoxFight:true,privateZoneWars:true,zoneStormAndResult:true,modeRankings:true,privacyToggle:true,boxBuildEdit:true,boxSeriesResult:true,privateZombiesCoop:true,serverZombiesExtraction:true,publicMatchUntouched:true,leaderboards:true,desktopLobby:true,zombiesDevelopmentBanner:true,mapStorage:health.mapStorage};
  await writeFile(out+'/result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 }catch(e){await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/failure.json',JSON.stringify({error:String(e),errors},null,2));throw e;}
-finally{clearInterval(clock);clearInterval(zclock);guest.destroy();host.destroy();await zclients?.close();await browser?.close();}
+finally{clearInterval(clock);clearInterval(zclock);guest.destroy();host.destroy();zwg?.destroy();zwh?.destroy();await zclients?.close();await browser?.close();}

@@ -31,5 +31,5 @@ export function predictMovement(player,input,map,dt,royale,time=0){
  }
  input=emoteInput({time},player,input);
  movePlayer(player,input,map,dt,time);
- if(map.boxArena)constrainBoxMovement(player,map,['waiting','prepare'].includes(royale?.boxfightStage));
+ if(map.boxArena||map.zoneWars)constrainBoxMovement(player,map,['waiting','prepare'].includes(royale?.boxfightStage));
 }

@@ -1,3 +1,4 @@
+import {buildZoneDistrict,updateZoneDistrict} from './zone-wars-view.js';
 import {buildBoxArena,updateBoxArena} from './box-fight-view.js';
 import {buildBlacktide,ZombiesView} from './zombies-view.js';
 import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay} from './perspective.js';
@@ -336,7 +337,7 @@ export class View {
     this.mapId = id;
     this.needsMapCompile=true;
     const map = getMap(id);
-    this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;delete this.world.userData.groundCover;delete this.world.userData.terrainEnvironment;delete this.world.userData.blacktide;delete this.world.userData.boxfight;
+    this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;delete this.world.userData.groundCover;delete this.world.userData.terrainEnvironment;delete this.world.userData.blacktide;delete this.world.userData.boxfight;delete this.world.userData.zoneWars;
     this.scene.background = new THREE.Color(map.sky);
     this.scene.fog = new THREE.Fog(map.theme==='royale'?0xc1e6f0:map.sky, map.theme==='royale'?280:72, map.theme==='royale'?1050:175);
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;
@@ -347,8 +348,8 @@ export class View {
       // A full-human early departure may arrive before preparation finishes.
       if(!pending.done)for(const _ of pending.steps){}
       this.world.add(...pending.group.children.slice());if(pending.group.userData.details)pending.group.userData.details.attach(this.world);if(pending.group.userData.groundCover)pending.group.userData.groundCover.attach(this.world);this.world.userData.terrainEnvironment=pending.group.userData.terrainEnvironment;this.preparedBattle=null;
-    }else if(map.theme==='boxfight')buildBoxArena(this.world,map);else if(map.theme==='zombies')buildBlacktide(this.world);else (map.theme==='royale'?buildIsland:buildArena)(this.world, map.authored?{...map,boxes:map.authored}:map, { block, ball, cylinder, mat, palette });
-    for (let i = 0; i < (['zombies','boxfight'].includes(map.theme)?0:2); i++) {
+    }else if(map.zoneWars)buildZoneDistrict(this.world,map);else if(map.theme==='boxfight')buildBoxArena(this.world,map);else if(map.theme==='zombies')buildBlacktide(this.world);else (map.theme==='royale'?buildIsland:buildArena)(this.world, map.authored?{...map,boxes:map.authored}:map, { block, ball, cylinder, mat, palette });
+    for (let i = 0; i < (['zombies','boxfight','zonewars'].includes(map.theme)?0:2); i++) {
       const [x, z] = map.bases[i];
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(2.1, 0.08, 8, 48),
@@ -975,7 +976,7 @@ export class View {
               : p.boss?"#ffda82":"#ffffff",
           );
           name.position.y = 2.15;model.userData.nameplate=name;
-          name.visible = p.id!==local?.id&&(!!p.boss||!state.royale||teammates(state.options,p,local));
+          name.visible = p.id!==local?.id&&(!!p.boss||!!state.zonewars||!state.royale||teammates(state.options,p,local));
           model.add(name);
           this.actors.add(model);
           this.models.set(p.id, model);
@@ -1208,7 +1209,7 @@ export class View {
       this.gunGroup.visible = true;
     }
     if(playing&&this.scopeActive&&gun(local).ads?.overlay&&this.aimBlend>.8)this.gunGroup.visible=false;
-    this.royaleView.update(state,this.renderLocalActor||local,dt,playing);updateBoxArena(this.world,state);this.zombiesView.update(state,dt,this.camera,playing);if(playing&&state?.zombies){this.scene.fog.near=65;this.scene.fog.far=245;}
+    this.royaleView.update(state,this.renderLocalActor||local,dt,playing);updateBoxArena(this.world,state);updateZoneDistrict(this.world,state);this.zombiesView.update(state,dt,this.camera,playing);if(playing&&state?.zombies){this.scene.fog.near=65;this.scene.fog.far=245;}
     this.throwablePreview.update(state,this.renderLocalActor||predicted||local,this.buildMap||this.map,playing,this.clock);
     this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
     if(this.needsMapCompile){
