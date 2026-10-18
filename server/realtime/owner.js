@@ -53,7 +53,7 @@ export class OwnerService {
    this.sweep();const r=this.relay,rooms=this.liveRooms(),reports=[...(r.serviceStatus?.reports.values()||[])],mean=key=>reports.length?reports.reduce((n,p)=>n+p[key],0)/reports.length:null;
    this.db.transaction(()=>{
     for(const room of rooms)this.db.observeMatch(room);this.db.finishMissingMatches();
-    const capacity=r.authority.capacity.snapshot();this.db.sample({online:this.db.get('SELECT count(*) n FROM visits WHERE ended IS NULL').n,players:[...r.parties.users.values()].filter(u=>r.parties.connected(u)).length,rooms:rooms.length,cpu:capacity.cpuMsPerSecond,memory:Math.round(process.memoryUsage().rss/1048576),fps:mean('fps'),rtt:mean('rtt'),modes:r.parties.modeCounts(),capacity});
+    const capacity=r.authority.capacity.snapshot();this.db.sample({online:this.db.get('SELECT count(*) n FROM visits WHERE ended IS NULL AND visible=1').n,players:[...r.parties.users.values()].filter(u=>r.parties.connected(u)).length,rooms:rooms.length,cpu:capacity.cpuMsPerSecond,memory:Math.round(process.memoryUsage().rss/1048576),fps:mean('fps'),rtt:mean('rtt'),modes:r.parties.modeCounts(),capacity});
     for(const i of r.serviceStatus?.history||[])this.db.event(i.endedAt?'incident-resolved':'incident-started',i.message,i.kind,i,i.id+(i.endedAt?':resolved':':started'),i.endedAt||i.detectedAt);
     if(!this.seededReceipts){for(const a of r.progression.accounts.values())for(const receipt of a.receipts||[])this.db.receipt(a,receipt);this.seededReceipts=true;}
     for(const ticket of r.parties.store.featureRequests)this.db.ticket(ticket);
@@ -69,7 +69,7 @@ export class OwnerService {
   const offset=Math.max(0,Math.floor(Number(input.offset)||0)),limit=50;return {rows:rows.slice(offset,offset+limit),total:rows.length,offset,limit};
  }
  summary(input={}){
-  this.db.assert();this.sweep();const r=this.relay,activeRooms=this.liveRooms(),online=this.db.get('SELECT count(*) n FROM visits WHERE ended IS NULL').n;
+  this.db.assert();this.sweep();const r=this.relay,activeRooms=this.liveRooms(),online=this.db.get('SELECT count(*) n FROM visits WHERE ended IS NULL AND visible=1').n;
   return {at:this.now(),expires:this.now()+WINDOW,online,visits:this.db.get('SELECT count(*) n FROM visits').n+this.db.meta('legacyVisitBaseline',0),relayConnections:[...(r?.peers.values()||[])].filter(p=>p.ws).length,activeRooms,active:this.db.all('SELECT * FROM visits WHERE ended IS NULL ORDER BY seen DESC LIMIT 100'),past:this.db.all('SELECT * FROM visits WHERE ended IS NOT NULL ORDER BY started DESC LIMIT 100'),historyPersistent:this.db.storage().persistent,storage:this.db.storage(),controls:this.controls,analytics:this.db.analytics(input),health:{build:process.env.RENDER_GIT_COMMIT||'local',version:r?.deployment?.version||'',uptimeSeconds:Math.floor((this.now()-this.openedAt)/1000),deployment:r?.deployment?.snapshot(),capacity:r?.authority?.capacity.snapshot(),social:r?.parties?.store.storage(),maps:r?.mapStore?.storage(),status:r?.serviceStatus?.snapshot(),backupError:this.backupError||null},counts:{players:r?.parties?.store.identities.size||0,onlinePlayers:r?[...r.parties.users.values()].filter(u=>r.parties.connected(u)).length:0,matches:this.db.get('SELECT count(*) n FROM matches').n,tickets:this.db.get("SELECT count(*) n FROM tickets WHERE status='open'").n,audit:this.db.get('SELECT count(*) n FROM events').n},modeCounts:r?.parties?.modeCounts()||{}};
  }
  disconnectPlayer(id,reason,ban=false){
