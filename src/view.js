@@ -1,3 +1,4 @@
+import {ShaderPreparation} from './shader-preparation.js';
 import {buildZoneDistrict,updateZoneDistrict} from './zone-wars-view.js';
 import {buildBoxArena,updateBoxArena} from './box-fight-view.js';
 import {buildBlacktide,ZombiesView} from './zombies-view.js';
@@ -148,7 +149,10 @@ function label(text, color = "#ffffff", compact = false, critical = false, runs 
 }
 export const worldKit={block,ball,cylinder,mat,palette};
 export class View {
+  get mapCompile(){return this.mapPreparation.pending;}
+  cancelMapPreparation(){if(this.mapCompile){this.mapPreparation.cancel();this.needsMapCompile=true;}}
   constructor(canvas, settings) {
+    this.mapPreparation=new ShaderPreparation();
     this.canvas = canvas;
     this.settings = settings;
     this.renderer = makeRenderer({
@@ -335,6 +339,7 @@ export class View {
     this.mapLayout=layout;
     if(this.preparedBattle&&this.preparedBattle.layout!==(getMap('sunnybreak').layoutKey||'')){this.disposeGroup(this.preparedBattle.group);this.preparedBattle=null;}
     this.mapId = id;
+    this.mapPreparation.cancel();
     this.needsMapCompile=true;
     const map = getMap(id);
     this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;delete this.world.userData.groundCover;delete this.world.userData.terrainEnvironment;delete this.world.userData.blacktide;delete this.world.userData.boxfight;delete this.world.userData.zoneWars;
@@ -1220,10 +1225,11 @@ export class View {
     this.royaleView.update(state,this.renderLocalActor||local,dt,playing);updateBoxArena(this.world,state);updateZoneDistrict(this.world,state);this.zombiesView.update(state,dt,this.camera,playing);if(playing&&state?.zombies){this.scene.fog.near=65;this.scene.fog.far=245;}
     this.throwablePreview.update(state,this.renderLocalActor||predicted||local,this.buildMap||this.map,playing,this.clock);
     this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
-    if(this.needsMapCompile){
+    // A departed match must never block rendering the lobby. Rewarm on reentry.
+    if(!playing)this.cancelMapPreparation();
+    if(playing&&this.needsMapCompile){
       this.needsMapCompile=false;
-      const job=this.renderer.compileAsync(this.scene,this.camera);this.mapCompile=job;
-      job.catch(error=>console.error('Map shader preparation failed',error)).finally(()=>{if(this.mapCompile===job)this.mapCompile=null;});
+      this.mapPreparation.start(()=>this.renderer.compileAsync(this.scene,this.camera));
     }
     if(this.mapCompile)return;
     this.renderer.info.autoReset=false;this.renderer.info.reset();

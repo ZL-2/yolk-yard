@@ -17,7 +17,7 @@ test('loading screen show, ready and failure paths are reversible',()=>{
 test('startup markup and reduced-motion rules are available before game JavaScript',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  assert.ok(html.includes('id="loading-screen"')&&html.includes('./loading.css'));
- assert.ok(html.includes('data-loading-art="startup"')&&html.includes('loading/kestrel-airstrip.webp'));
+ assert.ok(html.includes('data-loading-art="startup"')&&html.includes(LOADING_ART.startup.file));
  const css=readFileSync(new URL('../public/loading.css',import.meta.url),'utf8');
  assert.ok(css.includes('prefers-reduced-motion')&&css.includes('[hidden]'));
 });
@@ -45,5 +45,16 @@ test('a completed load stays visible for two seconds and then dismisses',async()
 test('briefing readiness waits for actual loading dismissal and releases its observer',async()=>{
  const root={hidden:false};let callback,disconnected=false,ready=false;
  globalThis.document={querySelector:()=>root};globalThis.MutationObserver=class{constructor(fn){callback=fn;}observe(target,options){assert.equal(target,root);assert.deepEqual(options.attributeFilter,['hidden']);}disconnect(){disconnected=true;}};
- try{const pending=waitUntilLoadingHidden().then(()=>ready=true);await Promise.resolve();assert.equal(ready,false);callback();await Promise.resolve();assert.equal(ready,false);root.hidden=true;callback();await pending;assert.equal(ready,true);assert.equal(disconnected,true);await waitUntilLoadingHidden();const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');assert.ok(main.includes('waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name))')&&main.includes('return showWelcomeBack();'));}finally{delete globalThis.document;delete globalThis.MutationObserver;}
+ try{const pending=waitUntilLoadingHidden().then(()=>ready=true);await Promise.resolve();assert.equal(ready,false);callback();await Promise.resolve();assert.equal(ready,false);root.hidden=true;callback();await pending;assert.equal(ready,true);assert.equal(disconnected,true);await waitUntilLoadingHidden();const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');assert.ok(main.includes('waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name))'));}finally{delete globalThis.document;delete globalThis.MutationObserver;}
+});
+
+test('a readiness signal before image load is remembered without another render frame',async()=>{
+ const root={hidden:true,removeAttribute(){}};let image;
+ globalThis.document={querySelector:()=>root};globalThis.Image=class{constructor(){image=this;}};
+ try{showLoading('RETURNING','Lobby',{kind:'exit'});hideLoading();await new Promise(r=>setTimeout(r,2050));assert.equal(root.hidden,false);image.onload();assert.equal(root.hidden,true);}finally{hideLoading(true);delete globalThis.document;delete globalThis.Image;}
+});
+test('an old artwork completion cannot dismiss a newer transition',async()=>{
+ const root={hidden:true,removeAttribute(){}};const images=[];
+ globalThis.document={querySelector:()=>root};globalThis.Image=class{constructor(){images.push(this);}};
+ try{showLoading('FIRST','');hideLoading();showLoading('SECOND','');images[0].onload();await new Promise(r=>setTimeout(r,2050));images[1].onload();assert.equal(root.hidden,false);hideLoading();assert.equal(root.hidden,true);}finally{hideLoading(true);delete globalThis.document;delete globalThis.Image;}
 });

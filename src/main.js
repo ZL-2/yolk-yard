@@ -695,7 +695,9 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   options=matchOptions({...next,session:'online',recurring:!!launch?.recurring});autoQueue=false;
   if(launch?.hostRun||!launch){matchEarnings.total=0;matchEarnings.status=launch?.recurring?'Public match · Waiting for participation rewards':'Player-hosted match · No verified Marks';progressMatch='';}
   const visibility=launch?.recurring?'public':launch?.hostRun||!launch?'private':visibilityOverride||'public';
+  const request=++matchRequest;
   busy=true;await refreshPublishedMaps();
+  if(request!==matchRequest)return;
   beginSim();
   if(launch?.recurring&&sim.options.mode==='royale'){bindPublicCrowns(sim);attachCrown(sim,sim.players.get('host'));sim.players.get('host').crownProgress={...crownStatus};attachCrown(sim,sim.players.get('host'));}
   if(launch?.admission)sim.assignTeam?.(sim.players.get("host"),launch.admission);
@@ -737,7 +739,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
       "error",
     );
   } finally {
-    busy = false;
+    if(request===matchRequest)busy = false;
   }
 }
 async function joinRoom(publicCode, quiet=false, ticket=null) {
@@ -749,6 +751,7 @@ async function joinRoom(publicCode, quiet=false, ticket=null) {
     toast("Enter all 8 characters of the room code.");
     return;
   }
+  const request=++matchRequest;
   busy = true;
   modal(
     "Joining the room",
@@ -766,7 +769,9 @@ async function joinRoom(publicCode, quiet=false, ticket=null) {
   seq = 0;
   pendingInputs = [];
   try {
-    localId = await attempt.join(code, profile, ticket);
+    const joinedId = await attempt.join(code, profile, ticket);
+    if(attempt!==net)return;
+    localId=joinedId;
     await waitForLoading();
     if (attempt !== net) return;
     screen = "lobby";
@@ -788,7 +793,7 @@ async function joinRoom(publicCode, quiet=false, ticket=null) {
       "error",
     );
   } finally {
-    busy = false;
+    if(request===matchRequest)busy = false;
   }
 }
 let lobbyRenderKey = "";
@@ -935,8 +940,9 @@ function leave(confirm = false,notifyParty=true) {
   buildControls.buildMode=false;buildUI.cancel();
   resultAt=0;$("#round-banner").hidden=true;matchEndUI.reset();view.eliminations.clear();damageDirections.reset();combatConfirmation.reset();
   matchRequest++;autoQueue=false;sound.stopWorld();royaleUI.waypoint=null;royaleUI.root.hidden=true;document.body.classList.remove('in-royale','in-spawn-island','in-duos');
-  net?.destroy();
-  net = null;
+  view.cancelMapPreparation();
+  const departing=net;net=null;
+  try{departing?.destroy();}catch(error){console.warn("Match connection cleanup failed",error);}
   chat.reset();
   sim = null;
   state = null;
@@ -959,6 +965,8 @@ function leave(confirm = false,notifyParty=true) {
   dialogType = "";
   $("#feed").innerHTML = "";
   renderMenu();
+  // Lobby readiness is local: no match shader, socket or service acknowledgment.
+  hideLoading();
   updates.apply();
   void updates.check();
 }
@@ -2111,6 +2119,8 @@ try {
 if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
     resume:()=>resume(false),
+    loadingFixture:fn=>fn(view),
+    leave:()=>leave(),
     startFixture:opts=>{options=matchOptions({...opts,session:'offline'});beginSim();return launchRound();},
     social:(type,data)=>party.request(type,data),
     zombiesView:()=>({rigs:view.zombiesView.rigs.filter(r=>r.id!==null).length+view.zombiesView.actors.pool.filter(r=>r.id!==null).length,drawCalls:view.renderer.info.render.calls,triangles:view.renderer.info.render.triangles,memory:{...view.renderer.info.memory},renderMs:view.updateMilliseconds,camera:{position:view.camera.position.toArray(),rotation:view.camera.rotation.toArray(),fov:view.camera.fov,near:view.camera.near,far:view.camera.far},world:{map:view.mapId,visible:view.world.visible,children:view.world.children.length,matrix:view.world.matrixWorld.elements.slice(),blacktide:!!view.world.userData.blacktide},actor:view.renderLocalActor?{x:view.renderLocalActor.x,y:view.renderLocalActor.y,z:view.renderLocalActor.z,yaw:view.renderLocalActor.yaw,pitch:view.renderLocalActor.pitch}:null}),

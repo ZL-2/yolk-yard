@@ -30,11 +30,12 @@ export function loadingMarkup(status='PREPARING THE FRONT',detail='Loading terra
  return `<div class="ravel-loading" data-loading-art="${art.id}" data-loading-kind="${kind}" style="--load-art:url('./${art.file}');--load-position:${art.position}"><div class="load-brand">RAVELFRONT<small>${art.eyebrow}</small></div><section class="load-story"><span>${art.location}</span><h1>${art.title}</h1><p>${caption}</p></section><div class="load-footer"><div class="load-state" role="status" aria-live="polite"><div class="load-context">${contextLabels[kind]||contextLabels.enter}</div><div class="load-status">${escape(status)}</div><div class="load-track" aria-hidden="true"></div><div class="load-detail">${escape(detail)}</div></div>${cancel?'<button class="load-cancel" data-action="cancel-connect">CANCEL DEPLOYMENT</button>':''}</div></div>`;
 }
 export const MIN_LOADING_MS=2000;
+let hideRequested=false;
 let shownAt=performance.now(),hideTimer=null,generation=0,activeArt=LOADING_ART.startup,activeKind='boot',imageReady=true,imageTimer=null,imageFinish=null,imagePromise=Promise.resolve();
 function prepareImage(art,current){
  imageFinish?.();clearTimeout(imageTimer);imageReady=typeof Image==='undefined';if(imageReady){imagePromise=Promise.resolve();return imagePromise;}
  const img=new Image();img.decoding='async';
- imagePromise=new Promise(resolve=>{let done=false;const finish=()=>{if(done)return;done=true;if(current===generation){imageReady=true;imageFinish=null;clearTimeout(imageTimer);}resolve();};imageFinish=finish;img.onload=finish;img.onerror=finish;imageTimer=setTimeout(finish,4000);img.src='./'+art.file;});
+ imagePromise=new Promise(resolve=>{let done=false;const finish=()=>{if(done)return;done=true;if(current===generation){imageReady=true;imageFinish=null;clearTimeout(imageTimer);if(hideRequested)hideLoading();}resolve();};imageFinish=finish;img.onload=finish;img.onerror=finish;imageTimer=setTimeout(finish,4000);img.src='./'+art.file;});
  return imagePromise;
 }
 export function showLoading(status,detail,{kind='enter',art}={}){
@@ -42,13 +43,14 @@ export function showLoading(status,detail,{kind='enter',art}={}){
  // Connecting and battlefield preparation are phases of one entry, not two rolls.
  const continuing=!root.hidden&&['connect','enter','spectate'].includes(activeKind)&&['connect','enter','spectate'].includes(kind);
  activeArt=art||(kind==='boot'?LOADING_ART.startup:continuing?activeArt:rotation.next());activeKind=kind;
- clearTimeout(hideTimer);hideTimer=null;generation++;shownAt=performance.now();root.className='';root.removeAttribute('role');root.innerHTML=loadingMarkup(status,detail,false,{kind,art:activeArt});root.hidden=false;prepareImage(activeArt,generation);return activeArt;
+ clearTimeout(hideTimer);hideTimer=null;generation++;hideRequested=false;shownAt=performance.now();root.className='';root.removeAttribute('role');root.innerHTML=loadingMarkup(status,detail,false,{kind,art:activeArt});root.hidden=false;prepareImage(activeArt,generation);return activeArt;
 }
 export function hideLoading(force=false){
  const root=document.querySelector('#loading-screen');if(!root||root.hidden)return;
+ hideRequested=true;
  if(!force&&!imageReady)return;
  const remaining=MIN_LOADING_MS-(performance.now()-shownAt);
- if(force||remaining<=0){clearTimeout(hideTimer);hideTimer=null;imageFinish?.();clearTimeout(imageTimer);root.hidden=true;}
+ if(force||remaining<=0){clearTimeout(hideTimer);hideTimer=null;hideRequested=false;imageFinish?.();clearTimeout(imageTimer);root.hidden=true;}
  else if(hideTimer===null){const current=generation;hideTimer=setTimeout(()=>{hideTimer=null;if(current===generation)hideLoading();},remaining);}
 }
 export function waitForLoading(){return Promise.all([imagePromise,new Promise(resolve=>setTimeout(resolve,Math.max(0,MIN_LOADING_MS-(performance.now()-shownAt))))]);}

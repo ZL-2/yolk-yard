@@ -27,6 +27,7 @@ jobs:
       zone_wars_update: ${{ steps.scope.outputs.zone_wars_update }}
       human_pvp_update: ${{ steps.scope.outputs.human_pvp_update }}
       tilted_map_update: ${{ steps.scope.outputs.tilted_map_update }}
+      loading_recovery_update: ${{ steps.scope.outputs.loading_recovery_update }}
       zone_spawn_update: ${{ steps.scope.outputs.zone_spawn_update }}
       owner_suite_update: ${{ steps.scope.outputs.owner_suite_update }}
       built_world_update: ${{ steps.scope.outputs.built_world_update }}
@@ -193,6 +194,9 @@ jobs:
           zone_spawn_allowed=set(['.github/workflows/pages.yml','docs/UPDATE_184.md','docs/ZONE_WARS_REFERENCE.md','package.json','package-lock.json','src/data.js','src/releases.js','src/main.js','src/view.js','src/royale.js','src/royale-loot.js','src/royale-view.js','src/zone-wars-view.js','src/zone-wars.js','src/zone-wars-map.js','src/zone-wars-rules.js','src/zone-wars-ui.js','src/zone-wars.css','tests/zone-wars.test.js','tests/zone-wars-network.test.js','scripts/zone-wars-browser.mjs','scripts/release-live-check.mjs'])
           zone_spawn_update=zone_spawn_files<=zone_spawn_allowed and {'src/zone-wars.js','src/view.js','tests/zone-wars.test.js','scripts/zone-wars-browser.mjs'}<=zone_spawn_files
           zone_wars_update=zone_wars_update or human_pvp_update or tilted_map_update or zone_spawn_update
+          loading_files=set(subprocess.check_output(['git','diff','--name-only','847454aa1f94a5556ac5ba2fb0066a19934c1a53','HEAD'],text=True).splitlines())
+          loading_allowed={'.github/workflows/pages.yml','docs/UPDATE_185.md','package.json','package-lock.json','src/releases.js','src/main.js','src/view.js','src/loading-screen.js','src/shader-preparation.js','tests/loading-screen.test.js','tests/shader-preparation.test.js','tests/loading-recovery.test.js','src/zone-wars-view.js','scripts/loading-recovery-browser.mjs'}
+          loading_recovery_update=loading_files<=loading_allowed and {'src/shader-preparation.js','src/loading-screen.js','tests/shader-preparation.test.js','scripts/loading-recovery-browser.mjs'}<=loading_files
           owner_files=set(subprocess.check_output(['git','diff','--name-only','d085c44a2be1e9138d9aad402162a0a5ea942323','HEAD'],text=True).splitlines())
           owner_allowed=set(['.github/workflows/pages.yml', 'docs/OWNER_HISTORY_RECOVERY.md', 'docs/UPDATE_178.md', 'package-lock.json', 'package.json', 'scripts/owner-browser-check.mjs', 'scripts/owner-live-check.mjs', 'server/realtime/index.js', 'server/realtime/lobby-chat.js', 'server/realtime/match-launch.js', 'server/realtime/owner-store.js', 'server/realtime/owner.js', 'server/realtime/parties.js', 'server/realtime/progression.js', 'server/realtime/public-host.js', 'server/realtime/relay.js', 'server/realtime/social-store.js', 'server/realtime/zombies-service.js', 'src/data.js', 'src/egg-wallet.js', 'src/lobby-comms.js', 'src/main.js', 'src/owner-console.css', 'src/owner-console.js', 'src/owner-runtime.js', 'src/owner-ui.js', 'src/party-client.js', 'src/releases.js', 'tests/owner-network.test.js', 'tests/owner.test.js'])
           owner_suite_update=owner_files<=owner_allowed and {'server/realtime/owner-store.js','src/owner-console.js','tests/owner.test.js','tests/owner-network.test.js','scripts/owner-browser-check.mjs','scripts/owner-live-check.mjs'}<=owner_files
@@ -201,7 +205,7 @@ jobs:
           visit_update=visit_files<={'server/realtime/owner-store.js','server/realtime/owner-recovery.js','server/realtime/owner.js','server/realtime/index.js','src/owner-console.js','tests/owner.test.js','src/releases.js','package.json','package-lock.json','.github/workflows/pages.yml','scripts/owner-live-check.mjs','docs/UPDATE_180.md'} and {'server/realtime/owner-recovery.js','tests/owner.test.js'}<=visit_files
           history_only=files<={'src/releases.js','src/release-history.js','tests/release-history.test.js','scripts/history-live-check.mjs','src/owner-request.js','src/owner-console.js','tests/owner-request.test.js','.github/workflows/pages.yml'} and 'src/release-history.js' in files
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-            for key,value in [('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('mixamo_update',mixamo_update),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('field_repair_update',field_repair),('zombies_update',zombies_update),('box_fights_update',box_fights_update),('zone_wars_update',zone_wars_update),('human_pvp_update',human_pvp_update),('tilted_map_update',tilted_map_update),('zone_spawn_update',zone_spawn_update),('owner_suite_update',owner_suite_update),('visit_verify_only',visit_verify_only),('visit_update',visit_update),('history_only',history_only),('focused',visit_update or history_only or owner_suite_update or zone_wars_update or box_fights_update or zombies_update or field_repair or scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh or mixamo_update)]: out.write(key+'='+str(value).lower()+'\n')
+            for key,value in [('loading_recovery_update',loading_recovery_update),('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('mixamo_update',mixamo_update),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('field_repair_update',field_repair),('zombies_update',zombies_update),('box_fights_update',box_fights_update),('zone_wars_update',zone_wars_update),('human_pvp_update',human_pvp_update),('tilted_map_update',tilted_map_update),('zone_spawn_update',zone_spawn_update),('owner_suite_update',owner_suite_update),('visit_verify_only',visit_verify_only),('visit_update',visit_update),('history_only',history_only),('focused',loading_recovery_update or visit_update or history_only or owner_suite_update or zone_wars_update or box_fights_update or zombies_update or field_repair or scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh or mixamo_update)]: out.write(key+'='+str(value).lower()+'\n')
           print('Focused release:',{'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
   build:
@@ -329,6 +333,9 @@ jobs:
       - name: Public release history redaction and numbering
         if: needs.scope.outputs.history_only == 'true'
         run: node --test tests/release-history.test.js tests/owner-request.test.js
+      - name: Loading transitions, shader deadlines and update policy
+        if: needs.scope.outputs.loading_recovery_update == 'true'
+        run: node --test tests/loading-screen.test.js tests/shader-preparation.test.js tests/loading-recovery.test.js tests/updates.test.js tests/deployment.test.js tests/realtime-resume.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -375,6 +382,15 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true'
+      - name: Desktop loading failure recovery and repeated lobby return
+        if: needs.scope.outputs.loading_recovery_update == 'true'
+        run: node scripts/loading-recovery-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.loading_recovery_update == 'true'
+        with:
+          name: loading-recovery-evidence
+          path: test-results/loading-recovery
+          retention-days: 14
       - name: Desktop owner workflows, durable exports, controls, and game integration
         if: needs.scope.outputs.owner_suite_update == 'true' || (needs.scope.outputs.visit_update == 'true' && needs.scope.outputs.visit_verify_only != 'true')
         run: node scripts/owner-browser-check.mjs

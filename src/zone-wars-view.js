@@ -91,7 +91,8 @@ export function buildZoneDistrict(world,map){
  const gates=new T.Group();world.add(gates);world.userData.zoneWars={gates,key:''};world.userData.geometryRevision=map.revision;
 }
 export function updateZoneDistrict(world,state){
- const z=world.userData.zoneWars;if(!z)return;z.gates.visible=!!state.zonewars&&['waiting','prepare'].includes(state.zonewars.stage);
+ const z=world.userData.zoneWars;if(!z)return;z.gates.visible=!!state?.zonewars&&['waiting','prepare'].includes(state.zonewars.stage);
+ if(!state?.zonewars)return;
  const key=state.royale?.matchId+':'+state.round;
  if(z.gates.visible&&key!==z.key){z.key=key;for(const m of [...z.gates.children]){m.geometry.dispose();m.material.dispose();z.gates.remove(m);}for(const p of state.players.filter(p=>p.contestant&&p.boxSpawn)){const s=p.boxSpawn,geo=new T.BoxGeometry(3.65,3.7,6.85),m=new T.Mesh(geo,new T.MeshBasicMaterial({color:0x65c9f6,transparent:true,opacity:.11,depthWrite:false,side:T.DoubleSide}));m.position.set(s.x-Math.sin(s.yaw)*1.6,s.y+1.85,s.z-Math.cos(s.yaw)*1.6);m.rotation.y=s.yaw;m.userData.ownedMaterial=true;z.gates.add(m);const edge=new T.LineSegments(new T.EdgesGeometry(geo),new T.LineBasicMaterial({color:0x8ee6ff,transparent:true,opacity:.7}));edge.position.copy(m.position);edge.rotation.copy(m.rotation);edge.userData.ownedMaterial=true;z.gates.add(edge);}}
  updateWorldDamage(world,state.royale?.worldDamage,key+':'+state.royale?.buildVersion);
