@@ -380,6 +380,7 @@ export class RoyaleSimulation extends Simulation {
  admitPlayer(id,profile,admission=null){
   if(this.players.has(id)){const player=this.players.get(id);player.connected=true;return player;}
   this.advanceWarmupClock();
+  if(admission?.exactMatch&&(this.matchId!==admission.exactMatch||!acceptsContestants(this.stage)))return null;
   if(admission?.spectator){const p=this.addPlayer(id,profile,false,true);if(p)Object.assign(p,{friendSpectator:!admission.publicSpectator,watchId:admission.watchId,partyId:admission.partyId,memberId:admission.memberId,partySize:admission.partySize||1});return p;}
   if(admission&&(admission.teamSize!==this.options.teamSize||this.options.teamSize<(admission.partySize||1)))return null;
   if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;

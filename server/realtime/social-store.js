@@ -71,12 +71,12 @@ export class SocialStore{
  }
  save(){if(!this.path)return;this.available();clearTimeout(this.timer);this.timer=setTimeout(()=>{this.flush().catch(()=>console.error('Social persistence failed; credentials and relationships were kept in memory.'));},100);this.timer.unref?.();}
  snapshot(){this.available();return {schema,nicknames:[...this.nicknames].map(([id,names])=>[id,[...names]]),identities:[...this.identities.values()],requests:[...this.requests.values()],featureRequests:this.featureRequests,friends:[...this.friends].map(([id,s])=>[id,[...s]]),blocks:[...this.blocks].map(([id,s])=>[id,[...s]])};}
- featureRequest(player,text){
+ featureRequest(player,text,reportKey=null){
   this.available();text=typeof text==='string'?text.normalize('NFKC').trim().replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,''):'';
   if(text.length<5||text.length>1000)throw Error('Describe your feature in 5 to 1,000 characters.');
   if(!this.identities.has(player))throw Error('Choose a player name first.');
   if(this.featureRequests.length>=1000){const old=this.featureRequests.findIndex(r=>['completed','dismissed'].includes(r.status)&&(r.replies||[]).every(x=>x.read));if(old<0)throw Error('The feature inbox is full. Please try again later.');this.ownerArchive?.(this.featureRequests[old]);this.featureRequests.splice(old,1);}
-  const r={id:randomUUID(),player,name:this.identities.get(player).profile.name,text,created:Date.now(),status:'open'};this.featureRequests.push(r);this.ownerArchive?.(r);this.save();return {id:r.id,created:r.created};
+  const r={id:randomUUID(),...(reportKey?{reportKey}:{}),player,name:this.identities.get(player).profile.name,text,created:Date.now(),status:'open'};this.featureRequests.push(r);this.ownerArchive?.(r);this.save();return {id:r.id,created:r.created};
  }
  featureUpdates(player){return this.featureRequests.filter(r=>r.player===player).flatMap(r=>(r.replies||[]).filter(reply=>!reply.read).map(reply=>({...reply,requestId:r.id,request:r.text.slice(0,180),status:r.status}))).sort((a,b)=>a.created-b.created).slice(0,50);}
  acknowledgeFeatures(player,ids){

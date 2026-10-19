@@ -1,3 +1,6 @@
+import {problemText,captureDialogPosition,restoreDialogPosition} from './problem-reports.js';
+import {PublicJoinNotice} from './public-join-notice.js';
+import {actionFrameDue} from './action-network.js';
 import {rankingMode,syncRankingSelection} from './ranking-modes.js';
 import './zone-wars.css';
 import {ZoneWarsSimulation} from './zone-wars.js';
@@ -254,7 +257,7 @@ async function openOwnerMapEditor(overview){
  const {MapEditor}=await import('./map-editor.js');
  dialog.close();dialogType='';paused=true;screen='editor';
  mapEditor=new MapEditor({owner:ownerConsole,overview,onClose:()=>{mapEditor=null;screen='menu';paused=false;view.mapId=null;renderMenu();void refreshPublishedMaps(true);void ownerConsole.refresh();}});
- try{await mapEditor.open();}catch(error){mapEditor?.close();toast('Map editor could not open: '+error.message);}
+ try{await mapEditor.open();}catch(error){mapEditor?.close();errorToast('Map editor could not open: '+error.message);}
 }
 let briefingsComplete=false;
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
@@ -354,6 +357,14 @@ function profileMenu(){
   $('#player-name').oninput=e=>{const checked=validatePlayerName(e.target.value);$('#name-safety').textContent=checked.message;e.target.setAttribute('aria-invalid',String(!checked.ok));};
   $('#player-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();actions['save-profile-name']();}};
 }
+let lastProblem=null;
+function rememberProblem(title,message){lastProblem={title,message,build:__BUILD_ID__,mode:state?.options.mode||party?.party?.selection.mode,screen,room:net?.code,connection:net?.migrating?'host transfer':net?.peer?.reconnecting?'reconnecting':net?.ready?'connected':'disconnected',ping:Math.round(net?.latency||0)};}
+function reportProblemMenu(){
+ const reportId=crypto.randomUUID(),context={...(lastProblem||{title:'Connection problem',message:document.querySelector('#match-connection span')?.textContent||'Connection interrupted',build:__BUILD_ID__,mode:state?.options.mode,screen,room:net?.code})};
+ modal('Report a problem',`<p>Your error details go to the owner’s private support inbox.</p><p class="error-box">${esc(context.message)}</p><form id="problem-report-form"><label for="problem-notes">WHAT HAPPENED? (OPTIONAL)</label><textarea id="problem-notes" class="field" maxlength="300" rows="4"></textarea><button class="primary" type="submit">SEND REPORT</button></form><p id="problem-status" role="status"></p>`,'problem-report');
+ $('#problem-report-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button'),status=$('#problem-status');button.disabled=true;status.textContent='Sending…';try{await party.request('problem-report',{reportId,text:problemText(context,$('#problem-notes').value)});if(form.isConnected){form.hidden=true;status.textContent='Report sent to support. Thank you.';}}catch(error){if(form.isConnected){status.textContent=error.message+' Your report is still here. Retry when connected.';button.disabled=false;}}};
+}
+function errorToast(message,title='Connection or service error'){rememberProblem(title,message);toast(message);const button=document.createElement('button');button.dataset.action='report-problem';button.textContent='REPORT PROBLEM';$('#toast').append(button);toastUntil=performance.now()+12000;}
 function modal(title, body, type = "generic") {
   if(needsPlayerName(profile.name)&&type!=='name-required'){requiredNamePrompt();return;}
   if(type==="error")sound.cue("ui-error");
@@ -368,6 +379,7 @@ function modal(title, body, type = "generic") {
   paused = true;
   if (document.pointerLockElement) document.exitPointerLock();
   if(type==='error')hideLoading(true);
+  if(type!=='problem-report'&&(type==='error'||body.includes('class="error-box"'))){const temp=document.createElement('div');temp.innerHTML=body;rememberProblem(title,temp.querySelector('.error-box')?.textContent||temp.textContent);body+='<button data-action="report-problem">REPORT PROBLEM</button>';}
   const connectingArt=type==='connecting'?showLoading('ESTABLISHING MATCH UPLINK','Connecting to the room service.',{kind:'connect'}):null;
   dialog.innerHTML = type==='connecting'?loadingMarkup('ESTABLISHING MATCH UPLINK','Connecting to the room service. You can cancel at any time.',true,{kind:'connect',art:connectingArt}):`<div class="dialog-head"><h2>${title}</h2><button class="close-btn" data-action="close" aria-label="Close dialog">×</button></div><div class="dialog-body">${body}</div>`;
   if (!dialog.open) dialog.showModal();
@@ -605,7 +617,7 @@ function callbacks() {
           matchEarnings.total=r.amount;matchEarnings.status=r.reason;
           stats=recordCareerReceipt(stats,r);
           stats.eggs=eggWallet.value.earned;save('yolk-stats',stats);if(r.amount)toast('+'+r.amount+' Marks · '+r.label);if(dialogType==='results')resultsMenu();if(screen==='menu'&&menuSection==='career')renderMenu(true);
-        }).catch(e=>toast(e.message));
+        }).catch(e=>errorToast(e.message));
       }else if(type==='afk'&&event.remaining<=0){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');}
       else if(type==='afk-enforce'&&sim&&!sim.remote){const p=sim.players.get(event.player);if(p){p.afkRemoved=true;p.health=0;p.spectating=true;p.contestant=false;sim.emit('afk-removed',{player:p.id});}}
       else if(type==='afk'&&state){const p=state.players.find(p=>p.id===localId);if(p)p.afkRemaining=event.remaining;}
@@ -665,14 +677,16 @@ function callbacks() {
       connectionReport.performance.update(performance.now()-updateStarted,pendingInputs.length);
     },
     onError: async (message) => {
+      const failedContext={mode:state?.options.mode,room:net?.code,screen};
       leave(false);
       modal(
         "Connection ended",
         `<div class="error-box">${esc(message)}</div><button class="primary" data-action="close">Back to arena</button>`,
         "error",
       );
+      Object.assign(lastProblem,failedContext);
     },
-    onStatus: (message) => toast(message),
+    onStatus: (message) => /disconnect|lost|failed|reconnect|unavailable|recover/i.test(message)?errorToast(message):toast(message),
   };
 }
 function beginSim() {
@@ -1023,7 +1037,7 @@ function handleState() {
   if (!state) return;
   if(state.zombies){applyZombiesState(state.zombies);if(dialog.open&&dialogType==='z-station'){const p=state.players.find(p=>p.id===localId),station=nearbyZombieStation(state,p);if(station?.id===dialog.dataset.zStation){const body=zombiesStationMenu(station,state,p),panel=dialog.querySelector('.dialog-body');if(panel&&dialog.zStationBody!==body){const scroll=panel.scrollTop;panel.innerHTML=body;dialog.zStationBody=body;panel.scrollTop=scroll;}}}}
   syncInventoryPreferences();
-  try{useMatchLayouts(state.mapLayouts||{},state.mapLayoutKey);}catch(error){toast('Invalid map layout: '+error.message);return;}
+  try{useMatchLayouts(state.mapLayouts||{},state.mapLayoutKey);}catch(error){errorToast('Invalid map layout: '+error.message);return;}
   const worldKey=(state.royale?.matchId||'')+':'+state.round+':'+state.options.map;
   if(state.royale&&lastWorldKey!==worldKey){lastWorldKey=worldKey;pendingInputs=[];predicted=null;keys.clear();queuedActions.clear();guestFire.reset();const me=state.players.find(p=>p.id===localId);if(me){input.slot=me.slot;input.yaw=me.yaw;input.pitch=me.pitch;}buildControls.buildMode=false;buildUI.cancel();}
   if (state.phase === "playing" && lastPhase !== "playing" && !(lastPhase==='extracted'&&state.players.find(p=>p.id===localId)?.zExtracted)) {
@@ -1265,7 +1279,7 @@ async function copy(text) {
   }
 }
 async function partyRequest(type,data={}){
- try{return await party.request(type,data);}catch(error){toast(error.message);return null;}
+ try{return await party.request(type,data);}catch(error){errorToast(error.message);return null;}
 }
 function playMenu(){modal('CHOOSE GAME MODE',modeMarkup(party?.party?.selection,party?.party?.leader!==party?.id,party?.party?.members.length||1,party?.modeCounts),'play');}
 async function selectExperience(id){
@@ -1288,8 +1302,9 @@ async function socialMenu(){
  if(party?.identityBlocked){modal('Restore Friend Code',`<p>${esc(party.identityBlocked)}</p><p>Retry to reconnect to your saved identity. Creating a new code starts a separate friend list.</p><div class="actions"><button class="primary" data-action="social-retry-identity">RETRY RESTORATION</button><button data-action="social-new-identity">CREATE A NEW FRIEND CODE…</button><button data-action="close">CLOSE</button></div>`,'social-recovery');return;}
  if(!party?.ready){toast('Social is connecting. Try again in a moment.');return;}
  if(socialFetching)return;socialFetching=true;
- const model=await partyRequest('social',{offset:socialOffset});socialFetching=false;if(!model)return;
- socialModel=model;modal('Social & Party',socialMarkup(party.party,party.id,model,socialTab),'social');
+ const requestedDialog=dialogType,refreshing=dialogType==='social',tab=socialTab,offset=socialOffset;
+ const model=await partyRequest('social',{offset});socialFetching=false;if(!model||dialogType!==requestedDialog||tab!==socialTab||offset!==socialOffset)return;
+ const position=refreshing?captureDialogPosition(dialog):[];socialModel=model;modal('Social & Party',socialMarkup(party.party,party.id,model,socialTab),'social');restoreDialogPosition(dialog,position);
 }
 function friendNicknameMenu(id){
  const friend=socialModel?.friends.find(p=>p.id===id);if(!friend)return;
@@ -1339,17 +1354,18 @@ function initializeParty(){
   status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
+  'public-join':event=>publicJoinNotice.receive(event,party?.id),
   'lobby-chat':m=>lobbyComms.receive(m.message),
   'lobby-chat-cleared':m=>lobbyComms.clear(m.channel),
   'owner-controls':m=>ownerRuntime.set(m.controls),
   'owner-grants':m=>{void eggWallet.syncOwnerGrants(m.record).then(r=>{if(r.amount){toast(r.amount.toLocaleString()+' Marks received from the owner.');if(screen==='menu')renderMenu();}}).catch(()=>toast('Your owner grant is saved online. Reconnect when browser storage is available.'));},
-  'owner-session-ended':m=>{if(net||screen==='game')leave(false,false);toast(m.message);},
+  'owner-session-ended':m=>{if(net||screen==='game')leave(false,false);errorToast(m.message);},
   'feature-updates':m=>lobbyComms.setUpdates(m.updates),
   'social-changed':scheduleSocialRefresh,
   'mode-counts':counts=>{for(const badge of document.querySelectorAll('[data-mode-population]')){const template=document.createElement('template');template.innerHTML=modePopulationMarkup(badge.dataset.modePopulation,counts);badge.replaceWith(template.content.firstElementChild);}},
-  'party-notice':m=>toast(m.message),
+  'party-notice':m=>/unavailable|interrupted|expired|failed|restricted|restor|reconnect/i.test(m.message)?errorToast(m.message):toast(m.message),
   'friend-request':m=>{toast(m.name+' sent a friend request. Open Social to accept or decline.');sound.cue('queue-found');scheduleSocialRefresh();},
-  cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing'||activeLaunch&&m.launchId===activeLaunch;activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);toast(m.message);if(screen==='menu')renderMenu();}
+  cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing'||activeLaunch&&m.launchId===activeLaunch;activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);errorToast(m.message);if(screen==='menu')renderMenu();}
  });
 }
 function royaleMap(){if(!state?.royale)return;modal(state.boxfight?state.boxfight.arena:'Ravel Coast',royaleUI.mapHTML(),'royale-map');royaleUI.drawMap($('#royale-fullmap'),state,state.players.find(p=>p.id===localId),true);}
@@ -1366,6 +1382,8 @@ function inventoryAction(action,index,from){
 }
 document.addEventListener('click',e=>{const button=e.target.closest('[data-box-team]');if(button){const action='box-team-'+button.dataset.boxTeam;if(sim&&!sim.remote){sim.playerAction(localId,action);state=sim.snapshot();net?.broadcast(state);renderLobby();}else net?.send({type:'player-action',action});}});
 const actions = {
+ 'report-problem':reportProblemMenu,
+ 'report-connection':()=>{rememberProblem('Match connection interrupted',document.querySelector('#match-connection span')?.textContent||'Connection interrupted');reportProblemMenu();},
  'feature-request':()=>{modal('Request a feature',`<p>Tell us what you would like to see in Ravelfront. Your request goes to the administrator’s private inbox.</p><form id="feature-request-form"><label for="feature-request-text">YOUR IDEA</label><textarea id="feature-request-text" class="field" rows="5" minlength="5" maxlength="1000" required placeholder="What would make the frontier better?"></textarea><button class="primary" type="submit">SEND REQUEST</button></form><p id="feature-request-status" role="status"></p>`,'feature-request');$('#feature-request-text').focus();$('#feature-request-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button'),status=$('#feature-request-status');button.disabled=true;status.textContent='Sending…';try{await party.request('feature-request',{text:$('#feature-request-text').value});if(form.isConnected){form.hidden=true;status.textContent='Request sent. Thank you for helping shape the frontier.';}}catch(error){if(form.isConnected){status.textContent=error.message;button.disabled=false;}}};},
  'owner-inbox':()=>{ownerConsole.inboxShowCleared=false;void ownerConsole.inbox();},
  'end-spectate':()=>{matchEndUI.watch();paused=false;},
@@ -1404,7 +1422,7 @@ const actions = {
  'z-journal':openZombiesJournal,
  'quick-rematch':()=>{if(net?.officialPublic)return toast('The next public round starts automatically.');if(sim&&(!sim.remote||state?.zombies)&&state?.phase==='results'&&(!net||net.isHost)){launchRound();}},
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
- 'start-training':()=>{try{ownerRuntime.admission('training');}catch(error){return toast(error.message);}if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
+ 'start-training':()=>{try{ownerRuntime.admission('training');}catch(error){return errorToast(error.message);}if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
  'career':()=>selectMenuSection('career'),
  'find-public':()=>lobbyOptionsMenu(),
  'choose-mode':playMenu,
@@ -1981,9 +1999,11 @@ const triggerGuard={};
 const performanceHUD=new PerformanceHUD(document.body);
 const lobbyStatus=new LobbyStatus();
 const snapshotTimes=new WeakMap(),framePacer=new FramePacer();
+const publicJoinNotice=new PublicJoinNotice(async event=>{if(screen!=='menu'||state)return;if(await partyRequest('queue',{targetPublic:event.code,targetMatch:event.matchId})){dialog.close();dialogType='';publicJoinNotice.events=[];renderMenu();}});
 function loop(now) {
   if(screen==='editor'){lastTime=now;requestAnimationFrame(loop);return;}
   lobbyStatus.update(now,now-lastTime,net,screen);
+  publicJoinNotice.update(screen==='menu'&&!dialog.open,party);
 
   matchConnectionUI.update(net,screen==='game',now);
   pumpNetworkInput(now);
@@ -2007,14 +2027,14 @@ function loop(now) {
       }
     }
   }
-  if (sim && !sim.remote && !net?.serverAuthority && (now-(snapshotTimes.get(sim)||0)>=(net?1000/60:1000/30)||!state)) {
+  if (sim && !sim.remote && !net?.serverAuthority && (now-(snapshotTimes.get(sim)||0)>=1000/30||actionFrameDue(sim,state))) {
     snapshotTimes.set(sim,now);state = sim.snapshot();handleState();
     if(autoQueue&&screen==='lobby'&&sim.queueEnds&&dialogType!=='setup'){
       const humans=[...sim.players.values()].filter(p=>!p.bot).length;
       if(sim.time>=sim.queueEnds||humans>=sim.options.capacity)launchRound();
     }
-    if (net?.isHost && broadcastClock >= .05) {
-      net.broadcast(state); broadcastClock = 0;
+    if (net?.isHost && (broadcastClock >= 1/30||broadcastClock>=1/60&&state.events?.some(e=>e.id>(net.lastActionEvent||0)&&['shot','hit','elimination','royale-eliminated','build-result','build-place','build-destroy','box-eliminated','finish','inventory-change','pickup'].includes(e.type)))) {
+      net.broadcast(state);net.lastActionEvent=state.events?.at(-1)?.id||0; broadcastClock = 0;
     }
 
     if (state.phase === "results" && lastPhase !== "results") {
@@ -2120,6 +2140,8 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
     resume:()=>resume(false),
     loadingFixture:fn=>fn(view),
+    connectionError:message=>callbacks().onError(message),
+    refreshSocial:scheduleSocialRefresh,
     leave:()=>leave(),
     startFixture:opts=>{options=matchOptions({...opts,session:'offline'});beginSim();return launchRound();},
     social:(type,data)=>party.request(type,data),

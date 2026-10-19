@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {fixture,until,pause} from './helpers/public-match.js';
+import {problemText} from '../src/problem-reports.js';
+
+test('join notices target one exact public room; full, expired and stale admission never create overflow matches',async()=>{
+ const f=await fixture();try{
+  const a=await f.user('Notice Host'),b=await f.user('Notice Guest'),c=await f.user('Notice Racer');const notices=[];b.ws.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='public-join')notices.push(m);});
+  await a.ask('select',{mode:'boxfight',teamSize:1});await a.ask('queue');assert.equal(notices.length,0);const host=await f.game(a);await until(()=>notices.length===1,'Actual public join notification');const event=notices[0];assert.equal(event.name,a.profile.name);assert.equal(event.mode,'boxfight');assert.equal(event.code,host.net.code);
+  await a.ask('joined',{id:a.launches.at(-1).id});await pause(30);assert.equal(notices.length,1,'Duplicate join acknowledgment is silent');
+  const rooms=f.app.relay.publicHost.rooms.size;
+  await assert.rejects(b.ask('queue',{targetPublic:event.code,targetMatch:'expired'}),/ended/);
+  const target={targetPublic:event.code,targetMatch:event.matchId};const attempts=await Promise.allSettled([b.ask('queue',target),c.ask('queue',target)]);assert.equal(attempts.filter(r=>r.status==='fulfilled').length,1);assert.match(attempts.find(r=>r.status==='rejected').reason.message,/full|fit/);assert.equal(f.app.relay.publicHost.rooms.size,rooms);
+  const accepted=attempts[0].status==='fulfilled'?b:c,rejected=accepted===b?c:b;assert.equal(accepted.launches.at(-1).code,event.code);assert.equal(accepted.launches.at(-1).host,false);const guest=await f.game(accepted);assert.equal(guest.net.code,host.net.code);await assert.rejects(rejected.ask('queue',target),/full|started|transferring/);assert.equal(f.app.relay.publicHost.rooms.size,rooms);
+  host.sim.beginBoxRound();host.net.broadcast(host.sim.snapshot());host.net.publishRoom();await until(()=>f.app.relay.publicHost.rooms.get(event.code).state.stage==='box-prepare','Entry closed');await assert.rejects(rejected.ask('queue',target),/started/);
+  guest.net.destroy();await until(()=>host.sim.phase==='results','Guest departure forfeits series');assert.equal(host.sim.seriesWinner,host.sim.players.get('host').team);
+ }finally{await f.close();}
+});
+test('host leaving a live 1v1 transfers the win and preserves the result on the surviving guest',async()=>{
+ const f=await fixture();try{const a=await f.user('Forfeit Host'),b=await f.user('Surviving Rival');for(const u of [a,b])await u.ask('select',{mode:'boxfight',teamSize:1});await a.ask('queue');const host=await f.game(a);await b.ask('queue');const guest=await f.game(b);host.sim.beginBoxRound();host.sim.boxEnd=1e6;host.net.broadcast(host.sim.snapshot());await until(()=>guest.state.boxfight.stage==='prepare','Prepare received');host.net.destroy();await a.ask('returned');await until(()=>guest.net.isHost&&guest.sim?.phase==='results','Host forfeit delivered after transfer',15000);assert.equal(guest.sim.seriesWinner,guest.sim.players.get(guest.net.id).team);assert.equal(guest.sim.roundReason,'forfeit');await until(()=>f.app.relay.progression.leaderboards(b.id,{mode:'boxfight'}).wins.self?.wins===1,'Public forfeit win recorded');guest.net.broadcast(guest.sim.snapshot());await pause(100);assert.equal(f.app.relay.progression.leaderboards(b.id,{mode:'boxfight'}).wins.self.wins,1);assert.deepEqual(guest.errors,[]);}finally{await f.close();}
+});
+test('problem reports persist in the owner support inbox with identity, status and rate limits',async()=>{
+ const f=await fixture();try{const u=await f.user('Support Reporter');const text=problemText({title:'Disconnected',message:'The host disconnected',mode:'zonewars'},'After a round');const reportId=crypto.randomUUID();const result=await u.ask('problem-report',{text,reportId});assert.equal((await u.ask('problem-report',{text,reportId})).id,result.id);const ticket=f.app.relay.parties.store.featureRequests.find(r=>r.id===result.id);assert.equal(ticket.player,u.id);assert.equal(ticket.status,'open');assert.equal(ticket.text,text);assert.ok(f.app.relay.parties.store.featureInbox().requests.some(r=>r.id===result.id));for(let i=0;i<3;i++)await u.ask('problem-report',{text});await assert.rejects(u.ask('problem-report',{text}),/wait/);}finally{await f.close();}
+});
+test('targeted party joins enforce readiness, team size, host recovery and admission-time cutoff',async()=>{
+ const f=await fixture();try{const a=await f.user('Exact Host'),b=await f.user('Exact Leader'),c=await f.user('Exact Mate');await a.ask('select',{mode:'boxfight',teamSize:1});await a.ask('queue');const host=await f.game(a),room=f.app.relay.publicHost.rooms.get(host.net.code),target={targetPublic:room.code,targetMatch:room.state.matchId},rooms=f.app.relay.publicHost.rooms.size;
+ await b.ask('privacy',{value:'open'});await c.ask('join',{id:b.party.id});await assert.rejects(b.ask('queue',target),/ready/);await c.ask('ready',{value:true});await assert.rejects(b.ask('queue',target),/fit/);assert.equal(f.app.relay.publicHost.rooms.size,rooms);await c.ask('leave');
+ const at=room.host.advancedAt;room.host.advancedAt=Date.now()-20000;await assert.rejects(b.ask('queue',target),/transferring|started/);room.host.advancedAt=at;
+ await assert.rejects(b.ask('queue',{...target,targetPublic:'BADROOMX'}),/ended/);await b.ask('queue',target);const ticket=b.launches.at(-1).ticket;room.state.stage='box-fight';assert.equal(f.app.relay.parties.claim(ticket,'new-peer',room.key),null,'A reserved click cannot enter after the fight starts');assert.equal(f.app.relay.publicHost.rooms.size,rooms);await b.ask('cancel');
+ }finally{await f.close();}
+});
+test('public Zombies notifications use the same run and never create a replacement for a stale target',async()=>{
+ const f=await fixture();try{f.app.relay.authority.capacity.sample=()=>{};f.app.relay.authority.capacity.overloaded=false;const a=await f.user('Run Host'),b=await f.user('Run Guest');const messages=[];b.ws.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='public-join')messages.push(m);});await a.ask('select',{mode:'zombies',access:'public',teamSize:4});await a.ask('queue');const host=await f.game(a);await until(()=>messages.length,'Zombies join announced');const event=messages[0],rooms=f.app.relay.authority.rooms.size;await assert.rejects(b.ask('queue',{targetPublic:event.code,targetMatch:'expired'}),/ended/);await b.ask('queue',{targetPublic:event.code,targetMatch:event.matchId});const guest=await f.game(b);assert.equal(guest.net.code,host.net.code);assert.equal(f.app.relay.authority.rooms.size,rooms);}finally{await f.close();}
+});

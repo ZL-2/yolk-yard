@@ -1,3 +1,4 @@
+import {checkpointWorldKey} from './action-network.js';
 import {isPublicCode} from './public-royale.js';
 import {rewardFrame} from './rewards.js';
 import {isWarmup,MAX_SPECTATORS,MAX_HUMANS,MAX_SNAPSHOT_ACTORS} from './royale-phases.js';
@@ -225,6 +226,7 @@ export class Network {
         return;
       }
       if (!accepted) return;
+      if(msg.type==="leave-match"){conn.intentionalLeave=true;conn.close();return;}
       if (msg.type === "input") this.callbacks.onInput?.(conn.peer, msg.input);
       else if (msg.type === "player-action" && (["respawn", "spectate", "rejoin", "team-entry-0", "team-entry-1", "box-team-0", "box-team-1"].includes(msg.action)||/^inventory-(select-[0-5]|drop-[1-5]|drop-one-[1-5]|split-[1-5]|swap-[1-5]-[1-5]|supply-(wood|brick|metal|light|medium|shells|heavy|rockets)-(half|all))$/.test(msg.action)||typeof msg.action==='string'&&msg.action.length<350&&(msg.action==='build-repair'||msg.action.startsWith('build-change:')||msg.action.startsWith('inventory-preferences:')||msg.action.startsWith('ping-')||msg.action.startsWith('watch:'))))
         this.callbacks.onPlayerAction?.(conn.peer, msg.action);
@@ -247,7 +249,7 @@ export class Network {
       if (this.connections.get(conn.peer) === conn) {
         this.connections.delete(conn.peer);
         const depart=()=>{this.reconnectingMembers.delete(conn.peer);if(this.connections.has(conn.peer))return;this.members=this.members.filter(m=>m.id!==conn.peer);this.chatRoom.remove(conn.peer);this.callbacks.onLeave?.(conn.peer);this.syncRoster();};
-        if(this.officialPublic&&!this.closed){
+        if(this.officialPublic&&!this.closed&&!conn.intentionalLeave){
           // A dropped logical channel is recoverable using the still-live relay
           // session. Do not replace this contestant with a bot or lose inventory.
           this.callbacks.onSuspendPlayer?.(conn.peer);
@@ -485,7 +487,7 @@ export class Network {
     }
     this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     state = {...state, visibility:this.visibility,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,network:{hostId:this.id,members:this.members,chatSequence:this.chatRoom.sequence}};
-    const worldVersion=state.royale?`${state.royale.matchId}:${state.round}:${state.royale.lootVersion}:${state.royale.buildVersion}`:null;
+    const worldVersion=checkpointWorldKey(state);
     // Commit ownership changes with their recovery state: host departure must
     // never restore a chest or pickup from before its last accepted transaction.
     const checkpointDue=performance.now()-(this.lastCheckpointSent||0)>3000||worldVersion!==this.checkpointWorldVersion;
@@ -627,6 +629,7 @@ export class Network {
   }
   destroy() {
     if (this.closed) return;
+    if(this.ready&&!this.isHost&&!this.serverAuthority)this.send({type:"leave-match"});
     this.closed = true;
     this.authorityReject?.(new Error('Connection cancelled.'));
     this.rejectOpen?.(new Error("Connection cancelled."));
@@ -638,6 +641,7 @@ export class Network {
     if (this.isHost)
       for (const conn of this.connections.values())
         if (conn.open) conn.send({ type: "host-left",...(handoff?{checkpoint:handoff,members:this.members}:{}) });
+    this.aliasPeer?.flush?.();this.peer?.flush?.();
     this.aliasPeer?.destroy();
     this.peer?.destroy();
     this.connections.clear();

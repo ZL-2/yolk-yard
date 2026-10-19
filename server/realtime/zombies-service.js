@@ -11,6 +11,7 @@ export function queueZombies(service,u,m){
  if(!m.code&&p.members.length>options.capacity)throw Error('Choose enough cooperative seats for your party.');
  let room=m.code?a.rooms.get(address(m.code)):null;
  if(m.code&&room?.sim.options.mode!=='zombies')throw Error('That Zombies room is unavailable.');
+ if(m.exactPublic&&(!room||room.visibility!=='public'||typeof m.targetMatch!=='string'||room.sim.matchId!==m.targetMatch))throw Error('That public Zombies run has ended.');
  const candidates=[...a.rooms.values()].filter(r=>r.zombies&&r.visibility==='public'&&r.sim.acceptsJoining());
  if(!room&&!privateMatch)room=candidates.sort((a,b)=>b.members.size-a.members.size).find(r=>a.capacity.humans(r)+a.capacity.pending(r.key)+p.members.length<=r.sim.options.capacity);
  if(room&&!room.sim.acceptsJoining())throw Error('This deployment is closed to new operators. Start a fresh run.');
@@ -21,7 +22,7 @@ export function queueZombies(service,u,m){
  }
  a.capacity.reserve(p.id,room.key,room.sim.options,p.members.length,0);
  const launch={id:randomUUID(),code:room.code,options:room.sim.options,creating:false,host:false,hostRun:false,serverAuthority:true,visibility:room.visibility,created:Date.now()};p.launch=launch;p.state='queueing';u.ready=true;
- for(const id of p.members){const token=randomUUID();service.tickets.set(token,{party:p.id,member:id,code:room.code,teamSize:room.sim.options.teamSize,partySize:p.members.length,hostRun:false,expires:Date.now()+90000,token});service.users.get(id).ticket=token;}
+ for(const id of p.members){const token=randomUUID();service.tickets.set(token,{...(m.exactPublic?{exactMatch:m.targetMatch}:{}),party:p.id,member:id,code:room.code,teamSize:room.sim.options.teamSize,partySize:p.members.length,hostRun:false,expires:Date.now()+90000,token});service.users.get(id).ticket=token;}
  service.sync(p);service.dispatch(p);return launch.id;
 }
 export function settleZombiesPlayer(relay,room,p,peer){

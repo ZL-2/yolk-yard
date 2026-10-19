@@ -50,6 +50,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
  }
  admitPlayer(id,profile,admission=null){
   if(this.players.has(id)){const p=this.players.get(id);p.connected=true;return p;}
+  if(admission?.exactMatch&&(this.matchId!==admission.exactMatch||this.phase!=='playing'||this.boxStage!=='waiting'))return null;
   if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;
   if(admission?.spectator&&admission.friendSpectator!==false){const p=this.addPlayer(id,profile,false,true);if(p)p.watchId=admission.watchId;return p;}
   const seats=[...this.players.values()].filter(p=>p.contestant&&!p.bot);
@@ -69,7 +70,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
  setBarrier(enabled){this.map.boxPrep=enabled;this.worldDamage['box-divider']={destroyed:!enabled||this.options.boxFormat==='ffa'};this.buildVersion++;rebuildMap(this);}
  startRound(){
   if(this.phase==='playing')return false;
-  this.matchId=globalThis.crypto.randomUUID();this.roundWins={};this.roundHistory=[];this.scores=[0,0];this.boxDraws=0;this.seriesWinner=null;this.winner='';this.boxRound=0;this.boxStage='waiting';this.phase='playing';this.stage='active';this.publicRestartAt=null;this.queueEnds=0;
+  this.matchId=globalThis.crypto.randomUUID();this.roundWins={};this.roundHistory=[];this.scores=[0,0];this.boxDraws=0;this.seriesWinner=null;this.forfeitedBy=null;this.winner='';this.boxRound=0;this.boxStage='waiting';this.phase='playing';this.stage='active';this.publicRestartAt=null;this.queueEnds=0;
   for(const p of this.players.values()){p.kills=p.deaths=p.assists=p.points=p.boxWins=p.boxDamage=0;resetFieldRecord(p);p.connected=p.connected!==false;}
   this.addBots();if(!this.options.recurring)return this.beginBoxRound();this.emit('box-cue',{cue:'waiting'});return true;
  }
@@ -111,7 +112,19 @@ export class BoxFightSimulation extends RoyaleSimulation {
  takeLoot(p,item,options){const ok=super.takeLoot(p,item,options);p.materials.wood=Math.min(this.rules.woodCap,p.materials.wood);return ok;}
  damageWorld(box,amount){if(this.boxStage==='fight')super.damageWorld(box,amount);}
  fire(p,burst=false){return this.boxStage==='fight'&&super.fire(p,burst);}
- leavePlayer(id){Simulation.prototype.removePlayer.call(this,id);}
+ leavePlayer(id){
+  const leaving=this.players.get(id),rival=[...this.players.values()].find(p=>p.id!==id&&p.contestant&&p.boxPlayed&&p.connected!==false&&!p.friendSpectator&&p.team!==leaving?.team);
+  if(this.options.mode==='boxfight'&&this.options.boxFormat!=='ffa'&&this.options.teamSize===1&&this.phase==='playing'&&this.boxRound>0&&leaving?.boxPlayed&&!leaving.friendSpectator&&rival){
+   if(['prepare','fight'].includes(this.boxStage)){this.boxStage='fight';this.endBoxRound(rival.team,'forfeit');}
+   this.roundReason='forfeit';this.forfeitedBy=leaving.id;
+   if(this.phase!=='results')this.completeBoxSeries(rival.team);
+  }
+  Simulation.prototype.removePlayer.call(this,id);
+ }
+ completeBoxSeries(winner){
+  if(this.phase==='results')return;
+  this.seriesWinner=winner;this.phase='results';this.finishedAt=this.time;this.winner=winner==null?'Series drawn':this.options.boxFormat==='ffa'?(this.players.get(winner)?.name||'Operator')+' wins the series':(winner===0?'Blue':'Orange')+' team wins the series';this.publicRestartAt=this.options.recurring?this.time+this.rules.restart:null;this.emit('finish',{winner:this.winner});this.emit('box-cue',{cue:'series-win',winner});
+ }
  advanceWarmupClock(){}
  finish(){} // Series victory is decided below; no Royale placement or rewards.
  endBoxRound(winner,reason='elimination'){
@@ -122,7 +135,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
   this.emit('box-cue',{cue:winner==null?'draw':'round-win',winner,round:this.boxRound});
   if(winner!=null&&this.roundWins[winner]>=this.options.scoreLimit||this.boxRound>=this.options.scoreLimit*4+10){
    const ranking=Object.entries(this.roundWins).sort((a,b)=>b[1]-a[1]);this.seriesWinner=winner!=null&&this.roundWins[winner]>=this.options.scoreLimit?winner:ranking.length&&(!ranking[1]||ranking[0][1]>ranking[1][1])?(this.options.boxFormat==='ffa'?ranking[0][0]:Number(ranking[0][0])):null;
-   this.phase='results';this.finishedAt=this.time;this.winner=this.seriesWinner==null?'Series drawn':this.options.boxFormat==='ffa'?(this.players.get(this.seriesWinner)?.name||'Operator')+' wins the series':(this.seriesWinner===0?'Blue':'Orange')+' team wins the series';this.publicRestartAt=this.options.recurring?this.time+this.rules.restart:null;this.emit('finish',{winner:this.winner});this.emit('box-cue',{cue:'series-win',winner:this.seriesWinner});
+   this.completeBoxSeries(this.seriesWinner);
   }
  }
  tick(dt){

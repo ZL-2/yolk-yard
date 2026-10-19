@@ -874,6 +874,7 @@ export class Simulation {
   }
   admitPlayer(id,profile,admission=null) {
     if(this.players.has(id))return this.players.get(id);
+    if(admission?.exactMatch&&(this.matchId!==admission.exactMatch||this.phase!=='playing'))return null;
     if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;
     if(admission?.spectator){const p=this.addPlayer(id,profile,false,true);if(p)Object.assign(p,{watchId:admission.watchId,partyId:admission.partyId,memberId:admission.memberId});return p;}
     const capacity=this.options.capacity||8;

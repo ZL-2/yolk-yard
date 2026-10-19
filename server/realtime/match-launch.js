@@ -12,6 +12,13 @@ export function queueMatch(service,u,m){
  if(service.relay.deployment?.snapshot().updating)throw Error('Ravelfront is updating. Matchmaking will reopen when publishing finishes.');
  if(p.members.some(id=>!service.connected(service.users.get(id))))throw Error('Wait for your party members to reconnect.');
  if(p.members.some(id=>id!==u.id&&!service.users.get(id).ready))throw Error('Every party member must ready up.');
+ if(m.targetPublic){
+  const target=service.relay.publicHost?.rooms.get(m.targetPublic),server=authority?.rooms.get(address(m.targetPublic));
+  if(!target&&(!server?.zombies||server.visibility!=='public'))throw Error('That public match has ended.');
+  const mode=target?.options.mode||'zombies';for(const id of p.members)service.relay.owner?.assertAdmission(id,mode,'public');
+  if(server?.zombies)return queueZombies(service,u,{...m,code:m.targetPublic,exactPublic:true});
+  return queuePublicMatch(service,u,m);
+ }
  const destination=m.code?service.relay.peers.get(address(m.code))?.listing:null;
  const selectedMode=destination?.mode||(!m.code&&m.custom?m.options?.mode:null)||p.selection.mode;
  const access=destination?destination.public===false?'private':'public':m.code?'private':m.custom?'private':p.selection.access||'public';
@@ -39,16 +46,21 @@ export function queueMatch(service,u,m){
  return launch.id;
 }
 
-function queuePublicMatch(service,u){
+function queuePublicMatch(service,u,m={}){
  const p=service.parties.get(u.party),pool=service.relay.publicHost;
  if(!pool?.enabled)throw Error('Public matchmaking is unavailable.');
- if(!['royale','ffa','zonewars','boxfight'].includes(p.selection.mode))throw Error('Choose an available game mode.');
- const options=publicMatchOptions(p.selection);
+ if(!m.targetPublic&&!['royale','ffa','zonewars','boxfight'].includes(p.selection.mode))throw Error('Choose an available game mode.');
+ const target=m.targetPublic?pool.rooms.get(m.targetPublic):null;
+ if(m.targetPublic&&(!target||typeof m.targetMatch!=='string'||target.state?.matchId!==m.targetMatch))throw Error('That public match has ended.');
+ const options=target?target.options:publicMatchOptions(p.selection);
  if((options.mode==='royale'||options.mode==='boxfight'&&options.recurring)&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
- const room=pool.findRoom(options,p.members.length),summary=room.summary(),creating=room.reserve(p,u);
+ const room=target||pool.findRoom(options,p.members.length),summary=room.summary();
+ if(target&&(!summary.hostReady||!summary.joinable||summary.recovering))throw Error('This match has started or is transferring hosts.');
+ if(target&&summary.availableSeats<p.members.length)throw Error('This match is full or cannot fit your entire party.');
+ const creating=target?false:room.reserve(p,u);
  const launch={id:randomUUID(),code:room.code,options,creating,hostRun:true,recurring:true,rewardPublic:false,spectator:false,visibility:'public',created:Date.now()};
- p.launch=launch;p.state='queueing';u.ready=true;
- for(const id of p.members){const token=randomUUID(),t={party:p.id,member:id,code:launch.code,teamSize:options.teamSize,teamFill:true,partySize:p.members.length,hostRun:true,recurring:true,spectator:false,expires:Date.now()+90000,token};service.tickets.set(token,t);service.users.get(id).ticket=token;}
+ p.selection={...options,access:'public'};p.launch=launch;p.state='queueing';u.ready=true;
+ for(const id of p.members){const token=randomUUID(),t={...(target?{exactMatch:m.targetMatch}:{}),party:p.id,member:id,code:launch.code,teamSize:options.teamSize,teamFill:true,partySize:p.members.length,hostRun:true,recurring:true,spectator:false,expires:Date.now()+90000,token};service.tickets.set(token,t);service.users.get(id).ticket=token;}
  service.sync(p);
  if(creating)service.send(u,{type:'launch',launch:{...launch,host:true,ticket:u.ticket,admission:service.publicAdmission(service.tickets.get(u.ticket))}});else if(summary.hostReady)service.dispatch(p);
  return launch.id;
