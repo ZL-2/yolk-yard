@@ -1809,8 +1809,10 @@ body.in-royale .match-center{display:none}
 /* Scope aperture and reticle are aligned to the magnified main camera. */
 .scope[data-overlay] {background:radial-gradient(circle at center,transparent 0 36vh,#172a35 36.15vh 36.7vh,#050b10f5 36.85vh);z-index:3;}
 .scope[data-overlay]::before {content:"";position:absolute;left:50%;top:50%;width:72vh;height:72vh;transform:translate(-50%,-50%);border-radius:50%;background:linear-gradient(transparent calc(50% - .6px),#111b20 calc(50% - .6px) calc(50% + .6px),transparent calc(50% + .6px)),linear-gradient(90deg,transparent calc(50% - .6px),#111b20 calc(50% - .6px) calc(50% + .6px),transparent calc(50% + .6px));}
-.scope[data-reticle="mil-dot"]::after {content:"·  ·  ·  ·  ·";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:900 25px/1 monospace;color:#15202a;letter-spacing:10px;}
-.scope[data-reticle="chevron"]::after {content:"⌃";position:absolute;left:50%;top:50%;transform:translate(-50%,-42%);font:900 30px/1 monospace;color:#da5c46;}
+/* Geometric marks avoid glyph bearings, trailing letter spacing and font baselines.
+   The middle dot's center and the chevron's upper tip are the camera aim point. */
+.scope[data-reticle="mil-dot"]::after {content:"";position:absolute;top:50%;left:50%;width:4px;height:4px;transform:translate(-50%,-50%);border-radius:50%;background:#15202a;box-shadow:-48px 0 #15202a,-24px 0 #15202a,24px 0 #15202a,48px 0 #15202a;}
+.scope[data-reticle="chevron"]::after {content:"";position:absolute;left:50%;top:50%;width:18px;height:10px;transform:translateX(-50%);background:#da5c46;clip-path:polygon(50% 0,100% 80%,85% 100%,50% 44%,15% 100%,0 80%);}
 #scope-label {bottom:12%;font-size:12px;}
 .flight-close {position:absolute;top:8px;right:10px;padding:5px 9px!important;font-size:12px!important;min-height:28px!important;background:#173345cc!important;border:1px solid #ffffff44!important;color:white!important;}
 .royale-flight {padding-top:40px!important;}

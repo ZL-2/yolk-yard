@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      scope_reticle_update: ${{ steps.scope.outputs.scope_reticle_update }}
       atv_only: ${{ steps.scope.outputs.atv_only }}
       kestrel_only: ${{ steps.scope.outputs.kestrel_only }}
       models_only: ${{ steps.scope.outputs.models_only }}
@@ -219,7 +220,16 @@ jobs:
           match_recovery_update=recovery_files<=recovery_allowed and {'server/realtime/relay-recovery.js','src/relay-peer.js','tests/match-recovery.test.js','scripts/match-recovery-browser.mjs'}<=recovery_files
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             for key,value in [('match_recovery_update',match_recovery_update),('round_room_update',round_room_update),('service_action_update',service_action_update),('loading_recovery_update',loading_recovery_update),('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('mixamo_update',mixamo_update),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('field_repair_update',field_repair),('zombies_update',zombies_update),('box_fights_update',box_fights_update),('zone_wars_update',zone_wars_update),('human_pvp_update',human_pvp_update),('tilted_map_update',tilted_map_update),('zone_spawn_update',zone_spawn_update),('owner_suite_update',owner_suite_update),('visit_verify_only',visit_verify_only),('visit_update',visit_update),('history_only',history_only),('focused',match_recovery_update or service_action_update or loading_recovery_update or visit_update or history_only or owner_suite_update or zone_wars_update or box_fights_update or zombies_update or field_repair or scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh or mixamo_update)]: out.write(key+'='+str(value).lower()+'\n')
-          print('Focused release:',{'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
+          reticle_base='5bda474aeed20fa37023a888852c36de94a298c5'
+          reticle_files=set(subprocess.check_output(['git','diff','--name-only',reticle_base,'HEAD'],text=True).splitlines())
+          reticle_allowed={'.github/workflows/pages.yml','src/style.css','src/releases.js','package.json','package-lock.json','scripts/scope-alignment-check.mjs'}
+          def without_scope_markers(css):
+            return re.sub(r'/\* Geometric marks.*?\*/\n|^\.scope\[data-reticle=[^\n]*\n','',css,flags=re.M|re.S)
+          scope_reticle_update=reticle_files<=reticle_allowed and {'src/style.css','scripts/scope-alignment-check.mjs'}<=reticle_files and without_scope_markers(subprocess.check_output(['git','show',reticle_base+':src/style.css'],text=True))==without_scope_markers(Path('src/style.css').read_text())
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('scope_reticle_update='+str(scope_reticle_update).lower()+'\n')
+            if scope_reticle_update: out.write('focused=true\n')
+          print('Focused release:',{'Scope reticles':scope_reticle_update,'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
   build:
     needs: scope
@@ -358,6 +368,9 @@ jobs:
       - name: Authenticated restart recovery, handoff and ordered action delivery
         if: needs.scope.outputs.match_recovery_update == 'true'
         run: node --test --test-concurrency=1 tests/match-recovery.test.js tests/public-disconnect.test.js tests/realtime-resume.test.js tests/relay-liveness.test.js tests/relay-queue.test.js tests/relay-compact.test.js tests/public-host.test.js tests/round-room-fill.test.js tests/service-action-update.test.js
+      - name: Release numbering
+        if: needs.scope.outputs.scope_reticle_update == 'true'
+        run: node --test tests/release-history.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -404,6 +417,9 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true'
+      - name: Desktop sniper and burst scope alignment
+        if: needs.scope.outputs.scope_reticle_update == 'true'
+        run: node scripts/scope-alignment-check.mjs
       - name: Desktop battle-map transition, relay restart and lobby return
         if: needs.scope.outputs.match_recovery_update == 'true'
         run: node scripts/match-recovery-browser.mjs
