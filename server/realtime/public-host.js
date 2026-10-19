@@ -78,13 +78,11 @@ export class PublicRoom {
  sweep(){
   if(!this.enabled)return;
   if(this.pending){const p=this.relay.parties.parties.get(this.pending.party);if(!p||p.state!=='queueing'||!p.launch?.recurring||p.launch.code!==this.code)this.pending=null;else if(this.pending.expires<Date.now()){this.pending=null;this.relay.parties.cancel(p,'The public host did not finish loading. Try joining again.');}}
-  if(this.host&&Date.now()-this.host.advancedAt>(this.state?15000:35000)){
-   const peer=this.relay.peers.get(this.host.peer);
-   // A stalled render is not a lost socket. Never destroy the only copy of a
-   // live round when there is nobody synchronized to take over. Disconnected
-   // sockets are reclaimed by the relay after their transport recovery window.
-   if(peer?.ws?.readyState===1&&(!this.state||this.successor()))this.relay.remove(peer,1001,'Public host stopped advancing');
-  }
+  // Simulation cadence is not transport liveness. Preparing the battle map or
+  // compiling shaders can pause frames while the browser still answers pings.
+  // A guest's checkpoint does not authorize evicting that connected host.
+  // The relay's native ping, resume grace and explicit leave own removal; once
+  // they remove a host, the existing lease election transfers the same round.
 
  }
  saveCrown(peer,value){if(this.options.mode!=='royale'||!peer.publicMember||this.members.get(peer.id)?.admission.spectator)return;this.relay.progression.account(peer.progressId).crowns=crownRecord(value);this.relay.progression.dirty=true;void this.relay.progression.save();}

@@ -471,6 +471,9 @@ export class Network {
   publishRoom() {
     if(this.serverAuthority)return;
     const s = this.snapshot;
+    // A newly elected host may have a checkpoint before its first visible frame.
+    // Do not publish an empty/lobby state over its already active public lease.
+    if(this.officialPublic&&(!this.isHost||!s||!['playing','results'].includes(s.phase)))return;
     const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
     const capacity=s?.royale?Math.min(s.options.capacity,MAX_HUMANS):(s?.options.capacity||8);
     const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,boxFormat:s.options.boxFormat,public:this.visibility==='public',players:humans.length,capacity,phase:s.boxfight?s.phase:s.royale?.accepting?"lobby":s.phase,...(this.officialPublic?{recurring:true,hostId:this.id,publicState:{stage:s.boxfight?(s.phase==='results'?'finished':'box-'+s.boxfight.stage):s.royale?.stage||(s.phase==='results'?'finished':'arena'),phase:s.phase,time:s.time,queueEnds:s.royale?.queueEnds||0,elapsed:s.royale?.elapsed||0,round:s.round,matchId:s.royale?.matchId||s.matchId,alive:s.royale?.alive||humans.length,botPlayers:s.players.filter(p=>p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).length,contestants:s.players.filter(p=>!p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).map(p=>p.id),estimatedSeconds:s.phase==='results'?Math.max(0,Math.ceil((s.publicRestartAt||s.time+10)-s.time)):Math.max(0,Math.ceil(s.royale?(s.royale.matchEnd||600)+20-s.royale.elapsed:s.remaining))}}:{})} : null;
@@ -601,6 +604,7 @@ export class Network {
     this.maxConnections=(['royale','zonewars'].includes(checkpoint.simulation.options.mode)?Math.min(checkpoint.simulation.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     this.callbacks.onHost?.(checkpoint.simulation,[...this.failedHosts]);
     this.callbacks.onHostRecovery?.(10000);
+    this.snapshot=this.callbacks.getChatState?.()||this.snapshot;
     this.lastPublish=0;this.lastCheckpointSent=0;this.claimRoomAddress();
     this.callbacks.onStatus?.('You are now the host. The match continues.');
     this.later(()=>{for(const member of [...this.members])if(member.id!==this.id&&!this.connections.has(member.id)){this.members=this.members.filter(m=>m.id!==member.id);this.callbacks.onLeave?.(member.id);}},10000);
@@ -613,6 +617,7 @@ export class Network {
     const alias=relayURL()?new RelayPeer(PREFIX+this.code,this.officialPublic?{publicHostProof:{id:this.peer.id,token:this.peer.resume?.resume}}:{}):new Peer(PREFIX+this.code,{debug:0,...config.peer,config:{iceServers:config.iceServers||[{urls:'stun:stun.l.google.com:19302'}]}});this.aliasPeer=alias;
     alias.on('open',()=>{if(this.closed)return;if(recovering&&this.migrating){this.publicLeaseAuthorized=true;this.promote();}this.publishRoom();});for(const type of ['reward','afk','afk-enforce'])alias.on(type,event=>this.callbacks.onProgress?.(type,event));
     alias.on('connection',conn=>this.accept(conn));
+    alias.on('transport-close',event=>{this.lastTransportClose=`WebSocket close ${event.code}: ${event.reason}.`;connectionReport.set('service','Interrupted',this.lastTransportClose);});
     const lost=()=>{if(this.aliasPeer!==alias)return;alias.destroy();if(this.closed)return;if(this.officialPublic&&this.isHost){this.isHost=false;this.publicLeaseAuthorized=false;this.callbacks.onError?.('The public host connection ended. Return to the lobby to rejoin the main match.');return;}this.later(()=>this.isHost?this.claimRoomAddress():recovering&&this.recoverPublicHost(),recovering?800:2500);};
     alias.on('error',lost);
     alias.on('disconnected',()=>{if(!alias.destroyed&&!this.closed){if(relayURL())lost();else alias.reconnect();}});

@@ -18,11 +18,12 @@ export async function until(check,label,timeout=8000){
  while(!check()){assert.ok(Date.now()<deadline,label);await pause(15);}
 }
 
-export async function fixture(){
+export async function fixture({recovery=false}={}){
  const directory=await mkdtemp(tmpdir()+'/ravel-singleton-');
  const previous={window:globalThis.window,WebSocket:globalThis.WebSocket,social:process.env.RAVEL_SOCIAL_DATA_PATH,reward:process.env.RAVEL_REWARD_DATA_PATH};
  process.env.RAVEL_SOCIAL_DATA_PATH=directory+'/social.json';process.env.RAVEL_REWARD_DATA_PATH=directory+'/rewards.json';
- const app=await startRealtimeServer({port:0,host:'127.0.0.1',mapPath:directory+'/maps.json'});
+ const config={host:'127.0.0.1',mapPath:directory+'/maps.json',recoveryPath:recovery?directory+'/relay.bin':null};
+ let app=await startRealtimeServer({...config,port:0});
  const base=`ws://127.0.0.1:${app.server.address().port}`,users=[],games=[];
  globalThis.window={YOLK_NETWORK:{relay:base+'/game'}};
  globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
@@ -83,5 +84,6 @@ export async function fixture(){
   if(previous.reward===undefined)delete process.env.RAVEL_REWARD_DATA_PATH;else process.env.RAVEL_REWARD_DATA_PATH=previous.reward;
   if(previous.social===undefined)delete process.env.RAVEL_SOCIAL_DATA_PATH;else process.env.RAVEL_SOCIAL_DATA_PATH=previous.social;
  }
- return {app,users,games,user,game,close};
+ async function restart(){const port=app.server.address().port;await app.close({restart:true});app=await startRealtimeServer({...config,port});}
+ return {get app(){return app;},users,games,user,game,close,restart,directory};
 }

@@ -30,7 +30,8 @@ export class RelayPeer extends Events {
  get bufferedAmount(){return (this.socket?.bufferedAmount||0)+this.queueBytes;}
  sendRaw(ws,raw){if(ws?.readyState!==1)return;this.sentBytes+=this.byteEncoder.encode(raw).byteLength;this.sentPackets++;ws.send(raw);}
  start(){
-  if(this.destroyed)return;
+  if(this.destroyed||this.socket&&this.socket.readyState<2)return;
+  this.rotating=true;this.resumeConfirmed=false;
   try{this.socket=new WebSocket(relayURL(),globalThis.window?.RAVEL_OWNER_SESSION?['ravelfront',`owner.${window.RAVEL_OWNER_SESSION}`]:[]);}catch{this.emit('error',{type:'socket-error'});return;}
   const ws=this.socket;this.transportHeartbeat=new HostHeartbeat(Date.now(),{silence:18000,grace:0});
   ws.addEventListener('open',()=>this.sendRaw(ws,JSON.stringify({type:'register',...this.registration,progressToken:progressToken(),...(this.id?{id:this.id}:{}),...this.resume,...(this.protocol===2?{cursor:this.cursor}:{})})));
@@ -47,9 +48,9 @@ export class RelayPeer extends Events {
   ws.addEventListener('error',()=>{if(!this.destroyed&&ws===this.socket&&this.protocol!==2)this.emit('error',{type:'socket-error'});});
   ws.addEventListener('close',event=>{
    if(this.destroyed||ws!==this.socket)return;
-   const reasons=['Server stopping','Connection too slow','Rate limit','Command sequence','Invalid relay message','Expired resume','Register first','Public host stopped advancing','Public host transferred','Reconnect grace expired','Invalid public host state','Invalid frame'];
+   const reasons=['Server stopping','Server restarting','Connection too slow','Rate limit','Command sequence','Invalid relay message','Expired resume','Register first','Public host stopped advancing','Public host transferred','Reconnect grace expired','Invalid public host state','Invalid frame'];
    this.emit('transport-close',{code:Number.isInteger(event.code)?event.code:0,reason:reasons.includes(event.reason)?event.reason:'unspecified'});
-   if(this.protocol===2&&this.resume){
+   if(this.protocol===2&&this.resume&&!['Expired resume','Command sequence','Invalid frame','Invalid relay message'].includes(event.reason)){
     this.reconnecting=true;this.rotating=true;
     if(!this.reconnectUntil){
      this.reconnectUntil=Date.now()+RELAY_RECONNECT_MS;
@@ -80,22 +81,28 @@ export class RelayPeer extends Events {
   }
  }
  acknowledge(){if(!this.ackTimer)this.ackTimer=setTimeout(()=>{this.ackTimer=null;this.control({type:'ack',seq:this.cursor});},16);}
+ finishRecovery(){
+  if(!this.reconnecting||!this.resumeConfirmed||[...this.unacked.keys()].some(seq=>seq<=this.recoverySeq))return;
+  this.reconnecting=false;this.reconnectUntil=null;clearTimeout(this.reconnectDeadline);this.emit('reconnected');
+ }
  message(m){
   if(!m||typeof m!=='object')return;
   if(m.type==='deployment'){this.emit('deployment',m.deployment);return;}
   if(m.type==='authority-frame'){this.authorityDecoder??=new SnapshotDecoder();const message=this.authorityDecoder.decode(m.frame);if(message)this.emit('authority-state',message.state);return;}
   if(['authority-ready','authority-owner','authority-notice','authority-error'].includes(m.type)){this.emit(m.type,m);return;}
   if(['reward','afk','afk-enforce'].includes(m.type)){this.emit(m.type,m);return;}
-  if(m.type==='command-ack'){const sent=this.sentTimes.get(m.seq);if(sent!==undefined)this.relayLatency=performance.now()-sent;for(const seq of this.unacked.keys())if(seq<=m.seq){this.unacked.delete(seq);this.sentTimes.delete(seq);}return;}
+  if(m.type==='command-ack'){const sent=this.sentTimes.get(m.seq);if(sent!==undefined)this.relayLatency=performance.now()-sent;for(const seq of this.unacked.keys())if(seq<=m.seq){this.unacked.delete(seq);this.sentTimes.delete(seq);}this.finishRecovery();return;}
+  if(m.type==='alive'){this.resumeConfirmed=true;this.finishRecovery();return;}
   if(m.type==='rotate-request'){this.flush();this.rotating=true;this.control({type:'rotate'});return;}
   if(m.type==='rotated'){this.resume={resume:m.resume,cursor:m.cursor,parts:m.parts};this.start();return;}
   if(m.type==='ready'){
    this.id=m.id;this.rotating=false;
    if(m.protocol===2){
-    this.protocol=2;this.resume={resume:m.resume};this.reconnecting=false;this.reconnectUntil=null;clearTimeout(this.reconnectDeadline);
+    this.protocol=2;this.resume={resume:m.resume};
     for(const message of this.unacked.values())this.sendRaw(this.socket,JSON.stringify(message));
-    if(m.resumed)this.emit('reconnected');
-   }if(m.resumed){this.flush();for(const message of this.deferredControls)this.control(message);this.deferredControls=[];}else this.emit('open',this.id);return;}
+   }
+   const deferred=this.deferredControls;this.deferredControls=[];for(const message of deferred)this.control(message);
+   if(m.resumed){this.flush();this.recoverySeq=this.commandSeq;this.control({type:'heartbeat'});}else this.emit('open',this.id);return;}
   if(m.type==='rooms'){const waiter=this.waiters.get(m.request);if(waiter){this.waiters.delete(m.request);waiter.resolve(m.rooms);}return;}
   if(m.type==='error'){
    // A failed election candidate belongs to its channel. Its error must not

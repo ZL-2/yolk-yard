@@ -27,6 +27,7 @@ jobs:
       zone_wars_update: ${{ steps.scope.outputs.zone_wars_update }}
       human_pvp_update: ${{ steps.scope.outputs.human_pvp_update }}
       tilted_map_update: ${{ steps.scope.outputs.tilted_map_update }}
+      match_recovery_update: ${{ steps.scope.outputs.match_recovery_update }}
       round_room_update: ${{ steps.scope.outputs.round_room_update }}
       service_action_update: ${{ steps.scope.outputs.service_action_update }}
       loading_recovery_update: ${{ steps.scope.outputs.loading_recovery_update }}
@@ -213,8 +214,11 @@ jobs:
           visit_verify_only=files<={'scripts/owner-live-check.mjs','.github/workflows/pages.yml'} and 'scripts/owner-live-check.mjs' in files
           visit_update=visit_files<={'server/realtime/owner-store.js','server/realtime/owner-recovery.js','server/realtime/owner.js','server/realtime/index.js','src/owner-console.js','tests/owner.test.js','src/releases.js','package.json','package-lock.json','.github/workflows/pages.yml','scripts/owner-live-check.mjs','docs/UPDATE_180.md'} and {'server/realtime/owner-recovery.js','tests/owner.test.js'}<=visit_files
           history_only=files<={'src/releases.js','src/release-history.js','tests/release-history.test.js','scripts/history-live-check.mjs','src/owner-request.js','src/owner-console.js','tests/owner-request.test.js','.github/workflows/pages.yml'} and 'src/release-history.js' in files
+          recovery_files=set(subprocess.check_output(['git','diff','--name-only','1157fdcf5254874e39d44d7381757688c0e11156','HEAD'],text=True).splitlines())
+          recovery_allowed={'.github/workflows/pages.yml','package.json','package-lock.json','docs/UPDATE_189.md','server/realtime/index.js','server/realtime/relay.js','server/realtime/relay-recovery.js','src/main.js','src/network.js','src/relay-peer.js','src/problem-reports.js','src/releases.js','tests/helpers/public-match.js','tests/match-recovery.test.js','tests/public-disconnect.test.js','server/realtime/public-host.js','scripts/match-recovery-browser.mjs'}
+          match_recovery_update=recovery_files<=recovery_allowed and {'server/realtime/relay-recovery.js','src/relay-peer.js','tests/match-recovery.test.js','scripts/match-recovery-browser.mjs'}<=recovery_files
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-            for key,value in [('round_room_update',round_room_update),('service_action_update',service_action_update),('loading_recovery_update',loading_recovery_update),('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('mixamo_update',mixamo_update),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('field_repair_update',field_repair),('zombies_update',zombies_update),('box_fights_update',box_fights_update),('zone_wars_update',zone_wars_update),('human_pvp_update',human_pvp_update),('tilted_map_update',tilted_map_update),('zone_spawn_update',zone_spawn_update),('owner_suite_update',owner_suite_update),('visit_verify_only',visit_verify_only),('visit_update',visit_update),('history_only',history_only),('focused',service_action_update or loading_recovery_update or visit_update or history_only or owner_suite_update or zone_wars_update or box_fights_update or zombies_update or field_repair or scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh or mixamo_update)]: out.write(key+'='+str(value).lower()+'\n')
+            for key,value in [('match_recovery_update',match_recovery_update),('round_room_update',round_room_update),('service_action_update',service_action_update),('loading_recovery_update',loading_recovery_update),('atv_only',scoped),('kestrel_only',aircraft),('models_only',models),('environment_only',environment),('built_world_update',built_world),('field_control_update',field_control),('public_match_fix',public_match),('operator_refresh',operator_refresh),('mixamo_update',mixamo_update),('visual_only',scoped or aircraft or models or environment),('crew_update',crew),('perspective_update',perspective),('referral_edit_fix',referral_edit),('field_repair_update',field_repair),('zombies_update',zombies_update),('box_fights_update',box_fights_update),('zone_wars_update',zone_wars_update),('human_pvp_update',human_pvp_update),('tilted_map_update',tilted_map_update),('zone_spawn_update',zone_spawn_update),('owner_suite_update',owner_suite_update),('visit_verify_only',visit_verify_only),('visit_update',visit_update),('history_only',history_only),('focused',match_recovery_update or service_action_update or loading_recovery_update or visit_update or history_only or owner_suite_update or zone_wars_update or box_fights_update or zombies_update or field_repair or scoped or aircraft or models or environment or crew or perspective or referral_edit or built_world or field_control or public_match or operator_refresh or mixamo_update)]: out.write(key+'='+str(value).lower()+'\n')
           print('Focused release:',{'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
   build:
@@ -351,6 +355,9 @@ jobs:
       - name: Loading transitions, shader deadlines and update policy
         if: needs.scope.outputs.loading_recovery_update == 'true'
         run: node --test tests/loading-screen.test.js tests/shader-preparation.test.js tests/loading-recovery.test.js tests/updates.test.js tests/deployment.test.js tests/realtime-resume.test.js
+      - name: Authenticated restart recovery, handoff and ordered action delivery
+        if: needs.scope.outputs.match_recovery_update == 'true'
+        run: node --test --test-concurrency=1 tests/match-recovery.test.js tests/public-disconnect.test.js tests/realtime-resume.test.js tests/relay-liveness.test.js tests/relay-queue.test.js tests/relay-compact.test.js tests/public-host.test.js tests/round-room-fill.test.js tests/service-action-update.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -397,6 +404,15 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true'
+      - name: Desktop battle-map transition, relay restart and lobby return
+        if: needs.scope.outputs.match_recovery_update == 'true'
+        run: node scripts/match-recovery-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.match_recovery_update == 'true'
+        with:
+          name: match-recovery-evidence
+          path: test-results/match-recovery
+          retention-days: 14
       - name: Desktop reports, social scrolling, exact match join and forfeit victory
         if: needs.scope.outputs.service_action_update == 'true'
         run: node scripts/service-action-browser.mjs

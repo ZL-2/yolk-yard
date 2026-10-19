@@ -19,6 +19,7 @@ export class RealtimeRelay {
     ws.on('pong',()=>{if(peer?.ws===ws)peer.lastSeen=Date.now();});
     const registration=setTimeout(()=>{if(!peer)ws.close(1008,'Register first');},10000);registration.unref?.();
     ws.on('message',(raw,binary)=>{
+      if(this.closing)return;
       try{
         if(binary||raw.length>MAX_FRAME)throw Error('Invalid frame');
         const m=JSON.parse(raw.toString());
@@ -49,7 +50,7 @@ export class RealtimeRelay {
           for(const item of peer.history)ws.send(item.raw);
           this.flush(peer);return;
         }
-        if(peer.ws!==ws)return;
+        if(peer.ws!==ws||ws.readyState!==1)return;
         peer.lastSeen=Date.now();
         if(!acceptFrame(peer,raw.length))throw Error('Rate limit');
         if(m.type==='heartbeat'){ws.send(JSON.stringify({type:'alive'}));return;}
@@ -111,7 +112,14 @@ export class RealtimeRelay {
       const r=m.room;
       if(r&&(peer.id!==`yolk-yard-v${r.version}-${r.code}`||!['lobby','playing','results'].includes(r.phase)||!['royale','ffa','zonewars','boxfight'].includes(r.mode)||!Number.isInteger(r.players)||r.players<0||r.players>MAX_HUMANS+MAX_SPECTATORS))throw Error('Invalid room');
       if(r&&(!peer.listing||peer.listing.mode!==r.mode)&&!this.publicHost.roomByAddress(peer.id))this.owner?.assertAdmission(this.progression.accounts.get(peer.progressId)?.socialId,r.mode,'private');
-      if(this.publicHost.enabled&&!!this.publicHost.roomByAddress(peer.id)&&!this.publicHost.publish(peer,r))throw Error('Invalid public host state');
+      if(this.publicHost.enabled&&!!this.publicHost.roomByAddress(peer.id)&&!this.publicHost.publish(peer,r)){
+        // A stale/empty publication during election is not a broken transport.
+        // Consume this command once; a later valid snapshot can repair listing.
+        // Otherwise reconnect replays the rejected command forever and poisons
+        // every subsequent sequence, disconnecting all guests of the new host.
+        this.publicHost.report('publish-rejected','Invalid public host state',peer);
+        this.send(peer,{type:'publish-rejected'});return;
+      }
       peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:r.mode,players:r.players,capacity:Math.max(2,Math.min(MAX_HUMANS,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(MAX_CONTESTANTS,Number(r.contestantCapacity)||8)),teamSize:(r.mode==='boxfight'?[2,3,4]:[2,4]).includes(r.teamSize)?r.teamSize:1,boxFormat:r.mode==='boxfight'&&r.boxFormat==='ffa'?'ffa':'teams',public:!!this.publicHost.roomByAddress(peer.id),hostRun:true,recurring:!!this.publicHost.roomByAddress(peer.id),phase:r.phase}:null;
       peer.listedAt=Date.now();return;
     }
@@ -162,5 +170,5 @@ export class RealtimeRelay {
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
-  close(){this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()])this.remove(peer,1001,'Server stopping');return Promise.all([this.progression.close(),this.parties.close()]);}
+  close({preserveSessions=false}={}){this.closing=true;this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()]){if(preserveSessions)peer.ws?.close(1001,'Server restarting');else this.remove(peer,1001,'Server stopping');}return Promise.all([this.progression.close(),this.parties.close()]);}
 }

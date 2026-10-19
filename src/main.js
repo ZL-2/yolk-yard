@@ -358,7 +358,7 @@ function profileMenu(){
   $('#player-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();actions['save-profile-name']();}};
 }
 let lastProblem=null;
-function rememberProblem(title,message){lastProblem={title,message,build:__BUILD_ID__,mode:state?.options.mode||party?.party?.selection.mode,screen,room:net?.code,connection:net?.migrating?'host transfer':net?.peer?.reconnecting?'reconnecting':net?.ready?'connected':'disconnected',ping:Math.round(net?.latency||0)};}
+function rememberProblem(title,message){lastProblem={title,message,build:__BUILD_ID__,mode:state?.options.mode||party?.party?.selection.mode,screen,room:net?.code,connection:net?.migrating?'host transfer':net?.peer?.reconnecting?'reconnecting':net?.ready?'connected':'disconnected',ping:Math.round(net?.latency||0),transport:net?.lastTransportClose};}
 function reportProblemMenu(){
  const reportId=crypto.randomUUID(),context={...(lastProblem||{title:'Connection problem',message:document.querySelector('#match-connection span')?.textContent||'Connection interrupted',build:__BUILD_ID__,mode:state?.options.mode,screen,room:net?.code})};
  modal('Report a problem',`<p>Your error details go to the owner’s private support inbox.</p><p class="error-box">${esc(context.message)}</p><form id="problem-report-form"><label for="problem-notes">WHAT HAPPENED? (OPTIONAL)</label><textarea id="problem-notes" class="field" maxlength="300" rows="4"></textarea><button class="primary" type="submit">SEND REPORT</button></form><p id="problem-status" role="status"></p>`,'problem-report');
@@ -677,7 +677,7 @@ function callbacks() {
       connectionReport.performance.update(performance.now()-updateStarted,pendingInputs.length);
     },
     onError: async (message) => {
-      const failedContext={mode:state?.options.mode,room:net?.code,screen};
+      const failedContext={mode:state?.options.mode,room:net?.code,screen,ping:Math.round(net?.latency||0),transport:net?.lastTransportClose};
       leave(false);
       modal(
         "Connection ended",

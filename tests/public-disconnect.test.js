@@ -17,14 +17,14 @@ test('a connected solo host retains its final-two match through a stalled render
  assert.equal(room.state.alive,2);assert.equal(room.state.matchId,'final-two');
  room.state.stage='spawn-island';assert.equal(room.summary().joinable,false,'New arrivals avoid a stalled host');
 });
-test('stalled host transfer requires a fresh same-round successor and waits for transport recovery',()=>{
+test('a render stall never evicts a connected host, even with a ready successor',()=>{
  const {relay,room,peer,removed}=leaseFixture();
  relay.peers.set('guest',{id:'guest',ws:{readyState:1}});
  const guest={peer:'guest',order:2,ready:true,readyAt:Date.now(),readyMatch:'previous-round',admission:{}};room.members.set('guest',guest);
  room.sweep();assert.deepEqual(removed,[],'A previous-round checkpoint cannot rescue this round');
  guest.readyMatch='final-two';guest.readyAt=Date.now()-9000;room.sweep();assert.deepEqual(removed,[],'A frozen guest cannot rescue the host');
  guest.readyAt=Date.now();peer.ws=null;room.sweep();assert.deepEqual(removed,[],'The transport owns its reconnect deadline');
- peer.ws={readyState:1};room.sweep();assert.deepEqual(removed,[peer.id]);
+ peer.ws={readyState:1};room.sweep();assert.deepEqual(removed,[],'Native transport liveness owns removal, not delayed simulation snapshots');
 });
 test('another public room can start and close while a stalled solo final-two match resumes intact',async()=>{
  const f=await fixture();try{
