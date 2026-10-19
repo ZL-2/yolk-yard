@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {fixture,until,pause} from './helpers/public-match.js';
 import {buildingTick,editBuilding} from '../src/building.js';
 
-test('Box matchmaking isolates team sizes and closes entry when the round begins',async()=>{
+test('Box matchmaking isolates team sizes and creates a new room only when the first is full',async()=>{
  const f=await fixture();try{
   const a=await f.user('Box Solo Host'),b=await f.user('Box Solo Guest'),c=await f.user('Box Duos'),d=await f.user('Box Next Duel');
   for(const u of [a,b,d])await u.ask('select',{mode:'boxfight',teamSize:1});await c.ask('select',{mode:'boxfight',teamSize:2});await a.ask('queue');await b.ask('queue');await c.ask('queue');
   const first=await f.game(a);await until(()=>b.launches.length,'Second duelist reservation');const second=await f.game(b),duo=await f.game(c);assert.equal(first.net.code,second.net.code);assert.notEqual(first.net.code,duo.net.code);assert.equal(second.state.options.mode,'boxfight');assert.equal(second.state.options.map,'box-foundry');
-  first.sim.beginBoxRound();first.net.broadcast(first.sim.snapshot());first.net.publishRoom();await until(()=>f.app.relay.publicHost.roomFor(f.app.relay.peers.get(first.net.peer.id)).state.stage==='box-prepare','Build phase closes entry');await d.ask('queue');const next=await f.game(d);assert.notEqual(next.net.code,first.net.code);assert.deepEqual(f.games.flatMap(g=>g.errors),[]);
+  first.sim.beginBoxRound();first.net.broadcast(first.sim.snapshot());first.net.publishRoom();await until(()=>f.app.relay.publicHost.roomFor(f.app.relay.peers.get(first.net.peer.id)).state.stage==='box-prepare','Full duel enters preparation');await d.ask('queue');const next=await f.game(d);assert.notEqual(next.net.code,first.net.code);assert.deepEqual(f.games.flatMap(g=>g.errors),[]);
  }finally{await f.close();}
 });
 test('ready 2v2 and 4v4 parties reserve capacity, stay together and enforce public rules',async()=>{

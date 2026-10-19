@@ -52,15 +52,17 @@ export class PublicRoom {
   if(s.time!==this.host.time){this.host.time=s.time;this.host.advancedAt=now;}
   const count=(n,max)=>Math.max(0,Math.min(max,Math.floor(n)||0));
   this.state={stage:s.stage,phase:s.phase,time:s.time,queueEnds:Number(s.queueEnds)||0,elapsed:Number(s.elapsed)||0,round:count(s.round,1e7),matchId:String(s.matchId||'').slice(0,80),alive:count(s.alive,48),botPlayers:['boxfight','zonewars'].includes(this.options.mode)?0:count(s.botPlayers,48),estimatedSeconds:count(s.estimatedSeconds,3600)};
-  // Public spectators enter the next round; deliberate friend observers remain.
-  if(Array.isArray(s.contestants))for(const member of this.members.values())if(!member.admission.friendSpectator){member.admission.spectator=!s.contestants.includes(member.id);member.admission.publicSpectator=member.admission.spectator;}
+  // Round-mode contestants retain their seats while waiting or eliminated,
+  // including when a host listing predates their admission. BR promotes spectators.
+  if(!['boxfight','zonewars'].includes(this.options.mode)&&Array.isArray(s.contestants))for(const member of this.members.values())if(!member.admission.friendSpectator){member.admission.spectator=!s.contestants.includes(member.id);member.admission.publicSpectator=member.admission.spectator;}
+  if(['boxfight','zonewars'].includes(this.options.mode)&&this.members.has(this.host.peer)&&!this.summary().recovering)for(const party of this.relay.parties.parties.values())if(party.state==='queueing'&&party.launch?.recurring&&party.launch.code===this.code)this.relay.parties.dispatch(party);
   return true;
  }
  summary(){
-  const s=this.state,warmup=!s||['boxfight','zonewars'].includes(this.options.mode)&&s.stage==='box-waiting'||this.options.mode==='ffa'||['spawn-island','starting'].includes(s.stage),recovering=!this.host&&(!!this.members.size||!!this.pending)||!!(s&&this.host&&Date.now()-this.host.advancedAt>15000);
+  const s=this.state,roundMode=['boxfight','zonewars'].includes(this.options.mode),warmup=!s||['boxfight','zonewars'].includes(this.options.mode)&&s.stage==='box-waiting'||this.options.mode==='ffa'||['spawn-island','starting'].includes(s.stage),recovering=!this.host&&(!!this.members.size||!!this.pending)||!!(s&&this.host&&Date.now()-this.host.advancedAt>15000);
   const members=[...this.members.values()],humanPlayers=members.filter(x=>!x.admission.spectator).length,spectators=members.length-humanPlayers;
   const countdownSeconds=warmup&&s?.queueEnds?Math.max(0,Math.ceil(s.queueEnds-s.time)):0;
-  return {availability:publicWindow(Date.now()),code:this.code,mode:this.options.mode,teamSize:this.options.teamSize,version:VERSION,hosting:'player',hostReady:!!this.host&&!!s,recovering,joinSerial:this.joinSerial,lastJoin:this.lastJoin,round:s?.round||0,matchId:s?.matchId||null,stage:s?.stage||'spawn-island',phase:s?.phase||'playing',capacity:this.options.capacity,difficulty:2,humanPlayers,spectators,botPlayers:['boxfight','zonewars'].includes(this.options.mode)?0:s?.botPlayers??this.options.capacity,alive:warmup?(['boxfight','zonewars'].includes(this.options.mode)?humanPlayers:this.options.capacity):s.alive,joinable:warmup&&!recovering,countdownStarted:countdownSeconds>0,countdownSeconds,estimatedSeconds:s?.estimatedSeconds||0,restartSeconds:s?.phase==='results'?s.estimatedSeconds:0,availableSeats:Math.max(0,this.options.capacity-humanPlayers-this.pendingCount()),availableSpectators:Math.max(0,16-spectators-this.pendingCount(true))};
+  return {availability:publicWindow(Date.now()),code:this.code,mode:this.options.mode,teamSize:this.options.teamSize,version:VERSION,hosting:'player',hostReady:!!this.host&&!!s,recovering,joinSerial:this.joinSerial,lastJoin:this.lastJoin,round:s?.round||0,matchId:s?.matchId||null,stage:s?.stage||'spawn-island',phase:s?.phase||'playing',capacity:this.options.capacity,difficulty:2,humanPlayers,spectators,botPlayers:['boxfight','zonewars'].includes(this.options.mode)?0:s?.botPlayers??this.options.capacity,alive:warmup?(['boxfight','zonewars'].includes(this.options.mode)?humanPlayers:this.options.capacity):s.alive,joinable:(roundMode||warmup)&&!recovering,countdownStarted:countdownSeconds>0,countdownSeconds,estimatedSeconds:s?.estimatedSeconds||0,restartSeconds:s?.phase==='results'?s.estimatedSeconds:0,availableSeats:Math.max(0,this.options.capacity-humanPlayers-this.pendingCount()),availableSpectators:Math.max(0,16-spectators-this.pendingCount(true))};
  }
  left(peer){
   const member=this.members.get(peer.id);if(this.options.mode==='royale'&&member&&!member.admission.spectator&&peer.progressId&&this.state?.phase==='playing'&&!['spawn-island','starting'].includes(this.state?.stage)){const account=this.relay.progression.account(peer.progressId);account.crowns={...crownRecord(account.crowns),owned:false};this.relay.progression.dirty=true;void this.relay.progression.save();}
@@ -98,7 +100,8 @@ export class PublicHost {
  roomByAddress(id){return [...this.rooms.values()].find(r=>r.key===id)||null;}
  findRoom(selection,partySize){
   const options=publicMatchOptions(selection),pool=publicPoolKey(options);
-  const rooms=[...this.rooms.values()].filter(r=>publicPoolKey(r.options)===pool&&(r.host||r.pending)&&(!r.state||r.summary().joinable&&(r.options.mode==='ffa'||!r.state.queueEnds||r.state.queueEnds-r.state.time>8)||r.pending)&&r.summary().availableSeats>=partySize);
+  const roundMode=['boxfight','zonewars'].includes(options.mode);
+  const rooms=[...this.rooms.values()].filter(r=>publicPoolKey(r.options)===pool&&(r.host||r.pending||roundMode&&r.members.size)&&(roundMode||!r.state||r.summary().joinable&&(r.options.mode==='ffa'||!r.state.queueEnds||r.state.queueEnds-r.state.time>8)||r.pending)&&r.summary().availableSeats>=partySize);
   // Fill the busiest compatible room; pending hosts retain their reserved seats.
   rooms.sort((a,b)=>(b.members.size+b.pendingCount())-(a.members.size+a.pendingCount()));
   if(rooms.length)return rooms[0];

@@ -57,12 +57,12 @@ function queuePublicMatch(service,u,m={}){
  const room=target||pool.findRoom(options,p.members.length),summary=room.summary();
  if(target&&(!summary.hostReady||!summary.joinable||summary.recovering))throw Error('This match has started or is transferring hosts.');
  if(target&&summary.availableSeats<p.members.length)throw Error('This match is full or cannot fit your entire party.');
- const creating=target?false:room.reserve(p,u);
+ const creating=target||room.members.size&&!room.host?false:room.reserve(p,u);
  const launch={id:randomUUID(),code:room.code,options,creating,hostRun:true,recurring:true,rewardPublic:false,spectator:false,visibility:'public',created:Date.now()};
  p.selection={...options,access:'public'};p.launch=launch;p.state='queueing';u.ready=true;
  for(const id of p.members){const token=randomUUID(),t={...(target?{exactMatch:m.targetMatch}:{}),party:p.id,member:id,code:launch.code,teamSize:options.teamSize,teamFill:true,partySize:p.members.length,hostRun:true,recurring:true,spectator:false,expires:Date.now()+90000,token};service.tickets.set(token,t);service.users.get(id).ticket=token;}
  service.sync(p);
- if(creating)service.send(u,{type:'launch',launch:{...launch,host:true,ticket:u.ticket,admission:service.publicAdmission(service.tickets.get(u.ticket))}});else if(summary.hostReady)service.dispatch(p);
+ if(creating)service.send(u,{type:'launch',launch:{...launch,host:true,ticket:u.ticket,admission:service.publicAdmission(service.tickets.get(u.ticket))}});else if(summary.hostReady&&!summary.recovering)service.dispatch(p);
  return launch.id;
 }
 

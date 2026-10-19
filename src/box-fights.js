@@ -33,8 +33,8 @@ export class BoxFightSimulation extends RoyaleSimulation {
  addPlayer(id,profile,bot=false,spectator=false){
   if(bot)return null;
   const p=Simulation.prototype.addPlayer.call(this,id,profile,false,spectator);if(!p)return null;
-  Object.assign(p,{inventory:inventory(),materials:{wood:0,brick:0,metal:0},bank:{light:0,medium:0,shells:0,heavy:0,rockets:0},ammo:Array(6).fill(0),reserve:Array(6).fill(0),accuracyState:Array.from({length:6},()=>({})),shield:100,stamina:100,flight:'ground',contestant:!spectator,spectating:spectator,lateSpectator:spectator,friendSpectator:spectator,awaitingEntry:false,connected:true,waitingRound:this.phase==='playing'&&this.boxStage!=='waiting',boxWins:0,boxRoundKills:0,boxDamage:0});
-  this.assignTeam(p);if(p.waitingRound||spectator){p.health=0;p.spectating=true;}else this.equip(p);
+  Object.assign(p,{inventory:inventory(),materials:{wood:0,brick:0,metal:0},bank:{light:0,medium:0,shells:0,heavy:0,rockets:0},ammo:Array(6).fill(0),reserve:Array(6).fill(0),accuracyState:Array.from({length:6},()=>({})),shield:100,stamina:100,flight:'ground',contestant:!spectator,spectating:spectator,lateSpectator:spectator,friendSpectator:spectator,awaitingEntry:false,connected:true,waitingRound:this.phase==='results'||this.phase==='playing'&&this.boxStage!=='waiting',boxWins:0,boxRoundKills:0,boxDamage:0});
+  this.assignTeam(p);if(p.waitingRound||spectator){p.health=0;p.spectating=true;p.lateSpectator=true;}else this.equip(p);
   return p;
  }
  assignTeam(p,admission){
@@ -50,7 +50,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
  }
  admitPlayer(id,profile,admission=null){
   if(this.players.has(id)){const p=this.players.get(id);p.connected=true;return p;}
-  if(admission?.exactMatch&&(this.matchId!==admission.exactMatch||this.phase!=='playing'||this.boxStage!=='waiting'))return null;
+  if(admission?.exactMatch&&(this.matchId!==admission.exactMatch))return null;
   if([...this.players.values()].some(p=>!p.bot&&nameKey(p.name)===nameKey(profile.name)))return null;
   if(admission?.spectator&&admission.friendSpectator!==false){const p=this.addPlayer(id,profile,false,true);if(p)p.watchId=admission.watchId;return p;}
   const seats=[...this.players.values()].filter(p=>p.contestant&&!p.bot);
