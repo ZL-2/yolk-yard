@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      comms_preferences_update: ${{ steps.scope.outputs.comms_preferences_update }}
       crew_field_update: ${{ steps.scope.outputs.crew_field_update }}
       voice_celebration_update: ${{ steps.scope.outputs.voice_celebration_update }}
       scope_reticle_update: ${{ steps.scope.outputs.scope_reticle_update }}
@@ -243,6 +244,13 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('crew_field_update='+str(crew_field_update).lower()+'\n')
             if crew_field_update: out.write('focused=true\n')
+          comms_files=set(subprocess.check_output(['git','diff','--name-only','8ac717dabd537615228fe138ce0c1210ad4027a7','HEAD'],text=True).splitlines())
+          comms_allowed={'scripts/loading-recovery-browser.mjs', 'scripts/options-browser-check.mjs', 'package-lock.json', 'src/lobby-options.js', 'src/zone-wars-ui.js', 'scripts/zombies-browser.mjs', 'src/lobby-ui.js', 'tests/options-autosave.test.js', 'src/voice-chat.js', 'scripts/box-fights-browser.mjs', 'src/voice-ui.js', '.github/workflows/pages.yml', 'scripts/public-match-browser-check.mjs', 'src/box-fight-ui.js', 'src/releases.js', 'scripts/zone-wars-browser.mjs', 'docs/UPDATE_193.md', 'src/main.js', 'scripts/voice-browser-check.mjs', 'package.json'}
+          comms_preferences_update=comms_files<=comms_allowed and {'src/lobby-options.js','src/voice-chat.js','tests/options-autosave.test.js','scripts/options-browser-check.mjs','scripts/voice-browser-check.mjs'}<=comms_files and json.loads(Path('package.json').read_text()).get('version')=='6.9.1'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('comms_preferences_update='+str(comms_preferences_update).lower()+'\n')
+            if comms_preferences_update: out.write('focused=true\n')
+          print('Comms preferences update:',comms_preferences_update)
           print('Crew and field update:',crew_field_update)
           print('Focused release:',{'Voice and celebrations':voice_celebration_update,'Scope reticles':scope_reticle_update,'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
@@ -409,6 +417,9 @@ jobs:
         run: |
           node --test --test-concurrency=2 tests/crew-field.test.js tests/bot-tactics.test.js tests/release-history.test.js
           node --test --test-name-pattern='healing and shield|trauma kit|shield flask|item cancellation|finishing a consumable|bots cannot see through cover' tests/royale.test.js tests/frontline-operations.test.js tests/expansion-foundation.test.js tests/field-polish.test.js tests/gameplay-overhaul.test.js
+      - name: Automatic option saves, voice rules and release numbering
+        if: needs.scope.outputs.comms_preferences_update == 'true'
+        run: node --test tests/options-autosave.test.js tests/voice-celebration.test.js tests/release-history.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -455,6 +466,19 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true'
+      - name: Desktop automatic options and remembered voice/microphone preferences
+        if: needs.scope.outputs.comms_preferences_update == 'true'
+        run: |
+          node scripts/options-browser-check.mjs
+          node scripts/voice-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.comms_preferences_update == 'true'
+        with:
+          name: comms-preferences-desktop
+          path: |
+            test-results/options
+            test-results/voice
+          retention-days: 14
       - name: Desktop lobby, announcement preferences, Spawn Island and batched rarity auras
         if: needs.scope.outputs.crew_field_update == 'true'
         run: node scripts/crew-field-browser-check.mjs

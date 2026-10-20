@@ -1,5 +1,6 @@
 import {problemText,captureDialogPosition,restoreDialogPosition} from './problem-reports.js';
 import {VoiceChat} from './voice-chat.js';
+import {bindLobbyOptions} from './lobby-options.js';
 import {VoiceUI} from './voice-ui.js';
 import {canCelebrate,celebrationTarget} from './celebration-state.js';
 import {PublicJoinNotice} from './public-join-notice.js';
@@ -390,7 +391,8 @@ function modal(title, body, type = "generic") {
   dialog.innerHTML = type==='connecting'?loadingMarkup('ESTABLISHING MATCH UPLINK','Connecting to the room service. You can cancel at any time.',true,{kind:'connect',art:connectingArt}):`<div class="dialog-head"><h2>${title}</h2><button class="close-btn" data-action="close" aria-label="Close dialog">×</button></div><div class="dialog-body">${body}</div>`;
   if (!dialog.open) dialog.showModal();
 }
-function closeDialog() {
+function closeDialog(optionsSaved=false) {
+  if(dialogType==='lobby-options'&&!optionsSaved){const editor=lobbyOptionsEditor;void editor?.flush().then(()=>{if(dialogType==='lobby-options'&&lobbyOptionsEditor===editor)closeDialog(true);});return;}
   if(dialogType==='name-required'){document.querySelector('#required-name')?.focus();return;}
   if(dialogType==='egg-shop'&&screen==='menu')renderMenu();
   if(dialogType==='settings'&&bindingEditor?.dirty){bindingEditor.message='Apply or Discard your keybind changes before closing.';bindingEditor.render();dialog.querySelector('.dialog-body').dispatchEvent(new Event('settings-show-bindings'));dialog.querySelector('.binding-footer')?.scrollIntoView({block:'nearest'});return;}
@@ -1295,13 +1297,17 @@ async function selectExperience(id){
  const previous=party.party.selection,teamSize=e.mode==='boxfight'?Math.max(1,party.party.members.length):e.mode==='zombies'?4:e.mode==='royale'?Math.max(previous.teamSize||1,party.party.members.length>2?4:party.party.members.length):1;
  if(await partyRequest('select',{mode:e.mode,teamSize,access:previous.access,teamFill:previous.teamFill,options:matchOptions({...previous,...(e.mode==='zonewars'?{scoreLimit:5,fill:false}:{}),...(e.mode==='boxfight'&&previous.mode!=='boxfight'?{scoreLimit:5,boxArena:'rotate',boxFormat:'teams',boxLoadout:'classic',fill:false}:{}),mode:e.mode,map:e.mode==='royale'?'sunnybreak':e.mode==='boxfight'?'box-foundry':'yard',teamSize,bots:['zonewars','boxfight'].includes(e.mode)?0:e.mode==='royale'?47:7,capacity:e.mode==='zonewars'?16:e.mode==='royale'?48:8})})){leaderboardSelection={playMode:e.mode,mode:e.mode};closeDialog();renderMenu();}
 }
+let lobbyOptionsEditor=null;
 function lobbyOptionsMenu(draft=party?.party?.selection){
  if(!draft||!party?.ready)return toast('Matchmaking is connecting.');
  const locked=party.party.leader!==party.id||party.party.state!=='idle';
- modal('MATCH OPTIONS',lobbyOptionsMarkup(draft,{locked,partySize:party.party.members.length,maps:MAPS.filter(m=>m.id!=='sunnybreak'&&m.id!=='hatchery-atoll'),difficulties:BOT_DIFFICULTIES}),'lobby-options');
- const form=$('#lobby-options-form'),read=()=>{const next={...draft};for(const key of ['access','teamSize','boxFormat','boxArena','boxLoadout','building','teamFill','capacity','storm','map','weaponPool','minutes','scoreLimit','fill','bots','difficulty']){const field=$('#lobby-'+key);if(!field)continue;next[key]=['building','teamFill','fill'].includes(key)?field.value==='true':['teamSize','capacity','minutes','scoreLimit','bots','difficulty'].includes(key)?Number(field.value):field.value;}return next;};
- for(const key of ['access','teamSize']){const field=$('#lobby-'+key);if(field)field.onchange=()=>{let next=read();if(next.access==='public')next={...publicMatchOptions(next),access:'public'};else if(next.mode==='zombies')next.capacity=next.teamSize;else next.capacity=Math.max(next.capacity||8,(next.teamSize||1)*2);lobbyOptionsMenu(next);};}
- form.onsubmit=async event=>{event.preventDefault();if(locked||!form.reportValidity())return;const next=read(),button=form.querySelector('[type=submit]');button.disabled=true;if(await partyRequest('select',{...next,options:next})){closeDialog();renderMenu();}else button.disabled=false;};
+ const markup=next=>lobbyOptionsMarkup(next,{locked,partySize:party.party.members.length,maps:MAPS.filter(m=>m.id!=='sunnybreak'&&m.id!=='hatchery-atoll'),difficulties:BOT_DIFFICULTIES});
+ modal('MATCH OPTIONS',markup(draft),'lobby-options');
+ const partyId=party.party.id;
+ lobbyOptionsEditor=bindLobbyOptions(dialog.querySelector('.dialog-body'),{selection:draft,markup,
+  canEdit:()=>party?.ready&&party.party.id===partyId&&party.party.leader===party.id&&party.party.state==='idle',
+  normalize:next=>next.access==='public'?{...publicMatchOptions(next),access:'public'}:{...matchOptions({...next,capacity:next.mode==='zombies'?next.teamSize:Math.max(next.capacity||8,(next.teamSize||1)*2),session:'online',recurring:false}),access:'private'},
+  send:next=>party.request('select',{...next,access:next.access||'private',options:next}),onError:errorToast});
 }
 let socialTab='friends',socialModel=null,socialOffset=0,socialRefreshTimer=null,socialFetching=false;
 async function socialMenu(){

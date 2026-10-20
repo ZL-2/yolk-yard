@@ -5,7 +5,7 @@ import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
 import {startRealtimeServer} from '../server/realtime/index.js';
 const temp=await mkdtemp('/tmp/ravel-voice-'),origin='http://127.0.0.1:5318',out='test-results/voice';
 process.env.RAVEL_SOCIAL_DATA_PATH=temp+'/social.json';process.env.RAVEL_REWARD_DATA_PATH=temp+'/rewards.json';
-let app,vite,browser;const errors=[],checks=[];checks.push=(label)=>{console.log('PASS',label);return Array.prototype.push.call(checks,label);};
+let app,vite,browser,strictBrowser;const errors=[],checks=[];checks.push=(label)=>{console.log('PASS',label);return Array.prototype.push.call(checks,label);};
 try{
  await mkdir(out,{recursive:true});
  const rate=48000,samples=rate*8,wav=Buffer.alloc(44+samples*2);wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(rate,24);wav.writeUInt32LE(rate*2,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(samples*2,40);for(let i=0;i<samples;i++)wav.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*440/rate)*7000),44+i*2);await writeFile(temp+'/tone.wav',wav);
@@ -30,6 +30,22 @@ try{
  for(const p of pages)await p.locator('[data-channel=game]').click();await b.waitForFunction(()=>voiceTest.voice.members().length===2);checks.push('private code join enables the exact game channel');
  await a.evaluate(()=>{voiceTest.voice.opus=false;voiceTest.voice.sendSettings();});await b.waitForTimeout(300);const fallback=await b.evaluate(()=>voiceTest.played);await b.waitForFunction(n=>voiceTest.played>n+4,fallback);checks.push('PCM compatibility fallback remains audible');
  const session=app.relay.voice.sessions.get(await b.evaluate(()=>voiceTest.party.id));session.ws.terminate();await b.waitForFunction(()=>voiceTest.voice.status==='Connected'&&voiceTest.voice.ws?.readyState===1);await b.waitForTimeout(1200);const reconnected=await b.evaluate(()=>voiceTest.played);await b.waitForFunction(n=>voiceTest.played>n,reconnected);checks.push('voice reconnect restores channel without replaying old audio');
- await b.screenshot({path:out+'/voice-panel.png'});assert.deepEqual(errors,[]);await writeFile(out+'/result.json',JSON.stringify({checks,errors},null,2));console.log('PASS',JSON.stringify(checks));
+ await a.reload();await a.waitForFunction(()=>voiceTest.voice.status==='Connected'&&!!voiceTest.voice.stream&&!voiceTest.voice.micMuted);
+ assert.equal(await a.evaluate(()=>voiceTest.voice.settings.method),'open');checks.push('reload restores voice, enabled microphone and chosen voice method without enable clicks');
+ await a.locator('#voice-open').click();await a.locator('[data-voice=mic]').click();await a.reload();await a.waitForFunction(()=>voiceTest.voice.status==='Connected');
+ assert.equal(await a.evaluate(()=>!!voiceTest.voice.stream),false);assert.equal(await a.evaluate(()=>voiceTest.voice.settings.microphone),false);checks.push('an intentional microphone mute remains off after reload');
+ await a.locator('#voice-open').click();await a.locator('[data-voice=leave]').click();await a.reload();await a.waitForFunction(()=>voiceTest.party.ready);
+ assert.equal(await a.evaluate(()=>voiceTest.voice.enabled),false);assert.equal(await a.evaluate(()=>!!voiceTest.voice.context||!!voiceTest.voice.ws),false);checks.push('Leave Voice is remembered and leaves no audio session on reload');
+ await b.reload();await b.waitForFunction(()=>voiceTest.voice.status==='Connected');assert.equal(await b.evaluate(()=>!!voiceTest.voice.stream),false);checks.push('listen-only users reconnect without acquiring a microphone');
+ await b.locator('#voice-open').click();await b.screenshot({path:out+'/voice-panel.png'});
+ strictBrowser=await chromium.launch({headless:true,...(process.env.YOLK_TEST_CHROME?{executablePath:process.env.YOLK_TEST_CHROME}:{}),args:['--no-sandbox','--autoplay-policy=document-user-activation-required','--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']});
+ const strictContext=await strictBrowser.newContext({permissions:['microphone']});const strict=await strictContext.newPage();strict.on('pageerror',e=>errors.push(e.message));
+ await strict.addInitScript(()=>localStorage.setItem('ravel-voice-settings',JSON.stringify({enabled:true,microphone:true,method:'ptt'})));
+ await strict.goto(origin+'/tests/voice-preview.html?name=Remembered%20Voice&relay='+encodeURIComponent(relay));
+ await strict.waitForFunction(()=>voiceTest.voice.node&&voiceTest.voice.context.state==='suspended');assert.equal(await strict.evaluate(()=>!!voiceTest.voice.stream),false);
+ await strict.locator('h1').click();await strict.waitForFunction(()=>voiceTest.voice.status==='Connected'&&!!voiceTest.voice.stream);assert.equal(await strict.evaluate(()=>voiceTest.voice.canTransmit()),false);checks.push('normal interaction unlocks restored voice under strict autoplay without turning push-to-talk on');
+ await strict.evaluate(()=>{voiceTest.voice.close();window.savedAfterClose=JSON.parse(localStorage.getItem('ravel-voice-settings'));});
+ assert.equal(await strict.evaluate(()=>savedAfterClose.enabled&&savedAfterClose.microphone),true);checks.push('session cleanup does not erase voice or microphone preferences');
+ assert.deepEqual(errors,[]);await writeFile(out+'/result.json',JSON.stringify({checks,errors},null,2));console.log('PASS',JSON.stringify(checks));
 }catch(error){console.error(error);if(browser)for(const [i,context]of browser.contexts().entries()){const p=context.pages()[0];if(p){console.error(await p.evaluate(()=>({status:window.voiceTest?.voice.status,error:window.voiceTest?.voice.error,channels:window.voiceTest?.voice.channels,played:window.voiceTest?.played,hidden:document.hidden})).catch(()=>null));await p.screenshot({path:out+'/failure-'+i+'.png'}).catch(()=>{});}}throw error;}
-finally{await browser?.close();await vite?.close();await app?.close();await rm(temp,{recursive:true,force:true});}
+finally{await strictBrowser?.close();await browser?.close();await vite?.close();await app?.close();await rm(temp,{recursive:true,force:true});}
