@@ -1049,6 +1049,8 @@ function handleState() {
   if (!state) return;
   if(state.zombies){applyZombiesState(state.zombies);if(dialog.open&&dialogType==='z-station'){const p=state.players.find(p=>p.id===localId),station=nearbyZombieStation(state,p);if(station?.id===dialog.dataset.zStation){const body=zombiesStationMenu(station,state,p),panel=dialog.querySelector('.dialog-body');if(panel&&dialog.zStationBody!==body){const scroll=panel.scrollTop;panel.innerHTML=body;dialog.zStationBody=body;panel.scrollTop=scroll;}}}}
   syncInventoryPreferences();
+  const local=state.players.find(p=>p.id===localId);
+  if(dialogType==='ready'&&(state.phase!=='playing'||!local||local.health<=0||local.spectating)){dialog.close();dialogType='';paused=false;}
   try{useMatchLayouts(state.mapLayouts||{},state.mapLayoutKey);}catch(error){errorToast('Invalid map layout: '+error.message);return;}
   const worldKey=(state.royale?.matchId||'')+':'+state.round+':'+state.options.map;
   if(state.royale&&lastWorldKey!==worldKey){lastWorldKey=worldKey;pendingInputs=[];predicted=null;keys.clear();queuedActions.clear();guestFire.reset();const me=state.players.find(p=>p.id===localId);if(me){input.slot=me.slot;input.yaw=me.yaw;input.pitch=me.pitch;}buildControls.buildMode=false;buildUI.cancel();}

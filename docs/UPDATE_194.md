@@ -17,11 +17,11 @@ Identical workloads compared with the published Update 193 checkout (71cac23). E
 
 | Workload | Previous ms/snapshot | Updated ms/snapshot | Reduction |
 |---|---:|---:|---:|
-| Zone Wars, 16 players / 500 builds | 0.290 | 0.180 | 38% |
-| Box Fights, 8 players / 220 builds | 0.138 | 0.088 | 36% |
-| Royale Duos, 48 contestants / 500 builds | 1.135 | 0.760 | 33% |
+| Zone Wars, 16 players / 500 builds | 0.220 | 0.078 | 65% |
+| Box Fights, 8 players / 220 builds | 0.110 | 0.047 | 57% |
+| Royale Duos, 48 contestants / 500 builds | 1.138 | 0.358 | 69% |
 
-Box Fights movement plus sight queries fell from 0.911 ms to 0.084 ms (91%) after routing that arena through the existing spatial collision index. Snapshot construction uses a stable field layout instead of repeated computed-key dictionary allocations. These measure CPU work, not device FPS or network ping.
+Box Fights movement plus sight queries fell from 0.941 ms to 0.090 ms (90%) after routing that arena through the existing spatial collision index. Snapshot construction reserves its complete field layout at creation and writes known fields directly; adding subclass fields no longer forces fast player objects into dictionary storage. These measure CPU work, not device FPS or network ping.
 
 ## Targeted verification
 

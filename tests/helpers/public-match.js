@@ -18,11 +18,11 @@ export async function until(check,label,timeout=8000){
  while(!check()){assert.ok(Date.now()<deadline,label);await pause(15);}
 }
 
-export async function fixture({recovery=false}={}){
+export async function fixture({recovery=false,serverOptions={}}={}){
  const directory=await mkdtemp(tmpdir()+'/ravel-singleton-');
  const previous={window:globalThis.window,WebSocket:globalThis.WebSocket,social:process.env.RAVEL_SOCIAL_DATA_PATH,reward:process.env.RAVEL_REWARD_DATA_PATH};
  process.env.RAVEL_SOCIAL_DATA_PATH=directory+'/social.json';process.env.RAVEL_REWARD_DATA_PATH=directory+'/rewards.json';
- const config={host:'127.0.0.1',mapPath:directory+'/maps.json',recoveryPath:recovery?directory+'/relay.bin':null};
+ const config={...serverOptions,host:'127.0.0.1',mapPath:directory+'/maps.json',recoveryPath:recovery?directory+'/relay.bin':null};
  let app=await startRealtimeServer({...config,port:0});
  const base=`ws://127.0.0.1:${app.server.address().port}`,users=[],games=[];
  globalThis.window={YOLK_NETWORK:{relay:base+'/game'}};
