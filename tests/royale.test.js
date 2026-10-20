@@ -42,10 +42,10 @@ test('five slots swap and drop without duplicating magazines or reserve ammo',()
  s.dropSlot(p,3);assert.equal(s.loot.find(i=>i.id==='peeper').ammo,gun({slot:0,inventory:[{id:'peeper',weapon:true,rarity:4}]}).magazine);assert.equal(p.bank.medium,12-gun({slot:0,inventory:[{id:'peeper',weapon:true,rarity:4}]}).magazine);
  p.bank.light=AMMO_CAPS.light;const ammo=s.dropAmmo(p,'light',50);assert.equal(s.takeLoot(p,ammo),false);assert.equal(ammo.count,50);
 });
-test('healing and shield use complete once, cancel on damage, and refuse full or capped stats',()=>{
+test('healing and shield use complete once, survive damage, and refuse full or capped stats',()=>{
  const s=make(),p=ground(s.players.get('host'));p.inventory[1]={id:'mini',count:3,rarity:1};p.slot=1;
  s.beginUse(p);advance(s,2.1);assert.equal(p.shield,25);assert.equal(p.inventory[1].count,2);
- s.beginUse(p);s.damage(p,null,1,'Hit');assert.equal(p.use,null);assert.equal(p.inventory[1].count,2);
+ s.beginUse(p);s.damage(p,null,1,'Hit');assert.ok(p.use);assert.equal(p.inventory[1].count,2);advance(s,2.1);assert.equal(p.shield,49);assert.equal(p.inventory[1].count,1);
  p.shield=50;s.beginUse(p);assert.equal(p.use,null);
  p.inventory[1]={id:'medkit',count:1};p.health=30;s.beginUse(p);advance(s,6.1);assert.equal(p.health,100);assert.equal(p.inventory[1],null);
 });

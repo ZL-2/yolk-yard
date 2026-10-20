@@ -91,8 +91,8 @@ test('splash healing advice describes the missing vital and pickaxe selection ex
  const{s,p}=room();p.inventory[1]=null;p.inventory[2]={id:'splash',count:2};p.health=60;p.shield=100;p.lastDamage=-100;assert.deepEqual(healingSuggestion(p,s.time),{slot:2,label:'Health available'});p.health=100;p.shield=60;assert.deepEqual(healingSuggestion(p,s.time),{slot:2,label:'Shield available'});
  p.use={id:'medkit'};s.playerAction(p.id,'inventory-select-0');assert.equal(p.use,null);assert.equal(p.slot,0);assert.equal(s.events.at(-1).cue,'use-cancel');assert.equal(s.events.at(-1).reason,'swap');
 });
-test('item cancellation explains damage, sprint and swapping without cancelling storm use',()=>{
- const{s,p,a}=room();p.health=50;p.inventory[1]={id:'medkit',count:2};s.beginUse(p);s.damage(p,null,1,'Storm');assert.ok(p.use);s.damage(p,a,1,'Rifle');assert.equal(s.events.at(-2)?.reason||s.events.find(e=>e.cue==='use-cancel')?.reason,'damage');
+test('item cancellation explains intentional actions without cancelling damage or storm use',()=>{
+ const{s,p,a}=room();p.health=50;p.inventory[1]={id:'medkit',count:2};s.beginUse(p);s.damage(p,null,1,'Storm');assert.ok(p.use);s.damage(p,a,1,'Rifle');assert.ok(p.use);assert.equal(s.events.some(e=>e.cue==='use-cancel'),false);
  s.beginUse(p);s.cancelUse(p,'sprint');assert.equal(s.events.at(-1).reason,'sprint');s.beginUse(p);s.cancelUse(p,'arbitrary');assert.equal(s.events.at(-1).reason,'action');
 });
 test('search keeps its reachable chest while aim changes and completes once',()=>{

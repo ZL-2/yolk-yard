@@ -82,10 +82,10 @@ test('hitscan damage arriving before its shot counts once; grenades cannot infla
  s.emit('shot',{player:p.id,shotId:30});assert.equal(p.field.hits,1);assert.equal(p.field.shots,1);
  s.emit('launch',{player:p.id,shotId:31,popper:true});s.emit('hit',{player:p.id,target:enemy.id,amount:35,shotId:31});assert.equal(p.field.hits,1);assert.equal(p.field.shots,1);assert.equal(p.field.damage,55);
 });
-test('trauma kit setup can cancel freely; interrupted recovery consumes exactly one kit',()=>{
+test('trauma kit setup can cancel freely; damage preserves recovery and deliberate cancellation consumes one kit',()=>{
  const {s,p,enemy}=battle();p.slot=1;p.health=20;p.inventory[1]={id:'medkit',count:2};s.beginUse(p);s.time+=.8;tickHealing(s,p);s.cancelUse(p);assert.equal(p.health,20);assert.equal(p.inventory[1].count,2);
  s.beginUse(p);s.time+=3.5;tickHealing(s,p);assert.equal(p.health,70);assert.equal(p.inventory[1].count,1);assert.equal(p.field.healing,50);
- s.damage(p,enemy,10,'Rifle');assert.equal(p.use,null);assert.equal(p.health,60);assert.equal(p.inventory[1].count,1);
+ s.damage(p,enemy,10,'Rifle');assert.ok(p.use);assert.equal(p.health,60);assert.equal(p.inventory[1].count,1);s.cancelUse(p,'swap');assert.equal(p.use,null);assert.equal(p.inventory[1].count,1);
 });
 test('shield flask partial recovery survives cancel, full recovery cleans the slot, malformed timers cannot heal',()=>{
  const {s,p}=battle();p.slot=1;p.shield=0;p.inventory[1]={id:'flask',count:1};s.beginUse(p);s.time+=2.4;tickHealing(s,p);assert.ok(Math.abs(p.shield-25)<1e-8);s.cancelUse(p);assert.equal(p.inventory[1],null);assert.ok(Math.abs(p.shield-25)<1e-8);

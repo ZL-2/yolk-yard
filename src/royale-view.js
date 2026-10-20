@@ -10,6 +10,7 @@ import {updateFrontierView} from './frontier-world-view.js';
 import {getMap} from './maps.js';
 import {glidePose} from './glide-pose.js';
 import {lootHeight} from './loot-motion.js';
+import {LootAuras} from './loot-auras.js';
 import {nearbyItems,itemById} from './nearby-items.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {groundAt} from './terrain.js';
@@ -119,7 +120,7 @@ function* streamedIslandSteps(world,map,kit){
 }
 function canopy(kit,color=0xffcf64){const g=gliderModel(kit,color);bake(g,false,true);return g;}
 export class RoyaleView{
- constructor(view,kit){this.view=view;this.kit=kit;this.root=new THREE.Group();view.scene.add(this.root);this.chests=new Map();this.loot=new Map();this.gliders=new Map();this.pads=new Map();this.createTransport();this.createStorm();this.marker=null;this.fx=[];this.flightPoses=new Map();}
+ constructor(view,kit){this.view=view;this.kit=kit;this.root=new THREE.Group();view.scene.add(this.root);this.chests=new Map();this.loot=new Map();this.lootAuras=new LootAuras(this.root);this.gliders=new Map();this.pads=new Map();this.createTransport();this.createStorm();this.marker=null;this.fx=[];this.flightPoses=new Map();}
  createTransport(){
   const detail=this.view.settings.quality==='low'?1:2;if(this.transport?.userData.detail===detail)return;
   if(this.transport){this.transport.removeFromParent();this.view.disposeGroup(this.transport);}
@@ -154,14 +155,17 @@ export class RoyaleView{
   // Close objects arrive first, with bounded geometry work each frame.
   let created=0;const deadline=performance.now()+3;
   for(const id of this.itemQuery.loot){if(this.loot.has(id))continue;const item=itemById(r,'loot',id);if(!item)continue;if(created>=3||performance.now()>deadline)break;const mesh=this.itemModel(item);this.loot.set(id,mesh);this.root.add(mesh);created++;}
+  this.lootAuras.begin(t);
   for(const [id,mesh]of this.loot){
-   const item=itemById(r,'loot',id),distance=item?Math.hypot(item.x-observer.x,item.z-observer.z):Infinity;
-   if(distance>150){mesh.removeFromParent();this.view.disposeGroup(mesh);this.loot.delete(id);continue;}
-   mesh.visible=distance<lootRadius;if(!mesh.visible)continue;
+   const item=itemById(r,'loot',id),distanceSq=item?(item.x-observer.x)**2+(item.z-observer.z)**2:Infinity;
+   if(distanceSq>150*150){mesh.removeFromParent();this.view.disposeGroup(mesh);this.loot.delete(id);continue;}
+   mesh.visible=distanceSq<lootRadius*lootRadius;if(!mesh.visible)continue;
    mesh.scale.setScalar(item.zoneSlot ? (item.weapon ? .42 : .72) : 1);
    mesh.position.set(item.x,lootHeight(item,time)+(item.zoneSlot ? .1 : .24)+Math.sin(t*1.65+item.uid)*.055,item.z);mesh.rotation.y=Math.sin(t*.55+item.uid)*.16;
    if(!item.motion&&item.spawnFrom&&time-item.spawnAt<.6){const age=Math.max(0,(time-item.spawnAt)/.6),ease=1-(1-age)**3;mesh.position.x=THREE.MathUtils.lerp(item.spawnFrom.x,item.x,ease);mesh.position.z=THREE.MathUtils.lerp(item.spawnFrom.z,item.z,ease);mesh.position.y=THREE.MathUtils.lerp(item.spawnFrom.y,item.y+.24,ease)+Math.sin(age*Math.PI)*.6;}
+   this.lootAuras.add(item,mesh.position);
   }
+  this.lootAuras.end();
   for(const id of this.itemQuery.chests){if(this.chests.has(id))continue;const chest=itemById(r,'chests',id);if(!chest)continue;if(created>=3||performance.now()>deadline)break;const mesh=this.chestModel(chest.supply,chest.epic);this.chests.set(id,mesh);this.root.add(mesh);created++;
    if(chest.supply){const rig=new THREE.Group(),c=canopy(this.kit,0x99dad9);c.position.y=1.5;rig.add(c);for(const x of [-.6,.6])for(const z of [-.4,.4])artKit(this.kit).beam(rig,[x,1.2,z],[Math.sign(x)*.72,3.7,.1],.018,0xf5ead2);bake(rig,false,true);mesh.add(rig);mesh.userData.canopy=rig;}
   }

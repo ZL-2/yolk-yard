@@ -7,7 +7,7 @@ import {falloffAt,rarityVariant} from './combat.js';
 import {ITEMS,ammoType,AMMO_CAPS} from './royale-data.js';
 import {dist,candidates,canStand,wallDistance} from './physics.js';
 import {groundAt} from './terrain.js';
-import {seesPoint} from './bot-perception.js';
+import {seesPoint,hostile} from './bot-perception.js';
 import {isWarmup} from './royale-phases.js';
 import {BOT_WORLD_SENSES,ROYALE_TEAM_BOT as teamPolicy} from './bot-config.js';
 import {squadAnchor,followGoal} from './bot-team.js';
@@ -18,6 +18,18 @@ import {searchObjective} from './bot-tactics.js';
 import {takeBotWork} from './bot-work.js';
 import {operationObjective} from './field-operations.js';
 export {coverPoint};
+// Idle pursuit only supplies a navigation goal. Perception must still confirm
+// visibility before aim/fire. Cache the nearest search between decisions.
+export function idleOpponent(sim,p,brain,anchor=null){
+ const allowed=q=>q&&!q.boss&&!q.henchman&&!q.downed&&hostile(sim,p,q)&&!(brain.unreachable?.[q.id]>sim.time)&&(!anchor||(q.x-anchor.x)**2+(q.z-anchor.z)**2<=teamPolicy.combatLeash**2);
+ let cached=brain.idleOpponent,target=cached&&sim.players.get(cached.id);
+ if(!cached||cached.round!==sim.round||cached.size!==sim.players.size||cached.anchor!==anchor?.id||sim.time>=cached.at||cached.id&&!allowed(target)){
+  let best=Infinity;target=null;
+  for(const other of sim.players.values())if(allowed(other)){const d=(p.x-other.x)**2+(p.y-other.y)**2+(p.z-other.z)**2;if(d<best){best=d;target=other;}}
+  cached=brain.idleOpponent={id:target?.id,at:sim.time+.75,round:sim.round,size:sim.players.size,anchor:anchor?.id};
+ }
+ return target?{kind:'seek-player',id:target.id,goal:{x:target.x,y:target.y,z:target.z}}:null;
+}
 export function selectWeapon(p,target){
  const distance=target?dist(p,target):22;
  const options=p.inventory?p.inventory.map((item,slot)=>({item,slot})).filter(({item})=>item?.weapon&&(item.ammo>0||p.bank[ammoType(item.id)]>0)):[p.weapon,'pip'].map((id,slot)=>({item:{id,ammo:p.ammo[slot],rarity:0},slot})).filter(({slot})=>p.ammo[slot]>0||p.reserve[slot]>0);
@@ -110,10 +122,11 @@ export function chooseObjective(sim,p,brain,skill,target){
   }
   if(needs){let anchor=null,nearest=Infinity;for(const q of sim.map.floorLoot||[])if(nearSquad(q)&&q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35){const d=dist(p,q);if(d<nearest){nearest=d;anchor=q;}}if(anchor)return {kind:'search-room',goal:anchor,id:anchor.id};}
  }
- if(anchor)return {kind:'follow',goal:followGoal(sim,p,anchor),id:anchor.id};
  if(target){const search=searchObjective(sim,p,brain,target);if(search)return search;}
  if(teamMode(sim.options)){const mates=[...sim.players.values()].filter(t=>teammates(sim.options,p,t)&&t.health>0&&dist(p,t)<70);const mate=mates.find(t=>t.brain?.target)||mates.find(t=>dist(p,t)>22);if(mate)return {kind:'support',goal:{x:mate.x+brain.side*5,y:mate.y,z:mate.z}};}
  if(!p.inventory){const pickup=sim.pickups?.filter(i=>sim.time>=i.availableAt&&(i.type==='health'&&p.health<70||i.type==='ammo'&&p.reserve[p.slot]<10)).sort((a,b)=>dist(p,a)-dist(p,b))[0];if(pickup)return {kind:'resupply',goal:pickup};}
+ const pursuit=idleOpponent(sim,p,brain,anchor);if(pursuit)return pursuit;
+ if(anchor)return {kind:'follow',goal:followGoal(sim,p,anchor),id:anchor.id};
  const landmarks=royale?[...(sim.map.districts||[]),...(sim.map.landmarks||[])]:(sim.map.spawns||[[0,0]]).map(([x,z],i)=>({x,z,id:'patrol-'+i}));
  const safeLandmarks=landmarks.filter(q=>!sim.storm?.active||!royale||Math.hypot(q.x-sim.storm.nextX,q.z-sim.storm.nextZ)<sim.storm.nextRadius*.9);
  const choices=safeLandmarks.length?safeLandmarks:landmarks;

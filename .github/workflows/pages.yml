@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      crew_field_update: ${{ steps.scope.outputs.crew_field_update }}
       voice_celebration_update: ${{ steps.scope.outputs.voice_celebration_update }}
       scope_reticle_update: ${{ steps.scope.outputs.scope_reticle_update }}
       atv_only: ${{ steps.scope.outputs.atv_only }}
@@ -236,6 +237,13 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('voice_celebration_update='+str(voice_celebration_update).lower()+'\n')
             if voice_celebration_update: out.write('focused=true\n')
+          crew_field_files=set(subprocess.check_output(['git','diff','--name-only','5494987302c0fea064274d63612c4ee60a313036','HEAD'],text=True).splitlines())
+          crew_field_allowed=set([".github/workflows/pages.yml","docs/UPDATE_192.md","package.json","package-lock.json","scripts/release-live-check.mjs","server/realtime/index.js","src/bot-objectives.js","src/bots.js","src/lobby-comms.js","src/lobby-deploy.css","src/lobby-news.js","src/lobby-ui.js","src/main.js","src/referrals.js","src/releases.js","src/royale-data.js","src/royale-loot.js","src/royale-ui.js","src/royale-view.js","src/royale.js","src/voice.css","src/zone-wars-rules.js","tests/expansion-foundation.test.js","tests/frontline-operations.test.js","tests/royale.test.js","public/season/voice-192.webp","scripts/crew-field-browser-check.mjs","src/loot-auras.js","src/voice-briefing.css","src/voice-briefing.js","tests/crew-field.test.js","tests/loot-auras-preview.html"])
+          crew_field_update=crew_field_files<=crew_field_allowed and {'src/voice-briefing.js','src/loot-auras.js','src/royale.js','tests/crew-field.test.js','scripts/crew-field-browser-check.mjs'}<=crew_field_files and json.loads(Path('package.json').read_text()).get('version')=='6.9.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('crew_field_update='+str(crew_field_update).lower()+'\n')
+            if crew_field_update: out.write('focused=true\n')
+          print('Crew and field update:',crew_field_update)
           print('Focused release:',{'Voice and celebrations':voice_celebration_update,'Scope reticles':scope_reticle_update,'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
   build:
@@ -396,6 +404,11 @@ jobs:
           name: voice-performance
           path: test-results/voice/performance.json
           retention-days: 14
+      - name: Crew announcements, healing, natural loot, idle bot priorities and release numbering
+        if: needs.scope.outputs.crew_field_update == 'true'
+        run: |
+          node --test --test-concurrency=2 tests/crew-field.test.js tests/bot-tactics.test.js tests/release-history.test.js
+          node --test --test-name-pattern='healing and shield|trauma kit|shield flask|item cancellation|finishing a consumable|bots cannot see through cover' tests/royale.test.js tests/frontline-operations.test.js tests/expansion-foundation.test.js tests/field-polish.test.js tests/gameplay-overhaul.test.js
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -442,6 +455,15 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true'
+      - name: Desktop lobby, announcement preferences, Spawn Island and batched rarity auras
+        if: needs.scope.outputs.crew_field_update == 'true'
+        run: node scripts/crew-field-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.crew_field_update == 'true'
+        with:
+          name: crew-field-desktop
+          path: test-results/crew-field
+          retention-days: 14
       - name: Desktop sniper and burst scope alignment
         if: needs.scope.outputs.scope_reticle_update == 'true'
         run: node scripts/scope-alignment-check.mjs

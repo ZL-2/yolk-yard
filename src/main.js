@@ -53,6 +53,7 @@ import {crosshairRadius} from './combat.js';
 import './referrals.css';
 import {showReferrals,ReferralRewards} from './referrals.js';
 import {showPerspectiveBriefing} from './perspective-briefing.js';
+import {showVoiceBriefing} from './voice-briefing.js';
 import {perspectiveMode,thirdPersonActive} from './perspective.js';
 import {showWelcomeBack} from './welcome-back.js';
 import {loadingMarkup,showLoading,hideLoading,waitForLoading,waitUntilLoadingHidden} from './loading-screen.js';
@@ -1424,7 +1425,8 @@ const actions = {
  'social-new-identity':()=>modal('Create New Friend Code?',`<p>This creates a separate identity with an empty friend list. It does not restore your old friendships. Your previous browser credential will be kept for recovery.</p><div class="actions"><button class="primary" data-action="social-confirm-new-identity">CREATE NEW CODE</button><button data-action="social">GO BACK</button></div>`,'social-new-identity'),
  'social-confirm-new-identity':()=>{party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
- referrals:()=>showReferrals({party,force:true}),
+ referrals:()=>showReferrals({party}),
+ 'voice-briefing':()=>showVoiceBriefing({force:true}),
  'perspective-briefing':()=>showPerspectiveBriefing({force:true}),
  'z-journal':openZombiesJournal,
  'quick-rematch':()=>{if(net?.officialPublic)return toast('The next public round starts automatically.');if(sim&&(!sim.remote||state?.zombies)&&state?.phase==='results'&&(!net||net.isHost)){launchRound();}},
@@ -1535,7 +1537,7 @@ const actions = {
   about: () =>
     modal(
       "Welcome to the frontier",
-      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, missions, weapons and UI are original. Blacktide uses licensed creature assets and recorded vocals.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera or microphone.</p><p>Blacktide creatures and animations by <a href="https://quaternius.com/" target="_blank" rel="noopener">Quaternius</a> (CC0 / CC BY 3.0); vocal recordings by artisticdude (CC0). Models adapted with scaling, tinting and animation blending. <a href="./models/blacktide/CREDITS.txt" target="_blank" rel="noopener">Asset credits and licenses</a>.</p><p class="hint">Version 6.2.0 · All gameplay code is included in the project.</p>`,
+      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, missions, weapons and UI are original. Blacktide uses licensed creature assets and recorded vocals.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera access. Voice chat is optional; your microphone is used only after you enable it. Live voice is not recorded or saved.</p><p>Blacktide creatures and animations by <a href="https://quaternius.com/" target="_blank" rel="noopener">Quaternius</a> (CC0 / CC BY 3.0); vocal recordings by artisticdude (CC0). Models adapted with scaling, tinting and animation blending. <a href="./models/blacktide/CREDITS.txt" target="_blank" rel="noopener">Asset credits and licenses</a>.</p><p class="hint">Version 6.2.0 · All gameplay code is included in the project.</p>`,
       "about",
     ),
 };
@@ -2003,7 +2005,8 @@ function pumpNetworkInput(now=performance.now()) {
 }
 const emoteButton=document.createElement('button');emoteButton.id='emote-button';emoteButton.dataset.action='emotes';document.body.append(emoteButton);
 const voice=new VoiceChat({party:()=>party,network:()=>net,state:()=>state,bindings:()=>settings.keybinds});
-const voiceUI=new VoiceUI(voice,{open:()=>{keys.clear();input.fire=input.aim=false;paused=screen==='game';document.exitPointerLock?.();dialog.close();dialogType='';},close:()=>{if(screen==='game')void resume(false);},report:p=>{rememberProblem('Voice chat report',`Player: ${p.name} | Identity: ${p.id} | Channel: ${voice.channel}. No audio recording is attached.`);reportProblemMenu();}});
+const voiceUI=new VoiceUI(voice,{open:()=>{lobbyComms.closeChat();keys.clear();input.fire=input.aim=false;paused=screen==='game';document.exitPointerLock?.();dialog.close();dialogType='';},close:()=>{if(screen==='game')void resume(false);},report:p=>{rememberProblem('Voice chat report',`Player: ${p.name} | Identity: ${p.id} | Channel: ${voice.channel}. No audio recording is attached.`);reportProblemMenu();}});
+lobbyComms.attachVoice(voiceUI.button);
 const soundVisuals=new SoundVisuals(document.getElementById('hud'));
 const triggerGuard={};
 const performanceHUD=new PerformanceHUD(document.body);
@@ -2139,7 +2142,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>showVoiceBriefing()).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);

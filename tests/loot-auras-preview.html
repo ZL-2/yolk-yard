@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Pickup rarity preview</title><style>body{margin:0;background:#132331;color:#e5f4ff;font:16px Arial}canvas{display:block}header{position:absolute;top:20px;left:30px}h1{font-size:22px}p{color:#aec7d3}</style></head><body><header><h1>PICKUP RARITY</h1><p>Common · Uncommon · Rare · Epic · Legendary · Mythic</p></header><script type="module">
+import * as THREE from 'three';
+import {LootAuras} from '/src/loot-auras.js';
+import {lootModel} from '/src/royale-art.js';
+import {bake} from '/src/royale-view.js';
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#132331');const camera=new THREE.PerspectiveCamera(44,innerWidth/innerHeight,.1,100);camera.position.set(0,5,10);camera.lookAt(0,0,0);
+scene.add(new THREE.HemisphereLight(0xf4f9ff,0x25372d,2.4));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(0,8,5);scene.add(light);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(50,50),new THREE.MeshLambertMaterial({color:0x4b5964}));floor.rotation.x=-Math.PI/2;floor.position.y=-.01;scene.add(floor);
+const auras=new LootAuras(scene),items=[];for(let i=0;i<6;i++){const item={id:'sprinter',weapon:true,rarity:i},mesh=lootModel(item,{}, {ground:true});bake(mesh,false,true);mesh.position.set((i-2.5)*1.9,.3,0);mesh.rotation.y=.35;scene.add(mesh);items.push({item,mesh});}
+function draw(){auras.begin(performance.now()/1000);for(const {item,mesh}of items)auras.add(item,mesh.position);auras.end();renderer.render(scene,camera);}
+draw();window.auraCheck={auras,renderer,scene,camera,draw};
+</script></body></html>

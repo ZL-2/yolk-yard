@@ -24,7 +24,7 @@ export const ITEMS={
  medkit:{name:'Trauma Kit',kind:'heal',amount:100,cap:100,duration:6,progressive:true,setup:1,stack:2,color:'#8be4b7',icon:'✚'},
  mini:{name:'Mini Shield',kind:'shield',amount:25,cap:50,duration:2,stack:6,color:'#65bdfa',icon:'◈'},
  flask:{name:'Shield Flask',kind:'shield',amount:50,cap:100,duration:4,progressive:true,setup:.8,stack:3,color:'#81a5ff',icon:'◈'},
- splash:{name:'Restoration Capsule',kind:'splash',amount:30,duration:.55,stack:4,color:'#74ebd9',icon:'✦'},
+ splash:{name:'Restoration Capsule',kind:'splash',amount:20,duration:.55,stack:4,color:'#74ebd9',icon:'✦'},
  popper:{name:'Frag Grenade',kind:'popper',duration:UTILITY_WEAPONS.popper.useTime,stack:6,color:'#c091ef',icon:'●'},
  impulse:{name:'Impulse Charge',kind:'impulse',duration:.35,stack:3,color:'#ec9fff',icon:'◎'},
  launchpad:{name:'Launch Pad',kind:'launchpad',duration:.6,stack:2,color:'#f9ca65',icon:'↟'},

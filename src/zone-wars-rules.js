@@ -15,7 +15,7 @@ const pick=(r,a)=>a[Math.min(a.length-1,Math.floor(r()*a.length))];
 export function zoneLoadout(random){
  const rarity=()=>pick(random,[2,2,3,3,4]),weapon=id=>({id,weapon:true,count:1,rarity:rarity()});
  // Slot roles are guaranteed; randomizing each role cannot create an unusable kit.
- return [weapon(pick(random,['sprinter','sprinter','duet'])),weapon(pick(random,['scatter','scatter','doubleyolk'])),random()<.65?weapon(pick(random,['zipper','needle','anchor','peeper'])):{id:'impulse',count:2,rarity:3},pick(random,[{id:'mini',count:6,rarity:1},{id:'flask',count:3,rarity:2},{id:'splash',count:4,rarity:2}]),pick(random,[{id:'medkit',count:2,rarity:1},{id:'splash',count:4,rarity:2},{id:'impulse',count:2,rarity:3},{id:'launchpad',count:1,rarity:3}])].map(i=>({...i}));
+ return [weapon(pick(random,['sprinter','sprinter','duet'])),weapon(pick(random,['scatter','scatter','doubleyolk'])),random()<.65?weapon(pick(random,['zipper','needle','anchor','peeper'])):{id:'impulse',count:2,rarity:3},pick(random,[{id:'mini',count:6,rarity:1},{id:'flask',count:3,rarity:2},{id:'splash',count:2,rarity:2}]),pick(random,[{id:'medkit',count:1,rarity:1},{id:'splash',count:2,rarity:2},{id:'impulse',count:2,rarity:3},{id:'launchpad',count:1,rarity:3}])].map(i=>({...i}));
 }
 // A straight, floor-supported pickup lane in the direction the player faces.
 export function zoneSpawnLootPoints(spawn){return Array.from({length:5},(_,i)=>({x:spawn.x-Math.sin(spawn.yaw)*(1+i*.8),y:spawn.y,z:spawn.z-Math.cos(spawn.yaw)*(1+i*.8)}));}

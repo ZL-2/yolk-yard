@@ -147,7 +147,7 @@ export class RoyaleUI{
   if(warmup){
    const players=realMatchPlayers(state),countdown=r.countdownStarted===false?'WAITING FOR PLAYERS':Math.max(0,Math.ceil(r.queueEnds-state.time))+'s TO DEPARTURE';
    setText($('royale-flight-title'),'KESTREL AIRFIELD');setText($('royale-flight-help'),countdown+' · Practice equipment resets at departure');$('royale-flight-button').hidden=true;
-   const rosterKey=players.map(o=>o.id+':'+o.name).join('|');if(rosterKey!==this.rosterKey){this.rosterKey=rosterKey;roster.innerHTML=`<div class="island-roster-heading"><b>${players.length}</b><span>REAL ${players.length===1?'PLAYER':'PLAYERS'} ON THE ISLAND</span><small>${state.options.session==='offline'?'OFFLINE PRACTICE':'LIVE ROSTER'}</small></div><div class="island-roster-names">${players.map(o=>`<span class="${o.id===local.id?'you':''}">${escape(o.name)}${o.id===local.id?' <b>YOU</b>':''}</span>`).join('')||'<span>Waiting for connected players</span>'}</div>`;}
+   const rosterKey=state.options.session+':'+local.id+':'+players.map(o=>o.id+':'+o.name).join('|');if(rosterKey!==this.rosterKey){this.rosterKey=rosterKey;roster.innerHTML=`<div class="island-roster-heading"><b>${players.length}</b><span>REAL ${players.length===1?'PLAYER':'PLAYERS'} ON THE ISLAND</span><small>${state.options.session==='offline'?'OFFLINE PRACTICE':'LIVE ROSTER'}</small></div><div class="island-roster-names">${players.map(o=>`<span class="${o.id===local.id?'you':''}">${escape(o.name)}${o.id===local.id?' <b>YOU</b>':''}</span>`).join('')||'<span>Waiting for connected players</span>'}</div>`;}
   }
 
   const outside=r.storm.active&&Math.hypot(p.x-r.storm.x,p.z-r.storm.z)>r.storm.radius;
