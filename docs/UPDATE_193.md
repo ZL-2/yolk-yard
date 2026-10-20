@@ -4,7 +4,7 @@ Version 6.9.1, compatible protocol 69. Publication remains authorized with activ
 
 - Match options save when changed in all five multiplayer modes. Number fields save after a short typing pause or when leaving the field. No Apply button. Status indicates saving, success or failure. Public/private and team changes refresh dependent controls immediately. Saves are serialized and intermediate pending changes are combined; closing flushes the last valid edit. Server authority and leader/idle restrictions remain in force.
 - Voice enabled and microphone enabled/muted choices are separate browser preferences. New users still opt into each. Returning users restore their previous settings without opening Voice or pressing Enable again. Leave Voice persists an off choice; cleanup and transient disconnects do not erase preferences. A blocked autoplay context resumes on an ordinary click or keypress. Mic permission errors leave listening available and do not retry permission continuously. Push-to-talk does not restore a held key.
-- Audio initialization is shared across simultaneous requests. Microphone cancellation invalidates in-flight permission requests and stops late streams. Voice-off users no longer send one voice-context request every second.
+- Audio initialization is shared across simultaneous requests. Microphone cancellation invalidates in-flight permission requests and stops late streams. Voice-off lobby users no longer send one voice-context request every second. Browser hosts still publish the roster needed by other players, even when the host leaves voice.
 
 ## Focused verification
 

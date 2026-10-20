@@ -113,7 +113,8 @@ export class VoiceChat {
  async devices(){try{return await navigator.mediaDevices.enumerateDevices();}catch{return [];}}
  async maintain(){
   const party=this.getParty(),net=this.getNetwork(),state=this.getState();
-  if(this.enabled&&party?.ready&&!this.contextPending){
+  // Browser hosts also publish the authoritative roster for other players' voice.
+  if((this.enabled||net?.ready&&net.isHost)&&party?.ready&&!this.contextPending){
    const peer=net?.peer,host=net?.aliasPeer||peer,m=net?.ready&&state&&peer?.resume?{peer:peer.id,proof:peer.resume.resume,host:host?.id,hostId:net.id,...(net.isHost?{roster:state.players.filter(p=>!p.bot&&!p.boss&&!p.henchman).map(p=>({id:p.id,team:p.team,squad:p.zSquad,spectator:!!p.friendSpectator||p.contestant===false}))}:{})}:{};
    this.contextPending=true;party.request('voice-context',m).catch(()=>{}).finally(()=>{this.contextPending=false;});
   }
