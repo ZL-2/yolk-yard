@@ -6,13 +6,14 @@ import {randomUUID} from 'node:crypto';
 import {mergeRelayMessage} from '../../src/relay-queue.js';
 import {ProgressionService} from './progression.js';
 import {PartyService} from './parties.js';
+import {VoiceService} from './voice.js';
 import {MAX_HUMANS,MAX_CONTESTANTS,MAX_SPECTATORS} from '../../src/royale-phases.js';
 import {RELAY_SESSION_GRACE_MS as GRACE} from '../../src/relay-recovery.js';
 const MAX_FRAME=2_000_000, MAX_QUEUE=4_000_000;
 const address=/^yolk-yard-v\d+-[A-Z2-9]{8}$/;
 // One persistent process owns every connected socket. No database in the data path.
 export class RealtimeRelay {
-  constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.progression=new ProgressionService(this);this.publicHost=new PublicHost(this);this.authority=new MatchAuthority(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
+  constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.progression=new ProgressionService(this);this.publicHost=new PublicHost(this);this.authority=new MatchAuthority(this);this.voice=new VoiceService(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
   attach(ws){
     let peer; const started=Date.now();
     // Browser networking can answer native pings while a costly render blocks JS.
@@ -170,5 +171,5 @@ export class RealtimeRelay {
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
-  close({preserveSessions=false}={}){this.closing=true;this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()]){if(preserveSessions)peer.ws?.close(1001,'Server restarting');else this.remove(peer,1001,'Server stopping');}return Promise.all([this.progression.close(),this.parties.close()]);}
+  close({preserveSessions=false}={}){this.closing=true;this.voice.close();this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()]){if(preserveSessions)peer.ws?.close(1001,'Server restarting');else this.remove(peer,1001,'Server stopping');}return Promise.all([this.progression.close(),this.parties.close()]);}
 }

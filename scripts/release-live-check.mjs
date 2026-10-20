@@ -24,6 +24,7 @@ await wait(async()=>{
 },'Website and relay must finish the same release'+(lastError||''),360000);
 assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,3);assert.equal(health.boxFightRevision,2);assert.ok(health.privateModes.includes('boxfight'));assert.equal(health.zoneWarsRevision,2);assert.ok(health.privateModes.includes('zonewars'));assert.equal(health.leaderboardRevision,3);
 const history=await get(front+'release-history.json?t='+Date.now());assert.equal(history.build,expected);assert.equal(history.releases[0].number,published.release);
+assert.equal(health.voiceRevision,1);assert.equal(health.emoteRevision,2);
 const board=await get(relay+'/leaderboards');assert.ok(Array.isArray(board.kills.rows)&&Array.isArray(board.wins.rows));
 
 // A separate private room exercises the deployed relay without entering the
@@ -57,6 +58,7 @@ try{
  await page.locator('#menu [data-action=settings]:visible').first().waitFor();
  assert.match(await page.locator('body').innerText(),/FRONTIER LEADERS/i);
  await page.screenshot({path:out+'/desktop.png',timeout:90000});
+ await page.locator('#voice-open').click();await page.locator('[data-voice=enable]').click();await page.waitForFunction(()=>document.querySelector('.voice-status')?.textContent.startsWith('Connected'));assert.equal(await page.locator('[data-channel=game]').isDisabled(),true);assert.match(await page.locator('[data-voice=mic]').innerText(),/ENABLE MIC/);await page.screenshot({path:out+'/voice-live.png',timeout:90000});await page.locator('[data-voice=leave]').click();await page.locator('[data-voice=close]').click();
  await page.locator('[data-action=choose-mode]').click();await page.locator('[data-experience=zombies] .mode-development').waitFor({state:'visible'});assert.equal(await page.locator('[data-experience=zombies] .mode-development').innerText(),'IN MAJOR DEVELOPMENT');assert.deepEqual(await page.locator('[data-experience]').evaluateAll(nodes=>nodes.map(n=>n.dataset.experience)),['royale','box-fights','zone-wars','zombies','ffa','training']);await page.locator('[data-experience=zone-wars]').click();await page.waitForFunction(()=>document.querySelector('[data-leaderboard-mode]')?.value==='zonewars');assert.doesNotMatch(await page.locator('.lobby-options-button').innerText(),/Public|Private/);await page.locator('[data-action=choose-mode]').click();await page.screenshot({path:out+'/zone-wars-live.png',timeout:90000});await page.locator('#dialog .close-btn').click();
  await page.locator('#menu [data-action=settings]:visible').first().click();await page.locator('[data-settings-tab=comfort]').click();await page.locator('#reducedMotion').check();
  await page.screenshot({path:out+'/desktop-settings.png',timeout:90000});

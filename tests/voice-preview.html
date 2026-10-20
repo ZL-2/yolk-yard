@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Desktop voice acceptance</title></head><body style="background:#183345;color:white;font-family:Arial"><h1>Voice acceptance</h1><script type="module">
+import {PartyClient} from '/src/party-client.js';
+import {VoiceChat} from '/src/voice-chat.js';
+import {VoiceUI} from '/src/voice-ui.js';
+import {Network} from '/src/network.js';
+import {BoxFightSimulation} from '/src/box-fights.js';
+const query=new URLSearchParams(location.search);window.YOLK_NETWORK={relay:query.get('relay')};
+const profile={name:query.get('name')||'Voice Player'};let network=null,state=null,sim=null;
+const party=new PartyClient(profile),voice=new VoiceChat({party:()=>party,network:()=>network,state:()=>state});
+const ui=new VoiceUI(voice,{open:()=>{},report:()=>{}});
+let played=0;const original=voice.play.bind(voice);voice.play=(...args)=>{played++;original(...args);};
+window.voiceTest={party,voice,ui,get played(){return played;},
+ async host(code){sim=new BoxFightSimulation({teamSize:1,fill:false});sim.addPlayer('host',profile);network=new Network({getCheckpoint:()=>sim.checkpoint(),onJoin:(id,p)=>!!sim.addPlayer(id,p),onLeave:id=>sim.removePlayer(id),onPlayerAction:(id,a)=>sim.playerAction(id,a)});await network.host(code);state=sim.snapshot();network.broadcast(state);},
+ async join(code){network=new Network({onState:s=>state=s});await network.join(code,profile);},
+ get state(){return state;},get net(){return network;},get sim(){return sim;},
+ close(){network?.destroy();voice.close();party.close();}
+};
+setInterval(()=>{if(network?.isHost){state=sim.snapshot();network.broadcast(state);}},200);
+</script></body></html>

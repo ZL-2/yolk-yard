@@ -15,7 +15,7 @@ import {tickLootMotion} from './loot-motion.js';
 import {tickHealing} from './progressive-healing.js';
 import {ammoType} from './royale-data.js';
 import {teammates} from './teams.js';
-import {emoteInput} from './emotes.js';
+import {emoteInput,tickCelebrations} from './emotes.js';
 
 export class BoxFightSimulation extends RoyaleSimulation {
  constructor(options={}){
@@ -100,7 +100,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
   }
   if(['respawn','rejoin'].includes(action))return;
   if(action==='spectate'&&p.health>0){if(this.boxStage==='fight')this.damage(p,null,10000,'Left round');return;}
-  if(!['prepare','fight'].includes(this.boxStage)&&!action.startsWith('watch'))return;
+  if(!['prepare','fight'].includes(this.boxStage)&&!action.startsWith('watch')&&!action.startsWith('emote-'))return;
   super.playerAction(id,action);
  }
  damage(victim,attacker,amount,source,precision=false,shotId=null){
@@ -140,8 +140,8 @@ export class BoxFightSimulation extends RoyaleSimulation {
  }
  tick(dt){
   dt=clamp(dt,0,1/30);if(this.recoveringHumans())return;this.time+=dt;
-  if(this.phase==='results'){if(this.options.recurring&&this.time>=this.publicRestartAt)this.startRound();return;}if(this.phase!=='playing')return;
-  if(this.boxStage==='intermission'){this.remaining=Math.max(0,this.boxEnd-this.time);if(this.time>=this.boxEnd)this.beginBoxRound();return;}
+  if(this.phase==='results'){tickCelebrations(this);if(this.options.recurring&&this.time>=this.publicRestartAt)this.startRound();return;}if(this.phase!=='playing')return;
+  if(this.boxStage==='intermission'){tickCelebrations(this);this.remaining=Math.max(0,this.boxEnd-this.time);if(this.time>=this.boxEnd)this.beginBoxRound();return;}
   if(this.boxStage==='waiting'){
    const people=this.eligiblePlayers(),teams=new Set(people.map(p=>boxTeam(this.options,p)));
    if(teams.size<2){this.queueEnds=0;this.remaining=0;}

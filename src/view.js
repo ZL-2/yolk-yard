@@ -803,7 +803,7 @@ export class View {
     for(const egg of this.partyEggs||[])egg.visible=!playing;
     this.actors.visible = playing;
     this.effects.visible = playing;
-    this.gunGroup.visible = playing && !local?.vehicleId && !local?.zVehicle && !this.cinematic?.victory && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
+    this.gunGroup.visible = playing && !local?.vehicleId && !local?.zVehicle && !this.cinematic?.victory && !this.celebrationTarget && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
     if (!playing) {
       this.clearOutgoing(this);
       this.preview(profile);
@@ -821,11 +821,11 @@ export class View {
       // The anchor sits above the highest crown, then the label grows upward.
       for(const label of this.lobbyLabels||[]){const index=Number(label.dataset.lobbyPlayer),model=index===0?this.menuEgg:this.partyEggs?.[index-1];if(!model)continue;const point=new THREE.Vector3(model.position.x,model.position.y+5.45,model.position.z).project(this.camera);label.style.left=((point.x+1)*50)+'%';label.style.top=((1-point.y)*50)+'%';}
     } else if (local) {
-      const hold=!!this.cinematic?.hold,victory=!!this.cinematic?.victory;
-      const killer = !hold&&local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && canSpectate(p,local.id));
+      const hold=!!this.cinematic?.hold,victory=!!this.cinematic?.victory||!!this.celebrationTarget;
+      const killer = this.celebrationTarget&&state.players.find(p=>p.id===this.celebrationTarget)||!hold&&local.health <= 0 && state.players.find(p => p.id === (local.spectating ? this.spectateTarget : local.killerId) && canSpectate(p,local.id));
       const p = {...(killer || (local.health <= 0 ? local : predicted || local))};
       if(!killer)p.perspective=this.settings.perspective;
-      this.renderLocalActor=p;
+      this.renderLocalActor=p.id===local.id?p:null;
       this.predictedVehicle=p.predictedVehicle||null;
       this.stairEye=stairCamera(this.stairEye,p,dt,`${state.round}:${p.id}:${local.health>0}`);
       const desiredEye=eyeHeight(p);this.stanceEye=this.stanceEye===undefined?desiredEye:THREE.MathUtils.lerp(this.stanceEye,desiredEye,1-Math.exp(-dt*17));
@@ -947,12 +947,13 @@ export class View {
       this.actorBounds ||= new THREE.Sphere(new THREE.Vector3(),2.5);
       this.actorFrustum.setFromProjectionMatrix(this.actorMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse));
       for (const source of state.players) {
-        const p=source.id===local?.id&&this.renderLocalActor?this.renderLocalActor:source;
+        let p=source.id===local?.id&&this.renderLocalActor?this.renderLocalActor:source;
+        if((p.emote||p.id===this.celebrationTarget)&&(state.phase==='results'||p.zExtracted))p={...p,health:100,spectating:false,flight:'ground',grounded:true,downed:false};
         // Transport passengers share one simulation position; the airship
         // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;
         if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.16)) || p.awaitingEntry)continue;
-        if(p.id===local?.id&&p.health>0&&!this.thirdPersonEnabled&&!p.vehicleId&&!p.zVehicle&&!this.cinematic?.victory&&!p.emote&&!p.downed&&(!p.inventory||p.flight==='ground'||p.flight==='transport')){const cached=this.models.get(p.id);if(cached){seen.add(p.id);cached.visible=false;}continue;}
+        if(p.id===local?.id&&p.health>0&&!this.thirdPersonEnabled&&!p.vehicleId&&!p.zVehicle&&!this.cinematic?.victory&&!this.celebrationTarget&&!p.emote&&!p.downed&&(!p.inventory||p.flight==='ground'||p.flight==='transport')){const cached=this.models.get(p.id);if(cached){seen.add(p.id);cached.visible=false;}continue;}
         seen.add(p.id);
         this.actorBounds.center.set(p.x,p.y+.9,p.z);
         if(playing&&!this.actorFrustum.intersectsSphere(this.actorBounds)){const hidden=this.models.get(p.id);if(hidden)hidden.visible=false;continue;}

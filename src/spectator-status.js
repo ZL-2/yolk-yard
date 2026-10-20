@@ -15,5 +15,6 @@ export function spectatorTargets(state,localId){
  const teamMode=(state?.options?.mode==='royale'&&[2,4].includes(state.options.teamSize))||(state?.options?.mode==='boxfight'&&state.options.boxFormat!=='ffa');
  const mates=teamMode&&me?.team>=0?alive.filter(p=>p.team===me.team):[];
  if(state?.players?.find(p=>p.id===me?.killerId)?.bot){const humans=alive.filter(p=>!p.bot);if(humans.length)return humans.sort((a,b)=>Number(b.team===me.team)-Number(a.team===me.team));}
- return (mates.length?mates:alive).sort((a,b)=>{const rank=p=>(teamMode&&me?.team>=0&&p.team===me.team?0:2)+(p.bot?1:0);return rank(a)-rank(b);});
+ const roundMode=['boxfight','zonewars'].includes(state?.options?.mode);
+ return (mates.length&&!roundMode?mates:alive).sort((a,b)=>{const rank=p=>roundMode&&p.id===me?.killerId?-1:(teamMode&&me?.team>=0&&p.team===me.team?0:2)+(p.bot?1:0);return rank(a)-rank(b);});
 }

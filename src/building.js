@@ -242,8 +242,11 @@ export function toggleDoor(sim,p){
  for(const box of pieceBoxes(proposal).filter(b=>b.door))if([...sim.players.values()].some(o=>o.health>0&&o.y<box.y+box.h&&o.y+bodyHeight(o)>box.y&&Math.abs(o.x-box.x)<box.w/2+RADIUS+.04&&Math.abs(o.z-box.z)<box.d/2+RADIUS+.04))return false;
  b.doorOpen=proposal.doorOpen;b.revision=(b.revision||0)+1;p.nextDoor=sim.time+.25;sim.buildVersion++;rebuildMap(sim);return true;
 }
+const constructionWork=new WeakMap();
 export function constructionTick(sim){
- for(const b of sim.builds){
+ let work=constructionWork.get(sim);
+ if(!work||work.source!==sim.builds||work.version!==sim.buildVersion){work={source:sim.builds,version:sim.buildVersion,items:sim.builds.filter(b=>(b.constructionRemaining??Math.max(0,b.maxHealth-buildStats(b).start))>0||(b.repairRemaining||0)>0)};constructionWork.set(sim,work);}
+ for(const b of work.items){
   const stats=buildStats(b);
   b.constructionRemaining??=Math.max(0,b.maxHealth-stats.start);
   b.constructionTick??=b.created+.5;
@@ -253,6 +256,7 @@ export function constructionTick(sim){
   const repair=Math.min(b.repairRemaining||0,stats.gain*ticks);b.repairRemaining=Math.max(0,(b.repairRemaining||0)-repair);
   b.health=Math.min(b.maxHealth,b.health+gain+repair);sim.buildVersion++;
  }
+ work.items=work.items.filter(b=>b.constructionRemaining>0||b.repairRemaining>0);work.version=sim.buildVersion;
 }
 // Remote prediction and rendering use their own map; simulation maps never mutate the authored island.
 export function applyBuildState(map,r){

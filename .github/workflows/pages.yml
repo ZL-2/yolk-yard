@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      voice_celebration_update: ${{ steps.scope.outputs.voice_celebration_update }}
       scope_reticle_update: ${{ steps.scope.outputs.scope_reticle_update }}
       atv_only: ${{ steps.scope.outputs.atv_only }}
       kestrel_only: ${{ steps.scope.outputs.kestrel_only }}
@@ -229,7 +230,13 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('scope_reticle_update='+str(scope_reticle_update).lower()+'\n')
             if scope_reticle_update: out.write('focused=true\n')
-          print('Focused release:',{'Scope reticles':scope_reticle_update,'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
+          voice_files=set(subprocess.check_output(['git','diff','--name-only','c6db90f0d14e4f8c871f1842a0a7b6c38f15a615','HEAD'],text=True).splitlines())
+          voice_allowed={'.github/workflows/pages.yml','package.json','package-lock.json','docs/UPDATE_191.md','server/realtime/index.js','server/realtime/relay.js','server/realtime/parties.js','server/realtime/voice.js','src/box-fights.js','src/box-fight-ui.js','src/zone-wars-ui.js','src/building.js','src/build-snapshot.js','src/celebration-state.js','src/emotes.js','src/guest-presentation.js','src/main.js','src/match-end-ui.js','src/match-presentation.js','src/royale.js','src/simulation.js','src/sound-visuals.js','src/spectator-status.js','src/view.js','src/zombies-expedition.js','src/zombies.js','src/voice-chat.js','src/voice-ui.js','src/voice-worklet.js','src/voice.css','src/releases.js','scripts/voice-browser-check.mjs','scripts/celebration-browser-check.mjs','scripts/voice-performance.mjs','scripts/release-live-check.mjs','tests/voice-celebration.test.js','tests/voice-preview.html'}
+          voice_celebration_update=voice_files<=voice_allowed and {'server/realtime/voice.js','src/voice-chat.js','tests/voice-celebration.test.js','scripts/voice-browser-check.mjs','scripts/celebration-browser-check.mjs','scripts/voice-performance.mjs'}<=voice_files
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('voice_celebration_update='+str(voice_celebration_update).lower()+'\n')
+            if voice_celebration_update: out.write('focused=true\n')
+          print('Focused release:',{'Voice and celebrations':voice_celebration_update,'Scope reticles':scope_reticle_update,'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
           PY
   build:
     needs: scope
@@ -371,6 +378,24 @@ jobs:
       - name: Release numbering
         if: needs.scope.outputs.scope_reticle_update == 'true'
         run: node --test tests/release-history.test.js
+      - name: Voice membership, winner emotes, spectator camera and building snapshots
+        if: needs.scope.outputs.voice_celebration_update == 'true'
+        run: |
+          node --test --test-concurrency=2 tests/voice-celebration.test.js tests/box-fights.test.js tests/spectator-status.test.js tests/guest-presentation.test.js tests/building-overhaul.test.js tests/snapshot-codec.test.js tests/release-history.test.js
+          node --test --test-name-pattern='emote|camera look|damage cancels' tests/crowns-bosses-emotes.test.js
+      - name: Compare populated building workloads with the previous release
+        if: needs.scope.outputs.voice_celebration_update == 'true'
+        run: |
+          git fetch origin c6db90f0d14e4f8c871f1842a0a7b6c38f15a615
+          git worktree add --detach ../baseline-191 c6db90f0d14e4f8c871f1842a0a7b6c38f15a615
+          ln -s "$GITHUB_WORKSPACE/node_modules" ../baseline-191/node_modules
+          VOICE_BASELINE=../baseline-191 node scripts/voice-performance.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.voice_celebration_update == 'true'
+        with:
+          name: voice-performance
+          path: test-results/voice/performance.json
+          retention-days: 14
       - name: All unit and real socket regression tests
         if: needs.scope.outputs.focused != 'true'
         run: node --test --test-concurrency=2 tests/*.test.js
@@ -420,6 +445,19 @@ jobs:
       - name: Desktop sniper and burst scope alignment
         if: needs.scope.outputs.scope_reticle_update == 'true'
         run: node scripts/scope-alignment-check.mjs
+      - name: Desktop audio delivery, channel controls and winner celebrations
+        if: needs.scope.outputs.voice_celebration_update == 'true'
+        run: |
+          node scripts/voice-browser-check.mjs
+          node scripts/celebration-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.voice_celebration_update == 'true'
+        with:
+          name: voice-celebration-desktop
+          path: |
+            test-results/voice
+            test-results/celebration
+          retention-days: 14
       - name: Desktop battle-map transition, relay restart and lobby return
         if: needs.scope.outputs.match_recovery_update == 'true'
         run: node scripts/match-recovery-browser.mjs

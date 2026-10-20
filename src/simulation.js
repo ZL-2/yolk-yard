@@ -2,7 +2,7 @@ import {thrownProjectile,stepThrowable} from './throwables.js';
 import {recordCombatDamage,combatRecap} from './combat-feedback.js';
 import {recordFieldEvent,resetFieldRecord,fieldSnapshot} from './field-record.js';
 import {reloadRequested} from './reload-buffer.js';
-import {startEmote,cancelEmote,emoteInput} from './emotes.js';
+import {startEmote,cancelEmote,emoteInput,tickCelebrations} from './emotes.js';
 import {watcherAction} from './spectator-status.js';
 import {COMBAT_LIMITS,UTILITY_WEAPONS} from './weapon-balance.js';
 import {arenaSpawnPoints} from './arena-spawns.js';
@@ -376,7 +376,7 @@ export class Simulation {
     this.time += dt;
     this.recordPoses();this.tickActivity(dt);
     if(this.options.recurring&&this.phase==='results'){this.publicRestartAt??=this.time+10;if(this.time>=this.publicRestartAt)this.startRound();}
-    if (this.phase !== "playing") {for(const p of this.players.values())if(p.emote)emoteInput(this,p,this.inputs.get(p.id)||{});return;}
+    if (this.phase !== "playing") {if(this.phase==='results')tickCelebrations(this);return;}
     this.remaining = Math.max(0, this.remaining - dt);
     for (const p of this.players.values()) {
       if (p.spectating) continue;

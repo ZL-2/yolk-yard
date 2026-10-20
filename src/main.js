@@ -1,4 +1,7 @@
 import {problemText,captureDialogPosition,restoreDialogPosition} from './problem-reports.js';
+import {VoiceChat} from './voice-chat.js';
+import {VoiceUI} from './voice-ui.js';
+import {canCelebrate,celebrationTarget} from './celebration-state.js';
 import {PublicJoinNotice} from './public-join-notice.js';
 import {actionFrameDue} from './action-network.js';
 import {rankingMode,syncRankingSelection} from './ranking-modes.js';
@@ -378,6 +381,8 @@ function modal(title, body, type = "generic") {
   input.aim = false;
   paused = true;
   if (document.pointerLockElement) document.exitPointerLock();
+  if(type==='results'){const p=state?.players.find(p=>p.id===localId);body=`<div class="split-actions">${canCelebrate(state,p)?'<button data-action="emotes">CELEBRATE</button>':''}<button data-action="watch-winner">WATCH WINNER</button></div>`+body;}
+  if(['results','pause','settings','social','chat-controls'].includes(type))body+='<button data-action="voice-chat">VOICE CHAT</button>';
   if(type==='error')hideLoading(true);
   if(type!=='problem-report'&&(type==='error'||body.includes('class="error-box"'))){const temp=document.createElement('div');temp.innerHTML=body;rememberProblem(title,temp.querySelector('.error-box')?.textContent||temp.textContent);body+='<button data-action="report-problem">REPORT PROBLEM</button>';}
   const connectingArt=type==='connecting'?showLoading('ESTABLISHING MATCH UPLINK','Connecting to the room service.',{kind:'connect'}):null;
@@ -1003,7 +1008,7 @@ function openEmotes(){
  const p=state?.players.find(p=>p.id===localId);
  if(screen==='game'&&p?.emote){sendPlayerAction('emote-cancel');return;}
  if(screen==='menu'&&view.lobbyEmote){view.lobbyEmote=null;return;}
- if(screen==='game'&&(!p||p.health<=0||p.spectating||p.downed||p.flight==='transport')){toast('Emotes are available while standing on the ground.');return;}
+ if(screen==='game'&&!canCelebrate(state,p)&&(!p||p.health<=0||p.spectating||p.downed||p.flight==='transport')){toast('Emotes are available while standing on the ground.');return;}
  keys.clear();input.fire=false;input.aim=false;touch.fire=false;paused=true;document.exitPointerLock?.();
  modal('EMOTES',emoteWheel(screen==='menu'?{crownWins:crownStatus.wins,crownEmoteUnlocked:crownStatus.unlocked}:p),'emotes');
 }
@@ -1087,7 +1092,7 @@ function processEvents() {
     if(e.type==='knocked'&&teammates(state.options,me,state.players.find(p=>p.id===e.target)))notice(`Teammate downed · ${e.targetName}`,1800);
     if(e.type==='revived'&&(e.player===localId||e.target===localId))notice(e.target===localId?'Back in the fight · 30 health':'Teammate revived',2200);
     if(e.type==='streak-bonus'&&e.player===localId){streakUI.announce(e,state.options.mode);sound.pickup();}
-    if(e.type==='royale-eliminated'&&e.player===localId){spectateTarget=preferredSpectator(state,localId);pendingInputs=[];predicted=null;keys.clear();queuedActions.clear();input.fire=input.aim=false;if(document.pointerLockElement)document.exitPointerLock();}
+    if(['royale-eliminated','box-eliminated'].includes(e.type)&&e.player===localId){spectateTarget=preferredSpectator(state,localId);pendingInputs=[];predicted=null;keys.clear();queuedActions.clear();input.fire=input.aim=false;if(document.pointerLockElement)document.exitPointerLock();}
     if (e.type === "shot"&&!echoed) {
       const distance = me
         ? Math.hypot(e.origin.x - me.x, e.origin.z - me.z)
@@ -1198,7 +1203,7 @@ function hud() {
   bonusPanel.textContent=bonusStatus(p,state.time).join(' • ');
   if(arenaBonuses(state.options.mode)&&p.health>0)$('#streak').textContent+=` · ${5-p.streak%5} to bonus`;
   $('#crosshair').classList.toggle('damage-boost',arenaBonuses(state.options.mode)&&p.damageUntil>state.time);
-  $('.quick-controls').innerHTML = [['forward','Move'],['crouch','Crouch / slide'],['reload','Reload'],['swap','Swap']].map(([id,label]) => `<span><kbd>${esc(controlLabel(id))}</kbd> ${label}</span>`).join('') + '<span><kbd>Esc</kbd> Menu</span>';
+  const quickControls=[['forward','Move'],['crouch','Crouch / slide'],['reload','Reload'],['swap','Swap']].map(([id,label]) => `<span><kbd>${esc(controlLabel(id))}</kbd> ${label}</span>`).join('') + '<span><kbd>Esc</kbd> Menu</span>';if($('.quick-controls').innerHTML!==quickControls)$('.quick-controls').innerHTML=quickControls;
   $("#gun-name").textContent = gun(p).name;
   $("#ammo").textContent = p.ammo[p.slot];
   $("#reserve").textContent = p.reserve[p.slot];
@@ -1382,6 +1387,8 @@ function inventoryAction(action,index,from){
 }
 document.addEventListener('click',e=>{const button=e.target.closest('[data-box-team]');if(button){const action='box-team-'+button.dataset.boxTeam;if(sim&&!sim.remote){sim.playerAction(localId,action);state=sim.snapshot();net?.broadcast(state);renderLobby();}else net?.send({type:'player-action',action});}});
 const actions = {
+ 'voice-chat':()=>voiceUI.show(),
+ 'watch-winner':()=>{dialog.close();dialogType='';resultAt=0;paused=false;},
  'report-problem':reportProblemMenu,
  'report-connection':()=>{rememberProblem('Match connection interrupted',document.querySelector('#match-connection span')?.textContent||'Connection interrupted');reportProblemMenu();},
  'feature-request':()=>{modal('Request a feature',`<p>Tell us what you would like to see in Ravelfront. Your request goes to the administrator’s private inbox.</p><form id="feature-request-form"><label for="feature-request-text">YOUR IDEA</label><textarea id="feature-request-text" class="field" rows="5" minlength="5" maxlength="1000" required placeholder="What would make the frontier better?"></textarea><button class="primary" type="submit">SEND REQUEST</button></form><p id="feature-request-status" role="status"></p>`,'feature-request');$('#feature-request-text').focus();$('#feature-request-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button'),status=$('#feature-request-status');button.disabled=true;status.textContent='Sending…';try{await party.request('feature-request',{text:$('#feature-request-text').value});if(form.isConnected){form.hidden=true;status.textContent='Request sent. Thank you for helping shape the frontier.';}}catch(error){if(form.isConnected){status.textContent=error.message;button.disabled=false;}}};},
@@ -1734,6 +1741,7 @@ document.addEventListener("keydown", (e) => {
     if (panel==='close') resume(); else if (panel==='royale-map') royaleMap(); else royaleInventory();
     return;
   }
+  if(screen==='game'&&settings.keybinds.emotes.includes(e.code)&&(state?.phase==='results'||state?.boxfight?.stage==='intermission')){e.preventDefault();if(!e.repeat)openEmotes();return;}
   if (dialog.open) return;
   if (settings.keybinds.chat.includes(e.code) && net?.ready && screen!=="menu") {
     e.preventDefault();if(!e.repeat)chat.open();return;
@@ -1994,6 +2002,8 @@ function pumpNetworkInput(now=performance.now()) {
   net.inputBatch(commands);
 }
 const emoteButton=document.createElement('button');emoteButton.id='emote-button';emoteButton.dataset.action='emotes';document.body.append(emoteButton);
+const voice=new VoiceChat({party:()=>party,network:()=>net,state:()=>state,bindings:()=>settings.keybinds});
+const voiceUI=new VoiceUI(voice,{open:()=>{keys.clear();input.fire=input.aim=false;paused=screen==='game';document.exitPointerLock?.();dialog.close();dialogType='';},close:()=>{if(screen==='game')void resume(false);},report:p=>{rememberProblem('Voice chat report',`Player: ${p.name} | Identity: ${p.id} | Channel: ${voice.channel}. No audio recording is attached.`);reportProblemMenu();}});
 const soundVisuals=new SoundVisuals(document.getElementById('hud'));
 const triggerGuard={};
 const performanceHUD=new PerformanceHUD(document.body);
@@ -2010,7 +2020,7 @@ function loop(now) {
   if(state){view.buildMap=getMap(state.options.map);if(state.royale)applyBuildState(view.buildMap,state.royale);}
 
   const elapsedFrame=Math.max(0,(now-lastTime)/1000),dt=Math.min(0.1,elapsedFrame);
-  const simulate=!(paused&&!net&&screen==='game'&&!['royale-inventory','royale-map'].includes(dialogType));
+  const simulate=state?.phase==='results'||state?.boxfight?.stage==='intermission'||!(paused&&!net&&screen==='game'&&!['royale-inventory','royale-map'].includes(dialogType));
   if(simulate)sim?.advanceWarmupClock?.(elapsedFrame-dt);
   lastTime = now;
   accumulator += dt;
@@ -2056,7 +2066,7 @@ function loop(now) {
   const startNow=document.getElementById('royale-start-now');if(startNow)startNow.textContent=controlLabel('startNow')+' · START NOW';if(startNow)startNow.hidden=!(screen==='game'&&state?.royale?.practice&&net?.isHost&&net?.visibility==='private'&&!net?.officialPublic);
   syncSocialActivity(me);
   document.body.classList.toggle('is-emoting',screen==='game'&&!!me?.emote);
-  emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game';
+  emoteButton.hidden=!!dialog.open||screen==='lobby'||screen==='game'&&!canCelebrate(state,me);
   const emoteButtonText=(screen==='menu'?!!view.lobbyEmote:!!me?.emote)?'STOP EMOTE':screen==='game'?'EMOTES':'EMOTES · '+bindingLabel(settings.keybinds.emotes[0]||'KeyO');if(emoteButton.textContent!==emoteButtonText)emoteButton.textContent=emoteButtonText;
   const emoteCameraKey=me?.emote?me.id+':'+me.emote.id+':'+me.emote.start:null;
   if(emoteCameraKey&&view.emoteCameraKey!==emoteCameraKey){input.yaw=me.emote.yaw;input.pitch=0;}
@@ -2066,8 +2076,9 @@ function loop(now) {
   if(currentProgress!==progressMatch){progressMatch=currentProgress;matchEarnings.total=0;matchEarnings.status=me?.friendSpectator?'Spectating · No Marks':net?.serverAuthority?'Match verification pending':net?'Private custom · No Marks':'Practice · No currency rewards';}
 
   if (me?.spectating && !state.players.some(p => p.id === spectateTarget && canSpectate(p,localId)))
-    switchSpectator(1);
+    spectateTarget=preferredSpectator(state,localId);
   view.spectateTarget = me?.spectating ? spectateTarget : null;
+  view.celebrationTarget=view.cinematic?.slowMotion&&!me?.emote?null:celebrationTarget(state,localId);
   updateSpectatorStatus(me,now);
   soundVisuals.update(state,me?.spectating?state?.players.find(p=>p.id===spectateTarget):me,{enabled:settings.visualSoundEffects,categories:settings,playing:screen==='game'&&!paused&&!document.hidden},now);
   sound.updateLobby(screen!=='game',renderDt,document.hidden);

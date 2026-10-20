@@ -14,7 +14,7 @@ export class GuestPresentation {
   this.key=key;this.received=now;
  }
  frame(state,predicted,now,dt){
-  const advance=state.phase==='playing'?Math.min(.15,Math.max(0,(now-this.received)/1000)):0;
+  const advance=['playing','results'].includes(state.phase)?Math.min(.15,Math.max(0,(now-this.received)/1000)):0;
   this.time=Math.max(state.time,Math.min(state.time+.15,Math.max(this.time,state.time+advance)));
   const elapsed=state.royale?state.royale.elapsed+(this.time-state.time):0;
   const visual={...state,time:this.time,...(state.royale?{royale:{...state.royale,elapsed}}:{})};
