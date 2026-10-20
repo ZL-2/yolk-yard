@@ -6,7 +6,7 @@ import {problemText} from '../src/problem-reports.js';
 test('join notices target one exact public room; full, expired and stale admission never create overflow matches',async()=>{
  const f=await fixture();try{
   const a=await f.user('Notice Host'),b=await f.user('Notice Guest'),c=await f.user('Notice Racer');const notices=[];b.ws.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='public-join')notices.push(m);});
-  await a.ask('select',{mode:'boxfight',teamSize:1});await a.ask('queue');assert.equal(notices.length,0);const host=await f.game(a);await until(()=>notices.length===1,'Actual public join notification');const event=notices[0];assert.equal(event.name,a.profile.name);assert.equal(event.mode,'boxfight');assert.equal(event.code,host.net.code);
+  await a.ask('select',{mode:'boxfight',teamSize:1});await a.ask('queue');assert.equal(notices.length,0);const host=await f.game(a);await until(()=>notices.length===1,'Actual public join notification');const event=notices[0];assert.equal(event.name,a.profile.name);assert.equal(event.mode,'boxfight');assert.equal(event.teamSize,1);assert.equal(event.boxFormat,'teams');assert.equal(event.code,host.net.code);
   await a.ask('joined',{id:a.launches.at(-1).id});await pause(30);assert.equal(notices.length,1,'Duplicate join acknowledgment is silent');
   const rooms=f.app.relay.publicHost.rooms.size;
   await assert.rejects(b.ask('queue',{targetPublic:event.code,targetMatch:'expired'}),/ended/);

@@ -58,6 +58,7 @@ export async function fixture({recovery=false}={}){
    onLeave:id=>game.sim?.leavePlayer(id),onRoster:ids=>game.sim?.setConnectedHumans(ids),
    onSuspendPlayer:id=>game.sim?.suspendPlayer(id),onHostRecovery:ms=>game.sim?.beginHostRecovery?.(ms),
    onPlayerAction:(id,action)=>game.sim?.playerAction(id,action),
+   onProfile:(id,profile)=>game.sim?.setProfile(id,profile),
    onInput:(id,input)=>game.sim?.setInput(id,input,true),
    onHost:(checkpoint,departed)=>{
     game.promotions++;game.sim=(checkpoint.options.mode==='zonewars'?new ZoneWarsSimulation(checkpoint.options):checkpoint.options.mode==='boxfight'?new BoxFightSimulation(checkpoint.options):checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options)).restore(checkpoint);

@@ -35,6 +35,7 @@ import {bossDefeatMessage} from './bosses.js';
 import {showFrontMessage,updateFrontMessage} from './front-message.js';
 import {emoteWheel} from './emote-ui.js';
 import {EMOTES} from './emotes.js';
+import {needsMouseCapture,matchInviteURL} from './gameplay-access.js';
 import {CROWN_ICON} from './crowns.js';
 import {LobbyNews} from './lobby-news.js';
 import {publicMatchOptions} from './public-royale.js';
@@ -369,7 +370,7 @@ function reportProblemMenu(){
  modal('Report a problem',`<p>Your error details go to the owner’s private support inbox.</p><p class="error-box">${esc(context.message)}</p><form id="problem-report-form"><label for="problem-notes">WHAT HAPPENED? (OPTIONAL)</label><textarea id="problem-notes" class="field" maxlength="300" rows="4"></textarea><button class="primary" type="submit">SEND REPORT</button></form><p id="problem-status" role="status"></p>`,'problem-report');
  $('#problem-report-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button'),status=$('#problem-status');button.disabled=true;status.textContent='Sending…';try{await party.request('problem-report',{reportId,text:problemText(context,$('#problem-notes').value)});if(form.isConnected){form.hidden=true;status.textContent='Report sent to support. Thank you.';}}catch(error){if(form.isConnected){status.textContent=error.message+' Your report is still here. Retry when connected.';button.disabled=false;}}};
 }
-function errorToast(message,title='Connection or service error'){rememberProblem(title,message);toast(message);const button=document.createElement('button');button.dataset.action='report-problem';button.textContent='REPORT PROBLEM';$('#toast').append(button);toastUntil=performance.now()+12000;}
+function errorToast(message,title='Connection or service error'){rememberProblem(title,message);toast(message);const button=document.createElement('button');button.dataset.action='report-problem';button.textContent='F8 · REPORT PROBLEM';$('#toast').append(button);toastUntil=performance.now()+12000;}
 function modal(title, body, type = "generic") {
   if(needsPlayerName(profile.name)&&type!=='name-required'){requiredNamePrompt();return;}
   if(type==="error")sound.cue("ui-error");
@@ -386,7 +387,7 @@ function modal(title, body, type = "generic") {
   if(type==='results'){const p=state?.players.find(p=>p.id===localId);body=`<div class="split-actions">${canCelebrate(state,p)?'<button data-action="emotes">CELEBRATE</button>':''}<button data-action="watch-winner">WATCH WINNER</button></div>`+body;}
   if(['results','pause','settings','social','chat-controls'].includes(type))body+='<button data-action="voice-chat">VOICE CHAT</button>';
   if(type==='error')hideLoading(true);
-  if(type!=='problem-report'&&(type==='error'||body.includes('class="error-box"'))){const temp=document.createElement('div');temp.innerHTML=body;rememberProblem(title,temp.querySelector('.error-box')?.textContent||temp.textContent);body+='<button data-action="report-problem">REPORT PROBLEM</button>';}
+  if(type!=='problem-report'&&(type==='error'||body.includes('class="error-box"'))){const temp=document.createElement('div');temp.innerHTML=body;rememberProblem(title,temp.querySelector('.error-box')?.textContent||temp.textContent);body+='<button data-action="report-problem">F8 · REPORT PROBLEM</button>';}
   const connectingArt=type==='connecting'?showLoading('ESTABLISHING MATCH UPLINK','Connecting to the room service.',{kind:'connect'}):null;
   dialog.innerHTML = type==='connecting'?loadingMarkup('ESTABLISHING MATCH UPLINK','Connecting to the room service. You can cancel at any time.',true,{kind:'connect',art:connectingArt}):`<div class="dialog-head"><h2>${title}</h2><button class="close-btn" data-action="close" aria-label="Close dialog">×</button></div><div class="dialog-body">${body}</div>`;
   if (!dialog.open) dialog.showModal();
@@ -419,7 +420,7 @@ function notice(text,duration=2600) {
 function settingsMenu() {
   modal(
     "Settings",
-    `<p>Settings are saved on this browser.</p><button class="slider-reset-all" data-reset-slider="all">Reset all sliders</button>${SLIDERS
+    `<p>Settings are saved on this browser.</p><div class="setting-row"><label for="playerName" class="setting-label">Display name <small>${esc(profile.name)}</small></label><button id="playerName" data-settings-row="playerName" data-action="profile">CHANGE NAME</button></div><button class="slider-reset-all" data-reset-slider="all">Reset all sliders</button>${SLIDERS
       .map(
         ([id, label, min, max, step]) =>
           `<div class="setting-row"><label class="setting-label" for="${id}">${label} <output id="out-${id}">${settings[id]}</output></label><div class="slider-controls"><input type="range" id="${id}" data-setting="${id}" min="${min}" max="${max}" step="${step}" value="${settings[id]}"><button class="slider-reset" data-reset-slider="${id}" aria-label="Reset ${label}">Reset</button></div></div>`,
@@ -471,7 +472,7 @@ function helpMenu() {
   );
 }
 function ruleSummary(o) {
-  if(o.mode==='zonewars')return `Solo · First to ${o.scoreLimit} rounds · 16 building spawns · 50 siphon`;
+  if(o.mode==='zonewars')return `Solo · ${o.scoreLimit?'First to '+o.scoreLimit+' rounds':'Infinite rounds · Every round win counts'} · 16 building spawns · 50 siphon`;
   if(o.mode==='boxfight')return `${boxFormat(o)} · First to ${o.scoreLimit} rounds · 500 wood · 50 siphon`;
   if(o.mode==='zombies')return `${o.capacity} cooperative seats · Blacktide Exclusion Coast · 25-minute expedition · Complete 3 contracts, then extract`;
   if(o.mode==='royale')return `${o.teamSize===4?'Squads':o.teamSize===2?'Duos':'Solo'} · ${o.capacity} contestants · ${o.fill?"Fill with bots":o.bots+" bots"} · ${o.storm==='quick'?'Quick':'Normal'} storm · One life`;
@@ -873,11 +874,13 @@ function enterGame(capture = false) {
   resume(capture||state.options.mode==='zonewars'||state.options.mode==='boxfight'||state.options.mode==='royale'||state.options.mode==='zombies');
 
 }
+let capturePendingUntil=0;
 function mouseCapturePrompt() {
-  if(screen==='game' && !document.pointerLockElement && (state?.royale||state?.zombies))
-    modal(state?.zonewars?"Enter Zone Wars":state?.boxfight?"Enter Box Fights":state?.zombies?"Enter Blacktide Extraction":"Enter Battle Royale", `<p>Click to capture your mouse and look around.</p><button class="primary" data-action="resume">ENTER GAME</button>`, "ready");
+  const player=state?.players.find(p=>p.id===localId);
+  if(screen!=='game'||state?.phase!=='playing'||player?.health<=0||player?.spectating||document.pointerLockElement||chat.opened||dialog.open&&dialogType!=='ready')return;
+  modal("Enter Game", `<p>Click Enter Game to lock your mouse and use your mouse or trackpad to look around. Press Esc to release it.</p><button class="primary" data-action="resume" autofocus>ENTER GAME</button><button data-action="pause">GAME MENU</button>`, "ready");
 }
-document.addEventListener('pointerlockerror',mouseCapturePrompt);
+document.addEventListener('pointerlockerror',()=>{capturePendingUntil=0;mouseCapturePrompt();});
 async function resume(capture = true) {
   dialog.close();
   dialogType = "";
@@ -891,13 +894,14 @@ async function resume(capture = true) {
   $("#world").focus({preventScroll:true});
   sound.unlock();
   if (capture && !state?.players.find(p => p.id === localId)?.spectating && !matchMedia("(pointer:coarse)").matches) {
+    capturePendingUntil=performance.now()+1000;
     try {
       const result = $("#world").requestPointerLock();
       if (result?.catch) await result;
     } catch {
-      if(state?.royale)mouseCapturePrompt();
-      else pauseMenu();
+      capturePendingUntil=0;mouseCapturePrompt();
     }
+
   }
 }
 let spectateTarget = null,watchSent=null,watchSentAt=0,watcherIds=[],watcherRound=null;
@@ -1018,7 +1022,7 @@ function openEmotes(){
 function playEmote(id){
  const def=EMOTES.find(e=>e.id===id);if(!def)return;
  if(screen==='menu'){if(def.locked&&!crownStatus.unlocked)return;view.lobbyEmote={id,start:view.clock,until:def.duration?view.clock+def.duration:0};view.lobbyCrownWins=crownStatus.wins;dialog.close();dialogType='';return;}
- sendPlayerAction('emote-'+id);buildUI.cancel();buildControls.buildMode=false;void resume(state?.phase!=='results');
+ actionToggles.reset();keys.clear();queuedActions.clear();input.fire=input.aim=false;sendPlayerAction('emote-'+id);buildUI.cancel();buildControls.buildMode=false;void resume(state?.phase!=='results');
 }
 function resultsMenu() {
   if(state?.zonewars){modal('ZONE WARS · SERIES RESULTS',zoneResultsMarkup(state,localId,!!sim||net?.isHost),'results');return;}
@@ -1284,6 +1288,7 @@ async function copy(text) {
       `<p>Select and copy the text below.</p><input class="field" readonly value="${esc(text)}" style="margin-top:16px">`,
       "copy",
     );
+    const field=dialog.querySelector('input');field.focus();field.select();
   }
 }
 async function partyRequest(type,data={}){
@@ -1534,11 +1539,7 @@ const actions = {
   },
   "copy-code": () => copy(formatCode(net.code)),
   "copy-link": () => {
-    const u = new URL(location.href);
-    u.search = "";
-    u.hash = "";
-    u.searchParams.set("room", net.code);
-    copy(u.href);
+    try{void copy(matchInviteURL(location.href,net?.code));}catch(error){toast(error.message);}
   },
   about: () =>
     modal(
@@ -1635,20 +1636,10 @@ dialog.addEventListener("cancel", (e) => {
   else closeDialog();
 });
 document.addEventListener("pointerlockchange", () => {
-  // The owner editor owns capture during Test walk even though the game is paused.
   if(screen==='editor'&&mapEditor?.walking&&document.pointerLockElement===mapEditor.canvas)return;
-  // A capture request can finish after a menu opens. Keep menu buttons usable.
+  capturePendingUntil=0;
   if(document.pointerLockElement&&(paused||dialog.open||chat.opened||screen!=="game")){document.exitPointerLock();return;}
-  if (
-    !document.pointerLockElement &&
-    screen === "game" &&
-    !paused &&
-    !buildControls.editing &&
-    !chat.opened &&
-    state?.players.find(p => p.id === localId)?.health > 0 &&
-    !matchMedia("(pointer:coarse)").matches
-  )
-    pauseMenu();
+  if(needsMouseCapture({screen,phase:state?.phase,player:state?.players.find(p=>p.id===localId),locked:document.pointerLockElement,paused,dialog:dialog.open,chat:chat.opened,hidden:document.hidden,coarse:matchMedia("(pointer:coarse)").matches}))mouseCapturePrompt();
 });
 function pressControl(code) {
   if(state?.boxfight&&state.players.find(p=>p.id===localId)?.spectating&&['ArrowLeft','ArrowRight'].includes(code)){switchSpectator(code==='ArrowLeft'?-1:1);return;}
@@ -1740,6 +1731,7 @@ function pointerPanelToggle(e){
 document.addEventListener('mousedown',pointerPanelToggle,true);
 document.addEventListener('wheel',pointerPanelToggle,{capture:true,passive:false});
 document.addEventListener("keydown", (e) => {
+  if(e.code==='F8'&&dialogType!=='problem-report'&&!e.target.matches('input,textarea,[contenteditable=true]')){const connection=!matchConnectionUI.root.hidden,problem=dialog.open&&!!dialog.querySelector('[data-action=report-problem]')||performance.now()<toastUntil&&!!$('#toast [data-action=report-problem]');if(connection||problem){e.preventDefault();if(!e.repeat)(connection?actions['report-connection']:reportProblemMenu)();return;}}
   if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();leaderboardTab=e.key==='Home'?'kills':e.key==='End'?'wins':leaderboardTab==='kills'?'wins':'kills';menuModel();renderLeaderboard(true);void refreshLeaderboards(true);return;}
   if (chat.opened || e.target.matches("input,select,textarea,[contenteditable=true]")) return;
   const panel = screen==='game' && state?.royale && (!paused || ['royale-map','royale-inventory'].includes(dialogType))
@@ -2025,6 +2017,7 @@ function loop(now) {
   publicJoinNotice.update(screen==='menu'&&!dialog.open,party);
 
   matchConnectionUI.update(net,screen==='game',now);
+  if(needsMouseCapture({screen,phase:state?.phase,player:state?.players.find(p=>p.id===localId),locked:document.pointerLockElement,paused,dialog:dialog.open,chat:chat.opened,hidden:document.hidden,coarse:matchMedia("(pointer:coarse)").matches,pending:now<capturePendingUntil}))mouseCapturePrompt();
   pumpNetworkInput(now);
   if(state){view.buildMap=getMap(state.options.map);if(state.royale)applyBuildState(view.buildMap,state.royale);}
 
@@ -2161,6 +2154,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
     resume:()=>resume(false),
     loadingFixture:fn=>fn(view),
     connectionError:message=>callbacks().onError(message),
+    connectionFixture:fn=>fn(net),
     refreshSocial:scheduleSocialRefresh,
     leave:()=>leave(),
     startFixture:opts=>{options=matchOptions({...opts,session:'offline'});beginSim();return launchRound();},

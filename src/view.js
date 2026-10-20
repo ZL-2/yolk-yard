@@ -948,7 +948,7 @@ export class View {
       this.actorFrustum.setFromProjectionMatrix(this.actorMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse));
       for (const source of state.players) {
         let p=source.id===local?.id&&this.renderLocalActor?this.renderLocalActor:source;
-        if((p.emote||p.id===this.celebrationTarget)&&(state.phase==='results'||p.zExtracted))p={...p,health:100,spectating:false,flight:'ground',grounded:true,downed:false};
+        if((p.emote||p.id===this.celebrationTarget)&&(state.phase==='results'||state.boxfight?.stage==='intermission'||p.zExtracted))p={...p,health:100,spectating:false,flight:'ground',grounded:true,downed:false};
         // Transport passengers share one simulation position; the airship
         // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;

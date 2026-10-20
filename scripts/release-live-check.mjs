@@ -22,9 +22,9 @@ await wait(async()=>{
  try{[published,health]=await Promise.all([get(front+'version.json?t='+Date.now()),get(relay+'/health')]);return published.build===expected&&health.build===expected&&published.appVersion===version&&health.gameVersion===VERSION&&health.deployment?.updating===false&&health.socialAvailable;}
  catch(e){lastError=e.message;return false;}
 },'Website and relay must finish the same release'+(lastError||''),360000);
-assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,3);assert.equal(health.boxFightRevision,2);assert.ok(health.privateModes.includes('boxfight'));assert.equal(health.zoneWarsRevision,2);assert.ok(health.privateModes.includes('zonewars'));assert.equal(health.leaderboardRevision,3);
+assert.equal(published.protocol,VERSION);assert.equal(health.publicHosting,'player');assert.ok(health.serverModes.includes('zombies'));assert.equal(health.zombiesRevision,3);assert.equal(health.boxFightRevision,2);assert.ok(health.privateModes.includes('boxfight'));assert.equal(health.zoneWarsRevision,3);assert.ok(health.privateModes.includes('zonewars'));assert.equal(health.leaderboardRevision,3);
 const history=await get(front+'release-history.json?t='+Date.now());assert.equal(history.build,expected);assert.equal(history.releases[0].number,published.release);
-assert.equal(health.voiceRevision,1);assert.equal(health.emoteRevision,2);
+assert.equal(health.voiceRevision,1);assert.equal(health.emoteRevision,3);
 const board=await get(relay+'/leaderboards');assert.ok(Array.isArray(board.kills.rows)&&Array.isArray(board.wins.rows));
 
 // A separate private room exercises the deployed relay without entering the

@@ -15,7 +15,7 @@ import {validLootPoint} from '../src/royale-loot.js';
 const setup=(options={},count=2)=>{const s=new ZoneWarsSimulation({fill:false,...options});s.addPlayer('a',{name:'Alpha'});s.addPlayer('b',{name:'Bravo'});for(let i=2;i<count;i++)s.addPlayer('human-'+i,{name:'Human '+i});s.startRound();return s;};
 const fight=s=>{s.boxEnd=s.time;s.tick(1/30);assert.equal(s.boxStage,'fight');};
 test('Zone Wars has a distinct public pool and configurable private solo rooms',()=>{
- const p=publicMatchOptions({mode:'zonewars',capacity:2,building:false,scoreLimit:1,fill:false});assert.equal(p.capacity,16);assert.equal(p.scoreLimit,5);assert.equal(p.fill,false);assert.equal(p.bots,0);assert.equal(p.building,true);assert.equal(p.boxFormat,'ffa');assert.notEqual(publicPoolKey(p),publicPoolKey({mode:'royale'}));
+ const p=publicMatchOptions({mode:'zonewars',capacity:2,building:false,scoreLimit:1,fill:false});assert.equal(p.capacity,16);assert.equal(p.scoreLimit,0);assert.equal(p.fill,false);assert.equal(p.bots,0);assert.equal(p.building,true);assert.equal(p.boxFormat,'ffa');assert.notEqual(publicPoolKey(p),publicPoolKey({mode:'royale'}));
  const s=new ZoneWarsSimulation({fill:false});s.addPlayer('a',{name:'Alfa'});assert.equal(s.configure({capacity:4,scoreLimit:7,fill:false}),true);assert.equal(s.options.mode,'zonewars');assert.equal(s.options.capacity,4);assert.equal(s.options.bots,0);assert.equal(s.map.id,'tilted-district');assert.equal(matchOptions({mode:'zonewars',capacity:500}).capacity,16);
 });
 test('sixteen randomized spawns, balanced random kit roles and intact interior floors',()=>{

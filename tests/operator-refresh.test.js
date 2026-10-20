@@ -21,14 +21,14 @@ test('presence names the current mode and every discovery artwork has an honest 
 
 test('mode counts deduplicate tabs, combine rooms, exclude bots/spectators/disconnects and clear returns',async()=>{
  const peers=new Map(),service=new PartyService({peers},{store:{flush:async()=>{}}}),messages=[];
- const add=(id,mode,room=id)=>{const ws={readyState:1,bufferedAmount:0,send:s=>messages.push(JSON.parse(s)),close(){}},u={id,profile:{name:id},sessions:new Map([[ws,{visible:true,activity:'in-match',mode}]]),ws,inMatch:mode!=='training',matchPeer:id,matchCode:room,matchSession:ws};service.users.set(id,u);service.create(u);if(u.inMatch){const host={id:`yolk-yard-v${VERSION}-${room}`,ws,listing:{mode,phase:'playing'},links:new Map()};peers.set(host.id,host);peers.set(id,{id,ws,links:new Map([[host.id,host]])});}return u;};
+ const add=(id,mode,room=id)=>{const ws={readyState:1,bufferedAmount:0,send:s=>messages.push(JSON.parse(s)),close(){}},u={id,profile:{name:id},sessions:new Map([[ws,{visible:true,activity:'in-match',mode}]]),ws,inMatch:mode!=='training',matchPeer:id,matchCode:room,matchSession:ws};service.users.set(id,u);service.create(u);if(u.inMatch){const host={id:`yolk-yard-v${VERSION}-${room}`,ws,listing:{mode,phase:'playing',public:room!=='private'},links:new Map()};peers.set(host.id,host);peers.set(id,{id,ws,links:new Map([[host.id,host]])});}return u;};
  try{
   const a=add('alpha','royale','public'),b=add('bravo','royale','private'),c=add('charlie','ffa'),d=add('delta','training');
   a.sessions.set({readyState:1,bufferedAmount:0,send(){},close(){}},{visible:true,activity:'in-match',mode:'royale'});
-  assert.deepEqual(service.modeCounts(),{royale:2,ffa:1,training:1});
+  assert.deepEqual(service.modeCounts(),{royale:1,ffa:1,training:1,zonewars:0,boxfight:0,zombies:0});
   service.publishModeCounts();const first=messages.filter(m=>m.type==='mode-counts').length;service.publishModeCounts();assert.equal(messages.filter(m=>m.type==='mode-counts').length,first,'unchanged counts do not fan out again');
   b.spectateLaunch={};c.sessions.get(c.ws).activity='spectating';d.ws.readyState=3;
-  assert.deepEqual(service.modeCounts(),{royale:1,ffa:0,training:0});
+  assert.deepEqual(service.modeCounts(),{royale:1,ffa:0,training:0,zonewars:0,boxfight:0,zombies:0});
   peers.delete(a.matchPeer);assert.equal(service.modeCounts().royale,0,'stale in-match reports cannot resurrect disconnected admitted players');
   service.command(b,{type:'returned'},b.ws);assert.equal(b.sessions.get(b.ws).activity,'lobby');assert.equal(service.modeCounts().royale,0);
  }finally{await service.close();}

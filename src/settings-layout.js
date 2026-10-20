@@ -1,4 +1,5 @@
 const categories=[
+ ['player','◉','Player',['playerName']],
  ['video','▣','Video',['quality','fpsLimit','fov','thirdPersonFov','showFps']],
  ['audio','♫','Audio',['volume','effectsVolume','ambienceVolume','musicVolume','visualSoundEffects','visualFootsteps','visualGunfire','visualBosses','visualOther']],
  ['mouse','↗','Mouse',['sensitivity','adsSensitivity','scopeSensitivity','buildSensitivity','editSensitivity','thirdPersonSensitivity','invert']],
@@ -8,6 +9,7 @@ const categories=[
  ['bindings','⌨','Keybinds',[]]
 ];
 const descriptions={
+ playerName:'Change the name shown in matches, your party, chat and rankings. Your progress and friend code stay with your identity.',
  perspective:'First person is the default. Third person adds a right-shoulder camera for combat, harvesting, building and editing. Scoped weapons still use their optic. Vehicles, flight and spectating use their dedicated cameras. Takes effect immediately and saves on this browser.',
  headBob:'Adjust walking bob of your held weapon. This never changes movement or accuracy.',weaponMotion:'Reduce decorative weapon kick and motion. Actual weapon recoil and aiming remain unchanged.',reducedMotion:'Reduce damage flashes, weapon bob and decorative interface animation without changing combat rules.',hudScale:'Resize the inventory and minimap, within screen-safe limits.',textScale:'Increase interaction, recap and HUD help text size.',highContrast:'Use darker HUD panels and stronger text contrast.',mapSide:'Move the minimap to the opposite side of the screen.',showMinimap:'Hide only the small map. Your full island map remains available.',showCompass:'Show or hide the compass.',buildSensitivity:'Mouse sensitivity multiplier while placing builds.',editSensitivity:'Mouse sensitivity multiplier while editing tiles.',thirdPersonSensitivity:'Mouse sensitivity multiplier during third-person gameplay.',sprintMode:'Hold the binding or press once to toggle. Menus, focus loss and death clear toggles.',crouchMode:'Hold or toggle crouching and sliding. Collision and speed requirements are unchanged.',aimMode:'Hold or toggle aiming. Actual aiming and recoil rules are unchanged.',interactMode:'Hold or toggle searching and reviving. Press again to stop; normal range and damage restrictions still apply.',visualFootsteps:'Show enemy footstep indicators. Teammate footsteps remain hidden.',visualGunfire:'Show gunfire and explosion indicators.',visualBosses:'Show nearby boss sound indicators.',visualOther:'Show chests, traversal and other environmental sound indicators.',
  slot_shotgun:'Places newly collected shotguns into this slot when empty. Existing equipment is never rearranged.',slot_rifle:'Preferred empty slot for rifles and precision weapons. Your manual arrangements are preserved.',slot_healing:'Partial stacks merge first, then use the preferred empty healing slot.',slot_mobility:'Preferred empty slot for Grappler, Shadowstep, Jump Rig, Impulse Charges and Launch Pads.',
@@ -27,7 +29,7 @@ const descriptions={
  chatMode:'Choose filtered messages, quick messages only, or no chat. The safety filter always remains enabled. Mute or report players through Pause → Player controls.'
 };
 export function arrangeSettings(dialog){
- const body=dialog.querySelector('.dialog-body'),rows=new Map([...body.querySelectorAll('[data-setting]')].map(el=>[el.dataset.setting,el.closest('.setting-row')]));
+ const body=dialog.querySelector('.dialog-body'),rows=new Map([...body.querySelectorAll('[data-setting],[data-settings-row]')].map(el=>[el.dataset.setting||el.dataset.settingsRow,el.closest('.setting-row')]));
  const bindings=body.querySelector('.keybind-list'),reset=body.querySelector('[data-reset-slider="all"]'),done=body.querySelector('[data-action="close"]');
  body.replaceChildren();
  body.innerHTML='<nav class="settings-tabs" role="tablist" aria-label="Settings categories"></nav><div class="settings-workspace"><div class="settings-options"></div><aside class="settings-description"><span class="eyebrow">SETTING DETAILS</span><h3></h3><p></p><div class="settings-tip">Make it yours.<br>Saved on this browser.</div></aside></div><footer class="settings-footer"><span>Options save automatically · Keybinds use Apply</span></footer>';

@@ -53,7 +53,7 @@ function collisionGrid(map){
 function queryStamp(grid){if(++grid.stamp===0xffffffff){grid.seen.fill(0);grid.stamp=1;}return grid.stamp;}
 const EMPTY_BOXES=Object.freeze([]);
 export function candidates(map,o,d=null,max=0,radius=RADIUS){
- if(map.theme!=='royale'&&map.theme!=='zonewars')return map.boxes;
+ if(map.theme!=='royale'&&map.theme!=='zonewars'&&map.theme!=='boxfight')return map.boxes;
  const grid=collisionGrid(map);
  // Reuse exact bucket unions for movement and short collision/LOS probes.
  // Cached arrays are read-only; invalidation discards every geometry reference.
@@ -84,7 +84,7 @@ export function candidates(map,o,d=null,max=0,radius=RADIUS){
 }
 export function wallDistance(map, o, d, max = 200) {
   let t = max;
-  if(map.theme!=='royale'&&map.theme!=='zonewars'){for(const b of map.boxes)t=Math.min(t,rayBox(o,d,b,t));}
+  if(map.theme!=='royale'&&map.theme!=='zonewars'&&map.theme!=='boxfight'){for(const b of map.boxes)t=Math.min(t,rayBox(o,d,b,t));}
   else{
    // Visit ray buckets in order and stop at the nearest hit. No candidate Set,
    // strings or result array is allocated for the many bot sight-line probes.

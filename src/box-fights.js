@@ -133,7 +133,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
   if(winner!=null){this.roundWins[winner]=(this.roundWins[winner]||0)+1;for(const p of this.players.values())if(boxTeam(this.options,p)===winner)p.boxWins=this.roundWins[winner];}else this.boxDraws++;
   this.scores=[this.roundWins[0]||0,this.roundWins[1]||0];this.roundHistory.push({round:this.boxRound,winner,reason});this.roundHistory=this.roundHistory.slice(-20);
   this.emit('box-cue',{cue:winner==null?'draw':'round-win',winner,round:this.boxRound});
-  if(winner!=null&&this.roundWins[winner]>=this.options.scoreLimit||this.boxRound>=this.options.scoreLimit*4+10){
+  if(this.options.scoreLimit>0&&(winner!=null&&this.roundWins[winner]>=this.options.scoreLimit||this.boxRound>=this.options.scoreLimit*4+10)){
    const ranking=Object.entries(this.roundWins).sort((a,b)=>b[1]-a[1]);this.seriesWinner=winner!=null&&this.roundWins[winner]>=this.options.scoreLimit?winner:ranking.length&&(!ranking[1]||ranking[0][1]>ranking[1][1])?(this.options.boxFormat==='ffa'?ranking[0][0]:Number(ranking[0][0])):null;
    this.completeBoxSeries(this.seriesWinner);
   }
@@ -160,7 +160,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
    if(p.health<=0||p.spectating)continue;
    const commands=this.movementInput(p,dt);let input=commands?.input||this.inputs.get(p.id);if(!input||this.time-p.lastInput>.4)input={yaw:p.yaw,pitch:p.pitch,slot:p.slot};input=emoteInput(this,p,gateBuildFire(p,input));p.executedShotTime=input.shotTime;
    const slot=clamp(Math.floor(input.slot??p.slot),0,5);if(slot!==p.slot){this.cancelUse(p,'swap');p.slot=slot;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);}
-   const before={x:p.x,y:p.y,z:p.z};this.moveWithCommands(p,input,dt,commands);if(p.health<=0)continue;p.vx=(p.x-before.x)/dt;p.vz=(p.z-before.z)/dt;p.moving=Math.hypot(p.vx,p.vz)>.01;p.aim=!!input.aim&&!p.use&&!!p.inventory[p.slot]?.weapon;p.landing=null;
+   const before={x:p.x,y:p.y,z:p.z};this.moveWithCommands(p,input,dt,p.emote&&commands?{...commands,steps:commands.steps.map(step=>({...step,yaw:p.emote.yaw,pitch:0,forward:0,strafe:0}))}:commands);if(p.health<=0)continue;p.vx=(p.x-before.x)/dt;p.vz=(p.z-before.z)/dt;p.moving=Math.hypot(p.vx,p.vz)>.01;p.aim=!!input.aim&&!p.use&&!!p.inventory[p.slot]?.weapon;p.landing=null;
    this.syncInventory(p);this.updateAccuracy(p,before,dt);if(p.reloadEnd&&this.time>=p.reloadEnd){const item=p.inventory[p.slot];if(item?.weapon){const type=ammoType(item.id),add=Math.min(gun(p).magazine-item.ammo,p.bank[type]);item.ammo+=add;p.bank[type]-=add;}p.reloadEnd=0;this.syncInventory(p);}
    if(input.sprint&&p.use)this.cancelUse(p,'sprint');
    if(input.drop&&!p.dropLatch)this.dropSlot(p);p.dropLatch=!!input.drop;this.interact(p,input,dt);

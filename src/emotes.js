@@ -9,7 +9,7 @@ export function canEmote(p){return !!p&&p.health>0&&!p.spectating&&!p.downed&&!p
 export function startEmote(sim,p,id){
  const def=EMOTES.find(e=>e.id===id);if(!def||p.bot||!canEmote(p)&&!canCelebrate(sim,p)||def.locked&&!p.crownEmoteUnlocked||sim.time<(p.emoteReadyAt||0))return false;
  p.emote={id,start:sim.time,yaw:p.yaw,until:def.duration?sim.time+def.duration:0};p.emoteReadyAt=sim.time+.25;
- if(sim.phase==='results'||sim.boxStage==='intermission'||p.zExtracted){sim.inputs.delete(p.id);sim.remoteInputs?.delete(p.id);}
+ sim.inputs.delete(p.id);sim.remoteInputs?.delete(p.id);
  p.building=false;p.editing=false;p.aim=false;p.reloadEnd=0;p.crouching=false;p.burstLeft=0;p.pendingFireUntil=0;p.sprinting=false;
  sim.emit('emote',{player:p.id,emote:id});return true;
 }
