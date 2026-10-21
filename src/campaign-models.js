@@ -35,20 +35,20 @@ export function createModels(){
   const mag=maker();if(pistol)mag.box(0,-.105,0,.052,.13,.075,poly);else{mag.profile([[-.24,-.04],[-.13,-.04],[-.12,-.18],[-.055,-.28],[-.16,-.30],[-.23,-.19]],.061,poly);for(const x of [-.033,.033])for(let y=-.09;y>-.25;y-=.033)mag.box(x,y,-.175+Math.max(0,-y-.18),.004,.009,.07,'#29332d',.002);}const magazine=mag.finish(true);magazine.name='magazine';g.add(magazine);
   templates.set(id,g);return g.clone(true);
  }
- function soldier(){
+ function soldier(role='rifle'){
   if(!templates.has('soldier')){
    const root=new T.Group(),rig=new T.Group();rig.name='rig';root.add(rig);
    const color='#414b40',dark='#202a28',pad='#323c37',strap='#8d8a70';
-   const body=maker();body.box(0,1.16,0,.38,.46,.22,color,.06);body.box(0,1.24,-.13,.36,.36,.08,pad);body.box(0,1.22,.14,.33,.35,.13,dark);body.box(0,.97,0,.38,.055,.26,dark);for(const x of [-.12,0,.12])body.box(x,1.18,-.196,.095,.15,.075,strap);for(const x of [-.15,.15])body.box(x,1.37,-.14,.045,.12,.05,strap);body.box(.22,1.03,.02,.085,.13,.16,pad);body.box(-.22,1.03,.02,.08,.14,.13,pad);rig.add(body.finish());
-   const head=maker();head.sphere(0,1.61,0,.125,.17,.12,'#605c4f');head.sphere(0,1.7,.012,.15,.10,.145,pad);head.box(0,1.61,-.115,.21,.072,.03,'#182429');head.box(0,1.525,-.09,.17,.11,.085,dark);for(const x of [-.145,.145])head.box(x,1.61,0,.045,.10,.10,dark);head.box(0,1.74,-.14,.075,.055,.055,dark);rig.add(head.finish());
+   const body=maker();body.box(0,1.16,0,.38,.46,.22,color,.06);body.box(0,1.24,-.13,.36,.36,.08,pad);body.box(0,1.22,.14,.33,.35,.13,dark);body.box(0,.97,0,.38,.055,.26,dark);for(const x of [-.12,0,.12])body.box(x,1.18,-.196,.095,.15,.075,strap);for(const x of [-.15,.15])body.box(x,1.37,-.14,.045,.12,.05,strap);for(const y of [1.08,1.16,1.24,1.32])for(const x of [-.13,0,.13])body.box(x,y,-.18,.095,.018,.012,'#222d29',.003);for(const x of [-.17,.17])body.link([x,.99,.15],[x,1.42,.12],.017,strap);body.box(0,1.05,.23,.27,.09,.06,pad);body.box(.22,1.03,.02,.085,.13,.16,pad);body.box(-.22,1.03,.02,.08,.14,.13,pad);rig.add(body.finish());
+   const head=maker();head.sphere(0,1.61,0,.125,.17,.12,'#605c4f');head.sphere(0,1.7,.012,.15,.10,.145,pad);head.box(0,1.61,-.115,.21,.072,.03,'#182429');head.box(0,1.525,-.09,.17,.11,.085,dark);for(const x of [-.145,.145])head.box(x,1.61,0,.045,.10,.10,dark);head.box(0,1.74,-.14,.075,.055,.055,dark);head.link([-.17,1.62,-.01],[-.12,1.53,-.19],.012,dark);head.box(-.12,1.53,-.2,.04,.025,.025,dark);head.box(.08,1.76,.07,.07,.035,.08,strap);head.box(-.08,1.76,.07,.07,.035,.08,strap);rig.add(head.finish());
    for(const side of [-1,1]){
     const hip=new T.Group();hip.name=side<0?'leftLeg':'rightLeg';hip.position.set(side*.115,.91,0);const thigh=maker();thigh.box(0,-.19,0,.17,.42,.20,color,.055);thigh.box(side*.075,-.14,.025,.06,.15,.15,pad);thigh.box(0,-.37,-.10,.13,.13,.04,pad);hip.add(thigh.finish());
     const knee=new T.Group();knee.name=side<0?'leftKnee':'rightKnee';knee.position.y=-.40;const shin=maker();shin.box(0,-.19,.0,.13,.36,.15,color,.04);shin.box(0,-.37,-.055,.15,.13,.26,dark,.03);knee.add(shin.finish());hip.add(knee);rig.add(hip);
     const arm=new T.Group();arm.name=side<0?'leftArm':'rightArm';arm.position.set(side*.24,1.38,0);const upper=maker();upper.box(0,-.13,0,.15,.29,.16,color,.04);upper.box(side*.06,-.07,-.01,.035,.095,.10,strap);arm.add(upper.finish());const elbow=new T.Group();elbow.position.y=-.27;const fore=maker();fore.box(0,-.12,0,.12,.26,.14,color,.04);fore.box(0,-.265,0,.10,.09,.12,dark,.025);elbow.add(fore.finish());elbow.rotation.x=-1.30;arm.rotation.x=-.65;arm.rotation.z=side*-.16;arm.add(elbow);rig.add(arm);
    }
-   const gun=weapon();gun.position.set(.09,1.21,-.35);gun.scale.setScalar(.8);rig.add(gun);templates.set('soldier',root);
+   const gun=weapon();gun.name='heldWeapon';gun.position.set(.09,1.21,-.35);gun.scale.setScalar(.8);rig.add(gun);templates.set('soldier',root);
   }
-  const root=templates.get('soldier').clone(true);root.userData={rig:root.getObjectByName('rig'),left:root.getObjectByName('leftLeg'),right:root.getObjectByName('rightLeg'),lk:root.getObjectByName('leftKnee'),rk:root.getObjectByName('rightKnee')};return root;
+  const root=templates.get('soldier').clone(true);root.userData={rig:root.getObjectByName('rig'),left:root.getObjectByName('leftLeg'),right:root.getObjectByName('rightLeg'),lk:root.getObjectByName('leftKnee'),rk:root.getObjectByName('rightKnee'),la:root.getObjectByName('leftArm'),ra:root.getObjectByName('rightArm'),gun:root.getObjectByName('heldWeapon')};if(role==='support'){const pack=maker();pack.box(0,1.2,.24,.32,.38,.19,'#776c4c');pack.box(.18,1.35,.16,.06,.18,.08,'#252e2c');pack.cylinder(.18,1.62,.16,.008,.4,'#343f3b',[0,0,0]);root.userData.rig.add(pack.finish());}return root;
  }
  function arms(){
   const b=maker(),cloth='#454c3f',glove='#2b342e';b.link([.23,-.47,.26],[.065,-.15,-.025],.073,cloth);b.link([-.26,-.47,.10],[-.075,-.15,-.45],.072,cloth);b.sphere(.064,-.14,-.025,.055,.075,.065,glove);b.sphere(-.05,-.13,-.46,.069,.054,.075,glove);
@@ -60,8 +60,10 @@ export function createModels(){
  return {weapon,soldier,arms,helicopter,dispose(){geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());}};
 }
 
-export function animateSoldier(root,time,speed,dead=0){
- const {rig,left,right,lk,rk}=root.userData;
+export function animateSoldier(root,time,speed,dead=0,crouch=false,reloading=false){
+ const {rig,left,right,lk,rk,la,ra,gun}=root.userData;
  if(dead){rig.rotation.x=-Math.min(1,dead*2)*Math.PI/2;rig.position.y=-Math.min(.7,dead*.8);return;}
- rig.rotation.x=0;rig.position.y=Math.abs(Math.sin(time*8))*Math.min(.035,speed*.02);const stride=Math.sin(time*7)*Math.min(.5,speed*.23);left.rotation.x=stride;right.rotation.x=-stride;lk.rotation.x=Math.max(0,-stride)*1.2;rk.rotation.x=Math.max(0,stride)*1.2;
+ rig.rotation.x=crouch?.12:0;rig.position.y=(crouch?-.5:0)+Math.abs(Math.sin(time*8))*Math.min(.028,speed*.015);const stride=Math.sin(time*7)*Math.min(crouch?.18:.52,speed*.23);
+ left.rotation.x=(crouch?-1.05:0)+stride;right.rotation.x=(crouch?-1.05:0)-stride;lk.rotation.x=(crouch?2.1:0)+Math.max(0,-stride)*1.2;rk.rotation.x=(crouch?2.1:0)+Math.max(0,stride)*1.2;
+ if(la){la.rotation.x=reloading?-1.05:-.65;la.rotation.z=reloading?-.1:.16;ra.rotation.x=reloading?-.4:-.65;gun.rotation.z=reloading?.18:0;gun.rotation.x=reloading?.25:0;}
 }
