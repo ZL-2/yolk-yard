@@ -1,6 +1,5 @@
 import * as T from 'three';
 import {createFacilityLayout,floorAt,surfaceHeight,CollisionIndex,moveFacilityBody} from './campaign-layout.js';
-import {moveBody} from './campaign-mission.js';
 import {FacilityNavigator} from './campaign-navigation.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -35,7 +34,7 @@ export function createWorld(scene){
  }
  for(const s of surfaces){
   if(s.ramp){const a=surfaceHeight(s,s.x,s.z-s.sz/2),b=surfaceHeight(s,s.x,s.z+s.sz/2),pos=[s.x-s.sx/2,a,s.z-s.sz/2,s.x+s.sx/2,a,s.z-s.sz/2,s.x+s.sx/2,b,s.z+s.sz/2,s.x-s.sx/2,b,s.z+s.sz/2],g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute([0,0,s.sx/2,0,s.sx/2,s.sz/2,0,s.sz/2],2));g.setIndex([0,2,1,0,3,2]);g.computeVertexNormals();add(g,m.concrete,0,0,0);
-   for(let z=s.z-s.sz/2+.3;z<s.z+s.sz/2;z+=s.id.includes('stairs')?.45:2){const y=surfaceHeight(s,s.x,z);box(s.x,y+.014,z,s.sx,.025,.05,s.id.includes('stairs')?m.steel:m.paint);}
+   for(let z=s.z-s.sz/2+.3;z<s.z+s.sz/2;z+=s.id.includes('stairs')?.45:2){const y=surfaceHeight(s,s.x,z);if(s.id.includes('stairs')){box(s.x,y,z,s.sx,.18,.45,m.steel);box(s.x,y+.095,z-.2,s.sx,.025,.045,m.paint);}else box(s.x,y+.014,z,s.sx,.025,.05,m.paint);}
    for(const x of [s.x-s.sx/2+.08,s.x+s.sx/2-.08]){beam([x,a+1.05,s.z-s.sz/2],[x,b+1.05,s.z+s.sz/2]);for(let z=s.z-s.sz/2;z<=s.z+s.sz/2;z+=2)cyl(x,surfaceHeight(s,x,z)+.5,z,.035,1.05);}
   }else if(!/upper|roof/.test(s.id)){
    // Concrete terrace retaining faces embedded in the natural cliff, down to rock.

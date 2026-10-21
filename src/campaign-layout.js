@@ -2,7 +2,7 @@ import {moveBody} from './campaign-mission.js';
 // One measured source for rendering, collision, navigation and mission placement.
 // Blueprint X/Y -> world x=X-80, z=110-Y. Heights are metres above sea level.
 export const FACILITY_BOUNDS={minX:-76,maxX:78,minZ:-108,maxZ:108};
-export const FACILITY={operations:{x:32,z:-12,w:48,d:36,ground:12,upper:16,roof:20},dish:{x:-22,z:-40,radius:14,terrace:16},mast:{x:63,z:-67,height:48,base:16},pad:{x:30,z:-92,y:20,radius:13}};
+export const FACILITY={operations:{x:32,z:-12,w:48,d:36,ground:12,upper:16,roof:20},dish:{x:-22,z:-42,radius:14,terrace:16},mast:{x:63,z:-67,height:48,base:16},pad:{x:30,z:-95,y:20,radius:13}};
 export function surfaceHeight(s,x,z){
  if(x<s.x-s.sx/2||x>s.x+s.sx/2||z<s.z-s.sz/2||z>s.z+s.sz/2)return null;
  const t=s.axis==='x'?(x-(s.x-s.sx/2))/s.sx:(z-(s.z-s.sz/2))/s.sz;
@@ -58,6 +58,8 @@ export function createFacilityLayout(){
  for(const x of [8,56])wall('upper-side',x,-12,.55,36,16,4);
  for(const z of [6,-30]){for(const x of [13,23,33,43,53])wall('upper-pier',x,z,1, .55,16,4);wall('upper-sill',32,z,48,.55,16,1.1);wall('upper-header',32,z,48,.55,19,1);}
  floor('operations-roof',32,-12,49,37,20,'darkConcrete');
+ ramp('roof-service-stairs',63,-12,4,20,20,-8);floor('roof-access-bridge',60,-24,9,4,20,'steel');
+ wall('roof-parapet-west',7.6,-12,.4,37,20,.9);wall('roof-parapet-south',32,6.5,49,.4,20,.9);wall('roof-parapet-north',32,-30.5,49,.4,20,.9);wall('roof-parapet-east-south',56.5,-5,.4,23,20,.9);wall('roof-parapet-east-north',56.5,-28,.4,5,20,.9);
  // Upper command gallery and optional information / supplies reward exploration.
  for(const [x,z]of [[22,-2],[29,-2],[39,-2],[45,-2]]){cover('command-console',x,z,3,1.3,16,1.05,'dark');prop('console',x,16,z);}
  wall('upper-room-partition',32,-17,35,.25,16,3.5);prop('table',27,16,-24);prop('workbench',43,16,-24);
@@ -76,6 +78,8 @@ export function createFacilityLayout(){
  cover('pad-crates-west',15,-88,3,2,20);cover('pad-crates-east',45,-97,3,2,20);cover('pad-south',39,-86,4,1.8,20);
  prop('helipad',30,20,-95);prop('supply',26,12,3);prop('supply',46,16,-73);
  for(const [x,y,z]of [[31,4,92],[49,4,65],[31,4,46],[34,8,31],[14,12,19],[63,12,18],[2,12,2],[65,12,-23],[-36,16,-26],[-36,16,-59],[4,16,-45],[53,16,-50],[53,16,-74],[13,20,-89],[47,20,-104]])lights.push({x,y,z});
+ const propBounds={terminal:[1.3,1.6,.55],hvac:[3,1.6,2],radome:[3.6,2.8,3.6],table:[4,.95,1.8],workbench:[4,1.4,1.8],supply:[1.4,1,.65],mast:[2.6,48,2.6]};
+ for(const p of props){const dims=propBounds[p.type];if(dims)box('prop-'+p.type,p.x,p.y+dims[1]/2,p.z,...dims,'dark',{invisible:true});}
  return {boxes,surfaces,covers,props,lights,bounds:FACILITY_BOUNDS};
 }
 // Broad phase for movement / grid construction. Immutable walls are indexed once.

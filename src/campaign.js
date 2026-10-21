@@ -4,9 +4,8 @@ import {createWorld} from './campaign-world.js';
 import {createModels,animateSoldier} from './campaign-models.js';
 import {CampaignAI} from './campaign-ai.js';
 import {cinematicFrame,INTRO_DURATION} from './campaign-cinematic.js';
-import {FACILITY} from './campaign-layout.js';
 import {CampaignAudio} from './campaign-audio.js';
-import {STAGES,ENEMIES,SAVE_KEY,PREF_KEY,groupStage,clamp,distance,readSave,checkpoint,createMission,interactionBlocked,rayBox,blockedRay,moveBody} from './campaign-mission.js';
+import {STAGES,ENEMIES,SAVE_KEY,PREF_KEY,groupStage,clamp,distance,readSave,checkpoint,createMission,interactionBlocked,rayBox,blockedRay} from './campaign-mission.js';
 import './campaign.css';
 
 const ART=import.meta.env.BASE_URL+'campaign/blackglass.webp';
