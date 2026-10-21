@@ -10,7 +10,7 @@ try{
  const relay=`ws://127.0.0.1:${f.app.server.address().port}/game`;
  vite=await createServer({plugins:[{name:'pause-test-relay',configureServer(server){server.middlewares.use((req,res,next)=>{if(req.url?.split('?')[0]!=='/network-config.js')return next();res.setHeader('Content-Type','text/javascript');res.end(`window.YOLK_NETWORK={relay:'${relay}'};`);});}}],server:{host:'127.0.0.1',port:5327,strictPort:true,watch:null}});await vite.listen();
  browser=await chromium.launch({args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
- page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:.5});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
+ page=await browser.newPage({bypassCSP:true,viewport:{width:1440,height:900},deviceScaleFactor:.5});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Pause Check'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,musicVolume:0,fpsLimit:30}));localStorage.setItem('ravelfront-voice-192-dismissed','yes');});
  await page.goto(origin+'/?qa',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__yolkTest?.party().ready);await page.locator('#loading-screen').waitFor({state:'hidden'});
  await page.locator('[data-action=choose-mode]').click();
