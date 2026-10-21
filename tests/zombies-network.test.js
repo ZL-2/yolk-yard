@@ -1,4 +1,7 @@
-import test from 'node:test';
+import nodeTest from 'node:test';
+import {modeAvailable} from '../src/mode-availability.js';
+// Preserve the playable-deployment suite for resumption; pause admission has its own real-socket tests.
+const test=modeAvailable('zombies')?nodeTest:nodeTest.skip;
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';

@@ -7,6 +7,7 @@ import {Simulation} from '../../src/simulation.js';
 import {RoyaleSimulation} from '../../src/royale.js';
 import {VERSION,safeProfile,nameKey} from '../../src/data.js';
 import {matchOptions} from '../../src/match-options.js';
+import {modeAvailable,PAUSED_MODES} from '../../src/mode-availability.js';
 import {SnapshotEncoder,SnapshotBatch} from '../../src/snapshot-codec.js';
 import {ChatRoom} from '../../src/chat.js';
 import {rewardFrame} from '../../src/rewards.js';
@@ -47,6 +48,7 @@ export class MatchAuthority{
   const m=entry.data;if(!m||typeof m!=='object')return true;
   if(m.type==='hello'){
    const reject=reason=>this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason}});
+   if(!modeAvailable(room.sim.options.mode))return reject(PAUSED_MODES[room.sim.options.mode]),true;
    if(m.version!==VERSION||room.kicked.has(peer.progressId))return reject('Refresh the game or choose another room.'),true;
    const profile=safeProfile(m.profile);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
    const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission||(room.recurring||room.zombies)&&!admission)return reject('Party reservation expired. Join the match from Play.'),true;

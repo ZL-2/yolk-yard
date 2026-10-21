@@ -1,4 +1,5 @@
 import {matchOptions} from '../../src/match-options.js';
+import {assertModeAvailable} from '../../src/mode-availability.js';
 import {publicMatchOptions} from '../../src/public-royale.js';
 import {creditReferral,referralSummary} from './referrals.js';
 import {queueMatch,spectateFriend} from './match-launch.js';
@@ -70,6 +71,7 @@ export class PartyService{
  }
  inviteView(i){return {id:i.id,name:this.store.identities.get(i.from)?.profile.name||'Player',size:this.parties.get(i.party)?.members.length||0,expires:i.expires};}
  command(u,m,ws=u.ws){const p=this.parties.get(u.party),leader=()=>{if(p?.leader!==u.id)throw Error('Only the party leader can do that.');},idle=()=>{if(p?.state!=='idle'||u.inMatch)throw Error('Return to the lobby first.');};
+  if(m.type==='select')assertModeAvailable(m.mode);
   switch(m.type){
    case 'voice-ticket':case 'voice-context':return this.relay.voice.command(u,m,ws);
    case 'ping':return {presence:this.presence(u.id)};

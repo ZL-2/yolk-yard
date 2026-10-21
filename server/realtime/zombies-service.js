@@ -4,9 +4,11 @@ import {matchOptions} from '../../src/match-options.js';
 import {ZombiesSimulation} from '../../src/zombies-expedition.js';
 import {ZOMBIES} from '../../src/zombies-config.js';
 import {ChatRoom} from '../../src/chat.js';
+import {assertModeAvailable} from '../../src/mode-availability.js';
 const address=code=>`yolk-yard-v${VERSION}-${code}`;
 const code=()=>Array.from({length:8},()=> 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[randomInt(32)]).join('');
 export function queueZombies(service,u,m){
+ assertModeAvailable('zombies');
  const p=service.parties.get(u.party),a=service.relay.authority,privateMatch=p.selection.access==='private'||!!m.code,options=matchOptions({...p.selection,mode:'zombies',session:'online',sharedWorld:!privateMatch});
  if(!m.code&&p.members.length>options.capacity)throw Error('Choose enough cooperative seats for your party.');
  let room=m.code?a.rooms.get(address(m.code)):null;

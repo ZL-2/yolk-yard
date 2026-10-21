@@ -1,4 +1,5 @@
 import {problemText,captureDialogPosition,restoreDialogPosition} from './problem-reports.js';
+import {modeAvailable,PAUSED_MODES} from './mode-availability.js';
 import {VoiceChat} from './voice-chat.js';
 import {bindLobbyOptions} from './lobby-options.js';
 import {VoiceUI} from './voice-ui.js';
@@ -1298,7 +1299,7 @@ async function partyRequest(type,data={}){
 }
 function playMenu(){modal('CHOOSE GAME MODE',modeMarkup(party?.party?.selection,party?.party?.leader!==party?.id,party?.party?.members.length||1,party?.modeCounts),'play');}
 async function selectExperience(id){
- const e=EXPERIENCES.find(e=>e.id===id);if(!e||e.soon)return;
+ const e=EXPERIENCES.find(e=>e.id===id);if(!e||e.soon||!modeAvailable(e.mode))return;
  if(!party?.ready||party.party.leader!==party.id)return;
  if(e.mode==='training'){if(party.party.members.length>1)return toast('Leave your party to train solo.');leaderboardSelection={playMode:party.party.selection.mode,mode:'training'};closeDialog();actions.training();return;}
  const previous=party.party.selection,teamSize=e.mode==='boxfight'?Math.max(1,party.party.members.length):e.mode==='zombies'?4:e.mode==='royale'?Math.max(previous.teamSize||1,party.party.members.length>2?4:party.party.members.length):1;
@@ -1345,6 +1346,7 @@ async function queueParty(custom=false,code=null){
  if(state){toast('Return to the lobby before finding another match.');return;}
  const selected=custom?getOptions():matchOptions(party?.party?.selection);
  if(!selected)return;
+ if(!code&&!modeAvailable(selected.mode))return toast(PAUSED_MODES[selected.mode]);
  // The custom launch applies its selection atomically, retaining party readiness.
  if(await partyRequest('queue',{custom,code,options:selected,visibility:custom?'private':'public'})){dialog.close();dialogType='';renderMenu();}
 }

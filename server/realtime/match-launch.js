@@ -2,6 +2,7 @@ import {randomUUID,randomInt} from 'node:crypto';
 import {queueZombies} from './zombies-service.js';
 import {VERSION} from '../../src/data.js';
 import {matchOptions} from '../../src/match-options.js';
+import {assertModeAvailable} from '../../src/mode-availability.js';
 import {MAX_SPECTATORS} from '../../src/royale-phases.js';
 import {PUBLIC_ROYALE,publicMatchOptions,isPublicCode} from '../../src/public-royale.js';
 const address=code=>`yolk-yard-v${VERSION}-${code}`;
@@ -16,11 +17,13 @@ export function queueMatch(service,u,m){
   const target=service.relay.publicHost?.rooms.get(m.targetPublic),server=authority?.rooms.get(address(m.targetPublic));
   if(!target&&(!server?.zombies||server.visibility!=='public'))throw Error('That public match has ended.');
   const mode=target?.options.mode||'zombies';for(const id of p.members)service.relay.owner?.assertAdmission(id,mode,'public');
+  assertModeAvailable(mode);
   if(server?.zombies)return queueZombies(service,u,{...m,code:m.targetPublic,exactPublic:true});
   return queuePublicMatch(service,u,m);
  }
  const destination=m.code?service.relay.peers.get(address(m.code))?.listing:null;
  const selectedMode=destination?.mode||(!m.code&&m.custom?m.options?.mode:null)||p.selection.mode;
+ assertModeAvailable(selectedMode);
  const access=destination?destination.public===false?'private':'public':m.code?'private':m.custom?'private':p.selection.access||'public';
  for(const id of p.members)service.relay.owner?.assertAdmission(id,selectedMode,access);
  if(p.selection.mode==='zombies'||m.code&&authority?.rooms.get(address(m.code))?.zombies)return queueZombies(service,u,m);
@@ -72,6 +75,7 @@ export function spectateFriend(service,u,m){
  const friend=service.users.get(m.id),location=service.matchLocation(friend);
  if(!location||friend.spectateLaunch)throw Error('Your friend is no longer in a match.');
  const room=location.room,capacity=service.relay.authority?.capacity,key=location.key;
+ assertModeAvailable(location.listing.mode);
  service.relay.owner?.assertAdmission(u.id,location.listing.mode,location.listing.public===false?'private':'public');
  if(room&&capacity){const plan=room.recurring?{ok:capacity.spectators(room)+capacity.pending(key,true)<MAX_SPECTATORS,reason:'The public spectator seats are full. Try again shortly.'}:capacity.plan(room.sim.options,{key,humans:capacity.humans(room)+capacity.pending(key),spectators:capacity.spectators(room)+capacity.pending(key,true)+1,botLimit:room.sim.botLimit});if(!plan.ok)throw Error(plan.reason);}
  const publicRoom=service.relay.publicHost?.roomByAddress(key);if(publicRoom&&publicRoom.summary().availableSpectators<1)throw Error('The public spectator seats are full.');
