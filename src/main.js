@@ -258,7 +258,21 @@ const touch = {
 $("#app").innerHTML =
   `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><i id="scope-spread" aria-hidden="true"></i><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="notice elimination-notice" id="elimination-notice" role="status"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">OPERATOR ELIMINATED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div id="arena-stamina" hidden><span>TACTICAL SPRINT</span><progress id="arena-stamina-fill" max="100" value="100"></progress></div><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Field ready</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="crouch">CROUCH / SLIDE</button><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
 const dialog = $("#dialog");
-let mapEditor=null;
+let mapEditor=null,campaign=null,campaignOpening=false;
+async function openOwnerCampaign(){
+ if(screen!=='menu'||campaign||campaignOpening)return;
+ if(party?.party?.state==='queueing')throw Error('Cancel matchmaking before opening the campaign.');
+ campaignOpening=true;
+ try{
+  const {BlackglassCampaign}=await import('./campaign.js');
+  if(screen!=='menu')return;
+  dialog.close();dialogType='';paused=true;screen='campaign';keys.clear();input.fire=input.aim=false;
+  sound.stopWorld();sound.lobbyMusic.update(false,.1);publicJoinNotice.root?.setAttribute('hidden','');
+  campaign=new BlackglassCampaign({volume:settings.volume,onClose:(returnToOwner)=>{campaign=null;screen='menu';paused=false;lastTime=performance.now();renderMenu();if(returnToOwner)void ownerConsole.refresh();}});
+  await campaign.open();
+ }catch(error){campaign?.close();campaign=null;if(screen==='campaign'){screen='menu';paused=false;renderMenu();}throw error;}
+ finally{campaignOpening=false;}
+}
 async function openOwnerMapEditor(overview){
  if(screen!=='menu'||mapEditor)return;
  const {MapEditor}=await import('./map-editor.js');
@@ -270,7 +284,7 @@ let briefingsComplete=false;
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerRuntime=new OwnerRuntime();
-const ownerConsole=new OwnerConsole({identity:()=>party?.id,onMapEditor:openOwnerMapEditor,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
+const ownerConsole=new OwnerConsole({identity:()=>party?.id,onMapEditor:openOwnerMapEditor,onCampaign:openOwnerCampaign,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 startAnonymousVisits(()=>screen==='game'?(state?.options?.training?'training':state?.options?.mode||options.mode||'royale'):screen==='lobby'?'lobby':screen==='editor'?'editor':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(eggWallet.value.balance);if(eggShop?.root?.isConnected)eggShop.render();if(screen==='menu'&&menuSection==='career')renderMenu(true);}});
@@ -1355,6 +1369,7 @@ async function queuePublicRoyale(spectate=false){
  if(await partyRequest('queue',{publicRoyale:true,spectate})){dialog.close();dialogType='';renderMenu();}
 }
 async function launchParty(launch){
+ campaign?.close({returnToOwner:false});
  if(activeLaunch===launch.id)return;activeLaunch=launch.id;
  if(net||state)leave(false,false);
  let ok=false;
@@ -1640,6 +1655,7 @@ dialog.addEventListener("cancel", (e) => {
   else closeDialog();
 });
 document.addEventListener("pointerlockchange", () => {
+  if(screen==='campaign')return;
   if(screen==='editor'&&mapEditor?.walking&&document.pointerLockElement===mapEditor.canvas)return;
   capturePendingUntil=0;
   if(document.pointerLockElement&&(paused||dialog.open||chat.opened||screen!=="game")){document.exitPointerLock();return;}
@@ -2016,7 +2032,7 @@ const lobbyStatus=new LobbyStatus();
 const snapshotTimes=new WeakMap(),framePacer=new FramePacer();
 const publicJoinNotice=new PublicJoinNotice(async event=>{if(screen!=='menu'||state)return;if(await partyRequest('queue',{targetPublic:event.code,targetMatch:event.matchId})){dialog.close();dialogType='';publicJoinNotice.events=[];renderMenu();}});
 function loop(now) {
-  if(screen==='editor'){lastTime=now;requestAnimationFrame(loop);return;}
+  if(screen==='editor'||screen==='campaign'){lastTime=now;requestAnimationFrame(loop);return;}
   lobbyStatus.update(now,now-lastTime,net,screen);
   publicJoinNotice.update(screen==='menu'&&!dialog.open,party);
 
@@ -2155,6 +2171,7 @@ try {
 // Development-only diagnostics. Vite removes this branch from the published bundle.
 if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
   window.__yolkTest = {
+    campaign:()=>campaign,
     resume:()=>resume(false),
     loadingFixture:fn=>fn(view),
     connectionError:message=>callbacks().onError(message),

@@ -1,7 +1,7 @@
 name: Test and publish Ravelfront
 on:
   push:
-    branches: [main]
+    branches: [main, codex/blackglass]
     paths-ignore: [public/room-test.html, public/room-test.js, public/server-check.html, public/server-check.js, .github/workflows/publish-room-test.yml]
   pull_request:
   workflow_dispatch:
@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      campaign_update: ${{ steps.scope.outputs.campaign_update }}
       zombies_pause_update: ${{ steps.scope.outputs.zombies_pause_update }}
       match_flow_update: ${{ steps.scope.outputs.match_flow_update }}
       comms_preferences_update: ${{ steps.scope.outputs.comms_preferences_update }}
@@ -265,6 +266,13 @@ jobs:
             out.write('zombies_pause_update='+str(zombies_pause_update).lower()+'\n')
             if zombies_pause_update: out.write('focused=true\n')
           print('Zombies pause update:',zombies_pause_update)
+          campaign_files=set(subprocess.check_output(['git','diff','--name-only','7711400b286768876ea253f058efd2cc52de3b94','HEAD'],text=True).splitlines())
+          campaign_allowed={'.github/workflows/pages.yml','package.json','package-lock.json','docs/CAMPAIGN_BLACKGLASS.md','public/campaign/blackglass.webp','src/campaign.js','src/campaign.css','src/campaign-owner.css','src/campaign-mission.js','src/campaign-models.js','src/campaign-world.js','src/campaign-audio.js','src/main.js','src/owner-console.js','src/releases.js','scripts/campaign-browser.mjs','scripts/owner-browser-check.mjs','scripts/match-desktop-check.mjs','tests/campaign.test.js'}
+          campaign_update=campaign_files<=campaign_allowed and {'src/campaign.js','src/campaign-mission.js','src/owner-console.js','scripts/campaign-browser.mjs','tests/campaign.test.js'}<=campaign_files and json.loads(Path('package.json').read_text()).get('version')=='6.11.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('campaign_update='+str(campaign_update).lower()+'\n')
+            if campaign_update: out.write('focused=true\n')
+          print('Campaign update:',campaign_update)
           print('Match flow update:',match_flow_update)
           print('Comms preferences update:',comms_preferences_update)
           print('Crew and field update:',crew_field_update)
@@ -453,6 +461,9 @@ jobs:
           name: match-flow-performance
           path: test-results/match194/performance.json
           retention-days: 14
+      - name: Campaign checkpoints, cover, admission and release history
+        if: needs.scope.outputs.campaign_update == 'true'
+        run: node --test tests/campaign.test.js tests/release-history.test.js
       - name: Zombies pause, invitation admission, retained simulation and release history
         if: needs.scope.outputs.zombies_pause_update == 'true'
         run: node --test --test-concurrency=2 tests/zombies-pause.test.js tests/exact-public-join.test.js tests/zombies-expedition.test.js tests/release-history.test.js
@@ -502,6 +513,21 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true'
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/codex/blackglass'
+        with:
+          name: campaign-desktop-runtime
+          path: /home/runner/.cache/ms-playwright/chromium_headless_shell-*/
+          retention-days: 1
+      - name: Desktop owner campaign, combat, objectives, checkpoint recovery and exit
+        if: needs.scope.outputs.campaign_update == 'true'
+        run: node scripts/campaign-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.campaign_update == 'true'
+        with:
+          name: blackglass-desktop
+          path: test-results/campaign
+          retention-days: 7
       - name: Desktop paused Zombies card and available modes
         if: needs.scope.outputs.zombies_pause_update == 'true'
         run: node scripts/zombies-pause-browser.mjs
