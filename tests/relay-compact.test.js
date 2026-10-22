@@ -32,7 +32,7 @@ test('private hosts admit all 48 contestant seats and spectator transport channe
 test('UTF-8 batches stay below the server frame limit and retain all action entries',()=>{
  const {peer,frames}=transport(false);peer.socket.bufferedAmount=100000;
  for(let i=0;i<5;i++)peer.enqueue({type:'data',channel:i%2?'a':'b',data:{type:'action',index:i,text:'界'.repeat(150000)}});
- assert.equal(peer.destroyed,undefined);peer.socket.bufferedAmount=0;peer.flush();
+ assert.equal(peer.destroyed,undefined);peer.socket.bufferedAmount=0;peer.flush(true);
  assert.ok(frames.length>1,'Wire bytes, rather than JavaScript string length, split the batch');
  assert.ok(frames.every(frame=>Buffer.byteLength(JSON.stringify(frame))<2000000));
  assert.deepEqual(frames.flatMap(frame=>frame.messages.map(m=>m.data.index)),[0,1,2,3,4]);

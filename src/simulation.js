@@ -9,7 +9,7 @@ import {arenaSpawnPoints} from './arena-spawns.js';
 import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
 import {sightRay,thirdPersonActive} from './perspective.js';
 import {RemoteInputBuffer} from './remote-input.js';
-import {resetStance,eyeHeight,eyePosition,canFight} from './stance.js';
+import {resetStance,eyeHeight,eyePosition,leanAmount,canFight} from './stance.js';
 import {updateCombatAccuracy,firedAccuracy,pelletOffsets,falloffAt,structureDamage,weaponReadyAt,rememberShot,triggerRequested} from './combat.js';
 import {arenaBonuses,resetBonuses,updateBonuses,awardBonus} from './streaks.js';
 import {botInput as tacticalBotInput} from './bots.js';
@@ -462,7 +462,7 @@ export class Simulation {
   }
   recordPoses(){
     this.poseHistory??=new Map();
-    for(const p of this.players.values()){let h=this.poseHistory.get(p.id);if(!h){h=[];this.poseHistory.set(p.id,h);}if(h.at(-1)?.time>this.time-1/30)continue;h.push({time:this.time,x:p.x,y:p.y,z:p.z,yaw:p.yaw,lean:p.lean||0,flight:p.flight,vx:p.vx,vz:p.vz,sprinting:p.sprinting,crouching:p.crouching,lowCrouch:p.lowCrouch,sliding:p.sliding,downed:p.downed});while(h.length>10)h.shift();}
+    for(const p of this.players.values()){let h=this.poseHistory.get(p.id);if(!h){h=[];this.poseHistory.set(p.id,h);}if(h.at(-1)?.time>this.time-1/30)continue;h.push({time:this.time,x:p.x,y:p.y,z:p.z,yaw:p.yaw,grounded:p.grounded,lean:leanAmount(p),flight:p.flight,vx:p.vx,vz:p.vz,sprinting:p.sprinting,crouching:p.crouching,lowCrouch:p.lowCrouch,sliding:p.sliding,downed:p.downed});while(h.length>10)h.shift();}
     for(const id of this.poseHistory.keys())if(!this.players.has(id))this.poseHistory.delete(id);
   }
   shotPose(target,shooter,w){
@@ -472,7 +472,13 @@ export class Simulation {
     if(!history?.length)return target;
     const after=history.find(v=>v.time>=time)||history.at(-1),before=history.findLast(v=>v.time<=time)||history[0],f=clamp((time-before.time)/(after.time-before.time||1),0,1);
     if(Math.hypot(target.x-before.x,target.y-before.y,target.z-before.z)>5)return target;
-    return {...target,lean:(before.lean||0)+((after.lean||0)-(before.lean||0))*f,yaw:before.yaw??target.yaw,flight:before.flight??target.flight,vx:before.vx??target.vx,vz:before.vz??target.vz,sprinting:before.sprinting??target.sprinting,crouching:before.crouching??target.crouching,lowCrouch:before.lowCrouch??target.lowCrouch,sliding:before.sliding??target.sliding,downed:before.downed??target.downed,x:before.x+(after.x-before.x)*f,y:before.y+(after.y-before.y)*f,z:before.z+(after.z-before.z)*f};
+    return {health:target.health,grounded:before.grounded??target.grounded,lean:(before.lean||0)+((after.lean||0)-(before.lean||0))*f,yaw:before.yaw??target.yaw,flight:before.flight??target.flight,vx:before.vx??target.vx,vz:before.vz??target.vz,sprinting:before.sprinting??target.sprinting,crouching:before.crouching??target.crouching,lowCrouch:before.lowCrouch??target.lowCrouch,sliding:before.sliding??target.sliding,downed:before.downed??target.downed,x:before.x+(after.x-before.x)*f,y:before.y+(after.y-before.y)*f,z:before.z+(after.z-before.z)*f};
+  }
+  cachedShotPose(target,shooter,w,poses){
+    if(!poses)return this.shotPose(target,shooter,w);
+    let pose=poses.get(target.id);
+    if(!pose){pose=this.shotPose(target,shooter,w);poses.set(target.id,pose);}
+    return pose;
   }
   updateAccuracy(p, previous, dt) {
     const w=gun(p),a=p.accuracyState[p.slot]??={};
@@ -480,7 +486,7 @@ export class Simulation {
     updateCombatAccuracy(seated?{...p,grounded:true}:p,w,a,dt,this.time,seated?0:p.motionFresh?Math.hypot(p.motionVX||0,p.motionVZ||0):Math.hypot(p.x-previous.x,p.z-previous.z)/Math.max(dt,1e-9));
     p.recoilPitch=a.recoilPitch;p.recoilYaw=a.recoilYaw;
   }
-  shotPath(p, w, directionOverride = null) {
+  shotPath(p, w, directionOverride = null, poses = null) {
     const ray=sightRay(this.map,p,w.flightRange??w.range),eye=ray.origin,bodyEye=ray.eye,
       aim = directionOverride || direction(p.yaw, p.pitch);
     let distance = wallDistance(this.map, eye, aim, ray.range);
@@ -490,7 +496,7 @@ export class Simulation {
         target.health > 0 &&
         !teammates(this.options,p,target)
       )
-        distance = Math.min(distance, rayEgg(eye, aim, this.shotPose(target,p,w)));
+        distance = Math.min(distance, rayEgg(eye, aim, this.cachedShotPose(target,p,w,poses)));
     const supply=this.supplyHit?.(eye,aim,distance);if(supply)distance=supply.distance;
     const target = {
       x: eye.x + aim.x * distance,
@@ -544,10 +550,10 @@ export class Simulation {
     const pitch=accuracy.recoilPitch||0,yaw=accuracy.recoilYaw||0,serial=firedAccuracy(p,w,accuracy,this.time);
     p.recoilPitch=accuracy.recoilPitch;p.recoilYaw=accuracy.recoilYaw;
     if(w.projectile){this.launch(p,false,spread,{pitch,yaw});return true;}
-    const shots=[],offsets=pelletOffsets(w.pellets,spread,serial*7919+(p.joinedOrder||0)*31,w.patternFixed);
+    const poses=new Map(),shots=[],offsets=pelletOffsets(w.pellets,spread,serial*7919+(p.joinedOrder||0)*31,w.patternFixed);
     let origin=muzzleOrigin(p,w),blocked=false;
     for(const offset of offsets){
-      const aim=direction(p.yaw+yaw+offset.yaw,p.pitch+pitch+offset.pitch),path=this.shotPath(p,w,aim);
+      const aim=direction(p.yaw+yaw+offset.yaw,p.pitch+pitch+offset.pitch),path=this.shotPath(p,w,aim,poses);
       origin=path.origin;
       if(path.blocked){blocked=true;if(w.id==='stormspike')this.lodgeStormspike?.({...path.blocked.point,owner:p.id,damage:w.damage},path.blocked.box,path.blocked.normal);if(path.blocked.box)this.damageWorld?.(path.blocked.box,structureDamage(w,path.blocked.distance||0));this.emit('impact',{...path.blocked.point,normal:path.blocked.normal,surface:path.blocked.box?.material||'stone',weapon:w.id});continue;}
       if(w.hitscan){
@@ -557,7 +563,7 @@ export class Simulation {
         const supply=this.supplyHit?.(origin,path.d,distance);if(supply){distance=supply.distance;vehicle=null;}
         for(const target of this.players.values()){
           if(target===p||target.health<=0||target.spectating||target.flight==='transport'||teammates(this.options,p,target))continue;
-          const candidate=this.shotPose(target,p,w),contact=humanHit(origin,path.d,candidate),d=contact.distance;
+          const candidate=this.cachedShotPose(target,p,w,poses),contact=humanHit(origin,path.d,candidate),d=contact.distance;
           if(d<distance){distance=d;victim=target;pose=candidate;region=contact.region;}
         }
         const point={x:origin.x+path.d.x*distance,y:origin.y+path.d.y*distance,z:origin.z+path.d.z*distance};

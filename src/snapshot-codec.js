@@ -71,15 +71,22 @@ export class SnapshotBatch {
   for(const key of ['loot','chests','builds','worldDamage'])if(!Object.hasOwn(next.royale,key)&&previous.royale[key])next.royale[key]=previous.royale[key];
   pairs.set(previous.royale,next);return next;
  }
- json(value){
+ json(value,depth=0){
   if(!value||typeof value!=='object')return JSON.stringify(value);
-  if(!this.payloads.has(value))this.payloads.set(value,JSON.stringify(value));
+  if(!this.payloads.has(value)){
+   // Normalized data is JSON-safe. Reuse serialized shared player patches and
+   // recovery/world records even when each recipient has a different root.
+   // Native serialization is faster inside a row. Memoize the shared record
+   // boundaries, without walking every primitive/key in JavaScript again.
+   const raw=Array.isArray(value)||depth>=2?JSON.stringify(value):'{'+Object.keys(value).filter(k=>value[k]!==undefined).map(k=>JSON.stringify(k)+':'+this.json(value[k],depth+1)).join(',')+'}';
+   this.payloads.set(value,raw);
+  }
   return this.payloads.get(value);
  }
- serialize(frame){
+ serialize(frame,type='authority-frame'){
   const kind=frame.full?'full':'patch',payload=frame[kind];
   const raw='{'+Object.keys(payload).map(key=>JSON.stringify(key)+':'+this.json(payload[key])).join(',')+'}';
-  return '{"type":"authority-frame","frame":{"base":'+frame.base+',"seq":'+frame.seq+',"'+kind+'":'+raw+(frame.omitWorld?',"omitWorld":'+JSON.stringify(frame.omitWorld):'')+'}}';
+  return '{"type":'+JSON.stringify(type)+',"frame":{"base":'+frame.base+',"seq":'+frame.seq+',"'+kind+'":'+raw+(frame.omitWorld?',"omitWorld":'+JSON.stringify(frame.omitWorld):'')+'}}';
  }
 }
 function normalize(message){
@@ -124,7 +131,7 @@ function patch(previous,next){
  if(Array.isArray(previous)||Array.isArray(next))return equalJson(previous,next)?undefined:[next];
  const changes=Object.create(null);
  for(const key of Object.keys(previous))if(!Object.hasOwn(next,key))changes[key]=[];
- for(const key of Object.keys(next)){const change=(['state','royale','zombies','enemies','simulation','players','projectiles','loot','chests','builds','worldDamage'].includes(key)?sharedPatch:patch)(previous[key],next[key]);if(change!==undefined)changes[key]=change;}
+ for(const key of Object.keys(next)){const change=sharedPatch(previous[key],next[key]);if(change!==undefined)changes[key]=change;}
  return Object.keys(changes).length?changes:undefined;
 }
 function apply(previous,changes){

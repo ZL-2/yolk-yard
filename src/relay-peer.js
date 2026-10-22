@@ -28,9 +28,9 @@ export class RelayPeer extends Events {
   this.sentTimes=new Map();this.receivedBytes=0;this.sentBytes=0;this.relayLatency=null;this.sentPackets=0;this.receivedPackets=0;this.byteEncoder=new TextEncoder();this.queuedSizes=new WeakMap();this.queuedWork=new WeakMap();this.snapshotWork=new WeakMap();
  }
  get bufferedAmount(){return (this.socket?.bufferedAmount||0)+this.queueBytes;}
- sendRaw(ws,raw){
+ sendRaw(ws,raw,bytes){
   if(ws?.readyState!==1)return false;
-  try{ws.send(raw);this.sentBytes+=this.byteEncoder.encode(raw).byteLength;this.sentPackets++;return true;}
+  try{ws.send(raw);this.sentBytes+=bytes??this.byteEncoder.encode(raw).byteLength;this.sentPackets++;return true;}
   catch{try{ws.close();}catch{}return false;}
  }
  commandBlocked(){return this.rotating||this.socket?.readyState!==1||this.socket.bufferedAmount>65536||this.unacked.size>=32||(this.unackedBytes||0)>524288;}
@@ -77,7 +77,8 @@ export class RelayPeer extends Events {
   });
   clearInterval(this.heartbeat);this.heartbeat=setInterval(()=>{if(this.transportHeartbeat.expired(Date.now()))ws.close();else this.control({type:'heartbeat'});},3000);
  }
- control(message,draining=false){
+ control(message,draining=false,prepared=null){
+  if(prepared){this.preparedControls??=new WeakMap();this.preparedControls.set(message,prepared);}
   if(this.destroyed)return false;
   if(this.protocol===2&&['heartbeat','ack'].includes(message.type))return this.sendRaw(this.socket,JSON.stringify(message));
   if((this.commandBlocked()||!draining&&this.deferredControls?.length)&&!['register','rotate'].includes(message.type)){
@@ -88,10 +89,12 @@ export class RelayPeer extends Events {
    this.deferredControls.push(message);this.scheduleFlush();return true;
   }
   if(this.socket?.readyState!==1)return false;
+  const preparedBody=this.preparedControls?.get(message);
   if(this.protocol===2){message={...message,seq:++this.commandSeq};this.unacked.set(message.seq,message);this.sentTimes.set(message.seq,performance.now());}
-  const raw=JSON.stringify(message);
-  if(this.protocol===2){this.wireCommands??=new Map();const bytes=this.byteEncoder.encode(raw).byteLength;this.wireCommands.set(message.seq,{raw,bytes});this.unackedBytes=(this.unackedBytes||0)+bytes;}
-  return this.sendRaw(this.socket,raw);
+  const raw=preparedBody?preparedBody.slice(0,-1)+(this.protocol===2?',\"seq\":'+message.seq:'')+'}':JSON.stringify(message);
+  const bytes=this.byteEncoder.encode(raw).byteLength;
+  if(this.protocol===2){this.wireCommands??=new Map();this.wireCommands.set(message.seq,{raw,bytes});this.unackedBytes=(this.unackedBytes||0)+bytes;}
+  return this.sendRaw(this.socket,raw,bytes);
  }
  drainControls(){
   while(this.deferredControls?.length&&!this.commandBlocked())this.control(this.deferredControls.shift(),true);
@@ -172,34 +175,46 @@ export class RelayPeer extends Events {
   }
   if(merged){this.queue.splice(index,1);this.queueBytes-=replacedBytes;if(connection)connection.queuedBytes-=replacedBytes;}
   this.queue.push(message);this.queueBytes+=bytes;const conn=this.connections.get(message.channel);if(conn)conn.queuedBytes+=bytes;
-  if(this.queue.length>=64||this.queueBytes>200000)this.flush();
-  else if(!this.flushTimer)this.flushTimer=setTimeout(()=>this.flush(),8);
+  // Never encode a room inside the animation/input callback that enqueued it.
+  if(!this.flushTimer)this.flushTimer=setTimeout(()=>this.flush(),this.queue.length>=64||this.queueBytes>200000?0:8);
   return true;
  }
  discardChannel(channel){this.queue=this.queue.filter(m=>{if(m.channel!==channel)return true;this.queueBytes-=this.queuedSizes.get(m);return false;});const conn=this.connections.get(channel);if(conn)conn.queuedBytes=0;}
- flush(){
+ flush(drain=false){
   if(this.destroyed)return;
   clearTimeout(this.flushTimer);this.flushTimer=null;this.drainControls();
   if(!this.queue.length){this.scheduleFlush();return;}
   if(this.commandBlocked()||this.deferredControls?.length){this.scheduleFlush();return;}
-  const messages=this.queue.splice(0,64);this.queueBytes=0;for(const conn of this.connections.values())conn.queuedBytes=0;for(const m of this.queue){const bytes=this.queuedSizes.get(m);this.queueBytes+=bytes;const conn=this.connections.get(m.channel);if(conn)conn.queuedBytes+=bytes;}if(this.queue.length)this.flushTimer=setTimeout(()=>this.flush(),10);
-  for(const m of messages){const conn=this.connections.get(m.channel);if(conn?.compact&&m.data?.type==='state'){conn.encoder??=new SnapshotEncoder();m.data=conn.encoder.encode(m.data,this.queuedWork.get(m)?.batch);}}
-  // The server limit is per WebSocket message in UTF-8 bytes, not per entry.
-  // Split only between entries so delta baselines and action ordering survive.
-  let batch=[],bytes=64;
-  for(const message of messages){const size=this.byteEncoder.encode(JSON.stringify(message)).byteLength+1;
-   if(size>1_800_000){const conn=this.connections.get(message.channel);this.discardChannel(message.channel);this.control({type:'batch',messages:[{type:'close',channel:message.channel}]});conn?.finish();continue;}
-   if(bytes+size>1_800_000){this.control({type:'batch',messages:batch});batch=[];bytes=64;}
-   batch.push(message);bytes+=size;
+  const started=performance.now(),budget=drain?Infinity:this.encodeBudgetMs??4;
+  let batch=[],parts=[],bytes=64,processed=0;
+  const send=()=>this.control({type:'batch',messages:batch},false,'{"type":"batch","messages":['+parts.join(',')+']}');
+  while(this.queue.length&&(drain||processed<64)){
+   const message=this.queue.shift(),conn=this.connections.get(message.channel),queued=this.queuedSizes.get(message)||0;
+   this.queueBytes-=queued;if(conn)conn.queuedBytes=Math.max(0,conn.queuedBytes-queued);processed++;
+   let raw;
+   if(conn?.compact&&message.data?.type==='state'){
+    conn.encoder??=new SnapshotEncoder();const work=this.queuedWork.get(message)?.batch;message.data=conn.encoder.encode(message.data,work);
+    if(work)raw='{"type":"data","channel":'+JSON.stringify(message.channel)+',"data":'+work.serialize(message.data.frame,'snapshot-v1')+'}';
+   }
+   raw??=JSON.stringify(message);const size=this.byteEncoder.encode(raw).byteLength+1;
+   if(size>1_800_000){this.discardChannel(message.channel);this.control({type:'batch',messages:[{type:'close',channel:message.channel}]});conn?.finish();continue;}
+   if(bytes+size>1_800_000){send();batch=[];parts=[];bytes=64;}
+   batch.push(message);parts.push(raw);bytes+=size;
+   // Preserve whole frames and baselines, then yield to input/render tasks.
+   // Unencoded snapshots remain coalescible with newer state and all events.
+   if(performance.now()-started>=budget||this.commandBlocked())break;
   }
-  if(batch.length)this.control({type:'batch',messages:batch});}
+  if(batch.length)send();
+  if(this.queue.length&&!this.flushTimer)this.flushTimer=setTimeout(()=>this.flush(),this.commandBlocked()?20:0);
+ }
+
  publish(room){this.control({type:'publish',room});}
  list(){
   const request=++this.requestId;
   return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.waiters.delete(request);reject(Error('The room directory did not respond.'));},10000);this.waiters.set(request,{resolve:rooms=>{clearTimeout(timer);resolve(rooms);},reject:()=>{clearTimeout(timer);reject(Error('The room directory disconnected.'));}});this.control({type:'list',request});});
  }
  destroy(){
-  if(this.destroyed)return;this.flush();this.destroyed=true;clearTimeout(this.flushTimer);clearTimeout(this.ackTimer);clearInterval(this.heartbeat);clearTimeout(this.reconnectTimer);clearTimeout(this.reconnectDeadline);
+  if(this.destroyed)return;this.flush(true);this.destroyed=true;clearTimeout(this.flushTimer);clearTimeout(this.ackTimer);clearInterval(this.heartbeat);clearTimeout(this.reconnectTimer);clearTimeout(this.reconnectDeadline);
   if(this.protocol===2&&this.socket?.readyState===1)this.sendRaw(this.socket,JSON.stringify({type:'bye'}));
   for(const waiter of this.waiters.values())waiter.reject();this.waiters.clear();
   for(const conn of [...this.connections.values()])conn.finish();

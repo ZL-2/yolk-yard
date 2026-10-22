@@ -14,7 +14,7 @@ export function updateWorldDamage(world,damage,key){
    if(stage===4)position.array.fill(0,start,end);
    if(color)for(let i=start;i<end;i+=3){const x=original[i],y=original[i+1],z=original[i+2],crack=Math.abs(Math.sin(y*3.7+x*1.2+Math.sin(z*6.1)*.5))<.15+.025*stage,shade=stage?crack?.24:1-stage*.105:1;for(let k=0;k<3;k++)color.array[i+k]=baseColors[i+k]*shade;
     if(stage>1&&stage<4){const chip=Math.sin(x*11+y*13+z*17)*.022*(stage-1);position.array[i]+=chip;position.array[i+2]-=chip;}}
-   position.needsUpdate=true;if(color)color.needsUpdate=true;
+   position.addUpdateRange(start,end-start);position.needsUpdate=true;if(color){color.addUpdateRange(start,end-start);color.needsUpdate=true;}
   }
  }
 }
