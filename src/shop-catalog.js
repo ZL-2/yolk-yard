@@ -1,3 +1,4 @@
+import {ROYALE_PICKAXES} from './royale-ranking.js';
 import {NEW_COLLECTIONS} from './shop-collections.js';
 // Original Ravelfront cosmetics. IDs are stable save/network identifiers.
 export const SHOP_SLOTS=['outfit','pickaxe','wrap','backbling','glider','trail'];
@@ -30,6 +31,7 @@ for(const set of NEW_COLLECTIONS){
  const base=SHOP_ITEMS.find(i=>i.id===`outfit-${set.id}`);
  SHOP_ITEMS.push({...base,id:base.id+'-alt',name:base.name+' · '+set.styleName,color:set.altColor,accent:set.altAccent,armor:set.altArmor,art:null,styleLabel:set.styleName,profile:{...base.profile,color:set.altColor,accent:set.altAccent}});
 }
+SHOP_ITEMS.push(...ROYALE_PICKAXES);
 const byId=new Map(SHOP_ITEMS.map(item=>[item.id,item]));
 export const shopItem=id=>byId.get(id);
 export const outfitStyles=id=>{const item=shopItem(id);return item?.styleRoot?SHOP_ITEMS.filter(i=>i.styleRoot===item.styleRoot):item?[item]:[];};

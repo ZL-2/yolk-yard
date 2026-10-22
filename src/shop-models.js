@@ -2,6 +2,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
 import {shopItem} from './shop-catalog.js';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {royalePickaxeModel} from './royale-pickaxe-models.js';
 import {collectionGear} from './collection-gear.js';
 import {modelMaterial,surfaceUV,surfaceAtlasMaterial} from './model-surfaces.js';
 const models=new Map(),wrapTextures=new Map();
@@ -25,7 +26,7 @@ export function collectionWrapTexture(item){
  const t=new THREE.DataTexture(data,n,n);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearMipmapLinearFilter;t.generateMipmaps=true;t.repeat.set(2,1);t.userData.shared=true;t.needsUpdate=true;wrapTextures.set(key,t);return t;
 }
 export function applyWrap(g,id){const item=shopItem(id);if(item?.slot!=='wrap')return g;g.userData.artRevision=155;let n=0;const texture=collectionWrapTexture(item);g.traverse(m=>{if(!m.isMesh||!m.material?.color||m.material.transparent||m===g.userData.lens)return;const material=m.material.clone(),base=new THREE.Color(item.color);material.color.copy(n++%6===0?new THREE.Color(item.accent).lerp(base,.4):base.multiplyScalar(.72+(n%4)*.09));if(n%3!==0){material.map=texture;material.color.set('#ffffff');}material.metalness=item.model==='voss'?.84:.56;material.roughness=.83;material.emissiveIntensity=0;m.material=material;m.userData.ownedMaterial=true;});return g;}
-function buildShopPickaxe(id){const i=shopItem(id),g=new THREE.Group();if(i?.slot!=='pickaxe')return g;g.name=i.name;if(i.model)return finish(collectionGear(i,'pickaxe',g,{box,tube,part}));const k=i.shape%6,c=i.color,a=i.accent,steel='#98a7a8';tube(g,c,[0,-.62,0],[0,.7,0],.04,'polymer');for(let j=0;j<6;j++)box(g,'#18262c',0,-.4+j*.06,0,.091,.023,.091,'rubber');box(g,a,0,.47,0,.12,.09,.12,'metal');
+function buildShopPickaxe(id){const i=shopItem(id),g=new THREE.Group();if(i?.slot!=='pickaxe')return g;g.name=i.name;if(i.rankReward)return finish(royalePickaxeModel(i,g,{box,tube,part,blade}));if(i.model)return finish(collectionGear(i,'pickaxe',g,{box,tube,part}));const k=i.shape%6,c=i.color,a=i.accent,steel='#98a7a8';tube(g,c,[0,-.62,0],[0,.7,0],.04,'polymer');for(let j=0;j<6;j++)box(g,'#18262c',0,-.4+j*.06,0,.091,.023,.091,'rubber');box(g,a,0,.47,0,.12,.09,.12,'metal');
  if(k===0){blade(g,steel,[[-.09,.56],[-.10,.81],[.15,.91],[.49,.95],[.56,.43],[.30,.49],[.17,.63]]);box(g,c,-.12,.7,0,.15,.18,.13,'paint');}
  if(k===4){blade(g,steel,[[-.09,.58],[-.1,.81],[.17,.89],[.39,.76],[.48,.53],[.34,.36],[.27,.51],[.30,.65],[.13,.71]]);box(g,c,-.1,.7,0,.15,.18,.13,'paint');}
  if(k===1||k===3){box(g,c,0,.73,0,.63,.26,.25,'paint');for(const s of [-1,1]){box(g,steel,s*.31,.73,0,.065,.3,.29,'metal');for(const z of [-.115,.115])bolt(g,s*.25,.73,z);}if(k===3)blade(g,steel,[[-.32,.82],[-.35,.64],[-.54,.47],[-.43,.72],[-.42,.83]]);}

@@ -147,6 +147,7 @@ export class Simulation {
     if([...this.players.values()].some(other=>other.id!==id&&!other.bot&&nameKey(other.name)===nameKey(safe.name)))return false;
     this.reserveHumanName(safe.name,id);
     p.nextProfile = safe;
+    p.pickaxe=safe.pickaxe; // Cosmetic changes can apply immediately without changing the combat loadout.
     p.name=safe.name;
     if (this.phase === "lobby" || p.health <= 0) Object.assign(p, safe);
     this.teamAppearance(p);

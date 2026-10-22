@@ -1,3 +1,4 @@
+import {royaleRating} from '../../src/royale-ranking.js';
 import {rankingMode} from '../../src/ranking-modes.js';
 const count=n=>Number.isFinite(n)?Math.max(0,Math.floor(n)):0;
 // Preserve available public history once; subsequent counters outlive receipt retention.
@@ -26,11 +27,11 @@ export function rankPublicPlayers(accounts,identities=new Map(),mode='royale'){
   // Merge those rows, counting overlapping round records only once.
   for(const r of a.publicRounds||[]){if((r.mode||'royale')!==mode)continue;const old=p.rounds.get(r.id);if(old){p.kills-=Math.min(count(old.kills),count(r.kills));p.wins-=Math.min(count(old.wins),count(r.wins));}p.rounds.set(r.id,{kills:Math.max(count(old?.kills),count(r.kills)),wins:Math.max(count(old?.wins),count(r.wins))});}
  }
- const players=[...groups.values()].map(({rounds,...p})=>p);
+ const players=[...groups.values()].map(({rounds,...p})=>mode==='royale'?{...p,rating:royaleRating(p)}:p);
  const rank=metric=>[...players].sort((a,b)=>b[metric]-a[metric]||b[metric==='kills'?'wins':'kills']-a[metric==='kills'?'wins':'kills']||a.name.localeCompare(b.name)||a.id.localeCompare(b.id)).map((p,i)=>({...p,rank:i+1}));
- return {kills:rank('kills'),wins:rank('wins')};
+ return {kills:rank('kills'),wins:rank('wins'),...(mode==='royale'?{rating:[...players].sort((a,b)=>b.rating-a.rating||b.wins-a.wins||b.kills-a.kills||a.id.localeCompare(b.id)).map((p,i)=>({...p,rank:i+1}))}:{})};
 }
 export function publicLeaderboardView(ranks,socialId,{offset=0}={}){
- const project=p=>({rank:p.rank,name:p.name,kills:p.kills,wins:p.wins,you:!!socialId&&p.socialId===socialId});
- return Object.fromEntries(['kills','wins'].map(metric=>{const all=ranks[metric],start=Math.min(Math.floor(count(offset)/25)*25,Math.max(0,Math.ceil(all.length/25)-1)*25),self=socialId?all.find(p=>p.socialId===socialId):null;return [metric,{total:all.length,offset:start,hasMore:start+25<all.length,rows:all.slice(start,start+25).map(project),self:self?project(self):null}];}));
+ const project=p=>({rank:p.rank,name:p.name,kills:p.kills,wins:p.wins,...(p.rating!==undefined?{rating:p.rating}:{}),you:!!socialId&&p.socialId===socialId});
+ return Object.fromEntries(Object.keys(ranks).map(metric=>{const all=ranks[metric],start=Math.min(Math.floor(count(offset)/25)*25,Math.max(0,Math.ceil(all.length/25)-1)*25),self=socialId?all.find(p=>p.socialId===socialId):null;return [metric,{total:all.length,offset:start,hasMore:start+25<all.length,rows:all.slice(start,start+25).map(project),self:self?project(self):null}];}));
 }

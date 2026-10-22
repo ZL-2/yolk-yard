@@ -104,6 +104,8 @@ import {LobbyStatus} from './lobby-status.js';
 import './lobby-status.css';
 import './egg-shop.css';
 import './ravelfront.css';
+import {RoyaleRewards} from './royale-rewards-ui.js';
+import {rankPickaxe,rankingMetrics} from './royale-ranking.js';
 import {EggShop} from './egg-shop.js';
 import {EggWallet,ownedLoadout} from './egg-wallet.js';
 import {KeybindEditor} from "./keybind-editor.js";
@@ -204,8 +206,9 @@ const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(k
 let progressMatch='';
 let crownStatus=read('ravelfront-crown-status',{season:1,wins:0,owned:false,unlocked:false}),crownStatusKey='';
 let menuSection=['locker','shop','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
-let privateMatchDrafts={},leaderboardSelection={playMode:null,mode:'royale'},leaderboardDataMode='',leaderboards=null,leaderboardTab='kills',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
+let privateMatchDrafts={},leaderboardSelection={playMode:null,mode:'royale'},leaderboardDataMode='',leaderboards=null,leaderboardTab='rating',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
 const menuShopStates={};
+let pendingRankPickaxe=rankPickaxe(profile.pickaxe)?profile.pickaxe:null;
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
 let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
 let view,
@@ -285,6 +288,10 @@ async function openOwnerMapEditor(overview){
  try{await mapEditor.open();}catch(error){mapEditor?.close();errorToast('Map editor could not open: '+error.message);}
 }
 let briefingsComplete=false;
+const rankRewards=new RoyaleRewards({getView:()=>view,getProfile:()=>profile,connected:()=>!!party?.ready,request:(...args)=>party?.ready?party.request(...args):Promise.reject(Error('Connect to claim your rank rewards.')),ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]'),beforeOpen:()=>{if(screen==='game'&&!paused)pauseMenu();},onAccess:record=>{
+ const selected=record.equipped||(pendingRankPickaxe&&record.claimed.includes(pendingRankPickaxe)?pendingRankPickaxe:'');pendingRankPickaxe=null;
+ if(selected&&profile.pickaxe!==selected||rankPickaxe(profile.pickaxe)&&profile.pickaxe!==selected){profile={...profile,pickaxe:selected};remember();if(screen==='menu')view.preview(profile);}
+},onChange:()=>{if(eggShop?.root?.isConnected&&eggShop.tab==='locker')eggShop.render();leaderboardFetchedAt=0;void refreshLeaderboards();}});
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerRuntime=new OwnerRuntime();
@@ -337,7 +344,7 @@ function syncSocialActivity(me){if(!party?.ready)return;const activity=screen===
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();if(screen==='menu')renderMenu();}});
 function currentLeaderboardMode(){leaderboardSelection=syncRankingSelection(leaderboardSelection,party?.party?.selection?.mode);return leaderboardSelection.mode;}
 function trainingBoard(){const p={rank:1,name:profile.name,kills:stats.training?.kills||0,wins:stats.training?.wins||0,you:true};return {mode:'training',...Object.fromEntries(['kills','wins'].map(k=>[k,{total:1,offset:0,rows:[p],self:p,hasMore:false}]))};}
-function menuModel(){const selected=currentLeaderboardMode();if(leaderboardDataMode!==selected){leaderboards=selected==='training'?trainingBoard():null;leaderboardPageBoards=leaderboards;leaderboardDataMode=selected;leaderboardFetchedAt=0;leaderboardOffset=0;}return {leaderboardMode:selected,profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
+function menuModel(){const selected=currentLeaderboardMode();if(leaderboardDataMode!==selected){leaderboardTab=rankingMetrics(selected)[0];leaderboards=selected==='training'?trainingBoard():null;leaderboardPageBoards=leaderboards;leaderboardDataMode=selected;leaderboardFetchedAt=0;leaderboardOffset=0;}return {leaderboardMode:selected,profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
 function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}installLeaderboardScrollbars();}
 async function refreshLeaderboards(force=false){
  if(screen!=='menu'||menuSection!=='play'&&dialogType!=='leaderboards'||!party?.ready||leaderboardPending||!force&&leaderboards&&performance.now()-leaderboardFetchedAt<15000)return;
@@ -360,7 +367,7 @@ function renderMenu(force=false) {
  root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':'Career'}" tabindex="-1">${menuSection==='career'?careerMarkup({stats,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
  if(menuSection==='career')$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};
  else {
-  eggShop??=new EggShop({wallet:eggWallet,view,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
+  eggShop??=new EggShop({wallet:eggWallet,view,rankRewards,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
   eggShop.embedded=true;eggShop.onTab=tab=>selectMenuSection(tab==='locker'?'locker':'shop');eggShop.tab=menuSection==='locker'?'locker':'shop';
   Object.assign(eggShop,{category:'all',search:'',sort:'featured',page:0},menuShopStates[menuSection]||{});
   if(menuSection==='locker'&&!eggWallet.value.owned.includes(eggShop.selected))eggShop.selected=eggWallet.value.owned[0]||null;
@@ -404,6 +411,7 @@ function modal(title, body, type = "generic") {
   paused = true;
   if (document.pointerLockElement) document.exitPointerLock();
   if(type==='results'){const p=state?.players.find(p=>p.id===localId);body=`<div class="split-actions">${canCelebrate(state,p)?'<button data-action="emotes">CELEBRATE</button>':''}<button data-action="watch-winner">WATCH WINNER</button></div>`+body;}
+  if(['results','pause'].includes(type))body+='<button data-action="royale-rank-rewards">ROYALE RANK REWARDS</button>';
   if(['results','pause','settings','social','chat-controls'].includes(type))body+='<button data-action="voice-chat">VOICE CHAT</button>';
   if(type==='error')hideLoading(true);
   if(type!=='problem-report'&&(type==='error'||body.includes('class="error-box"'))){const temp=document.createElement('div');temp.innerHTML=body;rememberProblem(title,temp.querySelector('.error-box')?.textContent||temp.textContent);body+='<button data-action="report-problem">F8 · REPORT PROBLEM</button>';}
@@ -472,7 +480,7 @@ let customTab = "shell";
 function customizeMenu(tab='shop') {
   if(screen==='menu'){selectMenuSection(tab==='locker'?'locker':'shop');return;}
   modal('Outfitter','<div id="egg-shop"></div>','egg-shop');
-  eggShop??=new EggShop({wallet:eggWallet,view,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
+  eggShop??=new EggShop({wallet:eggWallet,view,rankRewards,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
   eggShop.embedded=false;eggShop.tab=tab;eggShop.category='all';eggShop.page=0;eggShop.open($('#egg-shop'));
 }
 function helpMenu() {
@@ -638,6 +646,7 @@ function bindPublicCrowns(sim){bindCrownStore(sim,{load:id=>sim.players.get(id)?
 function callbacks() {
   return {
     onProgress:(type,event)=>{
+      if(type==='rank-cosmetic'){const p=sim?.players.get(event.player);if(p){p.pickaxe=event.pickaxe;if(p.nextProfile)p.nextProfile.pickaxe=event.pickaxe;}if(event.player===localId){profile={...profile,pickaxe:event.pickaxe};save('yolk-profile',profile);}return;}
       if(type==='reward'){
         const r=event.receipt;if(!r||eggWallet.value.receipts.includes(r.id))return;
         void eggWallet.awardVerified(r).then(({applied})=>{
@@ -1390,7 +1399,8 @@ async function launchParty(launch){
 function initializeParty(){
  if(needsPlayerName(profile.name))return;
  if(party){party.updateProfile(profile);return;}
- party=new PartyClient(profile,{
+ party=new PartyClient(pendingRankPickaxe?{...profile,pickaxe:pendingRankPickaxe}:profile,{
+  'royale-rank':m=>rankRewards.receive(m.record),
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
   status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
@@ -1423,6 +1433,8 @@ function inventoryAction(action,index,from){
 }
 document.addEventListener('click',e=>{const button=e.target.closest('[data-box-team]');if(button){const action='box-team-'+button.dataset.boxTeam;if(sim&&!sim.remote){sim.playerAction(localId,action);state=sim.snapshot();net?.broadcast(state);renderLobby();}else net?.send({type:'player-action',action});}});
 const actions = {
+ 'royale-rank-info':()=>rankRewards.info(),
+ 'royale-rank-rewards':()=>rankRewards.show(true),
  'voice-chat':()=>voiceUI.show(),
  'watch-winner':()=>{dialog.close();dialogType='';resultAt=0;paused=false;},
  'report-problem':reportProblemMenu,
@@ -1573,7 +1585,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("button,[data-action]");
   if (!b) return;
   if(needsPlayerName(profile.name)&&b.dataset.action!=='save-player-name'){e.preventDefault();requiredNamePrompt();return;}
-  if(b.dataset.leaderboardTab){leaderboardTab=b.dataset.leaderboardTab==='wins'?'wins':'kills';menuModel();renderLeaderboard(true);void refreshLeaderboards(true);}
+  if(b.dataset.leaderboardTab){menuModel();leaderboardTab=rankingMetrics(currentLeaderboardMode()).includes(b.dataset.leaderboardTab)?b.dataset.leaderboardTab:rankingMetrics(currentLeaderboardMode())[0];renderLeaderboard(true);void refreshLeaderboards(true);}
   if(b.dataset.leaderboardPage!==undefined&&!leaderboardPending&&dialogType==='leaderboards'){leaderboardOffset=Math.max(0,Number(b.dataset.leaderboardPage)||0);$('#dialog .frontier-board-ranks').scrollTop=0;void refreshLeaderboards(true);}
   if(b.dataset.socialTab){socialTab=b.dataset.socialTab;void socialMenu();}
   if(b.dataset.socialPage!==undefined){socialOffset=Number(b.dataset.socialPage);void socialMenu();}
@@ -1758,7 +1770,7 @@ document.addEventListener('mousedown',pointerPanelToggle,true);
 document.addEventListener('wheel',pointerPanelToggle,{capture:true,passive:false});
 document.addEventListener("keydown", (e) => {
   if(e.code==='F8'&&dialogType!=='problem-report'&&!e.target.matches('input,textarea,[contenteditable=true]')){const connection=!matchConnectionUI.root.hidden,problem=dialog.open&&!!dialog.querySelector('[data-action=report-problem]')||performance.now()<toastUntil&&!!$('#toast [data-action=report-problem]');if(connection||problem){e.preventDefault();if(!e.repeat)(connection?actions['report-connection']:reportProblemMenu)();return;}}
-  if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();leaderboardTab=e.key==='Home'?'kills':e.key==='End'?'wins':leaderboardTab==='kills'?'wins':'kills';menuModel();renderLeaderboard(true);void refreshLeaderboards(true);return;}
+  if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();menuModel();const metrics=rankingMetrics(currentLeaderboardMode());leaderboardTab=metrics[e.key==='Home'?0:e.key==='End'?metrics.length-1:(metrics.indexOf(leaderboardTab)+(e.key==='ArrowLeft'?-1:1)+metrics.length)%metrics.length];renderLeaderboard(true);void refreshLeaderboards(true);return;}
   if (chat.opened || e.target.matches("input,select,textarea,[contenteditable=true]")) return;
   if(screen==='game'&&!paused&&!dialog.open&&helicopterActions(state?.players.find(p=>p.id===localId),settings.keybinds,e.code).length){e.preventDefault();if(!e.repeat)pressControl(e.code);return;}
   const panel = screen==='game' && state?.royale && (!paused || ['royale-map','royale-inventory'].includes(dialogType))
@@ -2154,6 +2166,7 @@ function loop(now) {
   $('#hud').classList.toggle('low-health',!!current&&current.health>0&&current.health<25);
   damageFlash = Math.max(0, damageFlash - renderDt * 1.5);
   $("#damage").style.opacity = damageFlash*(settings.reducedMotion?.25:1);
+  rankRewards.update();
   referralRewards.update(now);
   lobbyComms.update();
   updateFrontMessage($("#notice"),now < noticeUntil);
