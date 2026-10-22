@@ -1,3 +1,4 @@
+import {eyePosition} from './stance.js';
 import {sightRay,reachablePoint,thirdPersonActive} from './perspective.js';
 // Unlimited plunger shots; successful pulls protect the following landing, not gunfire.
 // Range/projectile/cadence references are kept separate from pull-motion tuning.
@@ -9,7 +10,7 @@ export function grappleAim(map,p,ray){
   return {origin,anchor,length,valid:distance<sight.range-.001&&length>=GRAPPLER.minRange&&length<=GRAPPLER.range&&reachablePoint(map,p,anchor,GRAPPLER.range)};
  }
  const cp=Math.cos(p.pitch||0),d={x:-Math.sin(p.yaw||0)*cp,y:Math.sin(p.pitch||0),z:-Math.cos(p.yaw||0)*cp};
- const origin={x:p.x,y:p.y+(p.crouching?1.05:1.7),z:p.z},length=ray(map,origin,d,GRAPPLER.range);
+ const origin=eyePosition(p),length=ray(map,origin,d,GRAPPLER.range);
  return {origin,anchor:{x:origin.x+d.x*length,y:origin.y+d.y*length,z:origin.z+d.z*length},length,valid:length>=GRAPPLER.minRange&&length<GRAPPLER.range-.001};
 }
 export function startGrapple(p,aim,time){

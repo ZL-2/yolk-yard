@@ -1,7 +1,7 @@
 import {direction,wallDistance,worldHit,candidates,rayBox} from './physics.js';
 import {terrainHit} from './terrain.js';
 import {cameraDistance} from './camera-collision.js';
-import {eyeHeight} from './stance.js';
+import {eyeHeight,eyePosition} from './stance.js';
 import {gun} from './data.js';
 import {helicopterCameraDistance} from './helicopter.js';
 
@@ -16,7 +16,7 @@ export const weaponCameraAllowed=p=>(!p?.vehicleId||vehiclePassenger(p))&&!p?.zV
 export function scopedPerspective(p){return !!p?.aim&&!p.reloadEnd&&!p.use&&!p.sprinting&&!p.reviving&&!p.mantle&&!p.traversal&&!p.building&&!p.editing&&(!p.inventory||p.inventory[p.slot]?.weapon)&&['scope','prism'].includes(gun(p).optic);}
 export function thirdPersonActive(p){return p?.perspective==='third'&&p.health>0&&!p.spectating&&!p.downed&&!p.emote&&weaponCameraAllowed(p)&&(!p.flight||p.flight==='ground')&&!scopedPerspective(p);}
 export function cameraPose(map,p,{unclampedBoom=false}={}){
- const eye={x:p.x,y:p.y+eyeHeight(p),z:p.z},d=direction(p.yaw||0,p.pitch||0);
+ const eye=eyePosition(p),d=direction(p.yaw||0,p.pitch||0);
  if(!thirdPersonActive(p))return {origin:eye,eye,d,length:0,fraction:1,third:false};
  const t=clamp01(p.viewBlend??Number(!!p.aim&&!p.building&&!p.editing)),c=THIRD_PERSON;
  const distance=c.distance+(c.aimDistance-c.distance)*t,side=c.shoulder+(c.aimShoulder-c.shoulder)*t,height=c.height+(c.aimHeight-c.height)*t;
@@ -32,7 +32,7 @@ export function sightRay(map,p,range=200){
  return {...pose,range:range+(pose.third?pose.length*pose.fraction:0)};
 }
 export function reachablePoint(map,p,point,range,ignoreBuildId=null){
- const eye={x:p.x,y:p.y+eyeHeight(p),z:p.z},delta={x:point.x-eye.x,y:point.y-eye.y,z:point.z-eye.z},length=Math.hypot(delta.x,delta.y,delta.z);
+ const eye=eyePosition(p),delta={x:point.x-eye.x,y:point.y-eye.y,z:point.z-eye.z},length=Math.hypot(delta.x,delta.y,delta.z);
  if(length>range+.12)return false;if(length<.001)return true;
  const d={x:delta.x/length,y:delta.y/length,z:delta.z/length};
  if(!ignoreBuildId)return wallDistance(map,eye,d,length)>=length-.08;
@@ -47,7 +47,7 @@ export function toolDirection(map,p,range=100){
  if(!thirdPersonActive(p)||!map)return direction(p.yaw,p.pitch);
  const ray=sightRay(map,p,range),hit=worldHit(map,ray.origin,ray.d,ray.range),distance=hit?.distance??ray.range;
  const point=hit?.point||{x:ray.origin.x+ray.d.x*distance,y:ray.origin.y+ray.d.y*distance,z:ray.origin.z+ray.d.z*distance};
- const delta={x:point.x-p.x,y:point.y-(p.y+eyeHeight(p)-.15),z:point.z-p.z},length=Math.hypot(delta.x,delta.y,delta.z)||1;
+ const eye=eyePosition(p),delta={x:point.x-eye.x,y:point.y-(eye.y-.15),z:point.z-eye.z},length=Math.hypot(delta.x,delta.y,delta.z)||1;
  // A wall directly behind the shoulder must never make a tool fire backwards.
  if(delta.x*ray.d.x+delta.y*ray.d.y+delta.z*ray.d.z<=.05)return ray.d;
  return {x:delta.x/length,y:delta.y/length,z:delta.z/length};

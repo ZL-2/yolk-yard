@@ -5,7 +5,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Shared camera targeting and remote commands require matching host/client releases.
-export const VERSION = 74;
+export const VERSION = 75;
 export const WEAPONS = [
   {
     "id": "sprinter",

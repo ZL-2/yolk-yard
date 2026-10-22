@@ -8,7 +8,7 @@ import {SEASON} from './season-one.js';
 import {beginFallStep,finishFallStep} from "./airborne.js";
 import { clamp, weapon, gun } from "./data.js";
 import {groundAt,terrainHit} from './terrain.js';
-import {STANCE,stanceOf,bodyHeight,eyeHeight,regionPose} from './stance.js';
+import {STANCE,stanceOf,bodyHeight,eyeHeight,regionPose,eyePosition,canLean,leanAmount,LEAN} from './stance.js';
 export const RADIUS = 0.32,
   HEIGHT = 1.85,
   EYE = 1.70;
@@ -119,7 +119,8 @@ export function humanHit(o,d,p,radius=0){
  const result={distance:Infinity,region:null},posed={},mode=stanceOf(p),speed=Math.hypot(p.vx||0,p.vz||0);
  for(const base of HUMAN_HIT){
   const h=regionPose(base,p,posed,mode,speed),rx=h.rx+radius,ry=h.ry+radius,rz=h.rz+radius;
-  const ax=(ox-h.x)/rx,ay=(py-h.y)/ry,az=(pz-h.z)/rz,bx=vx/rx,by=vy/ry,bz=pvz/rz;
+  const cr=Math.cos(h.roll),sr=Math.sin(h.roll),hx=ox-h.x,hy=py-h.y;
+  const ax=(hx*cr+hy*sr)/rx,ay=(-hx*sr+hy*cr)/ry,az=(pz-h.z)/rz,bx=(vx*cr+vy*sr)/rx,by=(-vx*sr+vy*cr)/ry,bz=pvz/rz;
   const A=bx*bx+by*by+bz*bz,B=2*(ax*bx+ay*by+az*bz),C=ax*ax+ay*ay+az*az-1,D=B*B-4*A*C;
   if(A<1e-12||D<0)continue;const t=C<=0?0:(-B-Math.sqrt(D))/(2*A);
   if(t>=0&&t<result.distance){result.distance=t;result.region=h.region;}
@@ -191,6 +192,8 @@ export function movePlayer(p, input, map, dt, time=0) {
   const steps=Math.max(1,Math.ceil(Math.min(dt,.1)/(1/60)));
   for(let i=0;i<steps;i++){
     const before=beginFallStep(p);movePlayerStep(p,input,map,Math.min(dt,.1)/steps,time);
+    stepWater(p,map,before);
+    stepLean(p,input,map,Math.min(dt,.1)/steps);
     // Predicted and authoritative stance easing share a clock and never alter
     // the physical eye used for weapon obstruction or interaction reach.
     const targetEye=eyeHeight(p);
@@ -200,6 +203,40 @@ export function movePlayer(p, input, map, dt, time=0) {
     if(p.flight!=='transport')finishFallStep(p,before,normalY);
     pruneBuildPhases(p,map);
   }
+}
+function stepWater(p,map,before){
+  const surface=map.waterLevel;
+  p.swimming=false;
+  if(!Number.isFinite(surface)||!map.terrain||p.health<=0||p.vehicleId||p.zVehicle||p.flight==='transport'||p.mantle||p.traversal)return;
+  const bed=groundAt(map,p.x,p.z);
+  if(surface-bed<.15||p.y>=surface-.025)return;
+  // Water contact cancels this fall only. A bridge/deck above the surface never
+  // reaches this path, so landing on solid cover still causes normal damage.
+  if(p.fall)p.fall.immune=true;
+  const floatY=Math.max(bed,surface-1.05);
+  if(p.y>floatY+.025||p.vy>0)return;
+  if(!canOccupy(map,{x:p.x,y:floatY,z:p.z},HEIGHT))return;
+  p.y=floatY;p.vy=0;p.grounded=true;p.swimming=surface-bed>1.05;
+  p.flight='ground';p.crouching=p.lowCrouch=p.sliding=false;
+  p.sprinting=p.tacticalSprint=false;p.sprintBlend=0;
+  p.fall={apex:before.y,immune:true,source:'water'};
+}
+function stepLean(p,input,map,dt){
+  const allowed=p.grounded&&!p.swimming&&!p.reviving&&!p.use&&!input.buildMode&&!input.editing&&canLean(p);
+  const target=allowed?Number(!!input.leanRight)-Number(!!input.leanLeft):0;
+  if(!allowed){p.lean=0;return;}
+  p.lean=(p.lean||0)+(target-(p.lean||0))*(1-Math.exp(-LEAN.response*dt));
+  if(Math.abs(p.lean)<.001){p.lean=0;return;}
+  // Sweep both the head and shoulders. Sliding along a wall may retract a lean
+  // immediately; camera smoothing must never carry an eye through cover.
+  let fraction=1;
+  for(const [height,radius] of [[eyeHeight(p),.18],[eyeHeight(p)-.32,.25]]){
+    const origin={x:p.x,y:p.y+height,z:p.z},end=eyePosition(p,height),dx=end.x-origin.x,dy=end.y-origin.y,dz=end.z-origin.z,length=Math.hypot(dx,dy,dz);
+    if(length<.001)continue;
+    const hit=worldHit(map,origin,{x:dx/length,y:dy/length,z:dz/length},length,radius);
+    if(hit)fraction=Math.min(fraction,Math.max(0,(hit.distance-.015)/length));
+  }
+  p.lean*=fraction;
 }
 function movePlayerStep(p, input, map, dt, time) {
   if (p.health <= 0) return;
@@ -270,7 +307,7 @@ function movePlayerStep(p, input, map, dt, time) {
     const rule=TACTICAL_SPRINT,was=p.sprinting;p.stamina??=100;p.sprintRest??=0;p.sprintRecovery=Math.max(0,(p.sprintRecovery||0)-dt);
     if(p.stamina>=rule.restart)p.exhausted=false;
     // Carry an existing sprint through its jump; do not start a new sprint in air.
-    p.sprinting=!!input.sprint&&!p.boss&&!p.downed&&!p.reviving&&!p.crouching&&!p.sliding&&!p.exhausted&&p.stamina>0&&!input.aim&&!input.fire&&!p.use&&!input.buildMode&&!input.editing&&!p.reloadEnd&&(input.forward||0)>.2&&(p.grounded||was);
+    p.sprinting=!!input.sprint&&!p.boss&&!p.swimming&&!p.downed&&!p.reviving&&!p.crouching&&!p.sliding&&!p.exhausted&&p.stamina>0&&!input.aim&&!input.fire&&!p.use&&!input.buildMode&&!input.editing&&!p.reloadEnd&&(input.forward||0)>.2&&(p.grounded||was);
     p.tacticalSprint=p.sprinting;p.sprintBlend=Math.min(1,Math.max(0,(p.sprintBlend||0)+(p.sprinting?1:-2)*rule.acceleration*dt));
     if(p.sprinting){p.stamina=Math.max(0,p.stamina-rule.drain*dt);p.sprintRest=0;if(p.stamina===0)p.exhausted=true;}
     else{p.sprintRest+=dt;if(p.sprintRest>rule.delay)p.stamina=Math.min(100,p.stamina+rule.recharge*dt);}
@@ -311,7 +348,7 @@ function movePlayerStep(p, input, map, dt, time) {
   const speed =
     (p.inventory ? ROYALE_MOVEMENT.walk+(ROYALE_MOVEMENT.sprint-ROYALE_MOVEMENT.walk)*(p.sprinting?p.sprintBlend:0) : weapon(p.weapon).speed*(1+(TACTICAL_SPRINT.arenaMultiplier-1)*(p.sprinting?p.sprintBlend:0))) *
     (input.aim ? gun(p).adsMove : 1) *
-    (p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
+    (p.swimming?.65:1)*(p.quickstep?1.12:1)*(p.downed?STANCE.downed.speed:p.lowCrouch?STANCE.compact.speed:p.crouching&&!p.sliding?STANCE.crouching.speed:1);
   let mx=(-Math.sin(p.yaw)*f+Math.cos(p.yaw)*s)*speed,mz=(-Math.cos(p.yaw)*f-Math.sin(p.yaw)*s)*speed;
   if(p.sliding){
     let vx=p.slideVX||0,vz=p.slideVZ||0,v=Math.sqrt(vx*vx+vz*vz);
@@ -330,7 +367,7 @@ function movePlayerStep(p, input, map, dt, time) {
   if ((input.jump&&!p.jumpLatch||p.jumpBuffer>0) && p.grounded && !p.reviving && !p.downed && canStand(map,p)) {
     p.crouching=false;p.sliding=false;
     p.jumpBuffer=0;
-    p.vy = 8.6;
+    p.vy = p.swimming?5:8.6;
     p.grounded = false;
   }
   p.jumpLatch = !!input.jump;
@@ -386,6 +423,7 @@ export function sanitizeInput(i = {}) {
     forward: num(i.forward, -1, 1),
     strafe: num(i.strafe, -1, 1),
     heliUp:!!i.heliUp,heliDown:!!i.heliDown,heliBoost:!!i.heliBoost,heliSeat:!!i.heliSeat,heliExit:!!i.heliExit,heliHorn:!!i.heliHorn,
+    leanLeft:!!i.leanLeft,leanRight:!!i.leanRight,
     jump: !!i.jump,
     fire: !!i.fire,
     aim: !!i.aim,
@@ -408,13 +446,16 @@ export function muzzleOrigin(p, w) {
     y: Math.cos(p.pitch),
     z: Math.cos(p.yaw) * Math.sin(p.pitch),
   };
+  const eye=eyePosition(p),roll=-leanAmount(p)*LEAN.angle,cr=Math.cos(roll),sr=Math.sin(roll);
+  const rolledRight={x:right.x*cr+up.x*sr,y:up.y*sr,z:right.z*cr+up.z*sr};
+  const rolledUp={x:up.x*cr-right.x*sr,y:up.y*cr,z:up.z*cr-right.z*sr};
   const side = p.aim ? 0 : VIEWMODEL.x,
     height = p.aim ? -w.sightY * VIEWMODEL.scale : VIEWMODEL.y,
     forward = -VIEWMODEL.z + w.muzzle * VIEWMODEL.scale;
   return {
-    x: p.x + right.x * side + up.x * height + f.x * forward,
-    y: p.y + eyeHeight(p) + up.y * height + f.y * forward,
-    z: p.z + right.z * side + up.z * height + f.z * forward,
+    x: eye.x + rolledRight.x * side + rolledUp.x * height + f.x * forward,
+    y: eye.y + rolledRight.y * side + rolledUp.y * height + f.y * forward,
+    z: eye.z + rolledRight.z * side + rolledUp.z * height + f.z * forward,
   };
 }
 // Swept segment collision supplies the actual surface normal for impact and bounce effects.

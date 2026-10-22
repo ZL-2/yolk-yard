@@ -5,15 +5,17 @@ export const CONTROLS = [
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
   ['jump', 'Jump', 'Space', null],
   ['crouch', 'Crouch / slide', 'AltLeft', null],
+  ['leanLeft','Lean left (hold)','KeyQ',null],
+  ['leanRight','Lean right (hold)','KeyE',null],
   ['marker', 'Duo world marker', 'Mouse1', null],
   ['danger', 'Duo danger marker', 'KeyY', null],
   ['fire', 'Fire', 'Mouse0', null],
   ['aim', 'Aim / scope', 'ShiftLeft', 'Mouse2'],
   ['reload', 'Reload', 'KeyR', null],
-  ['popper', 'Throw popper', 'KeyE', 'KeyG'],
+  ['popper', 'Throw popper', 'KeyG', null],
   ['primary', 'Primary weapon / Royale slot 1', 'Digit1', null],
   ['sidearm', 'Sidearm / Royale slot 2', 'Digit2', null],
-  ['swap', 'Swap weapon', 'KeyQ', null],
+  ['swap', 'Swap weapon', 'Backquote', null],
   ['nextSlot', 'Next item', 'WheelDown', null],
   ['previousSlot', 'Previous item', 'WheelUp', null],
   ['scores', 'Scoreboard', 'Tab', null],
@@ -48,7 +50,7 @@ export const CONTROLS = [
   ['heliHorn','Helicopter: loudspeaker','KeyB',null],
 ];
 export const validBinding = code => typeof code === 'string' && /^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Tab|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Mouse[0-4]|Wheel(Up|Down)|Numpad([0-9]|Add|Subtract|Multiply|Divide|Decimal|Enter)|Enter|CapsLock|Backquote|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Home|End|PageUp|PageDown|Insert|F([1-9]|1[01]))$/.test(code);
-const heldActions=new Set(['heliUp','heliDown','heliBoost','heliExit','forward','back','left','right','aim','sprint','scores','crouch','interact']);
+const heldActions=new Set(['leanLeft','leanRight','heliUp','heliDown','heliBoost','heliExit','forward','back','left','right','aim','sprint','scores','crouch','interact']);
 export const bindingAllowed=(action,code)=>validBinding(code)&&!(code.startsWith('Wheel')&&heldActions.has(action));
 // These bindings are disjoint by gameplay context; everything else stays exclusive.
 export function shareBinding(a,b,code){
@@ -82,6 +84,12 @@ export function migratePerspectiveBindings(settings){
  settings.perspectiveBindings157=true;return settings;
 }
 export function normalizeBindings(saved) {
+  // Migrate only untouched old defaults once; explicit custom Q/E bindings win.
+  if(saved&&!Object.hasOwn(saved,'leanLeft')&&!Object.hasOwn(saved,'leanRight')){
+    saved={...saved};
+    if(saved.swap?.[0]==='KeyQ'&&!saved.swap[1])saved.swap=[Object.entries(saved).some(([id,keys])=>id!=='swap'&&keys?.includes('Backquote'))?null:'Backquote',null];
+    if(saved.popper?.[0]==='KeyE'&&saved.popper[1]==='KeyG')saved.popper=['KeyG',null];
+  }
   if(saved?.pickaxe?.[0]==='Digit6'&&!saved.slot6)saved={...saved,pickaxe:['KeyP',saved.pickaxe[1]]};
   const used = new Map();
   const ordered=[...CONTROLS].sort((a,b)=>Number(Array.isArray(saved?.[b[0]]))-Number(Array.isArray(saved?.[a[0]])));
@@ -105,7 +113,7 @@ export function bindingLabel(code) {
 }
 
 export const CONTROL_GROUPS=[
- ['Movement',['forward','back','left','right','jump','crouch','sprint']],
+ ['Movement',['forward','back','left','right','jump','crouch','sprint','leanLeft','leanRight']],
  ['Combat',['fire','aim','reload','popper']],
  ['Equipment & inventory',['primary','sidearm','slot3','slot4','slot5','swap','nextSlot','previousSlot','pickaxe','drop','inventory']],
  ['Building & editing',['buildToggle','buildWall','buildFloor','buildStairs','buildRoof','buildRotate','buildMaterial','buildEdit','buildReset','buildRepair']],

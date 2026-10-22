@@ -1,5 +1,8 @@
 // Shared triangulated terrain: geometry, minimap, walking, landing, shots and bots.
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
+export const WATER_LEVEL=.5;
+// Preserve the shoreline and every dry foundation; carve only the existing wet bed.
+export const deepenWaterBed=h=>h-3*smooth((WATER_LEVEL-h)/.35);
 export const HILLS=[[-110,105,85,19],[110,-140,78,31],[-10,-184,65,22],[88,45,72,14],[-210,-40,48,16],[8,125,55,10],[-170,-135,80,7],[180,175,56,8]];
 export const riverX=z=>24+Math.sin(z*.018)*22+Math.sin(z*.043)*5;
 export function naturalHeight(x,z){
@@ -12,7 +15,7 @@ export function naturalHeight(x,z){
  const harbor=smooth((z-196)/12)*(1-smooth((Math.abs(x-149)-29)/13));h=h*(1-harbor)+.1*harbor;
  const river=Math.abs(x-riverX(z));h=h*smooth((river-3.5)/12)+.12*(1-smooth((river-3.5)/12));
  const edge=(Math.abs(x/254)**4+Math.abs(z/254)**4)**.25;
- return Math.max(0,h*smooth((1-edge)/.13));
+ return deepenWaterBed(Math.max(0,h*smooth((1-edge)/.13)));
 }
 export function terrainColor(map,x,z){
  if(map.id==='hatchery-atoll'){const h=groundAt(map,x,z);return h<.7?0x537e89:h<2?0xb1ac91:Math.abs(x)<80&&Math.abs(z)<80?0x7c8d78:0x657b70;}

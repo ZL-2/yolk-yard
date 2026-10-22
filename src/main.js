@@ -1963,6 +1963,7 @@ function frameInput() {
     seq: ++seq,
     round:state?.round,
     ...localPerspective(),
+    leanLeft:active&&actionDown('leanLeft'),leanRight:active&&actionDown('leanRight'),
     shotTime:sim?state?.time:guestPresentation.poses.targetTime(guestPresentation.time),
     yaw: input.yaw,
     pitch: input.pitch,
