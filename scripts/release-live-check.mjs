@@ -55,6 +55,7 @@ try{
  page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:process.env.CI ? .5 : 1});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{localStorage.setItem('ravelfront-season-1-update-150-dismissed','yes');localStorage.setItem('ravelfront-referrals-dismissed','yes');localStorage.setItem('ravelfront-perspective-157-dismissed','yes');localStorage.setItem('ravelfront-voice-192-dismissed','yes');localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0}));localStorage.setItem('yolk-profile',JSON.stringify({name:'Release Lobby'}));});
  await page.goto(front+'?release='+expected);await page.locator('#loading-screen').waitFor({state:'hidden'});
+ await page.locator('.midseason-briefing[open]').waitFor();await page.locator('.midseason-art img').first().evaluate(i=>i.decode());await page.screenshot({path:out+'/announcement.png',timeout:90000});await page.locator('.midseason-done').click();
  await page.locator('#menu [data-action=settings]:visible').first().waitFor();
  assert.match(await page.locator('body').innerText(),/FRONTIER LEADERS/i);
  await page.screenshot({path:out+'/desktop.png',timeout:90000});
