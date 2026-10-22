@@ -476,7 +476,8 @@ export class Simulation {
   }
   updateAccuracy(p, previous, dt) {
     const w=gun(p),a=p.accuracyState[p.slot]??={};
-    updateCombatAccuracy(p,w,a,dt,this.time,p.motionFresh?Math.hypot(p.motionVX||0,p.motionVZ||0):Math.hypot(p.x-previous.x,p.z-previous.z)/Math.max(dt,1e-9));
+    const seated=!!p.vehicleId&&p.vehicleSeat>0;
+    updateCombatAccuracy(seated?{...p,grounded:true}:p,w,a,dt,this.time,seated?0:p.motionFresh?Math.hypot(p.motionVX||0,p.motionVZ||0):Math.hypot(p.x-previous.x,p.z-previous.z)/Math.max(dt,1e-9));
     p.recoilPitch=a.recoilPitch;p.recoilYaw=a.recoilYaw;
   }
   shotPath(p, w, directionOverride = null) {

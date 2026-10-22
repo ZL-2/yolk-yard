@@ -46,6 +46,12 @@ test('passenger third-person cameras stay outside the cabin at every craft headi
  }
  assert.equal(helicopterCameraDistance({}, {x:0,y:0,z:0},{x:1,y:0,z:0},3),3,'non-vehicle cameras retain their distance');
 });
+test('airborne passengers gain scoped accuracy, finish reloading and can fire again',()=>{
+ const {s,p,target}=battle(),v=board(s,p);target.x=100;v.seats[0]=null;v.seats[1]=p.id;v.y=30;v.rotor=1;v.grounded=false;p.vehicleSeat=1;seatPlayer(p,v);p.slot=1;p.inventory[1]={id:'needle',weapon:true,rarity:2,ammo:1};p.bank.heavy=5;p.equipUntil=0;p.reloadEnd=0;s.syncInventory(p);let seq=0;
+ const step=(extra={})=>{s.setInput(p.id,{seq:++seq,slot:1,aim:true,yaw:0,pitch:0,...extra});s.tick(1/60);};
+ for(let i=0;i<80;i++)step();assert.ok(p.accuracyState[1].adsBlend>.995);assert.equal(p.accuracyState[1].spread,0);assert.equal(p.grounded,false);
+ step({fire:true});assert.equal(p.ammo[1],0);step({reload:true});assert.ok(p.reloadEnd>s.time);for(let i=0;i<200;i++)step();assert.equal(p.reloadEnd,0);assert.equal(p.ammo[1],1);assert.equal(p.bank.heavy,4);step({fire:true});assert.equal(p.ammo[1],0);
+});
 test('a player hit sticks, follows movement and rotation, survives recovery, and bursts once',()=>{
  const {s,p,target}=battle();shoot(s,p);assert.equal(target.shield,42);assert.equal(s.stormSpikes.length,1);assert.equal(s.stormSpikes[0].playerId,target.id);
  const initial=structuredClone(s.stormSpikes[0]);target.x=7;target.z=-12;target.yaw=Math.PI/2;s.time+=.5;tickStormspikes(s);const pose=stormspikePose(initial,target);assert.equal(s.stormSpikes[0].x,pose.x);assert.equal(s.stormSpikes[0].z,pose.z);assert.equal(target.shield,42);

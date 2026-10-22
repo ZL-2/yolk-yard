@@ -493,7 +493,7 @@ jobs:
       - name: Kestrel controls, sticky damage, perspective, input and snapshot contracts
         if: needs.scope.outputs.flight_combat_fix == 'true'
         run: |
-          node --test --test-concurrency=2 tests/update-201.test.js tests/update-199.test.js tests/perspective.test.js tests/audio.test.js tests/remote-input.test.js tests/keybinds.test.js tests/snapshot-codec.test.js tests/release-history.test.js
+          node --test --test-concurrency=2 tests/update-201.test.js tests/update-199.test.js tests/reload-buffer.test.js tests/perspective.test.js tests/audio.test.js tests/remote-input.test.js tests/keybinds.test.js tests/snapshot-codec.test.js tests/release-history.test.js
           node scripts/update-201-network-check.mjs
       - name: Shared performance, collision, recovery, ordering and multiplayer contracts
         if: needs.scope.outputs.performance_update == 'true'
