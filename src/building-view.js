@@ -25,7 +25,9 @@ export function buildMesh(piece,kit,preview=false){
 }
 export function updateBuildingView(rv,state,p){
  rv.buildMeshes??=new Map();const r=state.royale,seen=new Set();
- for(const b of r.builds||[]){seen.add(b.id);let cached=rv.buildMeshes.get(b.id);const key=[b.material,b.mask,b.rotation,b.path,b.doorOpen].join(':');
+ for(const b of r.builds||[]){seen.add(b.id);let cached=rv.buildMeshes.get(b.id);const near=!p||(b.x-p.x)**2+(b.z-p.z)**2<180**2;
+  if(!near){if(cached)cached.mesh.visible=false;continue;}
+  const key=[b.material,b.mask,b.rotation,b.path,b.doorOpen].join(':');
   if(cached&&cached.key!==key){rv.root.remove(cached.mesh);rv.view.disposeGroup(cached.mesh);rv.buildMeshes.delete(b.id);cached=null;}
   if(!cached){const mesh=buildMesh(b,rv.kit);rv.root.add(mesh);cached={mesh,key};rv.buildMeshes.set(b.id,cached);}
   cached.mesh.visible=(!p||Math.hypot(b.x-p.x,b.z-p.z)<180)&&rv.view.buildControls?.editDraft?.id!==b.id;

@@ -113,6 +113,11 @@ export const HUMAN_HIT=[
 ];
 export const humanFlightPitch=p=>p.flight==='dive'?.78:p.flight==='glide'?.09+Math.max(-.06,Math.min(.11,(-(p.vx||0)*Math.sin(p.yaw||0)-(p.vz||0)*Math.cos(p.yaw||0))*.005)):0;
 export function humanHit(o,d,p,radius=0){
+ // Conservative sphere contains every stance, lean and rotated flight pose.
+ // Most combat rays miss most contestants; avoid all anatomical work for them.
+ const sx=o.x-p.x,sy=o.y-p.y,sz=o.z-p.z,dd=d.x*d.x+d.y*d.y+d.z*d.z;
+ const near=dd>1e-12?Math.max(0,-(sx*d.x+sy*d.y+sz*d.z)/dd):0;
+ if((sx+d.x*near)**2+(sy+d.y*near)**2+(sz+d.z*near)**2>(2.1+radius)**2)return {distance:Infinity,region:null};
  const yaw=p.yaw||0,c=Math.cos(yaw),s=Math.sin(yaw),dx=o.x-p.x,dz=o.z-p.z;
  const ox=dx*c-dz*s,oy=o.y-p.y,oz=dx*s+dz*c,vx=d.x*c-d.z*s,vz=d.x*s+d.z*c;
  const pitch=humanFlightPitch(p),cp=Math.cos(pitch),sp=Math.sin(pitch),py=oy*cp+oz*sp,pz=-oy*sp+oz*cp,vy=d.y*cp+vz*sp,pvz=-d.y*sp+vz*cp;

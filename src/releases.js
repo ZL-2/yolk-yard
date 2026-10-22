@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'204',title:'Smoother human firefights',changes:[
+  'Human-player lag compensation now reuses compact collision poses across every pellet and sight/muzzle test. Conservative broad-phase rejection skips distant misses while preserving precise anatomical hit regions, cover and damage.',
+  'Royale snapshots send exact prediction to their owner and compact display poses to opponents. Shared encoding, short queued encoding tasks and native WebSocket compression reduce combat traffic and host stalls while retaining reliable actions, world recovery and reconnect replay.',
+  'Impact sparks, marks and explosion debris use bounded render batches. Distant effects are culled, incoming tracers and scoped impacts stay visible, and muzzle flashes are reused. Damaged world geometry uploads only changed ranges; distant builds wait to create their meshes until approached. Version 6.16.0 / protocol 76.'
+ ]},
  {number:'203',title:'Deep water & tactical leaning',changes:[
   'Ravel Coast and the staging island now have deeper river, lake and coastal beds. Water cushions falls and supports swimming at the surface. Move to shore or jump to climb out; landing on a bridge or deck still applies normal fall damage.',
   'Hold Q or E to lean left or right while standing or crouching. Leaning moves the camera, weapon origin, visible upper body and hit regions together, with wall collision and multiplayer synchronization. Scoped sights work while leaning.',

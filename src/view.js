@@ -1,3 +1,4 @@
+import {CombatParticles,visibleShot} from './combat-particles.js';
 import {ShaderPreparation} from './shader-preparation.js';
 import {buildZoneDistrict,updateZoneDistrict} from './zone-wars-view.js';
 import {buildBoxArena,updateBoxArena} from './box-fight-view.js';
@@ -198,6 +199,7 @@ export class View {
     this.effects = new THREE.Group();
     this.scene.add(this.effects);
     this.eliminations=new EliminationEffects(this.effects);
+    this.combatParticles=new CombatParticles(this.effects);
     this.models = new Map();
     this.projectiles = new Map();
     this.renderPool=new RenderPool();
@@ -632,96 +634,19 @@ export class View {
         if(actor)actor.userData.throwStart=this.clock;
       }
       if (actor && !e.popper) actor.userData.armRecoil = 1;
-      if (!e.popper)
+      if (!e.popper&&(e.player===localId||visibleShot(e,this.camera.position,this.scopeActive?750:160)))
         this.pendingShots.push({ event: e, local: e.player === localId });
     }
-    if (e.type === "impact") {
-      const n = new THREE.Vector3(
-        e.normal?.x || 0,
-        e.normal?.y || 0,
-        e.normal?.z || 0,
-      );
-      for (let i = 0; i < (e.tag ? 4 : 6); i++) {
-        const m = new THREE.Mesh(
-          sphereGeo,
-          new THREE.MeshBasicMaterial({
-            color:e.tag?0xb9b7ad:e.surface==='metal'?(i%2?0xf5d59c:0x9ea7aa):e.surface==='wood'?0xa58b67:0xb2ada1,
-            transparent: true,
-          }),
-        );
-        m.position.set(e.x, e.y, e.z);
-        m.position.addScaledVector(n, 0.025);
-        m.scale.setScalar((e.surface==='metal'?.009:.017) + Math.random() * .017);
-        this.effects.add(m);
-        this.fx.push({
-          mesh: m,
-          life: 0.22,
-          max: 0.22,
-          v: n
-            .clone()
-            .multiplyScalar(1.4)
-            .add(
-              new THREE.Vector3(
-                (Math.random() - 0.5) * 2,
-                Math.random() * 1.7,
-                (Math.random() - 0.5) * 2,
-              ),
-            ),
-          ownedMaterial: true,
-        });
-      }
-      if (!e.tag) {
-        const mark = new THREE.Mesh(
-          new THREE.CircleGeometry(0.027, 10),
-          new THREE.MeshBasicMaterial({
-            color: 0x445258,
-            transparent: true,
-            opacity: 0.6,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-          }),
-        );
-        mark.position.set(e.x, e.y, e.z);
-        mark.position.addScaledVector(n, 0.012);
-        mark.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
-        this.effects.add(mark);
-        this.fx.push({
-          mesh: mark,
-          life: 2.4,
-          max: 2.4,
-          ownedMaterial: true,
-          ownedGeometry: true,
-        });
-      }
-    }
+    if(e.type==='impact')this.combatParticles.impact(e,this.camera.position,this.scopeActive?750:160);
     if(e.type==='elimination'&&(state?.royale||this.isRoyale)){
       const me=state?.players.find(p=>p.id===localId)||this.localPlayer,listener=me?.spectating&&e.target!==localId?state?.players.find(p=>p.id===this.spectateTarget)||me:me;
       const target=state?.players.find(p=>p.id===e.target);
       this.eliminations.spawn({...e,yaw:target?.yaw},this.models.get(e.target)||(e.target===localId?this.menuEgg:null),listener,this.settings.reducedMotion);
     }
-    if (e.type === "explosion" || e.type==='elimination'&&!(state?.royale||this.isRoyale)) {
-      for (let i = 0; i < (e.type === "elimination" ? 18 : 26); i++) {
-        const c =
-          e.type === "elimination"
-            ? [0xfff3c9, 0xffc843, 0x5dc7d5][i % 3]
-            : [0xffc642, 0xf5ede0, 0xfb9564][i % 3];
-        const m = new THREE.Mesh(boxGeo, mat(c));
-        m.position.set(e.x, e.y + 0.6, e.z);
-        m.scale.setScalar(0.08 + Math.random() * 0.14);
-        this.effects.add(m);
-        this.fx.push({
-          mesh: m,
-          life: 0.8,
-          max: 0.8,
-          v: new THREE.Vector3(
-            (Math.random() - 0.5) * 8,
-            Math.random() * 6,
-            (Math.random() - 0.5) * 8,
-          ),
-        });
-      }
-    }
+    if (e.type==='explosion'||e.type==='elimination'&&!(state?.royale||this.isRoyale))
+      this.combatParticles.burst(e,this.camera.position,this.scopeActive?750:180);
   }
+
   fadeLocalActor(model,opacity){
     if(model.userData.cameraFade===opacity)return;model.userData.cameraFade=opacity;
     model.traverse(m=>{if(!m.isMesh||!m.material)return;
@@ -741,7 +666,7 @@ export class View {
         model?.userData.muzzle?.getWorldPosition(new THREE.Vector3()) ||
         new THREE.Vector3(e.origin?.x || 0, e.origin?.y || 0, e.origin?.z || 0);
       if (local) this.lastMuzzleFlash = pos.clone();
-      if(!e.echoed){const flash = new THREE.Mesh(
+      if(!e.echoed){const flash = this.renderPool.acquire('muzzle-flash',()=>new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.045, 0),
         new THREE.MeshBasicMaterial({
           color: 0xffe3a0,
@@ -749,8 +674,8 @@ export class View {
           depthWrite: false,
           toneMapped: false,
         }),
-      );
-      flash.position.copy(pos);
+      ));
+      flash.material.opacity=1;flash.position.copy(pos);
       flash.scale.set(1, 1, 2.2);
       if (model)
         flash.quaternion.copy(model.getWorldQuaternion(new THREE.Quaternion()));
@@ -1154,6 +1079,7 @@ export class View {
       if (this.clock - offset.born > 0.12) this.shotOffsets.delete(id);
     const effectDt=this.cinematic?.slowMotion&&!this.settings.reducedMotion?dt*.35:dt;
     this.eliminations.update(effectDt);
+    this.combatParticles.update(effectDt);
     for (let i = this.fx.length - 1; i >= 0; i--) {
       const f = this.fx[i];
       if (f.fresh) {
