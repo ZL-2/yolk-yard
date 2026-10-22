@@ -15,7 +15,7 @@ export class RoyaleRankRewards{
   return {identity:id,rank:row?.rating>0?row.rank:0,rating:row?.rating||0,wins:row?.wins||0,kills:row?.kills||0,eligible,claimed,equipped:claimed.includes(identity.profile?.pickaxe)?identity.profile.pickaxe:'',pending:eligible.filter(x=>!claimed.includes(x)),epoch:record.epoch,revision:record.revision};
  }
  sanitize(profile,id){return rankLoadout(profile,this.status(id)?.claimed||[]);}
- sanitizePeer(profile,peer){return this.sanitize(profile,this.progression.accounts.get(peer?.progressId)?.socialId);}
+ sanitizePeer(profile,peer,admittedIdentity){return this.sanitize(profile,admittedIdentity||this.progression.accounts.get(peer?.progressId)?.socialId);}
  sync(id,force=false){
   const status=this.status(id);if(!status)return null;
   const parties=this.relay.parties,identity=parties.store.identities.get(id),user=parties.users?.get(id),approved=rankLoadout(identity.profile,status.claimed);

@@ -140,7 +140,6 @@ export class RealtimeRelay {
         if(!entry||!['accept','data','close'].includes(entry.type)||typeof entry.channel!=='string')throw Error('Invalid entry');
         const other=peer.links.get(entry.channel);
         if(!other){this.send(peer,{type:'closed',channel:entry.channel});continue;}
-        if(entry.type==='data'&&['hello','profile'].includes(entry.data?.type)&&entry.data.profile)entry.data={...entry.data,profile:this.progression.rankRewards.sanitizePeer(entry.data.profile,peer)};
         if(entry.type==='data'&&this.authority.data(peer,other,entry))continue;
         if(entry.type==='data'&&entry.data?.type==='input')this.progression.input(peer,entry.data.input||entry.data);
         if(entry.type==='data'&&entry.data?.type==='hello'){
@@ -153,6 +152,9 @@ export class RealtimeRelay {
           // Never forward a self-reported party or team claim.
           entry.data={...entry.data,admission};delete entry.data.ticket;
         }
+        // A validated ticket can restore the social identity before the new
+        // browser's progression credential has been bound by joined.
+        if(entry.type==='data'&&['hello','profile'].includes(entry.data?.type)&&entry.data.profile)entry.data={...entry.data,profile:this.progression.rankRewards.sanitizePeer(entry.data.profile,peer,entry.data.type==='hello'?entry.data.admission?.memberId:undefined)};
         this.send(other,{type:entry.type==='accept'?'opened':entry.type==='close'?'closed':'data',channel:entry.channel,...(entry.type==='data'?{data:entry.data}:{})});
         if(entry.type==='close'){peer.links.delete(entry.channel);other.links.delete(entry.channel);}
       }return;
