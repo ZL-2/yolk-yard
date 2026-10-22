@@ -10,6 +10,7 @@ export function adsFov(w,base){return w.ads?.fov??(w.ads?2*Math.atan(Math.tan(ba
 // viewmodel FOV keeps the gun readable when the world camera zooms for ADS.
 export const WEAPON_ART_REVISION=155;
 export const VIEWMODELS={
+ stormspike:{scale:.46,x:.24,y:-.22,z:-.66,fov:70},
  sprinter:{scale:.48,x:.23,y:-.21,z:-.61,fov:68},
  scatter:{scale:.49,x:.23,y:-.22,z:-.65,fov:70},
  needle:{scale:.47,x:.25,y:-.22,z:-.67,fov:70},
@@ -24,8 +25,9 @@ export const VIEWMODELS={
 };
 VIEWMODELS.arcLoom=VIEWMODELS.comet;VIEWMODELS.riftDriver=VIEWMODELS.thumper;VIEWMODELS.cinderLance=VIEWMODELS.anchor;
 export function viewmodelProfile(id,aspect=16/9){const p=VIEWMODELS[id]||VIEWMODELS.sprinter;return {...p,z:p.z-Math.max(0,1.25/aspect-1)*.26};}
-export const RETICLES={sprinter:'crosshair',scatter:'iron',needle:'mil-dot',zipper:'reflex-dot',thumper:'ring',anchor:'chevron',duet:'chevron',pip:'iron',peeper:'mil-dot',doubleyolk:'iron',comet:'reflex-dot'};
+export const RETICLES={stormspike:'reflex-dot',sprinter:'crosshair',scatter:'iron',needle:'mil-dot',zipper:'reflex-dot',thumper:'ring',anchor:'chevron',duet:'chevron',pip:'iron',peeper:'mil-dot',doubleyolk:'iron',comet:'reflex-dot'};
 export const GROUND_DISPLAY = {
+ stormspike:{scale:1,yaw:1.05,pitch:-.03,lift:.61},
  sprinter:{scale:1,yaw:.95,pitch:-.06,lift:.57},scatter:{scale:1,yaw:1.1,pitch:-.04,lift:.52},
  needle:{scale:.95,yaw:1.05,pitch:-.05,lift:.6},zipper:{scale:1.12,yaw:1.05,pitch:0,lift:.64},
  thumper:{scale:1.05,yaw:1.0,pitch:-.04,lift:.65},anchor:{scale:1,yaw:1.0,pitch:-.05,lift:.59},

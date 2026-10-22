@@ -41,3 +41,4 @@
  .settings-footer button{padding:8px 12px}.settings-options{padding-right:4px}
  #dialog[data-kind="settings"] .setting-row{gap:10px;padding:12px 8px}
 }
+.settings-group-heading{font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:#91b4c3;margin:24px 0 8px;padding-bottom:8px;border-bottom:1px solid #8fb0bd29}.binding-group[hidden],.keybind-row[hidden]{display:none}.settings-tabs button{flex:1 0 auto;min-width:82px}

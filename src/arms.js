@@ -26,8 +26,8 @@ export const ARM_POSES = {
 };
 ARM_POSES.peeper = ARM_POSES.needle;
 ARM_POSES.doubleyolk = ARM_POSES.scatter;
-ARM_POSES.comet = ARM_POSES.sprinter;ARM_POSES.arcLoom=ARM_POSES.comet;ARM_POSES.riftDriver=ARM_POSES.thumper;ARM_POSES.cinderLance=ARM_POSES.anchor;
-export const RELOAD_STYLES=Object.freeze({arcLoom:'energy-cell',riftDriver:'rocket',cinderLance:'heavy',sprinter:'rifle',zipper:'compact',anchor:'heavy',duet:'bullpup',pip:'pistol',needle:'bolt-rifle',peeper:'marksman',scatter:'break-action',doubleyolk:'tube-fed',thumper:'rocket',comet:'energy-cell'});
+ARM_POSES.stormspike=ARM_POSES.anchor;ARM_POSES.comet = ARM_POSES.sprinter;ARM_POSES.arcLoom=ARM_POSES.comet;ARM_POSES.riftDriver=ARM_POSES.thumper;ARM_POSES.cinderLance=ARM_POSES.anchor;
+export const RELOAD_STYLES=Object.freeze({stormspike:'energy-cell',arcLoom:'energy-cell',riftDriver:'rocket',cinderLance:'heavy',sprinter:'rifle',zipper:'compact',anchor:'heavy',duet:'bullpup',pip:'pistol',needle:'bolt-rifle',peeper:'marksman',scatter:'break-action',doubleyolk:'tube-fed',thumper:'rocket',comet:'energy-cell'});
 const smooth = t => {t=clamp(t,0,1);return t*t*(3-2*t);};
 function path(points, t) {
   if(t<=points[0][0]) return [...points[0][1]];

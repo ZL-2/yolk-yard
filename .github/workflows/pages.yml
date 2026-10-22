@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      stormspike_kestrel_update: ${{ steps.scope.outputs.stormspike_kestrel_update }}
       campaign_update: ${{ steps.scope.outputs.campaign_update }}
       zombies_pause_update: ${{ steps.scope.outputs.zombies_pause_update }}
       match_flow_update: ${{ steps.scope.outputs.match_flow_update }}
@@ -277,6 +278,15 @@ jobs:
           print('Comms preferences update:',comms_preferences_update)
           print('Crew and field update:',crew_field_update)
           print('Focused release:',{'Voice and celebrations':voice_celebration_update,'Scope reticles':scope_reticle_update,'ATV':scoped,'Kestrel':aircraft,'Models':models,'Environment':environment,'Built world':built_world,'Field control':field_control,'Public match':public_match,'Crew':crew,'Perspective':perspective,'Referral/edit fixes':referral_edit})
+          # This release follows the existing file-scoped acceptance scheme.
+          update199_files=set(subprocess.check_output(['git','diff','--name-only','ba0779110a548a30d28e5e74a9df33328087ffef','HEAD'],text=True).splitlines())
+          update199_allowed={'src/character-motion.js', 'src/simulation.js', 'src/bosses.js', 'src/main.js', 'src/helicopter-audio.js', 'tests/frontier-145.test.js', 'src/weapons.js', 'src/helicopter.js', 'src/releases.js', 'src/humanoid.js', 'src/weapon-rarities.js', 'src/lobby-news.js', 'src/audio.js', 'src/weapon-presentation.js', 'src/royale-loot.js', 'src/keybind-editor.js', 'src/weapon-balance.js', 'tests/weapon-balance.test.js', 'src/midseason-briefing.css', 'public/season/update-199-models.json', 'public/LICENSE.txt', 'public/season/stormspike-kestrel.webp', 'scripts/update-199-network-check.mjs', 'src/view.js', 'public/season/stormspike-model.webp', 'tests/weapon-presentation.test.js', 'package.json', 'package-lock.json', 'src/keybinds.js', 'src/settings-layout.css', 'src/settings-layout.js', 'src/season-one.css', 'src/vehicles.js', 'public/season/kestrel-model.webp', 'scripts/update-199-browser-check.mjs', 'src/royale.js', 'src/helipad-view.js', 'scripts/sync-credits.mjs', 'src/vehicle-view.js', '.github/workflows/pages.yml', 'public/THIRD_PARTY.txt', 'src/data.js', 'public/CREDITS.txt', 'src/stormspike-view.js', 'public/season/stormspike-kestrel-background.webp', 'src/stormspike.js', 'public/inventory-previews/manifest.json', 'src/helicopter-model.js', 'src/physics.js', 'src/royale-data.js', 'tests/update-199.test.js', 'src/credits.js', 'src/royale-ui.js', 'vite.config.js', 'scripts/render-update-199.mjs', 'src/royale-view.js', 'src/arms.js', 'src/royale-map.js', 'src/inventory-policy.js', 'docs/UPDATE_199.md', 'src/midseason-briefing.js', 'THIRD_PARTY.md', 'src/firearm-audio.js', 'public/inventory-previews/stormspike.svg'}
+          update199_required={'src/helicopter.js','src/stormspike.js','src/vehicles.js','tests/update-199.test.js','scripts/update-199-network-check.mjs','scripts/update-199-browser-check.mjs'}
+          stormspike_kestrel_update=update199_required<=update199_files<=update199_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.13.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('stormspike_kestrel_update='+str(stormspike_kestrel_update).lower()+'\n')
+            if stormspike_kestrel_update: out.write('focused=true\n')
+          print('Stormspike and Kestrel update:',stormspike_kestrel_update)
           PY
   build:
     needs: scope
@@ -461,6 +471,12 @@ jobs:
           name: match-flow-performance
           path: test-results/match194/performance.json
           retention-days: 14
+      - name: Stormspike, Kestrel, audio, controls, snapshots and weapon contracts
+        if: needs.scope.outputs.stormspike_kestrel_update == 'true'
+        run: |
+          node --test --test-concurrency=2 tests/update-199.test.js tests/weapon-balance.test.js tests/weapon-presentation.test.js tests/keybinds.test.js tests/audio.test.js tests/arms.test.js tests/snapshot-codec.test.js tests/remote-input.test.js tests/release-history.test.js
+          node --test --test-name-pattern='ATV|guest driving' tests/frontier-145.test.js
+          node scripts/update-199-network-check.mjs
       - name: Campaign checkpoints, cover, admission and release history
         if: needs.scope.outputs.campaign_update == 'true'
         run: node --test tests/campaign.test.js tests/release-history.test.js
@@ -513,6 +529,15 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true'
+      - name: Desktop announcement, settings, flight station, controls and exact weapon model
+        if: needs.scope.outputs.stormspike_kestrel_update == 'true'
+        run: node scripts/update-199-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.stormspike_kestrel_update == 'true'
+        with:
+          name: stormspike-kestrel-desktop
+          path: test-results/update-199
+          retention-days: 14
       - name: Desktop owner campaign, combat, objectives, checkpoint recovery and exit
         if: needs.scope.outputs.campaign_update == 'true'
         run: node scripts/campaign-browser.mjs

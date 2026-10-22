@@ -57,6 +57,8 @@ import './referrals.css';
 import {showReferrals,ReferralRewards} from './referrals.js';
 import {showPerspectiveBriefing} from './perspective-briefing.js';
 import {showVoiceBriefing} from './voice-briefing.js';
+import {showMidseasonBriefing} from './midseason-briefing.js';
+import {creditsHTML} from './credits.js';
 import {perspectiveMode,thirdPersonActive} from './perspective.js';
 import {showWelcomeBack} from './welcome-back.js';
 import {loadingMarkup,showLoading,hideLoading,waitForLoading,waitUntilLoadingHidden} from './loading-screen.js';
@@ -228,8 +230,9 @@ let view,
 const sound = new Sound();
 sound.setVolumes(settings);
 const keys = new Set();
+const vehicleControlCodes=new Set();
 const actionToggles=new ActionToggles();
-const actionDown = action => bindingDown(settings.keybinds, keys, action);
+const actionDown = action => settings.keybinds[action].some(code=>code&&keys.has(code)&&(action.startsWith('heli')||!vehicleControlCodes.has(code)));
 const controlLabel = action => settings.keybinds[action].filter(Boolean).map(bindingLabel).join(' / ') || 'Unbound';
 let bindingEditor = null;
 // Preserve brief actions until a simulation tick consumes them, even after a slow frame.
@@ -442,7 +445,7 @@ function settingsMenu() {
       )
       .join(
         "",
-      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div>${fpsLimitHTML(settings.fpsLimit)}<div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["visualSoundEffects", "Visualize Sound Effects"], ["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}${perspectiveSettingsHTML()}${inventoryPreferencesHTML(settings)}${comfortHTML(settings)}<h3>Chat & privacy</h3><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
+      )}<div class="setting-row"><label for="quality" class="setting-label">Graphics</label><select id="quality" data-setting="quality"><option value="high" ${settings.quality === "high" ? "selected" : ""}>High · shadows</option><option value="low" ${settings.quality === "low" ? "selected" : ""}>School laptop · faster</option></select></div>${fpsLimitHTML(settings.fpsLimit)}<div class="setting-row"><label for="invert" class="setting-label">Invert vertical look</label><input id="invert" data-setting="invert" type="checkbox" ${settings.invert ? "checked" : ""}></div><h3 style="margin-top:22px">Crosshair</h3>${[["visualSoundEffects", "Visualize Sound Effects"], ["centerDot", "Center Dot"], ["hitMarkers", "Hit Markers"], ["showFps", "Show FPS"], ["netDebugStats", "Net Debug Stats"], ["connectionWarnings", "Connection Warnings"]].map(([id, label]) => `<div class="setting-row"><label for="${id}" class="setting-label">${label}</label><input id="${id}" data-setting="${id}" type="checkbox" ${settings[id] ? "checked" : ""}></div>`).join("")}${perspectiveSettingsHTML()}${inventoryPreferencesHTML(settings)}${comfortHTML(settings)}<h3>Chat & privacy</h3><div class="setting-row"><label for="voiceSettings" class="setting-label">Voice chat & microphone</label><button id="voiceSettings" data-settings-row="voiceSettings" data-action="voice-chat">OPEN VOICE SETTINGS</button></div><div class="setting-row"><label for="chatMode" class="setting-label">Chat messages</label><select id="chatMode" data-setting="chatMode"><option value="all" ${settings.chatMode === "all" ? "selected" : ""}>Filtered messages</option><option value="quick" ${settings.chatMode === "quick" ? "selected" : ""}>Quick messages only</option><option value="off" ${settings.chatMode === "off" ? "selected" : ""}>Off</option></select></div><p class="small">The safety filter stays on in every room. Use Pause → Player controls to mute or report a player.</p><h3>Building & editing</h3><div class="setting-row"><label for="confirmEditOnRelease" class="setting-label">Confirm edit on selection release</label><input id="confirmEditOnRelease" data-setting="confirmEditOnRelease" type="checkbox" ${settings.confirmEditOnRelease ? "checked" : ""}></div><p class="small">Manual editing: aim at tiles and hold your Fire binding to select. Your Reset edit binding resets. Edit confirms; Esc cancels. Assign the same scroll direction to Edit and Reset edit for a single-scroll reset.</p><h3>Keybinds</h3><div class="keybind-list"></div><button class="primary" data-action="close" style="margin-top:22px">Done</button>`,
     "settings",
   );
   bindingEditor=new KeybindEditor(dialog.querySelector(".keybind-list"),settings.keybinds,bindings=>{settings.keybinds=bindings;keys.clear();queuedActions.clear();input.fire=input.aim=false;save("yolk-settings",settings);});
@@ -1456,6 +1459,7 @@ const actions = {
  'social-confirm-new-identity':()=>{party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
  referrals:()=>showReferrals({party}),
+ 'midseason-briefing':()=>showMidseasonBriefing({force:true}),
  'voice-briefing':()=>showVoiceBriefing({force:true}),
  'perspective-briefing':()=>showPerspectiveBriefing({force:true}),
  'z-journal':openZombiesJournal,
@@ -1560,12 +1564,7 @@ const actions = {
   "copy-link": () => {
     try{void copy(matchInviteURL(location.href,net?.code));}catch(error){toast(error.message);}
   },
-  about: () =>
-    modal(
-      "Welcome to the frontier",
-      `<p>Ravelfront is an original, independent combat arena shooter. Its maps, missions, weapons and UI are original. Blacktide uses licensed creature assets and recorded vocals.</p><p style="margin-top:14px">3D rendering: Three.js (MIT). Multiplayer: secure WebSocket relay, with PeerJS (MIT) for optional direct connections. Ravel Coast was abandoned after the relay network failed. Rival crews return for its technology, fighting through storm fronts and improvised fortifications.</p><p style="margin-top:14px">Settings and match totals stay in this browser. Social uses a browser identity saved on this device. Public Friend Codes allow lookup, while a separate private credential reconnects your identity. Friendships, requests and blocks are saved by the social server. Clearing site data loses access to this identity; there are no cross-device accounts. Server relationships require durable hosting storage to survive a server replacement. Presence uses live connections with timeouts. Parties hold up to four players, invitations expire after one minute, and disconnected memberships expire after a 30-second grace period. Rooms share your chosen name and game state with other players. Public rooms also share their room code and details in the directory. Filtered text chat is shared only within your room or team. Displayed chat clears when you leave. The game server briefly buffers messages for delivery; undelivered messages expire after 30 seconds. Reports notify the room host. Anonymous visit analytics record session start, end, duration and game mode for the owner; they do not record IP addresses or chat. History is retained for at most 30 days when the host provides persistent storage. No camera access. Voice chat is optional; your microphone is used only after you enable it. Live voice is not recorded or saved.</p><p>Blacktide creatures and animations by <a href="https://quaternius.com/" target="_blank" rel="noopener">Quaternius</a> (CC0 / CC BY 3.0); vocal recordings by artisticdude (CC0). Models adapted with scaling, tinting and animation blending. <a href="./models/blacktide/CREDITS.txt" target="_blank" rel="noopener">Asset credits and licenses</a>.</p><p class="hint">Version 6.2.0 · All gameplay code is included in the project.</p>`,
-      "about",
-    ),
+  about:()=>modal('Credits & about',creditsHTML(),'about'),
 };
 document.addEventListener("click", (e) => {
   const loadout=e.target.closest('[data-z-action^="z:loadout:"]');if(loadout){sendPlayerAction(loadout.dataset.zAction);return;}
@@ -1662,6 +1661,9 @@ document.addEventListener("pointerlockchange", () => {
   if(needsMouseCapture({screen,phase:state?.phase,player:state?.players.find(p=>p.id===localId),locked:document.pointerLockElement,paused,dialog:dialog.open,chat:chat.opened,hidden:document.hidden,coarse:matchMedia("(pointer:coarse)").matches}))mouseCapturePrompt();
 });
 function pressControl(code) {
+ const rider=state?.players.find(p=>p.id===localId);
+ if(rider?.vehicleId&&Object.entries(settings.keybinds).some(([id,codes])=>id.startsWith('build')&&codes.includes(code))&&!settings.keybinds.heliHorn.includes(code))return;
+ if(rider?.vehicleType==='helicopter'){const actions=(rider.vehicleSeat===0?['heliUp','heliDown','heliBoost','heliSeat','heliExit','heliHorn']:['heliSeat','heliExit','heliHorn']).filter(id=>settings.keybinds[id]?.includes(code));if(actions.length){keys.add(code);vehicleControlCodes.add(code);for(const id of actions)if(id==='heliSeat'||id==='heliHorn')queuedActions.add(id);return;}}
   if(state?.boxfight&&state.players.find(p=>p.id===localId)?.spectating&&['ArrowLeft','ArrowRight'].includes(code)){switchSpectator(code==='ArrowLeft'?-1:1);return;}
   if(state?.zombies){const p=state.players.find(p=>p.id===localId);for(const [key,action]of [['buildWall','z:field'],['drop','z:decoy'],['buildStairs','z:melee']])if(settings.keybinds[key].includes(code)){sendPlayerAction(action);return;}if(settings.keybinds.buildEdit.includes(code)){openZombiesJournal();return;}if(settings.keybinds.interact.includes(code)&&p&&!p.downed&&!nearbyDownedZombiePlayer(state,p)){const station=nearbyZombieStation(state,p);if(station){modal(station.name,zombiesStationMenu(station,state,p),'z-station');dialog.dataset.zStation=station.id;return;}}}
 
@@ -1779,7 +1781,7 @@ document.addEventListener("keydown", (e) => {
   if (!e.repeat) pressControl(e.code);
 });
 document.addEventListener("keyup", (e) => {
-  keys.delete(e.code);
+  keys.delete(e.code);vehicleControlCodes.delete(e.code);
   scoreHeld = actionDown('scores');
 });
 window.addEventListener("blur", () => {
@@ -1807,7 +1809,7 @@ $("#world").addEventListener("mousedown", (e) => {
   pressControl(`Mouse${e.button}`);
 });
 document.addEventListener("mouseup", (e) => {
-  keys.delete(`Mouse${e.button}`);
+  keys.delete(`Mouse${e.button}`);vehicleControlCodes.delete(`Mouse${e.button}`);
   scoreHeld = actionDown('scores');
 });
 function aimSensitivity() {
@@ -1938,10 +1940,12 @@ function startPrivateRoyale(){
  if(started&&paused)void resume();else if(!started)toast('At least two opposing contestants are needed to start.');return started;
 }
 function frameInput() {
+  for(const code of vehicleControlCodes)if(!keys.has(code))vehicleControlCodes.delete(code);
   const active = !document.hidden && !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && state?.players.find(p => p.id === localId)?.health > 0;
   if(!active)actionToggles.reset();
-  const combat=active&&state?.phase==='playing'&&canFight(state?.players.find(p=>p.id===localId));
-  if(active&&!combat){buildControls.buildMode=false;buildUI.cancel();}
+  const localRider=state?.players.find(p=>p.id===localId);
+  const combat=active&&state?.phase==='playing'&&canFight(localRider)&&(!localRider.vehicleId||localRider.vehicleSeat>0);
+  if(active&&(!combat||localRider?.vehicleId)){buildControls.buildMode=false;buildUI.cancel();}
   buildControls.yaw=input.yaw;buildControls.pitch=input.pitch;
   buildControls.buildFacing=snappedFacing(input.yaw,buildControls.buildMode?buildControls.buildFacing:undefined);
   if(!actionDown('fire')&&!touch.fire)buildControls.suppressBuildFire=false;
@@ -1950,6 +1954,7 @@ function frameInput() {
 
   if(state?.boxfight&&input.roundSeen!==state.round){const p=state.players.find(p=>p.id===localId);input.roundSeen=state.round;if(p?.boxSpawn){input.yaw=p.boxSpawn.yaw;input.pitch=state.zonewars?-.35:0;input.slot=state.zonewars?0:1;pendingInputs=[];predicted=null;}}
   const nextInput = {
+    heliUp:active&&actionDown('heliUp'),heliDown:active&&actionDown('heliDown'),heliBoost:active&&actionDown('heliBoost'),heliSeat:active&&(actionDown('heliSeat')||queuedActions.has('heliSeat')),heliExit:active&&actionDown('heliExit'),heliHorn:active&&(actionDown('heliHorn')||queuedActions.has('heliHorn')),
     seq: ++seq,
     round:state?.round,
     ...localPerspective(),
@@ -1974,7 +1979,7 @@ function frameInput() {
       active &&
       (actionDown("reload") || touch.reload || queuedActions.has("reload")),
     popper:
-      active && !buildControls.editing &&
+      active && !localRider?.vehicleId && !buildControls.editing &&
       (actionDown("popper") ||
         touch.popper ||
         queuedActions.has("popper")),
@@ -2161,7 +2166,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>showVoiceBriefing()).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>showMidseasonBriefing()).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);

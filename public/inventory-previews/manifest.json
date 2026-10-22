@@ -1,7 +1,7 @@
 {
   "revision": 155,
   "renderer": "WebGL PBR gameplay models",
-  "source": "4cd64af347c8230adb974dac22c109d305bfe9c186158a73ec0bf4616b181084",
+  "source": "359b0d20361ab677dcba1fe08ff62fbbfbd1f0abe1839c5beaaa4dce4e6891cf",
   "weapons": {
     "sprinter": {
       "name": "R-41 Service Rifle",
@@ -46,6 +46,10 @@
     "comet": {
       "name": "ARC-5 Pulse Rifle",
       "sha256": "2581154933b33f7b0b6b8b492e2c488d7e313b7ac335abc5ccb5840f73327247"
+    },
+    "stormspike": {
+      "name": "Stormspike Rifle",
+      "sha256": "7c7ba76a3c5893a793a6a52ed89cf761b1ac8777846ef14d9eba22e4a2eb4a25"
     }
   },
   "items": {

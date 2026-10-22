@@ -1,0 +1,12 @@
+{
+  "revision": 199,
+  "sources": {
+    "src/weapons.js": "359b0d20361ab677dcba1fe08ff62fbbfbd1f0abe1839c5beaaa4dce4e6891cf",
+    "src/helicopter-model.js": "5debebe61f401a8632533b8ee62d7d76bfb218d390856a1c7ea7ee5b23a5457a"
+  },
+  "art": [
+    "stormspike-model.webp",
+    "kestrel-model.webp"
+  ],
+  "note": "Exact gameplay meshes rendered with studio lighting. Background illustration generated separately."
+}

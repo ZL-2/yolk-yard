@@ -1,3 +1,4 @@
+import {HELIPAD} from './helicopter.js';
 import {environmentCollision} from './environment-collision.js';
 import {authorWatchtowers} from './watchtowers.js';
 import {authorFrontierWorld} from './world-locations.js';
@@ -45,7 +46,13 @@ const landmarkPlan=[
  ['Hush Hollow',-28,47,'cabin','park',1],['Driftwood Shed',113,214,'shed','dock',1],
 ];
 for(const [name,x,z,type,kind,floors] of landmarkPlan){const p={id:'landmark-'+landmarks.length,name,x,z,kind,risk:'low'};landmarks.push(p);addBuilding(p,[0,0,type==='tower'?12:14,16,floors,type],landmarks.length);}
-const terrain=createTerrain(buildings,DISTRICTS),surface={terrain};
+const helicopterBase=Math.round(naturalHeight(HELIPAD.x,HELIPAD.z)*2)/2;
+const helipad={...HELIPAD,y:helicopterBase};
+const heliDistrict={id:HELIPAD.id,name:HELIPAD.name,x:190,z:56,kind:'dock',risk:'medium'};
+landmarks.push({...heliDistrict,x:HELIPAD.x,z:HELIPAD.z});
+const hangar=addBuilding(heliDistrict,[0,0,24,18,1,'hangar'],0);helipad.hangarY=hangar.baseY;
+addBuilding(heliDistrict,[-4,29,12,10,2,'office'],1);
+const terrain=createTerrain(buildings,DISTRICTS,[{x:HELIPAD.x,z:HELIPAD.z,w:36,d:36,baseY:helicopterBase+.2}]),surface={terrain};
 const yAt=(x,z)=>groundAt(surface,x,z);
 function prop(kind,x,z,w=2,d=1.5,h=1.4,y=yAt(x,z),extra={}){
  const material=['truck','car','tank','container','lamp','barrels','shield-barrel','console','generator','pump','radio','silo','crane','telescope','dome','beacon','drill','solar'].includes(kind)?'metal':['rock','planter'].includes(kind)?'brick':'wood';
@@ -133,7 +140,9 @@ for(const z of [-102,20,112]){
 }
 // Sheltered coastal docks with real collision and loot.
 for(const x of [127,147,167]){const z=212,y=Math.max(...Array.from({length:13},(_,i)=>yAt(x,z-12+i*2)))+.15;box(x,z,5,24,.3,'crate',y-.3,'bridge',{material:'wood'});for(const dz of [-10,0,10])prop('bollard',x+2,z+dz,.3,.3,1.2,y);floorLoot.push({x,z:z+8,y,poi:'docks',role:'weapon',room:'pier',source:'ground',chance:.85});chests.push({x,z:z-8,y,poi:'docks',source:'high',chance:.6,room:'pier'});}
-const clear=(x,z,r=2)=>!buildings.some(b=>Math.abs(x-b.x)<b.w/2+r+3&&Math.abs(z-b.z)<b.d/2+r+5)&&!boxes.some(b=>Math.abs(x-b.x)<b.w/2+r&&Math.abs(z-b.z)<b.d/2+r)&&!floorLoot.some(p=>Math.hypot(x-p.x,z-p.z)<r+2)&&!chests.some(p=>Math.hypot(x-p.x,z-p.z)<r+2);
+box(HELIPAD.x,HELIPAD.z,36,36,.22,0x35444a,helipad.y-.22,'helipad',{material:'metal',indestructible:true});
+for(const [dx,dz]of [[-12,-12],[12,-12]]){floorLoot.push({x:helipad.x+dx,z:helipad.z+dz,y:helipad.y,poi:HELIPAD.id,role:'weapon',source:'ground',chance:.85});chests.push({x:helipad.x+dx,z:helipad.z+dz+2,y:helipad.y,poi:HELIPAD.id,source:'chest',chance:.8});}
+const clear=(x,z,r=2)=>!(Math.abs(x-helipad.x)<22+r&&Math.abs(z-helipad.z)<24+r)&&!buildings.some(b=>Math.abs(x-b.x)<b.w/2+r+3&&Math.abs(z-b.z)<b.d/2+r+5)&&!boxes.some(b=>Math.abs(x-b.x)<b.w/2+r&&Math.abs(z-b.z)<b.d/2+r)&&!floorLoot.some(p=>Math.hypot(x-p.x,z-p.z)<r+2)&&!chests.some(p=>Math.hypot(x-p.x,z-p.z)<r+2);
 // Freight, farming and relay research share a recognizable island history.
 for(const [kind,x,z,w,d,h]of [['crane',118,192,2,2,15],['crane',184,180,2,2,13],['telescope',117,-139,2,2,5],['drill',-171,64,3,3,8],['waterwheel',-9,101,2,3,6]])if(clear(x,z,1))prop(kind,x,z,w,d,h);
 for(const [i,b]of buildings.entries())if(b.type==='tower')prop(b.poi==='observatory'?'dome':'beacon',b.x+b.w*.23,b.z,3,3,4,b.baseY+b.h+2.3,{building:i,decorative:true});
@@ -170,4 +179,4 @@ for(const [x,z,kind] of [[116,-173,'crate'],[122,-172,'barrels'],[145,-127,'crat
 for(const [i,b]of boxes.entries())b.objectId=b.doorId?'world-door-'+b.doorId:'world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
 for(const b of boxes){const shape=environmentCollision(b,{props,trees});if(shape)b.collisionShape=shape;}
-export const ROYALE_MAP={id:'sunnybreak',revision:11,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[80,80]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,...outposts,material:'brick'};
+export const ROYALE_MAP={id:'sunnybreak',revision:12,helipad,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[80,80]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,...outposts,material:'brick'};

@@ -6,6 +6,7 @@
 // retaining Ravelfront's existing Rare recoil and standard firing cadence.
 const row=(reference,damage,reload,magazine,recoil,fireRateScale=1)=>Object.freeze({reference,damage:Object.freeze(damage),reload:Object.freeze(reload),magazine:Object.freeze(Array.isArray(magazine)?magazine:damage.map(()=>magazine)),recoil:Object.freeze(recoil),fireRateScale:Object.freeze(Array.isArray(fireRateScale)?fireRateScale:damage.map(()=>fireRateScale))});
 export const WEAPON_RARITIES=Object.freeze({
+ stormspike:row('Original Stormspike tuning; Rare–Mythic',[58,58,58,61,64,67],[3.4,3.4,3.4,3.2,3,2.8],4,[6,6,6,5.7,5.4,5.1]),
  sprinter:row('Assault Rifle / Skye',[30,31,33,35,36,37],[2.75,2.63,2.5,2.38,2.25,2.1],30,[3.85,3.68,3.5,3.33,3.15],[1,1,1,1,1,6/5.5]),
  scatter:row('Pump Shotgun',[87,95,103,111,119],[5.22,4.86,4.5,4.14,3.78],5,[10.44,9.72,9,8.28,7.56]),
  needle:row('Bolt-Action Sniper Rifle',[99,105,110,116,121],[3.3,3.15,3,2.5,2.35],1,[5.5,5.25,5,4.75,4.5]),

@@ -385,6 +385,7 @@ export function sanitizeInput(i = {}) {
     viewBlend:num(i.viewBlend,0,1),viewBoom:Number.isFinite(i.viewBoom)?num(i.viewBoom,0,1):1,
     forward: num(i.forward, -1, 1),
     strafe: num(i.strafe, -1, 1),
+    heliUp:!!i.heliUp,heliDown:!!i.heliDown,heliBoost:!!i.heliBoost,heliSeat:!!i.heliSeat,heliExit:!!i.heliExit,heliHorn:!!i.heliHorn,
     jump: !!i.jump,
     fire: !!i.fire,
     aim: !!i.aim,

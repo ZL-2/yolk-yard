@@ -9,6 +9,7 @@ import {modelMaterial,surfaceUV,surfaceAtlasMaterial} from './model-surfaces.js'
 // The same authored model is used in the player's hands, on other operators, and in previews.
 const geometries = new Map();
 const ART_REVISION=155;
+const spikeGlow=new THREE.MeshStandardMaterial({color:0x75e7f7,emissive:0x26bde8,emissiveIntensity:1.5,roughness:.25,metalness:.15});spikeGlow.userData.shared=true;
 const finishKind=(hex,metal=false)=>metal?'metal':hex===0x896044||hex===0x67442f?'wood':hex===0x151c20||hex===0x30383c?'polymer':hex===0x748087?'metal':'paint';
 const color=(hex,metal=false,kind=finishKind(hex,metal))=>modelMaterial(hex,kind);
 const cached = (key, create) => {
@@ -369,6 +370,30 @@ export function makeBlaster(id,wrap='') {
       box(g,side*.138,-.095,-.27,.006,.046,.23,black,.007,false,'rubber');
     }
     box(g,0,.157,.4,.20,.027,.27,black,.013,false,'rubber');
+  }else if(id==='stormspike'){
+    // Shared exact geometry for the reveal, inventory, pickup and held gun.
+    const shell=0x293849,edge=0x98a9b4,copper=0xb78250,cyan=0x6ce6ff;
+    plate(g,[[.38,-.13],[-.40,-.13],[-.49,.04],[-.30,.20],[.30,.19],[.42,.07]],.31,shell);grip(g,.16);stock(g,shell,.41);
+    box(g,0,.18,.48,.27,.12,.35,dark,.035);box(g,0,-.03,.72,.32,.34,.07,black,.03,false,'rubber');
+    tube(g,0,.015,-.69,.085,.80,steel);muzzleModel(-1.12,.13);
+    for(const z of [-.38,-.54,-.70,-.86]){ring(g,0,.015,z,.15,.026,copper);ring(g,0,.015,z-.038,.143,.014,cyan);}
+    for(const side of [-1,1]){
+      plate(g,[[-.29,-.09],[-.94,-.10],[-1.05,.025],[-.89,.062],[-.30,.10]],.044,shell,side*.177);
+      box(g,side*.218,-.035,-.61,.012,.015,.55,cyan,.004);
+      for(const z of [-.36,-.54,-.72,-.90]){box(g,side*.218,.027,z,.012,.05,.102,black,.006);box(g,side*.229,.031,z,.008,.018,.069,cyan,.003);screw(g,side*.226,-.074,z,.011);}
+      box(g,side*.18,-.018,.17,.025,.123,.28,steel,.009);box(g,side*.198,-.018,.17,.015,.091,.24,dark,.008);
+      for(const z of [.08,.25])screw(g,side*.211,-.019,z,.013);
+      for(let n=0;n<5;n++)box(g,side*.176,.148,-.15+n*.078,.014,.018,.039,edge,.003,true);
+      box(g,side*.18,-.08,-.17,.012,.021,.14,copper,.003,true);
+    }
+    // Four visible spike cells and a separate removable cassette.
+    const mag=magazine(-.11,.32);for(let i=0;i<4;i++){const spike=tube(mag,.09,-.07,-.073+i*.049,.016,.23,cyan);spike.rotation.x=0;}
+    rail(.015,.41);optic(g,'reflex');bolt(.19,.14);
+    for(const z of [.40,.51,.62])ring(g,0,.0,z,.084,.012,dark);
+    for(const side of [-1,1]){box(g,side*.163,.07,.045,.008,.065,.22,dark,.006);for(let i=0;i<4;i++)box(g,side*.17,.075,-.034+i*.048,.008,.018,.025,cyan,.003);}
+    for(let i=0;i<7;i++)box(g,0,-.12,-.40-i*.065,.27,.025,.024,dark,.003,true);
+    g.traverse(m=>{if(m.isMesh&&m.material?.color?.getHex()===cyan)m.material=spikeGlow;});
+    g.userData.artRevision=199;
   }else if(id==='comet'){
     // Original induction projector, curved coil housing and visible ceramic emitter.
     plate(g,[[.28,-.12],[-.29,-.13],[-.39,0],[-.27,.16],[.24,.18],[.36,.06]],.29,c);grip(g,.13);stock(g,0x55688e,.34);

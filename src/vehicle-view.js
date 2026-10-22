@@ -1,3 +1,6 @@
+import {makeHelicopter,animateHelicopter} from './helicopter-model.js';
+import {groundAt} from './terrain.js';
+import {getMap} from './maps.js';
 import {makeATV,atvEnvironment} from './atv-model.js';
 const templates=new WeakMap();
 function modelFor(renderer,detail){
@@ -20,11 +23,11 @@ export function updateVehicles(rv,state,local,dt){
  for(const source of state.royale.vehicles||[]){
   const v=rv.view.predictedVehicle?.id===source.id?rv.view.predictedVehicle:source;
   let m=rv.vehicleMeshes.get(v.id);const distance=local?Math.hypot(local.x-v.x,local.z-v.z):Infinity,near=distance<170;
-  if(!near||v.health<=0){if(m)m.visible=false;continue;}
+  if(!near||v.wrecked||v.health<=0&&v.type!=='helicopter'){if(m)m.visible=false;continue;}
   const detail=vehicleDetail(distance,rv.view.settings.quality,m?.userData.detail);
-  if(!m||m.userData.detail!==detail){const old=m;m=instantiate(rv,detail);if(old){m.userData.spin=old.userData.spin;old.removeFromParent();rv.view.disposeGroup(old);}rv.root.add(m);rv.vehicleMeshes.set(v.id,m);}
+  if(!m||m.userData.detail!==detail){const old=m;m=v.type==='helicopter'?makeHelicopter({detail,environment:atvEnvironment(rv.view.renderer)}):instantiate(rv,detail);if(old){m.userData.spin=old.userData.spin;old.removeFromParent();rv.view.disposeGroup(old);}rv.root.add(m);rv.vehicleMeshes.set(v.id,m);}
   m.visible=true;m.position.set(v.x,v.y,v.z);m.rotation.set(v.pitch||0,v.yaw,v.roll||0,'YXZ');
-  animateATV(m,v,state.time,dt);
+  if(v.type==='helicopter'){animateHelicopter(m,{...v,groundClearance:v.y-groundAt(getMap(state.options.map),v.x,v.z)},state.time,dt);}else animateATV(m,v,state.time,dt);
  }
 }
 

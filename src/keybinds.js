@@ -40,13 +40,20 @@ export const CONTROLS = [
   ['buildRepair','Repair (Royale)','KeyK',null],
   ['emotes','Emotes / cancel emote','KeyO',null],
   ['chat', 'Open chat', 'Enter', 'KeyT'],
+  ['heliUp','Helicopter: ascend','Mouse0','Space'],
+  ['heliDown','Helicopter: descend','Mouse2',null],
+  ['heliBoost','Helicopter: boost','ShiftLeft',null],
+  ['heliSeat','Helicopter: switch seat','ControlLeft',null],
+  ['heliExit','Helicopter: hold to exit','KeyE',null],
+  ['heliHorn','Helicopter: loudspeaker','KeyB',null],
 ];
 export const validBinding = code => typeof code === 'string' && /^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Tab|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Mouse[0-4]|Wheel(Up|Down)|Numpad([0-9]|Add|Subtract|Multiply|Divide|Decimal|Enter)|Enter|CapsLock|Backquote|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Home|End|PageUp|PageDown|Insert|F([1-9]|1[01]))$/.test(code);
-const heldActions=new Set(['forward','back','left','right','aim','sprint','scores','crouch','interact']);
+const heldActions=new Set(['heliUp','heliDown','heliBoost','heliExit','forward','back','left','right','aim','sprint','scores','crouch','interact']);
 export const bindingAllowed=(action,code)=>validBinding(code)&&!(code.startsWith('Wheel')&&heldActions.has(action));
 // These bindings are disjoint by gameplay context; everything else stays exclusive.
 export function shareBinding(a,b,code){
  if(a===b)return false;
+ if(a.startsWith('heli')!==b.startsWith('heli'))return true;
  if([a,b].includes('buildReset')&&[a,b].includes('aim'))return true;
  const edit=new Set(['buildEdit','buildReset']),scroll=new Set(['nextSlot','previousSlot']);
  return code?.startsWith('Wheel')&&((edit.has(a)&&edit.has(b))||(edit.has(a)&&scroll.has(b))||(edit.has(b)&&scroll.has(a)));
@@ -90,3 +97,12 @@ export function bindingLabel(code) {
   if (!code) return 'Unbound';
   return ({WheelUp:'Wheel up',WheelDown:'Wheel down',Mouse0:'Left click',Mouse1:'Middle click',Mouse2:'Right click',Mouse3:'Mouse 4',Mouse4:'Mouse 5',Space:'Space',ShiftLeft:'Left Shift',ShiftRight:'Right Shift',ControlLeft:'Left Ctrl',ControlRight:'Right Ctrl',AltLeft:'Left Alt',AltRight:'Right Alt'})[code] || code.replace(/^Key|^Digit/, '').replace(/([a-z])([A-Z])/g, '$1 $2');
 }
+
+export const CONTROL_GROUPS=[
+ ['Movement',['forward','back','left','right','jump','crouch','sprint']],
+ ['Combat',['fire','aim','reload','popper']],
+ ['Equipment & inventory',['primary','sidearm','slot3','slot4','slot5','swap','nextSlot','previousSlot','pickaxe','drop','inventory']],
+ ['Building & editing',['buildToggle','buildWall','buildFloor','buildStairs','buildRoof','buildRotate','buildMaterial','buildEdit','buildReset','buildRepair']],
+ ['World & squad',['interact','map','marker','danger','emotes','chat','scores','startNow','dismissFlight']],
+ ['Kestrel helicopter',['heliUp','heliDown','heliBoost','heliSeat','heliExit','heliHorn']]
+];
