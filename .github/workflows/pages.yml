@@ -555,7 +555,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true'
+        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true'
+      - name: Install the headless desktop runtime with a missing-library fallback
+        if: needs.scope.outputs.performance_update == 'true'
+        run: |
+          npx playwright install chromium --only-shell
+          # Ubuntu runners already carry the Chromium libraries. Avoid a full
+          # font/system upgrade on slow mirrors; install dependencies if needed.
+          node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium
       - name: Desktop modes, adaptive rendering, settings and persistent markers
         if: needs.scope.outputs.performance_update == 'true'
         run: node scripts/update-200-browser-check.mjs
