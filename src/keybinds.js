@@ -93,6 +93,12 @@ export function normalizeBindings(saved) {
   return Object.fromEntries(CONTROLS.map(([id])=>[id,result[id]]));
 }
 export const bindingDown = (bindings, keys, action) => bindings[action].some(code => code && keys.has(code));
+// Vehicle controls win over bindings used on foot, including custom edit keys.
+export function helicopterActions(player,bindings,code){
+ if(!player?.vehicleId||player.vehicleType!=='helicopter')return [];
+ const actions=player.vehicleSeat===0?['heliUp','heliDown','heliBoost','heliSeat','heliExit','heliHorn']:['heliSeat','heliExit'];
+ return actions.filter(id=>bindings[id]?.includes(code));
+}
 export function bindingLabel(code) {
   if (!code) return 'Unbound';
   return ({WheelUp:'Wheel up',WheelDown:'Wheel down',Mouse0:'Left click',Mouse1:'Middle click',Mouse2:'Right click',Mouse3:'Mouse 4',Mouse4:'Mouse 5',Space:'Space',ShiftLeft:'Left Shift',ShiftRight:'Right Shift',ControlLeft:'Left Ctrl',ControlRight:'Right Ctrl',AltLeft:'Left Alt',AltRight:'Right Alt'})[code] || code.replace(/^Key|^Digit/, '').replace(/([a-z])([A-Z])/g, '$1 $2');

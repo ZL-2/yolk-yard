@@ -1,0 +1,12 @@
+# Update 201 — Kestrel controls and sticky Stormspike impacts
+
+Version 6.14.1 / protocol 73. Based on Update 200, ebdb8a4a7cbb907c59dbbba00b26792e073d5aac.
+
+- Helicopter control bindings take precedence over on-foot build and panel bindings. Passenger right-click no longer gets swallowed by the shared build-reset binding. Hold-to-exit cancels on release, shows authoritative progress and retries immediately when an obstructed exit clears.
+- Side seats retain the player's first- or third-person preference. First-person weapons and scoped optics work; seated accuracy, recoil recovery and reload completion continue ticking; scoped aiming temporarily uses the optic view and returns to third person on release. Authority and guest prediction retain the same perspective and aim geometry. Passenger shoulder cameras collide with their own cabin instead of clipping inside it. The pilot retains the flight camera.
+- Loudspeaker is an external, original four-note musical signal, toggled by the pilot. The HUD shows ON/OFF; activation/deactivation cues provide feedback. Its sound uses Effects volume and works while parked with stopped rotors. Remote press edges survive press/release batching and are consumed once.
+- Stormspike bolts attach on every collision: players, vehicles, supply canopies, player builds, destructible world architecture/props, and ground. Moving targets carry the spike's local position and normal. The 1.15-second fuse deals an additional 40 player damage or 150 structural/vehicle damage at Rare, scaled by weapon rarity. Existing impact damage and vehicle weak points remain. Up to four touching structural neighbors take 55% burst damage; structures and object IDs are deduplicated. Terrain and protected objects retain their existing immunity.
+- Destruction of an attached target does not erase its fuse/effect. Checkpoints retain target identity, local offset and expiry; a respawned player does not inherit a previous life's damage. Simulation damage is never dropped by the 256-spike visual budget. Box/Zone round transitions clear armed spikes with projectiles.
+- Current weapon descriptions and the art briefing explain sticky delayed damage. No new external assets or dependencies were added; existing original procedural audio credit applies.
+
+Focused verification: helicopter/weapon regression tests, actual desktop keyboard and mouse boarding/exit/seat/scope/audio checks, a three-socket flight and moving-player attachment scenario, production build, and the standard live release gate. No mobile work or unrelated mode sweeps.

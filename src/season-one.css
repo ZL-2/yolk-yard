@@ -7,3 +7,5 @@
 .season-launch.season-poster-screen>footer{flex-direction:row;flex-wrap:nowrap}.season-launch.season-poster-screen>footer>label,.season-launch.season-poster-screen>footer>small{width:auto}@media(max-width:760px){.season-launch.season-poster-screen>footer{flex-wrap:wrap}}
 
 .vehicle-controls.helicopter-controls{left:22px;bottom:145px;transform:none;width:390px;background:linear-gradient(125deg,#0c253df5,#1c4264e8)}.helicopter-controls .vehicle-bindings{justify-content:flex-start;gap:8px 10px;line-height:1.6}.helicopter-controls .vehicle-readout{flex-wrap:wrap;gap:7px 12px}.helicopter-controls .vehicle-readout span{flex-basis:100%;color:#bad7df}.vehicle-meters [hidden]{display:none}
+
+.vehicle-exit-row{display:flex;align-items:center;gap:12px;margin-top:10px;color:#ffe4a0;font-size:10px;font-weight:800}.vehicle-exit-row[hidden]{display:none}.vehicle-exit-row progress{flex:1;min-width:70px;height:7px;accent-color:#ffce65}

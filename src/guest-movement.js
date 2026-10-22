@@ -17,6 +17,7 @@ export function predictMovement(player,input,map,dt,royale,time=0){
  if(player.zVehicle){player.yaw=input.yaw??player.yaw;player.pitch=input.pitch??player.pitch;return;}
  if(royale?.boxfightStage==='intermission')return;
  if(player.vehicleId){
+  player.perspective=input.perspective==='third'?'third':'first';player.viewBlend=input.viewBlend;player.viewBoom=input.viewBoom;player.aim=player.vehicleSeat>0&&!!input.aim;
   const source=royale?.vehicles?.find(v=>v.id===player.vehicleId);if(!source)return;
   if(!player.predictedVehicle||player.predictedVehicle.id!==source.id)player.predictedVehicle={...source,seats:[...source.seats]};
   const v=player.predictedVehicle;if(player.vehicleSeat===0)stepVehicle(v,input,map,dt);else Object.assign(v,source,{seats:[...source.seats]});seatPlayer(player,v);player.yaw=input.yaw??player.yaw;player.pitch=input.pitch??player.pitch;return;

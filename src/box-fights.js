@@ -63,7 +63,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
  addBots(){for(const p of this.players.values())if(p.bot)Simulation.prototype.removePlayer.call(this,p.id);}
  eligiblePlayers(){return [...this.players.values()].filter(p=>!p.bot&&p.contestant&&!p.friendSpectator&&p.connected!==false&&!p.afkRemoved&&(p.boxPlayed||!p.partyId||(p.partySize||1)<=1||[...this.players.values()].filter(o=>o.partyId===p.partyId&&o.connected!==false&&!o.bot&&!o.friendSpectator&&!o.afkRemoved).length>=p.partySize));}
  waitForOpponents(){
-  this.boxStage='waiting';this.queueEnds=0;this.remaining=0;this.boxStarted=0;this.projectiles=[];this.storm=this.initialStorm();this.setBarrier(true);
+  this.boxStage='waiting';this.queueEnds=0;this.remaining=0;this.boxStarted=0;this.projectiles=[];this.stormSpikes=[];this.storm=this.initialStorm();this.setBarrier(true);
   const seats=this.eligiblePlayers();for(const p of this.players.values()){if(seats.includes(p))this.equip(p);else {p.health=0;p.spectating=true;}}this.alive=seats.length;
   return true;
  }
@@ -78,7 +78,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
   this.addBots();const seats=this.eligiblePlayers();
   if(new Set(seats.map(p=>boxTeam(this.options,p))).size<2)return this.waitForOpponents();
   this.boxRound++;this.round++;this.roundEventFloor=this.eventId;this.boxStage='prepare';this.boxEnd=this.time+this.rules.prepare;this.boxStarted=0;this.boxStormCue=false;this.roundWinner=null;this.roundReason='';this.queueEnds=0;this.elapsed=0;
-  this.map=this.roundMap();this.options.map=this.map.id;resetBuilding(this);this.setBarrier(true);this.projectiles=[];this.loot=[];this.lootVersion++;this.chests=[];this.pads=[];this.markers=[];this.poseHistory=null;this.inputs.clear();this.remoteInputs.clear();
+  this.map=this.roundMap();this.options.map=this.map.id;resetBuilding(this);this.setBarrier(true);this.projectiles=[];this.stormSpikes=[];this.loot=[];this.lootVersion++;this.chests=[];this.pads=[];this.markers=[];this.poseHistory=null;this.inputs.clear();this.remoteInputs.clear();
   this.storm=this.initialStorm();
   seats.forEach((p,i)=>{p.boxPlayed=true;p.boxSpawn=this.roundSpawn(p,i,seats.length);this.equip(p);});
   for(const p of this.players.values())if(!seats.includes(p)){p.health=0;p.spectating=true;}
@@ -129,7 +129,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
  finish(){} // Series victory is decided below; no Royale placement or rewards.
  endBoxRound(winner,reason='elimination'){
   if(this.boxStage!=='fight')return;
-  this.roundWinner=winner;this.roundReason=reason;this.boxStage='intermission';this.boxEnd=this.time+this.rules.between;this.remaining=this.rules.between;this.projectiles=[];
+  this.roundWinner=winner;this.roundReason=reason;this.boxStage='intermission';this.boxEnd=this.time+this.rules.between;this.remaining=this.rules.between;this.projectiles=[];this.stormSpikes=[];
   if(winner!=null){this.roundWins[winner]=(this.roundWins[winner]||0)+1;for(const p of this.players.values())if(boxTeam(this.options,p)===winner)p.boxWins=this.roundWins[winner];}else this.boxDraws++;
   this.scores=[this.roundWins[0]||0,this.roundWins[1]||0];this.roundHistory.push({round:this.boxRound,winner,reason});this.roundHistory=this.roundHistory.slice(-20);
   this.emit('box-cue',{cue:winner==null?'draw':'round-win',winner,round:this.boxRound});

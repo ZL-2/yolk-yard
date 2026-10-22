@@ -51,17 +51,20 @@ export function vehicleInteract(sim,p,input){
  const fresh=!!input.interact&&!p.vehicleInteractHeld;p.vehicleInteractHeld=!!input.interact;
  if(p.vehicleId){const v=sim.vehicles.find(v=>v.id===p.vehicleId);if(!v||v.wrecked||!isHelicopter(v)&&v.health<=0||p.downed||p.health<=0||p.connected===false){exitVehicle(sim,p,{force:true});return false;}
   if(isHelicopter(v)){
-   if(input.heliExit){p.vehicleExitSince??=sim.time;if(sim.time-p.vehicleExitSince>=HELICOPTER.exitHold&&sim.time>=(p.vehicleLock||0)){exitVehicle(sim,p);p.vehicleExitSince=null;return true;}}else p.vehicleExitSince=null;
-   if(input.heliHorn&&!p.vehicleHornHeld&&p.vehicleSeat===0&&!v.falling)v.loudspeaker=!v.loudspeaker;p.vehicleHornHeld=!!input.heliHorn;
+   if(input.heliExit){p.vehicleExitSince??=sim.time;if(sim.time-p.vehicleExitSince>=HELICOPTER.exitHold&&sim.time>=(p.vehicleLock||0)){if(exitVehicle(sim,p)){p.vehicleExitSince=null;return true;}}}else p.vehicleExitSince=null;
+   const hornPress=input.heliHornPress?input.heliHornPress>(p.lastVehicleHornPress||0):input.heliHorn&&!p.vehicleHornHeld;
+   p.lastVehicleHornPress=Math.max(p.lastVehicleHornPress||0,input.heliHornPress||0);
+   if(hornPress&&p.vehicleSeat===0&&!v.falling){v.loudspeaker=!v.loudspeaker;v.revision++;sim.emit?.('royale-cue',{cue:v.loudspeaker?'helicopter-speaker-on':'helicopter-speaker-off',x:v.x,y:v.y,z:v.z});}p.vehicleHornHeld=!!input.heliHorn;
   }else if(fresh&&sim.time>=(p.vehicleLock||0)){exitVehicle(sim,p);return true;}
   const swapping=isHelicopter(v)?input.heliSeat:input.reload;
-  const swap=!!swapping&&!p.vehicleSeatHeld;p.vehicleSeatHeld=!!swapping;
+  const swap=isHelicopter(v)&&input.heliSeatPress?input.heliSeatPress>(p.lastVehicleSeatPress||0):!!swapping&&!p.vehicleSeatHeld;p.vehicleSeatHeld=!!swapping;p.lastVehicleSeatPress=Math.max(p.lastVehicleSeatPress||0,input.heliSeatPress||0);
   if(swap&&sim.time>=(p.vehicleLock||0)){const other=Array.from({length:v.seats.length-1},(_,i)=>(p.vehicleSeat+i+1)%v.seats.length).find(i=>!v.seats[i]);if(other!==undefined){v.seats[other]=p.id;v.seats[p.vehicleSeat]=null;p.vehicleSeat=other;p.vehicleLock=sim.time+.6;v.revision++;seatPlayer(p,v);}}
   return true;
  }
  if(!fresh||p.bot||p.health<=0||p.downed||p.spectating||p.flight!=='ground'||p.traversal||p.grapple||sim.time<(p.vehicleLock||0))return false;
  const prompt=vehiclePrompt(sim.vehicles,p);if(!prompt)return false;const v=sim.vehicles.find(v=>v.id===prompt.id),seat=v.seats.findIndex(s=>!s);
  v.seats[seat]=p.id;v.revision++;p.vehicleId=v.id;p.vehicleSeat=seat;p.vehicleLock=sim.time+.6;p.vehicleSeatHeld=!!(isHelicopter(v)?input.heliSeat:input.reload);p.vehicleExitSince=null;p.vehicleHornHeld=!!input.heliHorn;p.interactLatch=true;p.emote=null;p.use=null;p.reloadEnd=0;p.burstLeft=0;p.mantle=null;p.shadowstep=null;p.building=p.editing=false;seatPlayer(p,v);
+ p.lastVehicleHornPress=input.heliHornPress||0;p.lastVehicleSeatPress=input.heliSeatPress||0;
  sim.emit?.('royale-cue',{cue:'vehicle-enter',player:p.id,x:v.x,y:v.y,z:v.z});return true;
 }
 // Shared by authority and guest prediction. Six ATVs and one helicopter exist, with no

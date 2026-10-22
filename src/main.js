@@ -118,7 +118,7 @@ import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
 import {OwnerRuntime} from './owner-runtime.js';
-import { CONTROLS, migratePerspectiveBindings, normalizeBindings, bindingDown, bindingLabel, wheelIntent } from "./keybinds.js";
+import { CONTROLS, migratePerspectiveBindings, normalizeBindings, bindingDown, bindingLabel, wheelIntent, helicopterActions } from "./keybinds.js";
 import { RELEASES, RELEASE } from "./releases.js";
 import { UpdateWatcher } from "./updates.js";
 import {
@@ -1664,8 +1664,10 @@ document.addEventListener("pointerlockchange", () => {
 });
 function pressControl(code) {
  const rider=state?.players.find(p=>p.id===localId);
- if(rider?.vehicleId&&Object.entries(settings.keybinds).some(([id,codes])=>id.startsWith('build')&&codes.includes(code))&&!settings.keybinds.heliHorn.includes(code))return;
- if(rider?.vehicleType==='helicopter'){const actions=(rider.vehicleSeat===0?['heliUp','heliDown','heliBoost','heliSeat','heliExit','heliHorn']:['heliSeat','heliExit','heliHorn']).filter(id=>settings.keybinds[id]?.includes(code));if(actions.length){keys.add(code);vehicleControlCodes.add(code);for(const id of actions)if(id==='heliSeat'||id==='heliHorn')queuedActions.add(id);return;}}
+ const vehicleActions=helicopterActions(rider,settings.keybinds,code);
+ if(vehicleActions.length){keys.add(code);vehicleControlCodes.add(code);for(const id of vehicleActions)if(id==='heliSeat'||id==='heliHorn')queuedActions.add(id);return;}
+ const passengerAim=rider?.vehicleSeat>0&&settings.keybinds.aim.includes(code);
+ if(rider?.vehicleId&&!passengerAim&&Object.entries(settings.keybinds).some(([id,codes])=>id.startsWith('build')&&codes.includes(code)))return;
   if(state?.boxfight&&state.players.find(p=>p.id===localId)?.spectating&&['ArrowLeft','ArrowRight'].includes(code)){switchSpectator(code==='ArrowLeft'?-1:1);return;}
   if(state?.zombies){const p=state.players.find(p=>p.id===localId);for(const [key,action]of [['buildWall','z:field'],['drop','z:decoy'],['buildStairs','z:melee']])if(settings.keybinds[key].includes(code)){sendPlayerAction(action);return;}if(settings.keybinds.buildEdit.includes(code)){openZombiesJournal();return;}if(settings.keybinds.interact.includes(code)&&p&&!p.downed&&!nearbyDownedZombiePlayer(state,p)){const station=nearbyZombieStation(state,p);if(station){modal(station.name,zombiesStationMenu(station,state,p),'z-station');dialog.dataset.zStation=station.id;return;}}}
 
@@ -1758,6 +1760,7 @@ document.addEventListener("keydown", (e) => {
   if(e.code==='F8'&&dialogType!=='problem-report'&&!e.target.matches('input,textarea,[contenteditable=true]')){const connection=!matchConnectionUI.root.hidden,problem=dialog.open&&!!dialog.querySelector('[data-action=report-problem]')||performance.now()<toastUntil&&!!$('#toast [data-action=report-problem]');if(connection||problem){e.preventDefault();if(!e.repeat)(connection?actions['report-connection']:reportProblemMenu)();return;}}
   if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();leaderboardTab=e.key==='Home'?'kills':e.key==='End'?'wins':leaderboardTab==='kills'?'wins':'kills';menuModel();renderLeaderboard(true);void refreshLeaderboards(true);return;}
   if (chat.opened || e.target.matches("input,select,textarea,[contenteditable=true]")) return;
+  if(screen==='game'&&!paused&&!dialog.open&&helicopterActions(state?.players.find(p=>p.id===localId),settings.keybinds,e.code).length){e.preventDefault();if(!e.repeat)pressControl(e.code);return;}
   const panel = screen==='game' && state?.royale && (!paused || ['royale-map','royale-inventory'].includes(dialogType))
     ? royalePanelAction(e.code, settings.keybinds, dialog.open ? dialogType : '') : null;
   if (panel) {
@@ -2202,7 +2205,7 @@ if (import.meta.env.DEV && new URL(location.href).searchParams.has("qa"))
     bossVoiceAudio:()=>({...sound.bossAudio.debug,active:sound.bossAudio.active.size,loaded:!!sound.bossAudio.buffer}),
     frontline:()=>({score:{scene:sound.score.scene,voices:sound.score.voices.size,musicVolume:sound.musicVolume},motion:view.weaponMotionState?.out,uplink:!!view.royaleView.operationMesh?.visible,drawCalls:view.renderer.info.render.calls}),
     fieldAudio:()=>({...sound.fieldSamples.debug,loaded:[...sound.fieldSamples.buffers.keys()],active:[...sound.fieldSamples.active].map(([id,voices])=>({id,count:voices.size}))}),
-    vehicles:()=>({camera:view.camera.position.toArray(),sky:view.atmosphere.root.visible,meshes:[...(view.royaleView.vehicleMeshes||[])].map(([id,m])=>({id,visible:m.visible}))}),
+    vehicles:()=>({speaker:{active:sound.loops.has('helicopter-speaker'),gain:sound.loops.get('helicopter-speaker')?.gain.gain.value||0},camera:view.camera.position.toArray(),sky:view.atmosphere.root.visible,meshes:[...(view.royaleView.vehicleMeshes||[])].map(([id,m])=>({id,visible:m.visible}))}),
     throwables:()=>({visible:view.throwablePreview.root.visible,smokeClouds:[...view.royaleView.seasonMeshes.keys()].filter(k=>k.startsWith('smoke')).length}),
     endPresentation:()=>({phase:matchEndUI.phase,cinematic:view.cinematic,effects:view.eliminations.diagnostics()}),
     party:()=>({id:party?.id,party:party?.party,ready:party?.ready}),

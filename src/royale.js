@@ -336,6 +336,11 @@ export class RoyaleSimulation extends Simulation {
  supplyHit(o,d,max,radius=0){return supplyHit(this,o,d,max,radius);}
  damageSupply(c,amount,attacker){return damageSupply(this,c,amount,attacker);}
  reload(p){if(!canFight(p)||!p.inventory[p.slot]?.weapon)return false;this.syncInventory(p);const accepted=super.reload(p);if(accepted&&(p.boss||p.henchman))requestBossVoice(this,p,'reload');return accepted;}
+ finishReload(p){
+  if(!p.reloadEnd||this.time<p.reloadEnd)return;
+  const item=p.inventory[p.slot];if(item?.weapon){const type=ammoType(item.id),add=Math.min(gun(p).magazine-item.ammo,p.bank[type]);item.ammo+=add;p.bank[type]-=add;}
+  p.reloadEnd=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'reload-bolt'});
+ }
  fire(p,burst=false){
   if(p.vehicleId&&p.vehicleSeat===0)return false;
   const item=p.inventory[p.slot];if(!canFight(p)||!item?.weapon||p.flight!=='ground'||p.use)return false;
@@ -483,7 +488,7 @@ export class RoyaleSimulation extends Simulation {
   if(this.elapsed>=this.route.duration)this.stage=[...this.players.values()].some(p=>p.health>0&&['dive','glide'].includes(p.flight))?RP.DROP:RP.ACTIVE;
   }
   if(this.options.training&&this.time>(this.trainingResupply||0)){this.trainingResupply=this.time+2;for(const p of this.players.values()){if(p.bot)continue;p.bank={light:500,medium:500,shells:100,heavy:100,rockets:12};p.materials={wood:999,brick:999,metal:999};p.inventory[3]??={id:'jumpRig',count:1,rarity:5,charges:SEASON.rig.charges,rechargeAt:0};p.inventory[4]??={id:'smoke',count:3,rarity:1};p.inventory[5]??={id:'scanner',count:2,rarity:2};}}
-  seasonTick(this);tickVaultDoors(this);tickStormspikes(this);tickVehicles(this,dt);this.recordPoses();if(!this.options.training)this.tickActivity(dt);
+  seasonTick(this);tickVaultDoors(this);tickVehicles(this,dt);this.recordPoses();if(!this.options.training)this.tickActivity(dt);
   for(const p of this.players.values()){
    if(p.health<=0||p.spectating)continue;
    let actorDt=dt;
@@ -500,7 +505,8 @@ export class RoyaleSimulation extends Simulation {
    if(p.vehicleId){
     const v=this.vehicles.find(v=>v.id===p.vehicleId);seatPlayer(p,v);p.yaw=input.yaw??p.yaw;p.pitch=input.pitch??p.pitch;p.ack=Math.max(p.ack,...(commands?commands.steps.map(i=>i.seq):[input.seq||0]));
     p.aim=p.vehicleSeat>0&&!!input.aim;
-    if(p.vehicleSeat>0){const slot=clamp(Math.floor(input.slot??p.slot),0,5);if(slot!==p.slot){p.slot=slot;p.reloadEnd=0;beginEquip(p,this.time,true);}this.syncInventory(p);this.combatInput(p,{...input,reload:v.type==='helicopter'&&input.reload});}
+    p.perspective=input.perspective==='third'?'third':'first';p.viewBlend=input.viewBlend;p.viewBoom=input.viewBoom;p.executedShotTime=input.shotTime;
+    if(p.vehicleSeat>0){const slot=clamp(Math.floor(input.slot??p.slot),0,5);if(slot!==p.slot){p.slot=slot;p.reloadEnd=0;p.burstLeft=0;beginEquip(p,this.time,true);}this.syncInventory(p);this.updateAccuracy(p,p,actorDt);this.finishReload(p);if(p.inventory[p.slot]?.weapon)this.combatInput(p,{...input,reload:v.type==='helicopter'&&input.reload});p.fireLatch=!!input.fire&&this.time>=(p.equipUntil||0);}
     if(!warmup&&this.storm.active&&Math.hypot(p.x-this.storm.x,p.z-this.storm.z)>this.storm.radius)this.damage(p,null,this.storm.dps*actorDt,'Storm');
     continue;
    }
@@ -543,7 +549,7 @@ export class RoyaleSimulation extends Simulation {
     this.syncInventory(p);this.updateAccuracy(p,previous,actorDt);
     if(input.drop&&!p.dropLatch)this.dropSlot(p);p.dropLatch=!!input.drop;
     this.interact(p,input,actorDt);
-    if(p.reloadEnd&&this.time>=p.reloadEnd){const item=p.inventory[p.slot];if(item?.weapon){const type=ammoType(item.id),add=Math.min(gun(p).magazine-item.ammo,p.bank[type]);item.ammo+=add;p.bank[type]-=add;}p.reloadEnd=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'reload-bolt'});}
+    this.finishReload(p);
     const buildingAction=buildingTick(this,p,input);
     if(!buildingAction&&p.inventory[p.slot]?.weapon){
      this.combatInput(p,input);
@@ -598,7 +604,8 @@ export class RoyaleSimulation extends Simulation {
   return tacticalBotInput(this,p);
  }
 
- lodgeStormspike(projectile,box,normal){lodgeStormspike(this,projectile,box,normal);}
+ updateProjectiles(dt){super.updateProjectiles(dt);tickStormspikes(this);}
+ lodgeStormspike(projectile,box,normal,contact){return lodgeStormspike(this,projectile,box,normal,contact);}
  damageWorld(box,amount){damageObject(this,box,amount);}
  vehicleHit(origin,d,length,attacker){return vehicleHit(this,origin,d,length,attacker);}
  damageVehicle(vehicle,amount,attacker){return damageVehicle(this,vehicle,amount,attacker);}

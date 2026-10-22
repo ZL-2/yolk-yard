@@ -11,6 +11,16 @@ export function helicopterSeatPose(v,seat){
  const poses=[[0,.64,-1.05],[-1.75,.34,-.35],[1.75,.34,-.35],[-1.75,.34,1.10],[1.75,.34,1.10]];
  return heliLocal(v,...(poses[seat]||poses[0]));
 }
+// The passenger's shoulder camera must not pass through its own cabin. The
+// seat and authoritative craft yaw recover the craft origin on every peer.
+export function helicopterCameraDistance(p,origin,d,length,radius=.18){
+ if(p?.vehicleType!=='helicopter'||!p.vehicleId||!(p.vehicleSeat>0))return length;
+ const angle=p.vehicleYaw||0,c=Math.cos(angle),s=Math.sin(angle),seat=helicopterSeatPose({x:0,y:0,z:0,yaw:angle},p.vehicleSeat);
+ const x=origin.x-p.x+seat.x,z=origin.z-p.z+seat.z,o={x:x*c-z*s,y:origin.y-p.y+seat.y,z:x*s+z*c},ray={x:d.x*c-d.z*s,y:d.y,z:d.x*s+d.z*c};
+ let distance=length;
+ for(const box of [{x:0,y:.4,z:-.9,w:2.56,h:2.2,d:2.6},{x:0,y:.4,z:1.1,w:2.56,h:1.9,d:1.5},{x:0,y:1.25,z:3.35,w:.72,h:.65,d:3.5}])distance=Math.min(distance,rayBox(o,ray,box,distance,radius));
+ return Math.max(0,Math.min(length,distance-.025));
+}
 export function helicopterFloor(map,v){
  let floor=groundAt(map,v.x,v.z);
  for(const [x,z]of [[-1.35,-1.35],[1.35,-1.35],[-1.35,1.3],[1.35,1.3]]){
