@@ -50,8 +50,9 @@ export class MatchAuthority{
    const reject=reason=>this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason}});
    if(!modeAvailable(room.sim.options.mode))return reject(PAUSED_MODES[room.sim.options.mode]),true;
    if(m.version!==VERSION||room.kicked.has(peer.progressId))return reject('Refresh the game or choose another room.'),true;
-   const profile=this.relay.progression.rankRewards.sanitizePeer(safeProfile(m.profile),peer);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
+   const profile=safeProfile(m.profile);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
    const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission||(room.recurring||room.zombies)&&!admission)return reject('Party reservation expired. Join the match from Play.'),true;
+   Object.assign(profile,this.relay.progression.rankRewards.sanitizePeer(profile,peer,admission?.memberId));
    if(room.zombies&&!room.sim.players.has(peer.id)&&!admission?.spectator&&!room.sim.acceptsJoining())return reject('This deployment is closed to new operators.'),true;
    room.sim.advanceWarmupClock?.();
    const reserved=admission&&this.capacity.reservations.has(admission.partyId);

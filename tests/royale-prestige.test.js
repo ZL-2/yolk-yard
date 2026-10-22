@@ -53,3 +53,8 @@ test('claims survive a complete store reload and are still revoked against resto
   store=new SocialStore(directory+'/social.json');relay.parties.store=store;service=new ProgressionService(relay,{path:directory+'/progress.json'});await service.ready;const restored=store.identify(token,identity.profile);assert.equal(restored.identity.id,identity.id);assert.deepEqual(service.rankRewards.status(identity.id).claimed,ids);assert.deepEqual(service.rankRewards.status(identity.id).pending,[]);assert.equal(restored.identity.profile.pickaxe,ids[3]);service.accounts.set('rival',account('rival',10,0));service.rankRewards.invalidate();service.rankRewards.refresh();assert.equal(restored.identity.profile.pickaxe,'');assert.deepEqual(service.rankRewards.status(identity.id).claimed,ids.slice(0,3));
  }finally{await service?.close();await store.flush();clearTimeout(store.timer);await rm(directory,{recursive:true,force:true});}
 });
+
+test('a verified admission restores a claimed reward before a new browser progression credential is bound',async()=>{
+ const f=fixture(),r=f.service.rankRewards;f.add('returning-champion',5,25);r.claim('returning-champion',ids,ids[3]);const freshPeer={progressId:'new-browser'},profile={pickaxe:ids[3]};
+ assert.equal(r.sanitizePeer(profile,freshPeer).pickaxe,'');assert.equal(r.sanitizePeer(profile,freshPeer,'returning-champion').pickaxe,ids[3]);assert.equal(r.sanitizePeer(profile,freshPeer,'someone-else').pickaxe,'');await f.service.close();
+});
