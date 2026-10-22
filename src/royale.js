@@ -483,7 +483,7 @@ export class RoyaleSimulation extends Simulation {
   if(this.elapsed>=this.route.duration)this.stage=[...this.players.values()].some(p=>p.health>0&&['dive','glide'].includes(p.flight))?RP.DROP:RP.ACTIVE;
   }
   if(this.options.training&&this.time>(this.trainingResupply||0)){this.trainingResupply=this.time+2;for(const p of this.players.values()){if(p.bot)continue;p.bank={light:500,medium:500,shells:100,heavy:100,rockets:12};p.materials={wood:999,brick:999,metal:999};p.inventory[3]??={id:'jumpRig',count:1,rarity:5,charges:SEASON.rig.charges,rechargeAt:0};p.inventory[4]??={id:'smoke',count:3,rarity:1};p.inventory[5]??={id:'scanner',count:2,rarity:2};}}
-  seasonTick(this);tickVaultDoors(this);tickStormspikes(this);tickVehicles(this,dt);this.recordPoses();if(!this.options.training)this.tickActivity(dt);
+  seasonTick(this);tickVaultDoors(this);tickVehicles(this,dt);this.recordPoses();if(!this.options.training)this.tickActivity(dt);
   for(const p of this.players.values()){
    if(p.health<=0||p.spectating)continue;
    let actorDt=dt;
@@ -500,6 +500,7 @@ export class RoyaleSimulation extends Simulation {
    if(p.vehicleId){
     const v=this.vehicles.find(v=>v.id===p.vehicleId);seatPlayer(p,v);p.yaw=input.yaw??p.yaw;p.pitch=input.pitch??p.pitch;p.ack=Math.max(p.ack,...(commands?commands.steps.map(i=>i.seq):[input.seq||0]));
     p.aim=p.vehicleSeat>0&&!!input.aim;
+    p.perspective=input.perspective==='third'?'third':'first';p.viewBlend=input.viewBlend;p.viewBoom=input.viewBoom;p.executedShotTime=input.shotTime;
     if(p.vehicleSeat>0){const slot=clamp(Math.floor(input.slot??p.slot),0,5);if(slot!==p.slot){p.slot=slot;p.reloadEnd=0;beginEquip(p,this.time,true);}this.syncInventory(p);this.combatInput(p,{...input,reload:v.type==='helicopter'&&input.reload});}
     if(!warmup&&this.storm.active&&Math.hypot(p.x-this.storm.x,p.z-this.storm.z)>this.storm.radius)this.damage(p,null,this.storm.dps*actorDt,'Storm');
     continue;
@@ -598,7 +599,8 @@ export class RoyaleSimulation extends Simulation {
   return tacticalBotInput(this,p);
  }
 
- lodgeStormspike(projectile,box,normal){lodgeStormspike(this,projectile,box,normal);}
+ updateProjectiles(dt){super.updateProjectiles(dt);tickStormspikes(this);}
+ lodgeStormspike(projectile,box,normal,contact){return lodgeStormspike(this,projectile,box,normal,contact);}
  damageWorld(box,amount){damageObject(this,box,amount);}
  vehicleHit(origin,d,length,attacker){return vehicleHit(this,origin,d,length,attacker);}
  damageVehicle(vehicle,amount,attacker){return damageVehicle(this,vehicle,amount,attacker);}

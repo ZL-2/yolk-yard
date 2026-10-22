@@ -1,4 +1,10 @@
 export const RELEASE_NOTES = [
+ {number:'201',title:'Sticky impacts & Kestrel controls',changes:[
+  'Helicopter controls take priority over shared build bindings. Hold-to-exit shows progress and keeps trying while the exit is obstructed. Side passengers use their selected first- or third-person camera, with normal aiming, scoped sights and weapon handling.',
+  'The pilot loudspeaker has an on/off indicator and audible activation cues. Its original musical signal carries outside the aircraft and uses Effects volume, including while parked. Short multiplayer taps survive input batching.',
+  'Every Stormspike impact leaves an armed spike on players, vehicles, world structures, props, supply canopies or terrain. Attached spikes follow moving targets and burst after 1.15 seconds. Players take 40 extra damage at Rare, scaling with rarity; structures and vehicles take 150, with bounded damage to touching structural pieces. Terrain and protected objects keep their existing durability rules.',
+  'Authority owns the delayed damage, attachments survive recovery, and old spikes cannot damage a respawned life. Desktop controls, scopes, audio and three-player replication verified. Version 6.14.1 / protocol 73.'
+ ]},
  {number:'200',title:'A smoother, clearer, better-connected frontier',changes:[
   'Shared adaptive rendering responds to real frame time across matches. Sun shadows now follow the player around the island, update at a bounded cadence, and share work with scopes. Filmic lighting keeps bright surfaces and weapon details readable.',
   'Arena and Training collision searches use nearby spatial buckets. Campaign reuses nearby collision queries and follows the saved frame limit; the editor renders idle views at 30 FPS. Moving team markers keep their DOM nodes, and unchanged HUD labels avoid needless replacement.',

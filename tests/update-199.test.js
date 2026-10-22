@@ -25,11 +25,11 @@ test('Stormspike has four graduated tiers and replaces only Nyx’s Mythic DMR',
 test('every natural source restricts Stormspike to Rare–Legendary, even an exact-zero rarity roll',()=>{
  for(const source of ['ground','chest','high','supply','epic'])for(const edge of [0,.5,.999999]){let n=0;const item=rollItem(()=>++n===1?.999999:edge,source,'weapon');assert.equal(item.id,'stormspike');assert.ok(item.rarity>=2&&item.rarity<=4,source);assert.equal(item.ammo,4);}
 });
-test('spikes wait for the fuse, damage attached and touching builds, and never blast players',()=>{
+test('structural spikes wait for the fuse, damage touching structures, and do not blast through cover',()=>{
  const root={buildId:'a',x:0,y:0,z:0,w:4,h:4,d:.2},neighbor={buildId:'b',x:4,y:0,z:0,w:4,h:4,d:.2},separate={buildId:'c',x:10,y:0,z:0,w:4,h:4,d:.2},architecture={objectId:'wall',x:0,y:0,z:0,w:4,h:4,d:.2},hits=[];
- const sim={time:10,projectileId:0,builds:[{id:'a'},{id:'b'},{id:'c'}],map:{boxes:[root,neighbor,separate,architecture]},damageWorld:(b,n)=>hits.push([b.buildId,n]),damage:()=>assert.fail('player blast'),emit(){}};
- lodgeStormspike(sim,{owner:'p',x:0,y:1,z:.1,damage:58},root,{x:0,y:0,z:1});tickStormspikes(sim);assert.equal(hits.length,0);sim.time+=STORMSPIKE.fuse+.001;tickStormspikes(sim);assert.deepEqual(hits,[['a',150],['b',82.5]]);assert.equal(sim.stormSpikes.length,0);
- lodgeStormspike(sim,{owner:'p',x:0,y:1,z:0,damage:58},architecture,{x:0,y:0,z:1});assert.equal(sim.stormSpikes.length,0);
+ const sim={time:10,projectileId:0,builds:[{id:'a'},{id:'b'},{id:'c'}],map:{boxes:[root,neighbor,separate,architecture]},damageWorld:(b,n)=>hits.push([b.buildId||b.objectId,n]),damage:()=>assert.fail('player blast'),emit(){}};
+ lodgeStormspike(sim,{owner:'p',x:0,y:1,z:.1,damage:58},root,{x:0,y:0,z:1});tickStormspikes(sim);assert.equal(hits.length,0);sim.time+=STORMSPIKE.fuse+.001;tickStormspikes(sim);assert.deepEqual(hits,[['a',150],['b',82.5],['wall',82.5]]);assert.equal(sim.stormSpikes.length,0);
+ lodgeStormspike(sim,{owner:'p',x:0,y:1,z:0,damage:58},architecture,{x:0,y:0,z:1});assert.equal(sim.stormSpikes.length,1);assert.equal(sim.stormSpikes[0].objectId,'wall');
 });
 test('actual projectile collision lodges a spike and cover protects the player behind it',()=>{
  const {s,p}=battle();s.map={...flat,boxes:[{buildId:'cover',x:0,y:0,z:-5,w:4,h:4,d:.2}]};s.vehicles=[];s.builds=[{id:'cover',health:500}];const calls=[];s.damageWorld=(b,n)=>calls.push([b.buildId,n]);const enemy=s.addPlayer('target',{name:'Target'});Object.assign(enemy,{health:100,shield:100,shieldUntil:0,spectating:false,x:0,y:0,z:-9});

@@ -2,7 +2,7 @@ import {ShaderPreparation} from './shader-preparation.js';
 import {buildZoneDistrict,updateZoneDistrict} from './zone-wars-view.js';
 import {buildBoxArena,updateBoxArena} from './box-fight-view.js';
 import {buildBlacktide,ZombiesView} from './zombies-view.js';
-import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay} from './perspective.js';
+import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay,weaponCameraAllowed} from './perspective.js';
 import {warmArchitectureSurfaces} from './architecture-surfaces.js';
 import {RenderBudget,shadowAnchor} from './render-budget.js';
 import {perspectiveFov} from './settings.js';
@@ -799,7 +799,7 @@ export class View {
     for(const egg of this.partyEggs||[])egg.visible=!playing;
     this.actors.visible = playing;
     this.effects.visible = playing;
-    this.gunGroup.visible = playing && !local?.vehicleId && !local?.zVehicle && !this.cinematic?.victory && !this.celebrationTarget && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
+    this.gunGroup.visible = playing && weaponCameraAllowed(local) && !this.cinematic?.victory && !this.celebrationTarget && !local?.emote && canFight(local) && (!local.inventory || local.flight==='ground');
     if (!playing) {
       this.clearOutgoing(this);
       this.preview(profile);
@@ -832,7 +832,7 @@ export class View {
       );
       this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
       let cameraBoom=false;
-      if (killer || local.downed || local.emote || hold || victory || p.vehicleId || p.zVehicle) {
+      if (killer || local.downed || local.emote || hold || victory || !weaponCameraAllowed(p)) {
         const cameraYaw=victory?p.yaw+Math.PI+.35:local.emote?(this.emoteLook?.yaw??p.yaw):p.yaw;
         const back = this.cameraBack??=new THREE.Vector3();back.set(Math.sin(cameraYaw)*Math.cos((p.vehicleId||p.zVehicle)?p.pitch*.55:0),(p.vehicleId||p.zVehicle)?.4-Math.sin(p.pitch*.55):local.emote?.2:.35,Math.cos(cameraYaw)*Math.cos((p.vehicleId||p.zVehicle)?p.pitch*.55:0)).normalize();
         const origin = this.cameraOrigin??=new THREE.Vector3();origin.set(p.x,p.y+Math.min(1.6,eyeHeight(p)),p.z);
@@ -846,7 +846,7 @@ export class View {
       this.gunGroup.visible=this.gunGroup.visible&&draw.visible;
       const w = gun(local),
         scoped = w.optic === "scope" || w.optic === "prism";
-      const aiming = !!(canFight(local) && !p.sprinting && !p.use && !p.reviving && !p.traversal && !local.building && !local.editing && !p.building && !p.editing && !local.vehicleId && !local.zVehicle && !local.emote && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
+      const aiming = !!(canFight(local) && !p.sprinting && !p.use && !p.reviving && !p.traversal && !local.building && !local.editing && !p.building && !p.editing && weaponCameraAllowed(local) && !local.emote && aim && (!local.inventory||local.flight==='ground'&&local.inventory[local.slot]?.weapon) && local.health > 0 && local.reloadEnd <= state.time && !draw.active);
       if(!Number.isFinite(this.aimBlend))this.aimBlend=0;
       this.aimBlend += (Number(aiming) - this.aimBlend) * (1-Math.exp(-Math.log(20)*dt/w.adsTime));
       p.aim=aiming;
@@ -949,7 +949,7 @@ export class View {
         // represents them until exit instead of rendering sixteen overlapping operators.
         if(state.royale&&p.flight==='transport')continue;
         if ((p.spectating && (!p.eliminatedAt || state.time-p.eliminatedAt>.16)) || p.awaitingEntry)continue;
-        if(p.id===local?.id&&p.health>0&&!this.thirdPersonEnabled&&!p.vehicleId&&!p.zVehicle&&!this.cinematic?.victory&&!this.celebrationTarget&&!p.emote&&!p.downed&&(!p.inventory||p.flight==='ground'||p.flight==='transport')){const cached=this.models.get(p.id);if(cached){seen.add(p.id);cached.visible=false;}continue;}
+        if(p.id===local?.id&&p.health>0&&!this.thirdPersonEnabled&&weaponCameraAllowed(p)&&!this.cinematic?.victory&&!this.celebrationTarget&&!p.emote&&!p.downed&&(!p.inventory||p.flight==='ground'||p.flight==='transport')){const cached=this.models.get(p.id);if(cached){seen.add(p.id);cached.visible=false;}continue;}
         seen.add(p.id);
         this.actorBounds.center.set(p.x,p.y+.9,p.z);
         if(playing&&!this.actorFrustum.intersectsSphere(this.actorBounds)){const hidden=this.models.get(p.id);if(hidden)hidden.visible=false;continue;}

@@ -165,6 +165,7 @@ export class Simulation {
     safe.jumpHeld = safe.jump;
     safe.jumpPress = safe.jump && !previous?.jumpHeld ? safe.seq : previous?.jumpPress || 0;
     safe.reloadHeld=safe.reload;safe.reloadPress=safe.reload&&!previous?.reloadHeld?safe.seq:previous?.reloadPress||0;
+    for(const action of ['heliHorn','heliSeat']){safe[action+'Held']=safe[action];safe[action+'Press']=safe[action]&&!previous?.[action+'Held']?safe.seq:previous?.[action+'Press']||0;}
     if(remote) {
       if(p.health<=0||p.spectating)return;
       let buffer=this.remoteInputs.get(id);
@@ -187,6 +188,8 @@ export class Simulation {
     for(const step of steps){
       input.firePress=Math.max(input.firePress||0,step.firePress||0);input.reloadPress=Math.max(input.reloadPress||0,step.reloadPress||0);
       input.fire||=step.fire;input.reload||=step.reload;input.popper||=step.popper;input.interact||=step.interact;input.drop||=step.drop;
+      input.heliHorn||=step.heliHorn;input.heliSeat||=step.heliSeat;
+      input.heliHornPress=Math.max(input.heliHornPress||0,step.heliHornPress||0);input.heliSeatPress=Math.max(input.heliSeatPress||0,step.heliSeatPress||0);
     }
     if(this.time-p.lastInput>.4)input={yaw:p.yaw,pitch:p.pitch,slot:p.slot};
     return {steps,input};
@@ -677,7 +680,7 @@ export class Simulation {
       b.travelled = (b.travelled || 0) + distance;
       if (victim || hit || vehicle || supply) {
         if (b.kind === "bolt") {
-          if(b.weapon==='stormspike'&&!victim&&!vehicle&&!supply)this.lodgeStormspike?.(b,hit?.box,hit?.normal);
+          if(b.weapon==='stormspike')this.lodgeStormspike?.(b,victim||vehicle||supply?null:hit?.box,victim?{x:-d.x,y:-d.y,z:-d.z}:supply?.normal||vehicle?.normal||hit?.normal,{player:victim,vehicle:!victim&&!supply?vehicle?.vehicle:null,supply:!victim?supply?.chest:null,multiplier:vehicle?.multiplier});
           if (victim) {
             const w=weapon(b.weapon),precision=(b.critical??w.critical)>1&&region==='head',hitFactor=falloffAt(w,b.travelled)*(precision?(b.critical??w.critical):1);
             this.damage(
@@ -956,6 +959,8 @@ export class Simulation {
           mobilityKind:p.mobilityKind,
           vehicleId:p.vehicleId,
           vehicleSeat:p.vehicleSeat,
+          vehicleYaw:p.vehicleYaw,
+          vehicleExitSince:p.vehicleExitSince,
           vehicleType:p.vehicleType,
           vehicleLock:p.vehicleLock,
           downed:p.downed,

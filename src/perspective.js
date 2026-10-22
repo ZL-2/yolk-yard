@@ -3,14 +3,17 @@ import {terrainHit} from './terrain.js';
 import {cameraDistance} from './camera-collision.js';
 import {eyeHeight} from './stance.js';
 import {gun} from './data.js';
+import {helicopterCameraDistance} from './helicopter.js';
 
 // Original tuning in world metres. Rendering, prediction and authority share
 // this geometry; clients send only bounded blend/boom fractions, never origins.
 export const THIRD_PERSON=Object.freeze({distance:3.15,aimDistance:1.65,shoulder:.62,aimShoulder:.48,height:.22,aimHeight:.13,transition:14});
 const clamp01=n=>Math.max(0,Math.min(1,Number.isFinite(n)?n:0));
 export const perspectiveMode=value=>value==='third'?'third':'first';
+export const helicopterPassenger=p=>!!p?.vehicleId&&p.vehicleType==='helicopter'&&p.vehicleSeat>0;
+export const weaponCameraAllowed=p=>(!p?.vehicleId||helicopterPassenger(p))&&!p?.zVehicle;
 export function scopedPerspective(p){return !!p?.aim&&!p.reloadEnd&&!p.use&&!p.sprinting&&!p.reviving&&!p.mantle&&!p.traversal&&!p.building&&!p.editing&&(!p.inventory||p.inventory[p.slot]?.weapon)&&['scope','prism'].includes(gun(p).optic);}
-export function thirdPersonActive(p){return p?.perspective==='third'&&p.health>0&&!p.spectating&&!p.downed&&!p.emote&&!p.vehicleId&&(!p.flight||p.flight==='ground')&&!scopedPerspective(p);}
+export function thirdPersonActive(p){return p?.perspective==='third'&&p.health>0&&!p.spectating&&!p.downed&&!p.emote&&weaponCameraAllowed(p)&&(!p.flight||p.flight==='ground')&&!scopedPerspective(p);}
 export function cameraPose(map,p,{unclampedBoom=false}={}){
  const eye={x:p.x,y:p.y+eyeHeight(p),z:p.z},d=direction(p.yaw||0,p.pitch||0);
  if(!thirdPersonActive(p))return {origin:eye,eye,d,length:0,fraction:1,third:false};
@@ -19,7 +22,7 @@ export function cameraPose(map,p,{unclampedBoom=false}={}){
  const stance=Number.isFinite(p.cameraEye)?Math.max(.6,Math.min(1.7,p.cameraEye))-eyeHeight(p):0;
  const offset={x:-d.x*distance+Math.cos(p.yaw)*side,y:-d.y*distance+height+stance,z:-d.z*distance-Math.sin(p.yaw)*side};
  const length=Math.hypot(offset.x,offset.y,offset.z),back={x:offset.x/length,y:offset.y/length,z:offset.z/length};
- const allowed=map?cameraDistance(map,eye,back,length)/length:1;
+ const allowed=Math.min(map?cameraDistance(map,eye,back,length):length,helicopterCameraDistance(p,eye,back,length))/length;
  const fraction=Math.min(allowed,unclampedBoom||!Number.isFinite(p.viewBoom)?1:clamp01(p.viewBoom));
  return {origin:{x:eye.x+offset.x*fraction,y:eye.y+offset.y*fraction,z:eye.z+offset.z*fraction},eye,d,length,fraction,third:true};
 }

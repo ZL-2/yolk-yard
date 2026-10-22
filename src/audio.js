@@ -16,6 +16,8 @@ import {ITEMS} from './royale-data.js';
 const note=(f,d=.12,v=.12,w='sine',to=0,at=0)=>({f,d,v,w,to,at});
 const noise=(f,d=.15,v=.15,at=0)=>({noise:true,f,d,v,at});
 export const SOUND_CUES={...ZOMBIE_SOUNDS,
+ 'helicopter-speaker-on':[note(660,.09,.12,'triangle'),note(880,.12,.1,'triangle',0,.1)],
+ 'helicopter-speaker-off':[note(660,.1,.1,'triangle',330)],
  'uplink-active':[note(392,.18,.05,'triangle'),note(587,.2,.06,'sine',0,.18),note(784,.5,.05,'sine',0,.4),noise(1600,.22,.025,.36)],
  'uplink-secured':[note(523,.18,.055),note(659,.22,.065,'sine',0,.14),note(784,.3,.065,'sine',0,.28),note(1046,.65,.05,'sine',0,.45)],
  'field-medal':[note(880,.09,.055),note(1174,.18,.055,'triangle',0,.08),note(1760,.42,.035,'sine',0,.2)],
@@ -189,14 +191,14 @@ export class Sound {
  pickup(){this.cue('pickup-1');}eliminate(){this.cue('elimination');}
  reload(duration=1.2,id='sprinter',empty=true){this.cancelReload();this.reloadVoices=[];for(const e of reloadSequence(id,duration,empty))for(const p of SOUND_CUES[e.cue]||[]){const voice=this.layer({...p,at:e.at+(p.at||0)},null,'effects',e.scale);if(voice)this.reloadVoices.push(voice);}}
  cancelReload(){for(const source of this.reloadVoices||[])try{source.stop();}catch{}this.reloadVoices=[];}
- loop(id,target,{freq=300,volume=.06,noise:useNoise=true,pan=0,pulse=0}={}){
+ loop(id,target,{freq=300,volume=.06,noise:useNoise=true,pan=0,pulse=0,category='ambience',wave='sine'}={}){
   if(!this.ctx)return;
   let loop=this.loops.get(id);
   if(!loop&&target>0){const c=this.ctx,source=useNoise?c.createBufferSource():c.createOscillator(),filter=c.createBiquadFilter(),gain=c.createGain();
-   if(useNoise){source.buffer=this.noiseBuffer;source.loop=true;}else{source.type='sine';source.frequency.value=freq;}
+   if(useNoise){source.buffer=this.noiseBuffer;source.loop=true;}else{source.type=wave;source.frequency.value=freq;}
    filter.type='lowpass';filter.frequency.value=freq;gain.gain.value=0;const panner=c.createStereoPanner();source.connect(filter).connect(gain).connect(panner).connect(this.master);let modulator,modulation,amplitude;if(pulse){filter.disconnect();amplitude=c.createGain();amplitude.gain.value=.55;modulator=c.createOscillator();modulator.frequency.value=pulse;modulation=c.createGain();modulation.gain.value=.45;modulator.connect(modulation).connect(amplitude.gain);filter.connect(amplitude).connect(gain);modulator.start();}source.start();loop={source,filter,gain,useNoise,panner,modulator,modulation,amplitude};this.loops.set(id,loop);
   }
-  if(loop){loop.panner?.pan.setTargetAtTime(pan,this.ctx.currentTime,.1);if(loop.modulator)loop.modulator.frequency.setTargetAtTime(pulse||4,this.ctx.currentTime,.15);loop.filter.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);if(!loop.useNoise)loop.source.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);loop.gain.gain.setTargetAtTime(Math.max(0,target)*volume*this.ambienceVolume,this.ctx.currentTime,.3);if(!target){if(!loop.silentAt)loop.silentAt=this.clock;if(this.clock-loop.silentAt>1.5){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();loop.panner?.disconnect();loop.modulator?.stop();loop.modulator?.disconnect();loop.modulation?.disconnect();loop.amplitude?.disconnect();this.loops.delete(id);}}else loop.silentAt=0;}
+  if(loop){loop.panner?.pan.setTargetAtTime(pan,this.ctx.currentTime,.1);if(loop.modulator)loop.modulator.frequency.setTargetAtTime(pulse||4,this.ctx.currentTime,.15);loop.filter.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);if(!loop.useNoise)loop.source.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);loop.gain.gain.setTargetAtTime(Math.max(0,target)*volume*(category==='effects'?this.effectsVolume:this.ambienceVolume),this.ctx.currentTime,.3);if(!target){if(!loop.silentAt)loop.silentAt=this.clock;if(this.clock-loop.silentAt>1.5){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();loop.panner?.disconnect();loop.modulator?.stop();loop.modulator?.disconnect();loop.modulation?.disconnect();loop.amplitude?.disconnect();this.loops.delete(id);}}else loop.silentAt=0;}
  }
  stopWorld(){this.score.stop();this.occlusion.clear();this.bossAudio.stop();this.fieldSamples.stop();this.zombieSamples.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();loop.panner?.disconnect();loop.modulator?.stop();loop.modulator?.disconnect();loop.modulation?.disconnect();loop.amplitude?.disconnect();}this.loops.clear();this.stepClocks?.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;this.nextBirdAt=this.clock+8;}
  event(e,me,state){

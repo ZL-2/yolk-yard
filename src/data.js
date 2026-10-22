@@ -5,7 +5,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Shared camera targeting and remote commands require matching host/client releases.
-export const VERSION = 72;
+export const VERSION = 73;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -98,7 +98,7 @@ export const WEAPONS = [
   }
 ];
 export const ROYALE_WEAPONS = [
-  {id:'stormspike',muzzle:1.12,sightY:.285,optic:'reflex',name:'Stormspike Rifle',role:'BREACH',desc:'Four electric spikes. Fracture connected builds.',color:0x70ddff,size:1.25},
+  {id:'stormspike',muzzle:1.12,sightY:.285,optic:'reflex',name:'Stormspike Rifle',role:'BREACH',desc:'Sticky electric spikes. Impact, charge, burst.',color:0x70ddff,size:1.25},
   {
     "id": "peeper",
     "muzzle": 1.1,
