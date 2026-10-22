@@ -1,3 +1,4 @@
+import {WorldMarkers} from './world-markers.js';
 import {supplyMapIcon} from './supply-drops.js';
 import {drawOperationMap} from './field-operations-ui.js';
 import {realMatchPlayers} from './match-roster.js';
@@ -116,7 +117,15 @@ export class RoyaleUI{
   const invCrown=document.querySelector('.inventory-crown');if(invCrown){invCrown.hidden=!local.crown;setText(invCrown.querySelector('small'),`${local.crownWins||0} crowned victories · Season 1`);}
   this.waypoint=visibleMarkers(state,local).find(m=>m.player===local.id)||null;
   const mates=state.players.filter(o=>teammates(state.options,local,o)&&o.contestant).sort((a,b)=>(a.teamSlot||0)-(b.teamSlot||0));
-  const markerHTML=visibleMarkers(state,local).filter(m=>!r.practice||!m.planning).map(m=>{const pos=this.project?.(m);if(!pos)return '';const owner=state.players.find(o=>o.id===m.player),style=owner?teamStyle(state.players,owner):{slot:1,color:'#7dddf4'};return `<div class="duo-world-marker ${m.kind}" style="left:${pos.x}%;top:${pos.y}%;--team-color:${style.color}"><b>${pos.offscreen?'➤':m.kind==='danger'?'!':'◆'}</b><span>${style.slot} · ${escape(m.kind==='danger'?'DANGER':m.label||'MARKER')} · ${Math.round(dist(local,m))} m</span><small>${escape(m.name)}</small></div>`;}).join('')+mates.filter(m=>m.health>0&&!m.spectating).map(m=>{const pos=this.project?.({...m,y:m.y+2.4});if(!pos)return '';const style=teamStyle(state.players,m);return `<div class="duo-world-marker teammate" style="left:${pos.x}%;top:${pos.y}%;--team-color:${style.color}"><b>${pos.offscreen?'➤':m.downed?'＋':style.slot}</b><span>${escape(m.name)} · ${Math.round(dist(local,m))} m</span></div>`;}).join('');if(this.markerHTML!==markerHTML){$('duo-markers').innerHTML=markerHTML;this.markerHTML=markerHTML;}
+  this.worldMarkers??=new WorldMarkers($('duo-markers'));
+  const markers=[];
+  for(const m of visibleMarkers(state,local)){
+   if(r.practice&&m.planning)continue;const pos=this.project?.(m);if(!pos)continue;
+   const owner=state.players.find(o=>o.id===m.player),style=owner?teamStyle(state.players,owner):{slot:1,color:'#7dddf4'};
+   markers.push({id:'marker:'+m.id,kind:m.kind,...pos,color:style.color,icon:pos.offscreen?'➤':m.kind==='danger'?'!':'◆',label:`${style.slot} · ${m.kind==='danger'?'DANGER':m.label||'MARKER'} · ${Math.round(dist(local,m))} m`,name:m.name});
+  }
+  for(const m of mates){if(m.health<=0||m.spectating)continue;const pos=this.project?.({...m,y:m.y+2.4});if(!pos)continue;const style=teamStyle(state.players,m);markers.push({id:'teammate:'+m.id,kind:'teammate',...pos,color:style.color,icon:pos.offscreen?'➤':m.downed?'＋':style.slot,label:`${m.name} · ${Math.round(dist(local,m))} m`});}
+  this.worldMarkers.update(markers);
   this.root.classList.toggle('downed',!!local.downed);document.body.classList.toggle('is-downed',!!local.downed);
   const vehicle=r.vehicles?.find(v=>v.id===local.vehicleId),controls=$('vehicle-controls');controls.hidden=!vehicle;document.body.classList.toggle('in-vehicle',!!vehicle);document.body.classList.toggle('is-passenger',!!vehicle&&local.vehicleSeat>0);
   if(vehicle){

@@ -19,7 +19,7 @@ const descriptions={
  showFps:'Show your measured frames per second during gameplay.',
  netDebugStats:'Show ping, incoming and outgoing traffic, message rates and a latency graph. Packet loss is unavailable in this browser transport.',
  connectionWarnings:'Show a yellow connection arrow when updates are delayed and a red X when the connection is interrupted or severely delayed.',
- quality:'High enables shadows and richer graphics. Low reduces rendering work for smoother play on slower devices.',
+ quality:'High enables sun shadows and richer surfaces. Resolution adapts to sustained frame load; menus and HUD text stay sharp. Low favors frame rate.',
  fpsLimit:'Choose 30, 60, 90, 120, 144 FPS or Unlimited. Defaults to 60. Higher limits need a capable computer and display. Simulation, controls and multiplayer timing stay consistent.',
  fov:'First-person field of view. Your existing setting is preserved. Scoped optics use this value for their zoom.',
  thirdPersonFov:'Third-person field of view. Defaults to 65°. Adjust independently from first person; changes apply immediately.',
@@ -36,6 +36,7 @@ export function arrangeSettings(dialog){
  body.replaceChildren();
  body.innerHTML='<nav class="settings-tabs" role="tablist" aria-label="Settings categories"></nav><div class="settings-workspace"><div class="settings-options"></div><aside class="settings-description"><span class="eyebrow">SETTING DETAILS</span><h3></h3><p></p><div class="settings-tip">Make it yours.<br>Saved on this browser.</div></aside></div><footer class="settings-footer"><span>Options save automatically · Keybinds use Apply</span></footer>';
  const nav=body.querySelector('nav'),options=body.querySelector('.settings-options'),detail=body.querySelector('.settings-description');
+ nav.setAttribute('aria-orientation',matchMedia('(min-width:1000px)').matches?'vertical':'horizontal');
  function describe(title,text,row){detail.querySelector('h3').textContent=title;detail.querySelector('p').textContent=text;body.querySelectorAll('.setting-row.active').forEach(r=>r.classList.remove('active'));row?.classList.add('active');}
  function activate(id){
   for(const tab of nav.children){const active=tab.dataset.settingsTab===id;tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;}
@@ -55,7 +56,7 @@ export function arrangeSettings(dialog){
  }
  // A newly introduced preference stays reachable until its explicit category is added.
  const unassigned=[...rows.keys()].filter(key=>!assigned.has(key));if(unassigned.length){const panel=options.querySelector('#settings-panel-gameplay'),h=document.createElement('h4');h.className='settings-group-heading';h.textContent='Additional preferences';panel.append(h);for(const key of unassigned)attach(panel,key);}
- nav.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=[...nav.children],at=tabs.indexOf(document.activeElement);const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(at+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;tabs[next].click();tabs[next].focus();});
+ nav.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key))return;e.preventDefault();const tabs=[...nav.children],at=tabs.indexOf(document.activeElement);const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(at+(['ArrowRight','ArrowDown'].includes(e.key)?1:-1)+tabs.length)%tabs.length;tabs[next].click();tabs[next].focus();});
  const footer=body.querySelector('.settings-footer');done.textContent='Back';done.style.marginTop='0';footer.append(reset,done);
  activate('video');
  // Closing with an unapplied draft must reveal its Apply / Discard controls.

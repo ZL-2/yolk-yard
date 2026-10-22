@@ -75,6 +75,7 @@ export class MatchAuthority{
   if(message.type==='authority-create'){this.create(peer,message);return;}
   const room=this.roomFor(peer),id=peer.authorityId;if(!room||room.members.get(id)!==peer)return;
   const sim=room.sim,m=message.command||{},leader=id===room.owner;
+  if(m.type==='snapshot-reset'){room.encoders.delete(id);return;}
   if(m.type==='inputs'){
    if(!Array.isArray(m.inputs)||m.inputs.length>30)return;
    for(const input of m.inputs)this.command(peer,{command:{type:'input',input}});

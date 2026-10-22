@@ -5,7 +5,7 @@ import {RemotePoses} from './remote-poses.js';
 export class GuestPresentation {
  constructor(){this.key=null;this.offset={x:0,y:0,z:0};this.received=0;this.time=0;this.poses=new RemotePoses();}
  receive(state,before,after,now){
-  this.poses.receive(state);
+  this.poses.receive(state,now);
   const key=`${state.royale?.matchId}:${state.round}:${after?.id}:${after?.health>0}:${after?.flight}`;
   const continuous=this.key===key&&before&&after&&after.health>0;
   const correction=continuous?{x:before.x+this.offset.x-after.x,y:before.y+this.offset.y-after.y,z:before.z+this.offset.z-after.z}:{x:0,y:0,z:0};

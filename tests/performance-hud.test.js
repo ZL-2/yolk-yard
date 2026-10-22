@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {connectionHealth,PERFORMANCE_DEFAULTS,PerformanceHUD} from '../src/performance-hud.js';
 import {RelayPeer} from '../src/relay-peer.js';
-test('default-on HUD distinguishes delays, interruption and local play',()=>{
- assert.deepEqual(PERFORMANCE_DEFAULTS,{showFps:true,netDebugStats:true,connectionWarnings:true});
+test('compact default HUD distinguishes delays, interruption and local play',()=>{
+ assert.deepEqual(PERFORMANCE_DEFAULTS,{showFps:true,netDebugStats:false,connectionWarnings:true});
  const net={serverAuthority:true,lastState:1000,peer:{relayLatency:40,bufferedAmount:0}};
  assert.equal(connectionHealth(net,1100),'healthy');
  assert.equal(connectionHealth(net,1300),'degraded');
@@ -12,6 +12,7 @@ test('default-on HUD distinguishes delays, interruption and local play',()=>{
  net.peer.reconnecting=false;net.peer.relayLatency=200;assert.equal(connectionHealth(net,3100),'degraded');
  net.peer.relayLatency=700;assert.equal(connectionHealth(net,3100),'critical');
  assert.equal(connectionHealth(null,9000),'healthy');
+ assert.equal(connectionHealth({isHost:true,lastState:1,peer:{},latency:20},9000),'healthy');
 });
 test('wire telemetry counts UTF-8 payload bytes and only actual sends',()=>{
  const peer={sentBytes:0,sentPackets:0,byteEncoder:new TextEncoder()},sent=[];

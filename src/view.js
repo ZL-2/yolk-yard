@@ -4,7 +4,7 @@ import {buildBoxArena,updateBoxArena} from './box-fight-view.js';
 import {buildBlacktide,ZombiesView} from './zombies-view.js';
 import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay} from './perspective.js';
 import {warmArchitectureSurfaces} from './architecture-surfaces.js';
-import {fpsLimit} from './frame-pacing.js';
+import {RenderBudget,shadowAnchor} from './render-budget.js';
 import {perspectiveFov} from './settings.js';
 import {canSpectate} from './spectator-status.js';
 import {ThrowablePreview} from './throwable-view.js';
@@ -152,7 +152,7 @@ export class View {
   get mapCompile(){return this.mapPreparation.pending;}
   cancelMapPreparation(){if(this.mapCompile){this.mapPreparation.cancel();this.needsMapCompile=true;}}
   constructor(canvas, settings) {
-    this.mapPreparation=new ShaderPreparation();
+    this.mapPreparation=new ShaderPreparation();this.renderBudget=new RenderBudget();
     this.canvas = canvas;
     this.settings = settings;
     this.renderer = makeRenderer({
@@ -161,6 +161,8 @@ export class View {
       powerPreference: "high-performance",
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.15;
+    this.renderer.shadowMap.autoUpdate=false;
     this.renderer.shadowMap.enabled = settings.quality !== "low";
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
@@ -180,15 +182,15 @@ export class View {
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
     Object.assign(sun.shadow.camera, {
-      left: -58,
-      right: 58,
-      top: 58,
-      bottom: -58,
+      left: -42,
+      right: 42,
+      top: 42,
+      bottom: -42,
       near: 1,
       far: 140,
     });
-    sun.shadow.bias = -0.001;
-    this.scene.add(sun);
+    sun.shadow.bias = -0.0005;sun.shadow.normalBias=.045;
+    this.scene.add(sun,sun.target);
     this.world = new THREE.Group();
     this.scene.add(this.world);
     this.actors = new THREE.Group();
@@ -280,7 +282,7 @@ export class View {
   }
   setQuality() {
     warmArchitectureSurfaces();
-    this.renderScale=1;this.frameAverage=1/60;
+    this.renderBudget.reset();this.renderScale=1;this.lastShadowAt=-Infinity;
     this.renderer.shadowMap.enabled = this.settings.quality !== "low";
     this.resize();
   }
@@ -779,17 +781,11 @@ export class View {
     if(!playing&&this.eliminations.active.length)this.eliminations.clear();
     // Reduce GPU work when rendering itself delays input and socket processing.
     const updateStarted=performance.now();
-    this.frameAverage=(this.frameAverage||1/60)*.9+Math.min(.1,dt)*.1;
-    const frameBudget=1/Math.min(60,fpsLimit(this.settings.fpsLimit)||60);
-    this.detailPressure=this.frameAverage>frameBudget*1.25;
-    this.budgetClock=(this.budgetClock||0)+dt;
-    if(this.budgetClock>1){
-      this.budgetClock=0;const previous=this.renderScale||1;
-      if(this.frameAverage>frameBudget*1.18){this.slowFrames=(this.slowFrames||0)+1;this.fastFrames=0;if(this.slowFrames>=2){this.renderScale=playing?Math.max(.8,previous-.05):1;this.renderer.shadowMap.enabled=false;}}
-      else if(this.frameAverage<frameBudget*1.04){this.slowFrames=0;this.fastFrames=(this.fastFrames||0)+1;if(this.fastFrames>=3)this.renderScale=Math.min(1,previous+.025);if(this.fastFrames>=8&&previous>=.99)this.renderer.shadowMap.enabled=this.settings.quality!=='low';}
-      this.renderScale=playing?Math.max(.8,this.renderScale||1):1;
-      if(this.renderScale!==previous)this.resize();
-    }
+    const resized=this.renderBudget.sample(updateStarted,{quality:this.settings.quality,limit:this.settings.fpsLimit,active:!document.hidden});
+    this.renderScale=this.renderBudget.scale;this.detailPressure=this.renderBudget.pressure;
+    if(resized)this.resize();
+    const shadows=this.settings.quality!=='low'&&this.renderBudget.shadows;
+    if(this.renderer.shadowMap.enabled!==shadows){this.renderer.shadowMap.enabled=shadows;this.lastShadowAt=-Infinity;}
     this.clock += dt;
     this.recoil = Math.max(0, this.recoil - dt * (local?gun(local).recoilRecovery:7));
     if(playing)this.loadMap(state?.options.map || "yard");
@@ -1202,6 +1198,26 @@ export class View {
         this.opticLens.material.needsUpdate = true;
       }
     }
+    if(playing&&this.scopeActive&&gun(local).ads?.overlay&&this.aimBlend>.8)this.gunGroup.visible=false;
+    this.royaleView.update(state,this.renderLocalActor||local,dt,playing);updateBoxArena(this.world,state);updateZoneDistrict(this.world,state);this.zombiesView.update(state,dt,this.camera,playing);if(playing&&state?.zombies){this.scene.fog.near=65;this.scene.fog.far=245;}
+    this.throwablePreview.update(state,this.renderLocalActor||predicted||local,this.buildMap||this.map,playing,this.clock);
+    this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
+    // A departed match must never block rendering the lobby. Rewarm on reentry.
+    if(!playing)this.cancelMapPreparation();
+    if(playing&&this.needsMapCompile){
+      this.needsMapCompile=false;
+      this.mapPreparation.start(()=>this.renderer.compileAsync(this.scene,this.camera));
+    }
+    if(this.mapCompile)return;
+    // Update the shadow once for all views, including the scope, at a bounded
+    // cadence. Near actors keep smooth shadows without duplicate scope passes.
+    const shadowKey=`${playing}:${this.mapId}:${state?.round}`;
+    if(shadowKey!==this.shadowKey||updateStarted-(this.lastShadowAt??-Infinity)>=(this.detailPressure?100:1000/30)){
+      const anchor=shadowAnchor(playing?this.camera.position:{x:0,y:0,z:0});
+      this.sun.target.position.set(anchor.x,anchor.y,anchor.z);this.sun.position.set(anchor.x-15,anchor.y+38,anchor.z+18);
+      this.renderer.shadowMap.needsUpdate=this.renderer.shadowMap.enabled;this.lastShadowAt=updateStarted;this.shadowKey=shadowKey;
+    }
+    this.renderer.info.autoReset=false;this.renderer.info.reset();
     if (playing && this.scopeActive && this.opticLens && !gun(local).ads?.overlay && this.clock-(this.lastScopeRender||-1) >= 1/30) {
       this.lastScopeRender=this.clock;
       this.scopeCamera.position.copy(this.camera.position);
@@ -1222,18 +1238,7 @@ export class View {
       this.renderer.setRenderTarget(null);
       this.gunGroup.visible = true;
     }
-    if(playing&&this.scopeActive&&gun(local).ads?.overlay&&this.aimBlend>.8)this.gunGroup.visible=false;
-    this.royaleView.update(state,this.renderLocalActor||local,dt,playing);updateBoxArena(this.world,state);updateZoneDistrict(this.world,state);this.zombiesView.update(state,dt,this.camera,playing);if(playing&&state?.zombies){this.scene.fog.near=65;this.scene.fog.far=245;}
-    this.throwablePreview.update(state,this.renderLocalActor||predicted||local,this.buildMap||this.map,playing,this.clock);
-    this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
-    // A departed match must never block rendering the lobby. Rewarm on reentry.
-    if(!playing)this.cancelMapPreparation();
-    if(playing&&this.needsMapCompile){
-      this.needsMapCompile=false;
-      this.mapPreparation.start(()=>this.renderer.compileAsync(this.scene,this.camera));
-    }
-    if(this.mapCompile)return;
-    this.renderer.info.autoReset=false;this.renderer.info.reset();
+
     this.renderer.render(this.scene, this.camera);
     if(playing&&!this.thirdPersonEnabled&&(this.gunGroup.visible||this.outgoing?.group.visible)){this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.viewmodelScene,this.viewmodelCamera);this.renderer.autoClear=true;}
     this.updateMilliseconds=performance.now()-updateStarted;

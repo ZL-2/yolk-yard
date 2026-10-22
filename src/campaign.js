@@ -1,4 +1,6 @@
 import * as T from 'three';
+import {RenderBudget} from './render-budget.js';
+import {FramePacer,fpsLimit} from './frame-pacing.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {createWorld} from './campaign-world.js';
 import {createModels,animateSoldier} from './campaign-models.js';
@@ -25,6 +27,7 @@ const duration=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0'
 export class BlackglassCampaign{
  constructor({onClose,volume=.65}){
   this.onClose=onClose;this.audio=new CampaignAudio();this.keys=new Set();this.handlers=[];this.phase='briefing';this.time=0;this.last=0;this.disposed=false;this.hudClock=0;this.effectPool=[];this.grenades=[];this.damageFlash=0;this.recoil=0;this.aim=0;this.weaponIndex=0;this.senseClock=0;this.nextShot=0;this.nextFootstep=0;this.interaction=0;this.radioQueue=[];this.radioEnd=0;this.smoke=[];this.flashlightOn=false;this.nightVision=false;this.pathClock=0;
+  this.renderBudget=new RenderBudget();this.framePacer=new FramePacer();this.fpsLimit=60;try{this.fpsLimit=fpsLimit(JSON.parse(localStorage.getItem('yolk-settings'))?.fpsLimit);}catch{}
   this.prefs={volume:clamp(volume,0,1),sensitivity:1,quality:'balanced',radio:true,difficulty:'regular'};
   try{const p=JSON.parse(localStorage.getItem(PREF_KEY));if(p){this.prefs={...this.prefs,volume:clamp(Number(p.volume)||0,0,1),sensitivity:clamp(Number(p.sensitivity)||1,.3,2),quality:p.quality==='high'?'high':'balanced',radio:p.radio!==false,difficulty:p.difficulty==='story'?'story':'regular'};}}catch{}
   this.save=readSave(localStorage);this.audio.radio=this.prefs.radio;this.audio.volume=this.prefs.volume;
@@ -67,7 +70,7 @@ export class BlackglassCampaign{
   this.listen(this.canvas,'webglcontextlost',e=>{e.preventDefault();this.pause('Graphics were interrupted. Your last checkpoint is saved. Exit and reopen the mission.');});
   this.listen(this.root,'contextmenu',e=>e.preventDefault());
   this.listen(this.root,'click',e=>{const button=e.target.closest('[data-bg]');if(button)void this.action(button.dataset.bg);});
-  this.listen(this.root,'input',e=>{const key=e.target.dataset.bgSetting;if(!key)return;this.prefs[key]=key==='radio'?e.target.checked:key==='volume'||key==='sensitivity'?Number(e.target.value):e.target.value;this.audio.radio=this.prefs.radio;this.audio.setVolume(this.prefs.volume);this.savePreferences();if(key==='quality'){this.renderer.setPixelRatio(Math.min(devicePixelRatio,this.prefs.quality==='high'?1.5:1));this.resize();}});
+  this.listen(this.root,'input',e=>{const key=e.target.dataset.bgSetting;if(!key)return;this.prefs[key]=key==='radio'?e.target.checked:key==='volume'||key==='sensitivity'?Number(e.target.value):e.target.value;this.audio.radio=this.prefs.radio;this.audio.setVolume(this.prefs.volume);this.savePreferences();if(key==='quality'){this.renderBudget.reset();this.resize();}});
   this.listen(window,'keydown',e=>{
    if(this.disposed||e.target.matches('input,select,textarea'))return;
    if(this.phase==='cinematic'){e.preventDefault();e.stopImmediatePropagation();if(e.code==='Space')this.finishIntro();if(e.code==='Escape')this.pause();return;}
@@ -85,7 +88,7 @@ export class BlackglassCampaign{
   this.listen(document,'visibilitychange',()=>{if(document.hidden&&['playing','cinematic'].includes(this.phase))this.pause();});
  }
  savePreferences(){try{localStorage.setItem(PREF_KEY,JSON.stringify(this.prefs));}catch{}}
- resize(){if(!this.renderer)return;this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=this.weaponCamera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.weaponCamera.updateProjectionMatrix();this.needsRender=true;}
+ resize(){if(!this.renderer)return;this.renderer.setPixelRatio(Math.min(devicePixelRatio,this.prefs.quality==='high'?1.5:1,Math.sqrt(2300000/Math.max(1,innerWidth*innerHeight)))*this.renderBudget.scale);this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=this.weaponCamera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.weaponCamera.updateProjectionMatrix();this.needsRender=true;}
  settingsHTML(){return `<details class="bg-settings"><summary>FIELD SETTINGS & CONTROLS</summary><div class="bg-setting-grid"><label>Mouse sensitivity<input aria-label="Mouse sensitivity" data-bg-setting="sensitivity" type="range" min=".3" max="2" step=".05" value="${this.prefs.sensitivity}"></label><label>Audio<input aria-label="Mission volume" data-bg-setting="volume" type="range" min="0" max="1" step=".05" value="${this.prefs.volume}"></label><label>Rendering<select data-bg-setting="quality"><option value="balanced" ${this.prefs.quality==='balanced'?'selected':''}>Balanced</option><option value="high" ${this.prefs.quality==='high'?'selected':''}>High resolution</option></select></label><label class="bg-check"><input type="checkbox" data-bg-setting="radio" ${this.prefs.radio?'checked':''}>Spoken radio · device voice</label></div><p>WASD move · Mouse aim · Left click fire · Right click sights · Shift sprint · C / Ctrl crouch · Space jump · R reload · 1 / 2 weapons · Hold E interact · G grenade · X field dressing · F flashlight · N night vision · Esc pause</p><small>Subtitles always on. Progress saves at mission checkpoints in this browser.</small></details>`;}
  showBriefing(){
   this.phase='briefing';this.overlay.hidden=false;this.hud.hidden=true;this.overlay.style.setProperty('--bg-art',`url("${ART}")`);this.overlay.className='bg-overlay bg-briefing';
@@ -225,7 +228,7 @@ export class BlackglassCampaign{
   }else if(this.phase==='cinematic'){this.updateIntro(dt);}
   else if(this.phase==='briefing'){const t=now*.00005;this.camera.position.set(-70+Math.sin(t)*8,35,78);this.camera.lookAt(0,26,-35);this.world.update(now/1000,{x:0,z:20});}
   else if(this.phase==='complete'){this.heli.position.y+=dt*1.4;this.heli.position.z-=dt*3;this.heli.userData.rotor.rotation.y+=dt*32;this.camera.position.set(45,26,-78);this.camera.lookAt(this.heli.position);}
-  if(!document.hidden&&(this.needsRender||this.phase==='playing'||this.phase==='complete'||this.phase==='cinematic')){this.renderer.info.reset();this.renderer.clear();this.renderer.render(this.scene,this.camera);if(this.phase==='playing'||this.phase==='paused'&&this.resumePhase!=='cinematic'){this.renderer.clearDepth();this.renderer.render(this.weaponScene,this.weaponCamera);}this.needsRender=false;}
+  if(!document.hidden&&(this.needsRender||this.phase==='playing'||this.phase==='complete'||this.phase==='cinematic')&&this.framePacer.shouldRender(now,this.fpsLimit)){if(this.renderBudget.sample(now,{quality:this.prefs.quality,limit:this.fpsLimit,active:['playing','cinematic'].includes(this.phase)}))this.resize();if(this.renderer.shadowMap.enabled!==this.renderBudget.shadows){this.renderer.shadowMap.enabled=this.renderBudget.shadows;this.renderer.shadowMap.needsUpdate=true;}this.renderer.info.reset();this.renderer.clear();this.renderer.render(this.scene,this.camera);if(this.phase==='playing'||this.phase==='paused'&&this.resumePhase!=='cinematic'){this.renderer.clearDepth();this.renderer.render(this.weaponScene,this.weaponCamera);}this.needsRender=false;}
   this.raf=requestAnimationFrame(t=>this.frame(t));
  }
  close({returnToOwner=true}={}){

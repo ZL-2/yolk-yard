@@ -113,6 +113,7 @@ import './field-refinement.css';
 import './field-stability.css';
 import './lobby-deploy.css';
 import './menu-refresh.css';
+import './experience-200.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
@@ -1183,6 +1184,7 @@ function processEvents() {
   }
   const confirmation=combatConfirmation.takeSound();if(confirmation&&confirmation!=='elimination')sound.hit(confirmation);
 }
+const hudText=(node,value)=>{const text=String(value);if(node.textContent!==text)node.textContent=text;};
 function hud() {
   if (screen !== "game" || !state) return;
   const p = state.players.find((p) => p.id === localId);
@@ -1195,26 +1197,26 @@ function hud() {
   royaleUI.update(state,{...p,...localPerspective()},watched,controlLabel,paused);
   fieldUI.update(state,p,!state.zombies&&!state.boxfight,paused,point=>view.projectMarker(point));zombiesUI.update(state,p,controlLabel,paused,point=>view.projectMarker(point));boxUI.update(state,p,paused,sound);zoneUI.update(state,p,paused,sound);
   view.waypoint=royaleUI.waypoint;
-  $("#hud-mode").textContent = m.name.toUpperCase();
-  $("#hud-map").textContent = getMap(state.options.map).name;
-  $("#hud-network").textContent = net
+  hudText($("#hud-mode"), m.name.toUpperCase());
+  hudText($("#hud-map"), getMap(state.options.map).name);
+  hudText($("#hud-network"), net
     ? (net.isHost ? "HOST · " : net.latency + " ms · ") + formatCode(net.code)
-    : "LOCAL MATCH";
+    : "LOCAL MATCH");
   $("#timer").textContent =
     Math.floor(Math.ceil(state.remaining) / 60) +
     ":" +
     String(Math.ceil(state.remaining) % 60).padStart(2, "0");
-  $("#score-blue").textContent = m.teams ? state.scores[0] : "";
-  $("#score-coral").textContent = m.teams ? state.scores[1] : "";
+  hudText($("#score-blue"), m.teams ? state.scores[0] : "");
+  hudText($("#score-coral"), m.teams ? state.scores[1] : "");
   $("#objective").textContent =
     m.id==='royale'&&state.royale.practice?`SPAWN ISLAND · ${state.royale.contestants} CONTESTANTS` : m.id==='royale' ? `${state.royale.alive} ALIVE · ${p.kills} ELIMS · ${p.place?'#'+p.place:'LAST OPERATOR STANDING'}` :
     `FIRST TO ${state.options.scoreLimit} ELIMINATIONS`;
   const vitals=state.royale&&watched?watched:p;
   royaleUI.project=point=>view.projectMarker(point);
-  $("#shield").textContent = Math.ceil(vitals.shield || 0);
+  hudText($("#shield"), Math.ceil(vitals.shield || 0));
   $("#shield-fill").style.width = Math.max(0, Math.min(100, vitals.shield || 0)) + "%";
   $("#arena-stamina").hidden=!!state.royale;$("#arena-stamina-fill").value=vitals.stamina??100;$("#arena-stamina").classList.toggle("exhausted",!!vitals.exhausted);
-  $("#health").textContent = Math.ceil(vitals.health);
+  hudText($("#health"), Math.ceil(vitals.health));
   $("#health-fill").style.width = Math.max(0, Math.min(100, vitals.health/(vitals.maxHealth||100)*100)) + "%";
   $("#streak").hidden=!!state.royale&&state.time>=p.shieldUntil;
   $("#streak").textContent =
@@ -1231,9 +1233,9 @@ function hud() {
   if(arenaBonuses(state.options.mode)&&p.health>0)$('#streak').textContent+=` · ${5-p.streak%5} to bonus`;
   $('#crosshair').classList.toggle('damage-boost',arenaBonuses(state.options.mode)&&p.damageUntil>state.time);
   const quickControls=[['forward','Move'],['crouch','Crouch / slide'],['reload','Reload'],['swap','Swap']].map(([id,label]) => `<span><kbd>${esc(controlLabel(id))}</kbd> ${label}</span>`).join('') + '<span><kbd>Esc</kbd> Menu</span>';if($('.quick-controls').innerHTML!==quickControls)$('.quick-controls').innerHTML=quickControls;
-  $("#gun-name").textContent = gun(p).name;
-  $("#ammo").textContent = p.ammo[p.slot];
-  $("#reserve").textContent = p.reserve[p.slot];
+  hudText($("#gun-name"), gun(p).name);
+  hudText($("#ammo"), p.ammo[p.slot]);
+  hudText($("#reserve"), p.reserve[p.slot]);
   $("#ammo-extra").textContent =
     p.reloadEnd > state.time
       ? "RELOADING…"
@@ -1241,23 +1243,23 @@ function hud() {
   $("#respawn").style.display =
     p.health <= 0 && !p.spectating && state.phase === "playing" ? "block" : "none";
   const killer = p.health <= 0 && state.players.find(k => k.id === p.killerId);
-  $("#spectator-stats").textContent = killer
+  hudText($("#spectator-stats"), killer
     ? `${killer.health > 0 ? "Spectating" : "Eliminated"} ${killer.name} · Health ${Math.ceil(killer.health)} · ${gun(killer).name} · ${killer.kills} K / ${killer.deaths} D · ${Math.floor(killer.points)} pts`
-    : "";
+    : "");
   const watching = !!p.spectating && state.phase === "playing";
   $("#spectate-panel").hidden = !watching;
   $("#hud").classList.toggle("spectating", watching);
   $('#spectate-panel [data-action=rejoin]').hidden=!!p.friendSpectator||!!state.royale||!!state.zombies;
   const target = state.players.find(k => k.id === spectateTarget);
-  $("#spectate-info").textContent = target && watching
+  hudText($("#spectate-info"), target && watching
     ? `${target.name} · Health ${Math.ceil(target.health)} · ${state.royale?itemInfo(target.inventory?.[target.slot]).name:gun(target).name} · ${target.kills} K / ${target.deaths} D`
-    : "Waiting for a player to spawn…";
+    : "Waiting for a player to spawn…");
   const delay = Math.max(0, Math.ceil(p.respawnAt - state.time));
-  $("#spawn-heading").textContent = p.awaitingEntry ? "OPERATOR READY" : "OPERATOR ELIMINATED";
-  $("#spawn-status").textContent = p.spawnRequested
+  hudText($("#spawn-heading"), p.awaitingEntry ? "OPERATOR READY" : "OPERATOR ELIMINATED");
+  hudText($("#spawn-status"), p.spawnRequested
     ? (delay ? `Entering in ${delay}…` : "Entering the arena…")
-    : delay ? `Respawn available in ${delay}` : "Ready when you are";
-  $("#spawn-button").textContent = p.awaitingEntry ? "DEPLOY" : "Respawn";
+    : delay ? `Respawn available in ${delay}` : "Ready when you are");
+  hudText($("#spawn-button"), p.awaitingEntry ? "DEPLOY" : "Respawn");
   $("#spawn-button").disabled = !!p.spawnRequested || delay > 0;
   if(state.zombies){$('#hud-network').textContent=(net?'SERVER · '+(net.latency||0)+' ms · '+formatCode(net.code):'LOCAL EXPEDITION');$('#ammo-extra').textContent=p.reloadEnd>state.time?'RELOADING…':`${p.poppers} FRAGMENTATION · ${controlLabel('popper')} · TIER ${gun(p).tier}`;$('#arena-stamina').hidden=false;}
   if (p.health > 0) spawnIntentUntil = 0;
@@ -1292,9 +1294,9 @@ function hud() {
   $("#scope").style.display = scoped && view.aimBlend>.8 ? "block" : "none";
   $("#scope").dataset.reticle=gun(p).ads?.reticle||"mil-dot";
   $("#scope").dataset.overlay=gun(p).ads?.overlay||"precision";
-  $("#scope-label").textContent = scoped
+  hudText($("#scope-label"), scoped
     ? `${gun(p).name.toUpperCase()} / OPTIC ${gun(p).magnification||2.5}×`
-    : "";
+    : "");
   $("#scoreboard").style.display = scoreHeld && !dialog.open ? "block" : "none";
   if (scoreHeld){const board=$("#scoreboard"),markup=`<h2>${m.name} · ${getMap(state.options.map).name}</h2>${scoresHTML()}`;if(board.innerHTML!==markup){const scroll=board.scrollTop;board.innerHTML=markup;board.scrollTop=scroll;}}
 }

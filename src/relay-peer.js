@@ -3,7 +3,7 @@ import {mergeRelayMessage} from './relay-queue.js';
 import {SnapshotEncoder,SnapshotDecoder} from './snapshot-codec.js';
 import {HostHeartbeat} from './host-heartbeat.js';
 import {RelaySnapshotWork} from './relay-snapshot-work.js';
-import {RELAY_RECONNECT_MS} from './relay-recovery.js';
+import {RELAY_RECONNECT_MS,RELAY_CONNECT_MS,relayRetryDelay} from './relay-recovery.js';
 // Peer-shaped, ordered WebSocket transport; the game rules stay in Network.
 // Explicit peer configuration retains the local WebRTC development path.
 export const relayURL=()=>globalThis.window?.YOLK_NETWORK?.relay||'';
@@ -22,19 +22,38 @@ class RelayConnection extends Events {
 }
 export class RelayPeer extends Events {
  constructor(id,registration={}){
-  super();this.registration=registration;this.id=id;this.destroyed=false;this.disconnected=false;this.connections=new Map();this.waiters=new Map();this.queue=[];this.queueBytes=0;this.requestId=0;this.deferredControls=[];this.commandSeq=0;this.unacked=new Map();this.cursor=0;this.protocol=1;
+  super();this.registration=registration;this.id=id;this.destroyed=false;this.disconnected=false;this.connections=new Map();this.waiters=new Map();this.queue=[];this.queueBytes=0;this.requestId=0;this.deferredControls=[];this.commandSeq=0;this.unacked=new Map();this.cursor=0;this.protocol=1;this.retryAttempt=0;this.connectUntil=Date.now()+RELAY_CONNECT_MS;this.unackedBytes=0;this.wireCommands=new Map();
   // Defer errors so Network can attach listeners before anything fires.
   queueMicrotask(()=>this.start());
   this.sentTimes=new Map();this.receivedBytes=0;this.sentBytes=0;this.relayLatency=null;this.sentPackets=0;this.receivedPackets=0;this.byteEncoder=new TextEncoder();this.queuedSizes=new WeakMap();this.queuedWork=new WeakMap();this.snapshotWork=new WeakMap();
  }
  get bufferedAmount(){return (this.socket?.bufferedAmount||0)+this.queueBytes;}
- sendRaw(ws,raw){if(ws?.readyState!==1)return;this.sentBytes+=this.byteEncoder.encode(raw).byteLength;this.sentPackets++;ws.send(raw);}
+ sendRaw(ws,raw){
+  if(ws?.readyState!==1)return false;
+  try{ws.send(raw);this.sentBytes+=this.byteEncoder.encode(raw).byteLength;this.sentPackets++;return true;}
+  catch{try{ws.close();}catch{}return false;}
+ }
+ commandBlocked(){return this.rotating||this.socket?.readyState!==1||this.socket.bufferedAmount>65536||this.unacked.size>=32||(this.unackedBytes||0)>524288;}
+ scheduleFlush(){if(!this.destroyed&&!this.flushTimer&&(this.queue.length||this.deferredControls?.length))this.flushTimer=setTimeout(()=>{this.flushTimer=null;this.flush();},20);}
+ retry(initial=false){
+  const now=Date.now();this.rotating=true;this.reconnecting=!initial;
+  if(!initial&&!this.reconnectUntil)this.reconnectUntil=now+RELAY_RECONNECT_MS;
+  const until=initial?this.connectUntil:this.reconnectUntil;
+  if(now>=until)return false;
+  if(!this.reconnectDeadline)this.reconnectDeadline=setTimeout(()=>this.failConnection(),until-now);
+  const delay=Math.min(until-now,relayRetryDelay(this.retryAttempt++));this.retryAt=now+delay;
+  this.emit(initial?'connecting':'reconnecting');clearTimeout(this.reconnectTimer);this.reconnectTimer=setTimeout(()=>this.start(),delay);return true;
+ }
+ failConnection(){
+  if(this.destroyed)return;this.disconnected=true;this.emit('error',{type:'socket-closed'});
+  for(const conn of [...this.connections.values()])conn.finish();this.emit('disconnected');this.destroy();
+ }
  start(){
   if(this.destroyed||this.socket&&this.socket.readyState<2)return;
   this.rotating=true;this.resumeConfirmed=false;
   try{this.socket=new WebSocket(relayURL(),globalThis.window?.RAVEL_OWNER_SESSION?['ravelfront',`owner.${window.RAVEL_OWNER_SESSION}`]:[]);}catch{this.emit('error',{type:'socket-error'});return;}
   const ws=this.socket;this.transportHeartbeat=new HostHeartbeat(Date.now(),{silence:18000,grace:0});
-  ws.addEventListener('open',()=>this.sendRaw(ws,JSON.stringify({type:'register',...this.registration,progressToken:progressToken(),...(this.id?{id:this.id}:{}),...this.resume,...(this.protocol===2?{cursor:this.cursor}:{})})));
+  ws.addEventListener('open',()=>{if(ws!==this.socket||this.destroyed)return;this.sendRaw(ws,JSON.stringify({type:'register',...this.registration,progressToken:progressToken(),...(this.id?{id:this.id}:{}),...this.resume,...(this.protocol===2?{cursor:this.cursor}:{})}));});
   ws.addEventListener('message',event=>{
    if(ws!==this.socket)return;this.transportHeartbeat.contact(Date.now());this.receivedBytes+=this.byteEncoder.encode(event.data).byteLength;this.receivedPackets++;let data;try{data=JSON.parse(event.data);}catch{return this.destroy();}
    for(const m of Array.isArray(data)?data:[data]){
@@ -45,63 +64,60 @@ export class RelayPeer extends Events {
     }else this.message(m);
    }
   });
-  ws.addEventListener('error',()=>{if(!this.destroyed&&ws===this.socket&&this.protocol!==2)this.emit('error',{type:'socket-error'});});
+  // Browsers deliver close after error. Retry there once, with the close reason.
+  ws.addEventListener('error',()=>{});
   ws.addEventListener('close',event=>{
    if(this.destroyed||ws!==this.socket)return;
    const reasons=['Server stopping','Server restarting','Connection too slow','Rate limit','Command sequence','Invalid relay message','Expired resume','Register first','Public host stopped advancing','Public host transferred','Reconnect grace expired','Invalid public host state','Invalid frame'];
    this.emit('transport-close',{code:Number.isInteger(event.code)?event.code:0,reason:reasons.includes(event.reason)?event.reason:'unspecified'});
-   if(this.protocol===2&&this.resume&&!['Expired resume','Command sequence','Invalid frame','Invalid relay message'].includes(event.reason)){
-    this.reconnecting=true;this.rotating=true;
-    if(!this.reconnectUntil){
-     this.reconnectUntil=Date.now()+RELAY_RECONNECT_MS;
-     this.reconnectDeadline=setTimeout(()=>{if(!this.reconnecting||this.destroyed)return;this.emit('error',{type:'socket-closed'});this.emit('disconnected');this.destroy();},RELAY_RECONNECT_MS);
-    }
-    if(Date.now()<this.reconnectUntil){this.emit('reconnecting');clearTimeout(this.reconnectTimer);this.reconnectTimer=setTimeout(()=>this.start(),400);return;}
-   }
-   this.disconnected=true;this.emit('error',{type:'socket-closed'});
-   for(const conn of [...this.connections.values()])conn.finish();
-   this.emit('disconnected');this.destroy();
+   clearInterval(this.heartbeat);
+   const fatal=event.code===1008||['Expired resume','Command sequence','Invalid frame','Invalid relay message'].includes(event.reason);
+   if(!fatal&&((this.protocol===2&&this.resume)||!this.openedOnce)&&this.retry(!this.openedOnce))return;
+   this.failConnection();
   });
   clearInterval(this.heartbeat);this.heartbeat=setInterval(()=>{if(this.transportHeartbeat.expired(Date.now()))ws.close();else this.control({type:'heartbeat'});},3000);
  }
- control(message){
-  if(this.protocol===2&&['heartbeat','ack'].includes(message.type)){
-   if(this.socket?.readyState===1)this.sendRaw(this.socket,JSON.stringify(message));return;
-  }
-  if(this.destroyed)return;
-  if(this.rotating&&!['register','rotate'].includes(message.type)){
-   if(message.type==='heartbeat')return;
+ control(message,draining=false){
+  if(this.destroyed)return false;
+  if(this.protocol===2&&['heartbeat','ack'].includes(message.type))return this.sendRaw(this.socket,JSON.stringify(message));
+  if((this.commandBlocked()||!draining&&this.deferredControls?.length)&&!['register','rotate'].includes(message.type)){
+   if(message.type==='heartbeat')return false;
+   this.deferredControls??=[];
    if(message.type==='publish')this.deferredControls=this.deferredControls.filter(m=>m.type!=='publish');
-   if(this.deferredControls.length>=128){this.emit('error',{type:'server-error'});this.emit('disconnected');this.destroy();return;}
-   this.deferredControls.push(message);return;
+   if(this.deferredControls.length>=128){this.failConnection();return false;}
+   this.deferredControls.push(message);this.scheduleFlush();return true;
   }
-  if(this.socket?.readyState===1){
-   if(this.protocol===2){message={...message,seq:++this.commandSeq};this.unacked.set(message.seq,message);this.sentTimes.set(message.seq,performance.now());}
-   const raw=JSON.stringify(message);this.sendRaw(this.socket,raw);
-  }
+  if(this.socket?.readyState!==1)return false;
+  if(this.protocol===2){message={...message,seq:++this.commandSeq};this.unacked.set(message.seq,message);this.sentTimes.set(message.seq,performance.now());}
+  const raw=JSON.stringify(message);
+  if(this.protocol===2){this.wireCommands??=new Map();const bytes=this.byteEncoder.encode(raw).byteLength;this.wireCommands.set(message.seq,{raw,bytes});this.unackedBytes=(this.unackedBytes||0)+bytes;}
+  return this.sendRaw(this.socket,raw);
+ }
+ drainControls(){
+  while(this.deferredControls?.length&&!this.commandBlocked())this.control(this.deferredControls.shift(),true);
  }
  acknowledge(){if(!this.ackTimer)this.ackTimer=setTimeout(()=>{this.ackTimer=null;this.control({type:'ack',seq:this.cursor});},16);}
  finishRecovery(){
   if(!this.reconnecting||!this.resumeConfirmed||[...this.unacked.keys()].some(seq=>seq<=this.recoverySeq))return;
-  this.reconnecting=false;this.reconnectUntil=null;clearTimeout(this.reconnectDeadline);this.emit('reconnected');
+  this.reconnecting=false;this.reconnectUntil=null;clearTimeout(this.reconnectDeadline);this.reconnectDeadline=null;this.emit('reconnected');
  }
  message(m){
   if(!m||typeof m!=='object')return;
   if(m.type==='deployment'){this.emit('deployment',m.deployment);return;}
-  if(m.type==='authority-frame'){this.authorityDecoder??=new SnapshotDecoder();const message=this.authorityDecoder.decode(m.frame);if(message)this.emit('authority-state',message.state);return;}
+  if(m.type==='authority-frame'){this.authorityDecoder??=new SnapshotDecoder();const message=this.authorityDecoder.decode(m.frame);if(message){this.authorityReset=false;this.emit('authority-state',message.state);}else if(!this.authorityReset){this.authorityReset=true;this.control({type:'authority-command',command:{type:'snapshot-reset'}});}return;}
   if(['authority-ready','authority-owner','authority-notice','authority-error'].includes(m.type)){this.emit(m.type,m);return;}
   if(['reward','afk','afk-enforce'].includes(m.type)){this.emit(m.type,m);return;}
-  if(m.type==='command-ack'){const sent=this.sentTimes.get(m.seq);if(sent!==undefined)this.relayLatency=performance.now()-sent;for(const seq of this.unacked.keys())if(seq<=m.seq){this.unacked.delete(seq);this.sentTimes.delete(seq);}this.finishRecovery();return;}
+  if(m.type==='command-ack'){const sent=this.sentTimes.get(m.seq);if(sent!==undefined)this.relayLatency=performance.now()-sent;for(const seq of this.unacked.keys())if(seq<=m.seq){this.unacked.delete(seq);this.sentTimes.delete(seq);this.unackedBytes=Math.max(0,(this.unackedBytes||0)-(this.wireCommands?.get(seq)?.bytes||0));this.wireCommands?.delete(seq);}this.drainControls();this.finishRecovery();this.flush();return;}
   if(m.type==='alive'){this.resumeConfirmed=true;this.finishRecovery();return;}
   if(m.type==='rotate-request'){this.flush();this.rotating=true;this.control({type:'rotate'});return;}
   if(m.type==='rotated'){this.resume={resume:m.resume,cursor:m.cursor,parts:m.parts};this.start();return;}
   if(m.type==='ready'){
-   this.id=m.id;this.rotating=false;
+   this.id=m.id;this.rotating=false;this.openedOnce=true;this.retryAttempt=0;this.retryAt=null;if(!m.resumed){clearTimeout(this.reconnectDeadline);this.reconnectDeadline=null;}
    if(m.protocol===2){
     this.protocol=2;this.resume={resume:m.resume};
-    for(const message of this.unacked.values())this.sendRaw(this.socket,JSON.stringify(message));
+    for(const message of this.unacked.values())this.sendRaw(this.socket,this.wireCommands?.get(message.seq)?.raw||JSON.stringify(message));
    }
-   const deferred=this.deferredControls;this.deferredControls=[];for(const message of deferred)this.control(message);
+   this.drainControls();
    if(m.resumed){this.flush();this.recoverySeq=this.commandSeq;this.control({type:'heartbeat'});}else this.emit('open',this.id);return;}
   if(m.type==='rooms'){const waiter=this.waiters.get(m.request);if(waiter){this.waiters.delete(m.request);waiter.resolve(m.rooms);}return;}
   if(m.type==='error'){
@@ -120,7 +136,7 @@ export class RelayPeer extends Events {
   if(m.type==='opened')conn.opened();
   else if(m.type==='data'&&!conn.closed){
    if(['hello','welcome'].includes(m.data?.type)&&m.data.relayCodec===1)conn.compact=true;
-   if(m.data?.type==='snapshot-reset'){conn.encoder?.reset();return;}
+   if(m.data?.type==='snapshot-reset'){conn.encoder?.reset();conn.royaleVersion=null;conn.buildVersion=null;return;}
    let data=m.data;
    if(data?.type==='snapshot-v1'){
     conn.decoder??=new SnapshotDecoder();data=conn.decoder.decode(data.frame);
@@ -163,9 +179,10 @@ export class RelayPeer extends Events {
  discardChannel(channel){this.queue=this.queue.filter(m=>{if(m.channel!==channel)return true;this.queueBytes-=this.queuedSizes.get(m);return false;});const conn=this.connections.get(channel);if(conn)conn.queuedBytes=0;}
  flush(){
   if(this.destroyed)return;
-  if(this.rotating||this.socket?.readyState!==1||this.socket.bufferedAmount>65536||this.unacked.size>32){
-   clearTimeout(this.flushTimer);this.flushTimer=setTimeout(()=>this.flush(),20);return;
-  }clearTimeout(this.flushTimer);this.flushTimer=null;if(!this.queue.length)return;const messages=this.queue.splice(0,64);this.queueBytes=0;for(const conn of this.connections.values())conn.queuedBytes=0;for(const m of this.queue){const bytes=this.queuedSizes.get(m);this.queueBytes+=bytes;const conn=this.connections.get(m.channel);if(conn)conn.queuedBytes+=bytes;}if(this.queue.length)this.flushTimer=setTimeout(()=>this.flush(),10);
+  clearTimeout(this.flushTimer);this.flushTimer=null;this.drainControls();
+  if(!this.queue.length){this.scheduleFlush();return;}
+  if(this.commandBlocked()||this.deferredControls?.length){this.scheduleFlush();return;}
+  const messages=this.queue.splice(0,64);this.queueBytes=0;for(const conn of this.connections.values())conn.queuedBytes=0;for(const m of this.queue){const bytes=this.queuedSizes.get(m);this.queueBytes+=bytes;const conn=this.connections.get(m.channel);if(conn)conn.queuedBytes+=bytes;}if(this.queue.length)this.flushTimer=setTimeout(()=>this.flush(),10);
   for(const m of messages){const conn=this.connections.get(m.channel);if(conn?.compact&&m.data?.type==='state'){conn.encoder??=new SnapshotEncoder();m.data=conn.encoder.encode(m.data,this.queuedWork.get(m)?.batch);}}
   // The server limit is per WebSocket message in UTF-8 bytes, not per entry.
   // Split only between entries so delta baselines and action ordering survive.
@@ -186,6 +203,6 @@ export class RelayPeer extends Events {
   if(this.protocol===2&&this.socket?.readyState===1)this.sendRaw(this.socket,JSON.stringify({type:'bye'}));
   for(const waiter of this.waiters.values())waiter.reject();this.waiters.clear();
   for(const conn of [...this.connections.values()])conn.finish();
-  this.socket?.close();
+  this.queue=[];this.queueBytes=0;this.deferredControls=[];this.unacked.clear();this.wireCommands?.clear();this.unackedBytes=0;this.sentTimes.clear();this.socket?.close();
  }
 }

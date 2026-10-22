@@ -1,3 +1,4 @@
+import {FramePacer} from './frame-pacing.js';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {TransformControls} from 'three/addons/controls/TransformControls.js';
@@ -24,7 +25,7 @@ const editorHelp='WASD: move · Q/E: down/up · Shift: faster · Right drag: loo
 const autosaveKey=id=>'ravelfront-map-draft-v1:'+id;
 
 export class MapEditor{
- constructor({owner,overview,onClose}){this.owner=owner;this.overview=overview;this.onClose=onClose;this.assets=overview.assets||[];this.selected=null;this.placing=null;this.tab='catalog';this.search='';this.mode='select';this.space='world';this.cameraSpeed=35;this.explorerSearch='';this.collapsed=new Set();this.snap=1;this.rotationSnap=15;this.gridVisible=true;this.locked=new Set();this.keys=new Set();this.closed=false;this.busy=false;this.listeners=[];this.buildGeneration=0;this.tickAt=performance.now();}
+ constructor({owner,overview,onClose}){this.owner=owner;this.overview=overview;this.onClose=onClose;this.assets=overview.assets||[];this.selected=null;this.placing=null;this.tab='catalog';this.search='';this.mode='select';this.space='world';this.cameraSpeed=35;this.explorerSearch='';this.collapsed=new Set();this.snap=1;this.rotationSnap=15;this.gridVisible=true;this.locked=new Set();this.keys=new Set();this.closed=false;this.busy=false;this.listeners=[];this.buildGeneration=0;this.framePacer=new FramePacer();this.tickAt=performance.now();}
  get selected(){return [...(this.selection||[])].at(-1)||null;}
  set selected(id){this.selection=new Set(id?[id]:[]);}
  selectedRecords(){return [...this.selection].map(id=>this.doc.record(id)).filter(r=>r&&!r.removed);}
@@ -36,7 +37,7 @@ export class MapEditor{
   this.renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));this.renderer.outputColorSpace=THREE.SRGBColorSpace;
   this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(55,1,.08,1600);this.scene.add(new THREE.HemisphereLight(0xebfaff,0x536450,2.5));const sun=new THREE.DirectionalLight(0xfff0d9,2.2);sun.position.set(-80,180,65);this.scene.add(sun);
   this.world=new THREE.Group();this.scene.add(this.world);this.markerRoot=new THREE.Group();this.scene.add(this.markerRoot);
-  this.controls=new OrbitControls(this.camera,this.canvas);this.controls.enableDamping=true;this.controls.dampingFactor=.12;this.controls.maxDistance=850;this.controls.minDistance=1;this.controls.maxPolarAngle=Math.PI-.01;this.controls.mouseButtons={LEFT:null,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
+  this.controls=new OrbitControls(this.camera,this.canvas);this.controls.addEventListener('change',()=>{this.cameraChangedAt=performance.now();});this.controls.enableDamping=true;this.controls.dampingFactor=.12;this.controls.maxDistance=850;this.controls.minDistance=1;this.controls.maxPolarAngle=Math.PI-.01;this.controls.mouseButtons={LEFT:null,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
   this.transform=new TransformControls(this.camera,this.canvas);this.transform.setSize(.9);this.scene.add(this.transform.getHelper());
   this.transform.addEventListener('dragging-changed',e=>{this.controls.enabled=!e.value;this.dragging=e.value;if(e.value){this.dragRecords=this.selectedRecords().map(clone);this.dragOrigin=this.selectedGroups.length>1?this.transform.object.position.toArray():null;this.applySnapping();}else if(this.dragRecords){this.commitMany(this.readTransforms());this.dragRecords=null;void this.rebuild();}});
   this.transform.addEventListener('objectChange',()=>{if(this.dragRecords&&this.selectedGroups.length>1)this.previewRecords(this.readTransforms());this.updateTransformFields();});
@@ -56,7 +57,7 @@ export class MapEditor{
   this.listen(document,'pointerlockchange',()=>{if(this.walking&&document.pointerLockElement!==this.canvas)this.endWalk();});
   this.listen(this.canvas,'click',()=>{if(this.walking&&document.pointerLockElement!==this.canvas)void this.canvas.requestPointerLock()?.catch(()=>{});});
   this.listen(window,'beforeunload',e=>{if(this.doc?.dirty){e.preventDefault();e.returnValue='';}});
-  this.resize();this.frame=now=>{if(this.closed)return;const dt=Math.min(.05,(now-this.tickAt)/1000);this.tickAt=now;if(this.walking)this.walk(dt);else {this.moveCamera(dt);if(!this.looking)this.controls.update();}this.world.userData.details?.update({x:this.controls.target.x,y:this.controls.target.y,z:this.controls.target.z},{quality:'low',time:now/1000});this.renderer.render(this.scene,this.camera);this.raf=requestAnimationFrame(this.frame);};this.raf=requestAnimationFrame(this.frame);
+  this.resize();this.frame=now=>{if(this.closed)return;const dt=Math.min(.05,(now-this.tickAt)/1000);this.tickAt=now;if(this.walking)this.walk(dt);else {this.moveCamera(dt);if(!this.looking)this.controls.update();}if(!document.hidden&&this.framePacer.shouldRender(now,this.walking||this.looking||this.keys.size||now-(this.cameraChangedAt??-Infinity)<180?60:30)){this.world.userData.details?.update({x:this.controls.target.x,y:this.controls.target.y,z:this.controls.target.z},{quality:'low',time:now/1000});this.renderer.render(this.scene,this.camera);}this.raf=requestAnimationFrame(this.frame);};this.raf=requestAnimationFrame(this.frame);
   await this.loadMap('sunnybreak');this.root.focus();return this;
  }
  $(s){return this.root.querySelector(s);}
