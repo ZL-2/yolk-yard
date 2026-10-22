@@ -78,6 +78,9 @@ tools, composed for Ravel Front. Gameplay geometry, material patterns and
 world dressing: original procedural game work. Stormspike and Kestrel
 announcement cutouts render the exact gameplay models; only the scenic
 background is generated illustration. See scripts/render-update-199.mjs.
+Royale Prestige: Tempest Talon, Rift Reaver, Solar Dominion and Apex Sovereign
+are original procedural game models. Reward and Locker previews render the
+exact gameplay meshes. No external model, texture or audio assets were added.
 Fortnite / Epic Games is a gameplay and visual reference, including the
 classic five-seat Choppa behavior. Kestrel flight constants are independent
 tuning; audio is original, and exact proprietary parity is not asserted.

@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      royale_prestige_update: ${{ steps.scope.outputs.royale_prestige_update }}
       combat_performance_update: ${{ steps.scope.outputs.combat_performance_update }}
       water_lean_update: ${{ steps.scope.outputs.water_lean_update }}
       vehicle_field_fix: ${{ steps.scope.outputs.vehicle_field_fix }}
@@ -333,6 +334,15 @@ jobs:
             out.write('combat_performance_update='+str(combat_performance_update).lower()+'\n')
             if combat_performance_update: out.write('focused=true\n')
           print('Human combat performance:',combat_performance_update)
+          update205_files=set(subprocess.check_output(['git','diff','--name-only','8c922121730c904ef7f128c1291a81b46c3feaa4','HEAD'],text=True).splitlines())
+          update205_allowed=['.github/workflows/pages.yml', 'docs/UPDATE_205.md', 'package-lock.json', 'package.json', 'public/CREDITS.txt', 'scripts/royale-prestige-browser-check.mjs', 'server/realtime/authority.js', 'server/realtime/leaderboards.js', 'server/realtime/parties.js', 'server/realtime/progression.js', 'server/realtime/relay.js', 'server/realtime/royale-rank-rewards.js', 'src/credits.js', 'src/data.js', 'src/egg-shop.js', 'src/egg-wallet.js', 'src/leaderboard-ui.js', 'src/main.js', 'src/network.js', 'src/party-client.js', 'src/relay-peer.js', 'src/releases.js', 'src/royale-pickaxe-models.js', 'src/royale-ranking.css', 'src/royale-ranking.js', 'src/royale-rewards-ui.js', 'src/shop-catalog.js', 'src/shop-front.js', 'src/shop-models.js', 'src/simulation.js', 'src/view.js', 'tests/egg-shop.test.js', 'tests/royale-prestige.test.js', 'tests/shop-overhaul.test.js']
+          update205_required={'src/royale-ranking.js','server/realtime/royale-rank-rewards.js','src/royale-rewards-ui.js','src/royale-pickaxe-models.js','tests/royale-prestige.test.js','scripts/royale-prestige-browser-check.mjs'}
+          royale_prestige_update=update205_required<=update205_files<=set(update205_allowed) and json.loads(Path('package.json').read_text()).get('version')=='6.17.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('royale_prestige_update='+str(royale_prestige_update).lower()+'\n')
+            if royale_prestige_update: out.write('focused=true\n')
+          print('Royale ranking and exclusive pickaxes:',royale_prestige_update)
+
 
           PY
   build:
@@ -518,6 +528,9 @@ jobs:
           name: match-flow-performance
           path: test-results/match194/performance.json
           retention-days: 14
+      - name: Royale scoring, conditional rewards, loadouts and social transport
+        if: needs.scope.outputs.royale_prestige_update == 'true'
+        run: node --test --test-concurrency=2 tests/royale-prestige.test.js tests/leaderboards.test.js tests/egg-shop.test.js tests/shop-overhaul.test.js tests/private-social.test.js tests/server-authority.test.js tests/social-persistence.test.js tests/release-history.test.js
       - name: Combat poses, recipient state, encoding budgets, GPU ranges and recovery
         if: needs.scope.outputs.combat_performance_update == 'true'
         run: |
@@ -625,14 +638,23 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true'
+        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true'
       - name: Install the headless desktop runtime with a missing-library fallback
-        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true'
+        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           # Ubuntu runners already carry the Chromium libraries. Avoid a full
           # font/system upgrade on slow mirrors; install dependencies if needed.
           node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium
+      - name: Four earned rewards, claiming, equipping, two-session rank changes and the Locker
+        if: needs.scope.outputs.royale_prestige_update == 'true'
+        run: node scripts/royale-prestige-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.royale_prestige_update == 'true'
+        with:
+          name: royale-prestige-desktop-evidence
+          path: test-results/update-205
+          retention-days: 14
       - name: Dense combat rendering, distant effects, scoped visibility and pooled muzzle
         if: needs.scope.outputs.combat_performance_update == 'true'
         run: node scripts/update-204-browser-check.mjs
@@ -1078,9 +1100,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true'
+        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true'
       - name: Install the focused headless desktop runtime
-        if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true'
+        if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium

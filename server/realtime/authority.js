@@ -50,7 +50,7 @@ export class MatchAuthority{
    const reject=reason=>this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason}});
    if(!modeAvailable(room.sim.options.mode))return reject(PAUSED_MODES[room.sim.options.mode]),true;
    if(m.version!==VERSION||room.kicked.has(peer.progressId))return reject('Refresh the game or choose another room.'),true;
-   const profile=safeProfile(m.profile);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
+   const profile=this.relay.progression.rankRewards.sanitizePeer(safeProfile(m.profile),peer);if([...room.sim.players.values()].some(p=>!p.bot&&p.id!==peer.id&&nameKey(p.name)===nameKey(profile.name))){this.send(peer,{type:'data',channel:entry.channel,data:{type:'name-required',joining:true}});return true;}
    const admission=m.ticket?this.relay.parties.claim(m.ticket,peer.id,room.key):null;if(m.ticket&&!admission||(room.recurring||room.zombies)&&!admission)return reject('Party reservation expired. Join the match from Play.'),true;
    if(room.zombies&&!room.sim.players.has(peer.id)&&!admission?.spectator&&!room.sim.acceptsJoining())return reject('This deployment is closed to new operators.'),true;
    room.sim.advanceWarmupClock?.();
@@ -83,7 +83,7 @@ export class MatchAuthority{
   }
   if(m.type==='input'){sim.setInput(id,m.input,true);if(!peer.controlReady&&sim.inputs.has(id)){peer.controlReady=true;sim.players.get(id).loading=false;this.connection(peer,true);}this.relay.progression.input(peer,m.input);return;}
   if(m.type==='player-action'&&typeof m.action==='string'&&m.action.length<350){sim.playerAction(id,m.action);return;}
-  if(m.type==='profile'){const ok=sim.setProfile(id,safeProfile(m.profile));this.send(peer,{type:'authority-notice',event:ok===false?'name-required':'name-accepted'});return;}
+  if(m.type==='profile'){const ok=sim.setProfile(id,this.relay.progression.rankRewards.sanitizePeer(safeProfile(m.profile),peer));this.send(peer,{type:'authority-notice',event:ok===false?'name-required':'name-accepted'});return;}
   if(m.type==='chat-send'){const result=room.chat.submit(id,m,sim.snapshot());if(!result.ok)this.send(peer,{type:'authority-notice',event:'chat-status',data:result});else for(const recipient of result.recipients){const target=room.members.get(recipient);if(target)this.send(target,{type:'authority-notice',event:'chat-message',data:result.message});}return;}
   if(m.type==='chat-report'){const report=room.chat.report(id,m.target,m.reason,sim.snapshot());if(report)this.send(room.members.get(room.owner),{type:'authority-notice',event:'chat-report',data:report});return;}
   if(room.zombies&&m.type==='configure')return;

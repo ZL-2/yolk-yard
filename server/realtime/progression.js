@@ -1,3 +1,4 @@
+import {RoyaleRankRewards} from './royale-rank-rewards.js';
 import {rankingMode} from '../../src/ranking-modes.js';
 import {progressionDataPath} from './data-path.js';
 import {createHash,randomUUID} from 'node:crypto';
@@ -10,21 +11,21 @@ import {modeTotals,publicTotals,rankPublicPlayers,publicLeaderboardView} from '.
 const warmup=new Set(['waiting','spawn-island','starting']);
 const bounded=(v,max=1e7)=>Number.isFinite(v)?Math.min(max,Math.max(-max,v)):0;
 export class ProgressionService{
- constructor(relay,{clock=()=>Date.now()/1000,path=progressionDataPath()}={}){this.relay=relay;this.clock=clock;this.path=path;this.matches=new Map();this.inputTargets=new Map();this.accounts=new Map();this.ready=this.load();this.dirty=false;this.saveChain=Promise.resolve();}
- async load(){if(!this.path)return;try{for(const [id,a]of JSON.parse(await readFile(this.path,'utf8'))){publicTotals(a);this.accounts.set(id,a);}}catch{}}
+ constructor(relay,{clock=()=>Date.now()/1000,path=progressionDataPath()}={}){this.relay=relay;this.clock=clock;this.path=path;this.matches=new Map();this.inputTargets=new Map();this.accounts=new Map();this.ready=this.load();this.dirty=false;this.saveChain=Promise.resolve();this.rankRewards=new RoyaleRankRewards(this);}
+ async load(){if(!this.path)return;try{for(const [id,a]of JSON.parse(await readFile(this.path,'utf8'))){publicTotals(a);this.accounts.set(id,a);}}catch{}this.rankRewards?.invalidate();}
  identity(token){return typeof token==='string'&&/^[a-f0-9]{32,64}$/.test(token)?createHash('sha256').update(token).digest('hex'):null;}
  async register(peer,token){peer.progressId=this.identity(token)||randomUUID();await this.ready;const account=this.account(peer.progressId);try{this.relay.owner?.assertPlayer(account.socialId);}catch{this.relay.remove(peer,1008,'Owner restricted this identity');return;}for(const receipt of account.receipts.slice(-30))this.relay.send(peer,{type:'reward',receipt});}
  account(id){if(!this.accounts.has(id))this.accounts.set(id,{receipts:[],pairs:[],earned:[],encounters:[]});return this.accounts.get(id);}
- bindPublicPlayer(peer,socialId,{participant=false,mode='royale'}={}){const identity=this.relay.parties?.store.identities.get(socialId);if(!identity||!peer.progressId)return;const a=this.account(peer.progressId);if(a.socialId===socialId&&a.publicName===identity.profile.name&&(!participant||(mode==='royale'?a.publicParticipant:a.modeParticipants?.[mode])))return;a.socialId=socialId;a.publicName=identity.profile.name;if(participant){if(mode==='royale')a.publicParticipant=true;a.modeParticipants??={};a.modeParticipants[mode]=true;}this.dirty=true;this.leaderboardCache=null;}
+ bindPublicPlayer(peer,socialId,{participant=false,mode='royale'}={}){const identity=this.relay.parties?.store.identities.get(socialId);if(!identity||!peer.progressId)return;const a=this.account(peer.progressId);if(a.socialId===socialId&&a.publicName===identity.profile.name&&(!participant||(mode==='royale'?a.publicParticipant:a.modeParticipants?.[mode])))return;a.socialId=socialId;a.publicName=identity.profile.name;if(participant){if(mode==='royale')a.publicParticipant=true;a.modeParticipants??={};a.modeParticipants[mode]=true;}this.dirty=true;this.leaderboardCache=null;this.rankRewards?.invalidate();}
  restoreLeaderboardViewer(token,socialId){const progressId=this.identity(token);if(progressId&&this.accounts.has(progressId))this.bindPublicPlayer({progressId},socialId);}
- recordPublicStat(p,metric){if(p.bot)return;const a=this.account(p.identity),totals=publicTotals(a);totals[metric]++;this.dirty=true;this.leaderboardCache=null;}
+ recordPublicStat(p,metric){if(p.bot)return;const a=this.account(p.identity),totals=publicTotals(a);totals[metric]++;this.dirty=true;this.leaderboardCache=null;this.rankRewards?.invalidate();}
  recordPublicRound(p,m,won=false){
   if(p.bot||!p.identity||p.afkRemoved||p.raw?.lateSpectator||p.raw?.contestant===false)return;
   const a=this.account(p.identity),totals=modeTotals(a,m.mode),id=m.key.slice(m.room.length+1);a.publicRounds??=[];
   let round=a.publicRounds.find(r=>r.id===id&&(r.mode||'royale')===(m.mode||'royale'));if(!round){round={id,mode:m.mode||'royale',kills:0,wins:0};a.publicRounds.push(round);a.publicRounds=a.publicRounds.slice(-128);}
   const kills=Math.min(m.mode==='royale'?MAX_CONTESTANTS-1:10000,Math.max(0,Number.isInteger(p.raw?.kills)?p.raw.kills:p.kills||0)),wins=Number(won),deltaKills=Math.max(0,kills-round.kills),deltaWins=Math.max(0,wins-round.wins),first=!(m.mode==='royale'?a.publicParticipant:a.modeParticipants?.[m.mode]);
   if(!deltaKills&&!deltaWins&&!first)return;
-  round.kills+=deltaKills;round.wins+=deltaWins;totals.kills+=deltaKills;totals.wins+=deltaWins;if(m.mode==='royale')a.publicParticipant=true;a.modeParticipants??={};a.modeParticipants[m.mode||'royale']=true;this.dirty=true;this.leaderboardCache=null;
+  round.kills+=deltaKills;round.wins+=deltaWins;totals.kills+=deltaKills;totals.wins+=deltaWins;if(m.mode==='royale')a.publicParticipant=true;a.modeParticipants??={};a.modeParticipants[m.mode||'royale']=true;this.dirty=true;this.leaderboardCache=null;this.rankRewards?.invalidate();
  }
  leaderboards(socialId,options={}){const now=this.clock(),mode=rankingMode(options.mode);if(!this.leaderboardCache||this.leaderboardCache.mode!==mode||now-this.leaderboardCache.time>30)this.leaderboardCache={time:now,mode,ranks:rankPublicPlayers(this.accounts,this.relay.parties?.store.identities,mode)};return {mode,updatedAt:this.leaderboardCache.time,...publicLeaderboardView(this.leaderboardCache.ranks,socialId,options)};}
  unbindInput(peer,key){const targets=this.inputTargets.get(peer);if(!targets)return;targets.delete(key);if(!targets.size)this.inputTargets.delete(peer);}
@@ -100,5 +101,5 @@ export class ProgressionService{
   for(const p of m.players.values()){if(!p.controlled||p.bot||p.afkRemoved||!p.peer?.ws)continue;const remaining=Math.ceil(activityRemaining(p.activity,now));if(remaining<=12)this.relay.send(p.peer,{type:'afk',remaining});if(remaining<=0){p.afkRemoved=true;p.controlled=false;const host=this.relay.peers.get(m.room);if(host)this.relay.send(host,{type:'afk-enforce',player:p.id});}}
  }if(this.dirty){this.dirty=false;void this.save();}}
  save(){if(!this.path)return Promise.resolve();const json=JSON.stringify([...this.accounts]);this.saveChain=this.saveChain.then(async()=>{await mkdir(dirname(this.path),{recursive:true});await writeFile(this.path+'.tmp',json);await rename(this.path+'.tmp',this.path);}).catch(()=>{this.dirty=true;});return this.saveChain;}
- async close(){await this.ready;await this.save();}
+ async close(){this.rankRewards.close();await this.ready;await this.save();}
 }

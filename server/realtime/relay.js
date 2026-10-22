@@ -140,6 +140,7 @@ export class RealtimeRelay {
         if(!entry||!['accept','data','close'].includes(entry.type)||typeof entry.channel!=='string')throw Error('Invalid entry');
         const other=peer.links.get(entry.channel);
         if(!other){this.send(peer,{type:'closed',channel:entry.channel});continue;}
+        if(entry.type==='data'&&['hello','profile'].includes(entry.data?.type)&&entry.data.profile)entry.data={...entry.data,profile:this.progression.rankRewards.sanitizePeer(entry.data.profile,peer)};
         if(entry.type==='data'&&this.authority.data(peer,other,entry))continue;
         if(entry.type==='data'&&entry.data?.type==='input')this.progression.input(peer,entry.data.input||entry.data);
         if(entry.type==='data'&&entry.data?.type==='hello'){

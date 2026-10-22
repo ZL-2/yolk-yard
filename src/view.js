@@ -510,7 +510,7 @@ export class View {
   shopPortrait(item,angle=0){
     this.shopPortraits??=new Map();const key=(item.previewKey||item.id)+':'+angle;if(this.shopPortraits.has(key))return this.shopPortraits.get(key);if(this.shopPortraits.size>140)this.shopPortraits.delete(this.shopPortraits.keys().next().value);
     if(!this.portraitRenderer){this.portraitRenderer=makeRenderer({alpha:true,antialias:true});this.portraitRenderer.setPixelRatio(1);}
-    const resolution=item.characterInspection?600:320;this.portraitRenderer.setSize(resolution,resolution);
+    const resolution=item.characterInspection||item.rankReward?600:320;this.portraitRenderer.setSize(resolution,resolution);
     const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0x768697,3));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(-3,5,-4);scene.add(light);
     let model;
     if(item.starter){const kit={block,ball,cylinder,mat,palette};model=item.slot==='pickaxe'?lootModel({id:'pickaxe',pickaxe:true},kit,{ground:false}):item.slot==='glider'?gliderModel(kit):item.slot==='wrap'?makeBlaster('sprinter'):makeEgg({...item.profile,outfit:''},-1,!!item.characterInspection&&item.showWeapon!==false);}

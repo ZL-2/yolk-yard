@@ -78,7 +78,7 @@ export class Network {
         ],
       },
     });
-    for(const type of ['reward','afk','afk-enforce'])this.peer.on(type,event=>this.callbacks.onProgress?.(type,event));
+    for(const type of ['reward','afk','afk-enforce','rank-cosmetic'])this.peer.on(type,event=>this.callbacks.onProgress?.(type,event));
     this.peer.on('deployment',status=>this.callbacks.onDeployment?.(status));
     this.peer.on('authority-state',s=>{
       if(s?.version!==VERSION||!Array.isArray(s.players))return;this.serverAuthority=true;this.snapshot=s;this.visibility=s.visibility;this.chatEnabled=s.chatEnabled;this.chatMuted=s.chatMuted||[];this.hostId=s.network.hostId;this.members=s.network.members;const wasHost=this.isHost;this.isHost=this.id===this.hostId;this.lastState=performance.now();this.hostHeartbeat.contact(this.lastState);
@@ -613,7 +613,7 @@ export class Network {
     if(this.aliasPeer&&!this.aliasPeer.destroyed)return;
     const config=window.YOLK_NETWORK||{};
     const alias=relayURL()?new RelayPeer(PREFIX+this.code,this.officialPublic?{publicHostProof:{id:this.peer.id,token:this.peer.resume?.resume}}:{}):new Peer(PREFIX+this.code,{debug:0,...config.peer,config:{iceServers:config.iceServers||[{urls:'stun:stun.l.google.com:19302'}]}});this.aliasPeer=alias;
-    alias.on('open',()=>{if(this.closed)return;if(recovering&&this.migrating){this.publicLeaseAuthorized=true;this.promote();}this.publishRoom();});for(const type of ['reward','afk','afk-enforce'])alias.on(type,event=>this.callbacks.onProgress?.(type,event));
+    alias.on('open',()=>{if(this.closed)return;if(recovering&&this.migrating){this.publicLeaseAuthorized=true;this.promote();}this.publishRoom();});for(const type of ['reward','afk','afk-enforce','rank-cosmetic'])alias.on(type,event=>this.callbacks.onProgress?.(type,event));
     alias.on('connection',conn=>this.accept(conn));
     alias.on('transport-close',event=>{this.lastTransportClose=`WebSocket close ${event.code}: ${event.reason}.`;connectionReport.set('service','Interrupted',this.lastTransportClose);});
     const lost=()=>{if(this.aliasPeer!==alias)return;alias.destroy();if(this.closed)return;if(this.officialPublic&&this.isHost){this.isHost=false;this.publicLeaseAuthorized=false;this.callbacks.onError?.('The public host connection ended. Return to the lobby to rejoin the main match.');return;}this.later(()=>this.isHost?this.claimRoomAddress():recovering&&this.recoverPublicHost(),recovering?800:2500);};

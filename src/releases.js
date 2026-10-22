@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'205',title:'Royale Prestige: hold your place',changes:[
+  'Four exclusive original pickaxes follow your live public Royale rank: Top 25 Tempest Talon, Top 10 Rift Reaver, Top 5 Solar Dominion and #1 Apex Sovereign. Rewards stack, so the leader can wield all four. Drop below a cutoff to lose access; climb back to reclaim it.',
+  'Victory Score combines 1,000 points per public Royale win with 100 times the square root of public Royale kills, rounded to whole points. Wins have consistent weight and kills have diminishing returns. A new Royale score column, score tab and in-game explanation show the formula, examples and tiebreaks.',
+  'Earned tools appear together with Claim, Equip and Claim All. The Locker shows every rank reward and current access. Claims persist online; rank changes update connected sessions and remove an ineligible equipped tool. Exact gameplay models are used in reward previews, with two batched draws per tool. Version 6.17.0 / protocol 77.'
+ ]},
  {number:'204',title:'Smoother human firefights',changes:[
   'Human-player lag compensation now reuses compact collision poses across every pellet and sight/muzzle test. Conservative broad-phase rejection skips distant misses while preserving precise anatomical hit regions, cover and damage.',
   'Royale snapshots send exact prediction to their owner and compact display poses to opponents. Shared encoding, short queued encoding tasks and native WebSocket compression reduce combat traffic and host stalls while retaining reliable actions, world recovery and reconnect replay.',
