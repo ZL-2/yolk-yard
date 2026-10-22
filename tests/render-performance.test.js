@@ -23,11 +23,11 @@ test('repeated weapon creation reuses the exact baked geometry for every firearm
 });
 
 test('warmup construction preserves the full island and departure adopts prepared geometry',async()=>{
- const THREE=await import('three'),{View}=await import('../src/view.js');
+ const THREE=await import('three'),{View}=await import('../src/view.js'),{ShaderPreparation}=await import('../src/shader-preparation.js');
  const previous=globalThis.document;
- globalThis.document={createElement:()=>({getContext:()=>({strokeText(){},fillText(){}})})};
+ globalThis.document={createElement:()=>({getContext:()=>Object.fromEntries(['strokeText','fillText','fillRect','beginPath','moveTo','lineTo','stroke','arc','save','translate','rotate','restore'].map(name=>[name,()=>{}]))})};
  try{
-  const make=()=>Object.assign(Object.create(View.prototype),{world:new THREE.Group(),scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),scopeCamera:new THREE.PerspectiveCamera(),pickupMeshes:new Map(),renderer:{compileAsync:async()=>{}}});
+  const make=()=>Object.assign(Object.create(View.prototype),{mapPreparation:new ShaderPreparation(),world:new THREE.Group(),scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),scopeCamera:new THREE.PerspectiveCamera(),pickupMeshes:new Map(),renderer:{compileAsync:async()=>{}}});
   const direct=make();
   const prepared=make();let batches=0;
   while(!prepared.preparedBattle?.done){prepared.prepareBattleMap();assert.ok(++batches<3000);}

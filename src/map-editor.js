@@ -1,3 +1,4 @@
+import {FramePacer} from './frame-pacing.js';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {TransformControls} from 'three/addons/controls/TransformControls.js';
@@ -24,7 +25,7 @@ const editorHelp='WASD: move · Q/E: down/up · Shift: faster · Right drag: loo
 const autosaveKey=id=>'ravelfront-map-draft-v1:'+id;
 
 export class MapEditor{
- constructor({owner,overview,onClose}){this.owner=owner;this.overview=overview;this.onClose=onClose;this.assets=overview.assets||[];this.selected=null;this.placing=null;this.tab='catalog';this.search='';this.mode='select';this.space='world';this.cameraSpeed=35;this.explorerSearch='';this.collapsed=new Set();this.snap=1;this.rotationSnap=15;this.gridVisible=true;this.locked=new Set();this.keys=new Set();this.closed=false;this.busy=false;this.listeners=[];this.buildGeneration=0;this.tickAt=performance.now();}
+ constructor({owner,overview,onClose}){this.owner=owner;this.overview=overview;this.onClose=onClose;this.assets=overview.assets||[];this.selected=null;this.placing=null;this.tab='catalog';this.search='';this.mode='select';this.space='world';this.cameraSpeed=35;this.explorerSearch='';this.collapsed=new Set();this.snap=1;this.rotationSnap=15;this.gridVisible=true;this.locked=new Set();this.keys=new Set();this.closed=false;this.busy=false;this.listeners=[];this.buildGeneration=0;this.framePacer=new FramePacer();this.tickAt=performance.now();}
  get selected(){return [...(this.selection||[])].at(-1)||null;}
  set selected(id){this.selection=new Set(id?[id]:[]);}
  selectedRecords(){return [...this.selection].map(id=>this.doc.record(id)).filter(r=>r&&!r.removed);}
@@ -56,7 +57,7 @@ export class MapEditor{
   this.listen(document,'pointerlockchange',()=>{if(this.walking&&document.pointerLockElement!==this.canvas)this.endWalk();});
   this.listen(this.canvas,'click',()=>{if(this.walking&&document.pointerLockElement!==this.canvas)void this.canvas.requestPointerLock()?.catch(()=>{});});
   this.listen(window,'beforeunload',e=>{if(this.doc?.dirty){e.preventDefault();e.returnValue='';}});
-  this.resize();this.frame=now=>{if(this.closed)return;const dt=Math.min(.05,(now-this.tickAt)/1000);this.tickAt=now;if(this.walking)this.walk(dt);else {this.moveCamera(dt);if(!this.looking)this.controls.update();}this.world.userData.details?.update({x:this.controls.target.x,y:this.controls.target.y,z:this.controls.target.z},{quality:'low',time:now/1000});this.renderer.render(this.scene,this.camera);this.raf=requestAnimationFrame(this.frame);};this.raf=requestAnimationFrame(this.frame);
+  this.resize();this.frame=now=>{if(this.closed)return;const dt=Math.min(.05,(now-this.tickAt)/1000);this.tickAt=now;if(this.walking)this.walk(dt);else {this.moveCamera(dt);if(!this.looking)this.controls.update();}if(!document.hidden&&this.framePacer.shouldRender(now,this.walking||this.looking||this.keys.size?60:30)){this.world.userData.details?.update({x:this.controls.target.x,y:this.controls.target.y,z:this.controls.target.z},{quality:'low',time:now/1000});this.renderer.render(this.scene,this.camera);}this.raf=requestAnimationFrame(this.frame);};this.raf=requestAnimationFrame(this.frame);
   await this.loadMap('sunnybreak');this.root.focus();return this;
  }
  $(s){return this.root.querySelector(s);}

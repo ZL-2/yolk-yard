@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      performance_update: ${{ steps.scope.outputs.performance_update }}
       stormspike_kestrel_update: ${{ steps.scope.outputs.stormspike_kestrel_update }}
       campaign_update: ${{ steps.scope.outputs.campaign_update }}
       zombies_pause_update: ${{ steps.scope.outputs.zombies_pause_update }}
@@ -288,6 +289,14 @@ jobs:
             out.write('stormspike_kestrel_update='+str(stormspike_kestrel_update).lower()+'\n')
             if stormspike_kestrel_update: out.write('focused=true\n')
           print('Stormspike and Kestrel update:',stormspike_kestrel_update)
+          update200_files=set(subprocess.check_output(['git','diff','--name-only','1aa771f933c85bb2bd0817c6966b4ff905c65991','HEAD'],text=True).splitlines())
+          update200_allowed=['.github/workflows/pages.yml', 'docs/UPDATE_200.md', 'package-lock.json', 'package.json', 'scripts/campaign-browser.mjs', 'scripts/update-200-browser-check.mjs', 'scripts/update-200-performance.mjs', 'server/realtime/authority.js', 'src/campaign-layout.js', 'src/campaign.js', 'src/data.js', 'src/experience-200.css', 'src/guest-presentation.js', 'src/main.js', 'src/map-editor.js', 'src/match-connection-ui.js', 'src/network.js', 'src/performance-hud.js', 'src/physics.js', 'src/relay-peer.js', 'src/relay-recovery.js', 'src/releases.js', 'src/remote-poses.js', 'src/render-budget.js', 'src/royale-ui.js', 'src/settings-layout.js', 'src/view.js', 'src/world-markers.js', 'tests/multiplayer-200.test.js', 'tests/performance-hud.test.js', 'tests/render-performance.test.js', 'tests/update-200.test.js']
+          update200_required={'src/render-budget.js','src/relay-peer.js','src/physics.js','tests/update-200.test.js','tests/multiplayer-200.test.js','scripts/update-200-browser-check.mjs','scripts/update-200-performance.mjs'}
+          performance_update=update200_required<=update200_files<=set(update200_allowed) and json.loads(Path('package.json').read_text()).get('version')=='6.14.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('performance_update='+str(performance_update).lower()+'\n')
+            if performance_update: out.write('focused=true\n')
+          print('Performance and multiplayer update:',performance_update)
           PY
   build:
     needs: scope
@@ -472,6 +481,23 @@ jobs:
           name: match-flow-performance
           path: test-results/match194/performance.json
           retention-days: 14
+      - name: Shared performance, collision, recovery, ordering and multiplayer contracts
+        if: needs.scope.outputs.performance_update == 'true'
+        run: |
+          node --test --test-concurrency=2 tests/update-200.test.js tests/multiplayer-200.test.js tests/match-recovery.test.js tests/render-performance.test.js tests/performance-hud.test.js tests/relay-compact.test.js tests/relay-liveness.test.js tests/relay-queue.test.js tests/guest-responsiveness.test.js tests/snapshot-codec.test.js tests/remote-input.test.js tests/campaign.test.js tests/frame-pacing.test.js tests/map-editor.test.js tests/streaming-performance.test.js tests/box-fights-network.test.js tests/zone-wars-network.test.js tests/update-199.test.js tests/release-history.test.js
+          node scripts/update-199-network-check.mjs
+      - name: Compare all active match collision workloads and campaign with Update 199
+        if: needs.scope.outputs.performance_update == 'true'
+        run: |
+          git worktree add --detach ../baseline-200 1aa771f933c85bb2bd0817c6966b4ff905c65991
+          ln -s "$GITHUB_WORKSPACE/node_modules" ../baseline-200/node_modules
+          UPDATE_200_BASELINE=../baseline-200 node scripts/update-200-performance.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.performance_update == 'true'
+        with:
+          name: performance-multiplayer-comparison
+          path: test-results/update-200/performance.json
+          retention-days: 14
       - name: Stormspike, Kestrel, audio, controls, snapshots and weapon contracts
         if: needs.scope.outputs.stormspike_kestrel_update == 'true'
         run: |
@@ -530,6 +556,20 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true'
+      - name: Desktop modes, adaptive rendering, settings and persistent markers
+        if: needs.scope.outputs.performance_update == 'true'
+        run: node scripts/update-200-browser-check.mjs
+      - name: Campaign combat, checkpoint recovery and exit alongside a live multiplayer room
+        if: needs.scope.outputs.performance_update == 'true'
+        run: node scripts/campaign-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.performance_update == 'true'
+        with:
+          name: performance-multiplayer-desktop
+          path: |
+            test-results/update-200
+            test-results/campaign
+          retention-days: 14
       - name: Desktop announcement, settings, flight station, controls and exact weapon model
         if: needs.scope.outputs.stormspike_kestrel_update == 'true'
         run: node scripts/update-199-browser-check.mjs

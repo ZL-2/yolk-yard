@@ -109,23 +109,21 @@ export class Network {
       else if(!this.closed)this.later(()=>{if(this.peer?.disconnected&&!this.peer.destroyed)this.peer.reconnect();},1200);
     });
     return new Promise((resolve, reject) => {
-      this.rejectOpen = reject;
+      let settled=false;
+      const finish=(error,id)=>{if(settled)return;settled=true;clearTimeout(timer);this.timers.delete(timer);this.rejectOpen=null;error?reject(error):resolve(id);};
+      this.rejectOpen = error=>finish(error);
       const timer = setTimeout(
         () => {
           connectionReport.set("service","Failed","Matchmaking timed out after 14 seconds.");
-          reject(
-            new Error(
-            "The room service did not respond. Please try again shortly.",
-            ),
-          );
+          finish(new Error("The room service did not respond. Please try again shortly."));
+          this.peer?.destroy();
         }, 14000,
       );
       this.timers.add(timer);
       this.peer.on("open", (id) => {
-        clearTimeout(timer);
-        this.timers.delete(timer);
+        if(settled)return;
         connectionReport.set("service","Passed","Room service connected.");
-        resolve(id);
+        finish(null,id);
       });
     });
   }

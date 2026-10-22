@@ -84,8 +84,14 @@ export function createFacilityLayout(){
 }
 // Broad phase for movement / grid construction. Immutable walls are indexed once.
 export class CollisionIndex{
- constructor(boxes,size=8){this.boxes=boxes;this.size=size;this.cells=new Map();for(const b of boxes){for(let x=Math.floor((b.x-b.sx/2)/size);x<=Math.floor((b.x+b.sx/2)/size);x++)for(let z=Math.floor((b.z-b.sz/2)/size);z<=Math.floor((b.z+b.sz/2)/size);z++){const key=x+':'+z;if(!this.cells.has(key))this.cells.set(key,[]);this.cells.get(key).push(b);}}}
- near(x,z,r=1){const out=new Set();for(let xx=Math.floor((x-r)/this.size);xx<=Math.floor((x+r)/this.size);xx++)for(let zz=Math.floor((z-r)/this.size);zz<=Math.floor((z+r)/this.size);zz++)for(const b of this.cells.get(xx+':'+zz)||[])out.add(b);return [...out];}
+ constructor(boxes,size=8){this.queries=new Map();this.boxes=boxes;this.size=size;this.cells=new Map();for(const b of boxes){for(let x=Math.floor((b.x-b.sx/2)/size);x<=Math.floor((b.x+b.sx/2)/size);x++)for(let z=Math.floor((b.z-b.sz/2)/size);z<=Math.floor((b.z+b.sz/2)/size);z++){const key=x+':'+z;if(!this.cells.has(key))this.cells.set(key,[]);this.cells.get(key).push(b);}}}
+ // Facility box positions are fixed; active flags are read by the caller.
+ near(x,z,r=1){
+  const x0=Math.floor((x-r)/this.size),x1=Math.floor((x+r)/this.size),z0=Math.floor((z-r)/this.size),z1=Math.floor((z+r)/this.size),key=x0+':'+x1+':'+z0+':'+z1;
+  const cached=this.queries.get(key);if(cached)return cached;
+  const out=new Set();for(let xx=x0;xx<=x1;xx++)for(let zz=z0;zz<=z1;zz++)for(const b of this.cells.get(xx+':'+zz)||[])out.add(b);
+  const result=[...out];if(this.queries.size>=256)this.queries.delete(this.queries.keys().next().value);this.queries.set(key,result);return result;
+ }
 }
 
 export function moveFacilityBody(world,body,dx,dz,radius=.3,height=1.7){

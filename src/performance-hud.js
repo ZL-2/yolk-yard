@@ -1,8 +1,8 @@
-export const PERFORMANCE_DEFAULTS={showFps:true,netDebugStats:true,connectionWarnings:true};
+export const PERFORMANCE_DEFAULTS={showFps:true,netDebugStats:false,connectionWarnings:true};
 // Connection health, not a measurement of Wi-Fi signal strength or TCP packet loss.
 export function connectionHealth(net,now){
  if(!net)return 'healthy';
- const peer=net.peer,age=net.lastState?Math.max(0,now-net.lastState):0;
+ const peer=net.peer,age=!net.isHost&&net.lastState?Math.max(0,now-net.lastState):0;
  const rtt=net.serverAuthority?peer?.relayLatency:net.latency;
  if(net.closed||peer?.destroyed||peer?.disconnected||peer?.reconnecting||net.migrating||age>1500||rtt>500)return 'critical';
  if(age>250||rtt>150||(peer?.bufferedAmount||0)>65536)return 'degraded';

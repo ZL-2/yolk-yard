@@ -1,0 +1,39 @@
+/* Desktop workspace and HUD refinement. Existing compact layouts keep their rules. */
+@media (min-width: 1000px) {
+ #dialog[data-kind="settings"] { width:min(1320px,94vw);height:min(880px,91dvh);padding:26px 28px;border:1px solid #526e7c;background:linear-gradient(135deg,#172635,#101e2b);box-shadow:0 24px 90px #0008; }
+ #dialog[data-kind="settings"] .dialog-body { display:grid;grid-template-columns:158px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;column-gap:24px; }
+ #dialog[data-kind="settings"] .settings-tabs { grid-row:1;display:flex;flex-direction:column;gap:5px;overflow-y:auto;overflow-x:hidden;padding:12px 16px 12px 0;border-bottom:0;border-right:1px solid #55717d55; }
+ #dialog[data-kind="settings"] .settings-tabs button { flex:none;min-width:0;min-height:46px;width:100%;justify-content:flex-start;gap:12px;padding:11px 12px;font-size:12px;border:1px solid transparent;border-radius:6px;background:transparent;color:#b5cbd6;box-shadow:none; }
+ #dialog[data-kind="settings"] .settings-tabs button span { width:20px;text-align:center;font-size:18px; }
+ #dialog[data-kind="settings"] .settings-tabs button:hover { color:#fff;background:#294451; }
+ #dialog[data-kind="settings"] .settings-tabs button[aria-selected="true"] { color:#112733;background:#f1d17e;border-color:#ffe4a4;font-weight:800; }
+ #dialog[data-kind="settings"] .settings-workspace { grid-column:2;grid-row:1;grid-template-columns:minmax(0,1fr) minmax(180px,24%);gap:22px;padding:14px 0 18px; }
+ #dialog[data-kind="settings"] .settings-category-heading { background:transparent;padding:0 0 16px;border-bottom:1px solid #54738166;border-radius:0;font-size:18px;letter-spacing:.08em; }
+ #dialog[data-kind="settings"] .settings-description { padding:10px 0 12px 22px;border-left:1px solid #55717d55; }
+ #dialog[data-kind="settings"] .settings-description h3 { font-size:20px;line-height:1.25; }
+ #dialog[data-kind="settings"] .settings-description p { font-size:13px;line-height:1.65; }
+ #dialog[data-kind="settings"] .settings-tip { border:1px solid #55717d55;border-radius:6px;font-size:12px;padding:14px;margin-top:28px; }
+ #dialog[data-kind="settings"] .setting-row { padding:14px 16px;border:1px solid #39536266;background:#1b303d;border-radius:6px;margin-bottom:10px; }
+ #dialog[data-kind="settings"] .setting-row:is(.active,:focus-within) { background:#23414e;border-color:#90beca; }
+ #dialog[data-kind="settings"] .settings-footer { grid-column:1 / -1;grid-row:2;padding-top:16px;border-top:1px solid #55717d66; }
+ #dialog[data-kind="settings"] .settings-footer [data-action="close"] { flex:0 0 150px;min-width:150px; }
+ #dialog[data-kind="settings"] .settings-options { scrollbar-width:thin;scrollbar-color:#648898 #132735; }
+ #hud #respawn { border:1px solid #a8cddb55;border-radius:9px;background:#112a37f2;box-shadow:0 10px 35px #0005;padding:22px; }
+ #hud #respawn .eyebrow { color:#a9cdda;letter-spacing:.12em;font-size:11px; }
+ #hud #respawn h2 { font-size:22px;margin:8px 0 16px;color:#f4df9f; }
+ #hud #respawn button.plain { background:#284652;color:#e3f2f7;border:1px solid #7a9daa;border-radius:5px; }
+ #hud #respawn button.plain:hover { background:#345865; }
+ #hud #respawn p:empty { display:none; }
+ #hud .match-label { padding:11px 15px;border:1px solid #b6d9e333;border-radius:7px;background:#102733e8;box-shadow:0 3px 14px #0003; }
+ #hud #hud-mode { letter-spacing:.09em;font-size:10px;color:#a6ceda; }
+ #hud #hud-map { font-size:16px;line-height:1.5;color:#f3f8fa; }
+ #hud #hud-network { color:#9eb7c2;font-size:10px;letter-spacing:.035em; }
+ #hud #match-connection { width:min(440px,76vw);padding:15px 18px;border-radius:8px;box-shadow:0 8px 32px #0006; }
+ #hud #match-connection strong { font-size:13px;letter-spacing:.09em; }
+ #hud #match-connection i { width:21px;height:21px;border-width:2px; }
+ .performance-hud .net-details { padding:9px 11px;background:#102733df;border:1px solid #83b4c333;border-radius:6px;font-size:11px;line-height:1.5; }
+ body.in-royale .performance-hud .performance-fps { top:84px;right:244px; }
+ .performance-hud .performance-fps { padding:5px 8px;border-radius:4px;background:#102733d9;color:#c8e1e7;font-size:11px; }
+}
+.duo-world-marker { left:0;top:0; }
+.duo-world-marker small:empty { display:none; }
