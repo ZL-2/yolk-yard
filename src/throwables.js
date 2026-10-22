@@ -1,11 +1,11 @@
 import {toolDirection} from './perspective.js';
 import {UTILITY_WEAPONS} from './weapon-balance.js';
 import {direction,worldHit} from './physics.js';
-import {eyeHeight} from './stance.js';
+import {eyePosition} from './stance.js';
 export const SMOKE_RULES=Object.freeze({fuse:1.5,duration:20,radius:4.5});
 export function thrownProjectile(p,kind='popper',map=null){
  const c=UTILITY_WEAPONS.popper,d=toolDirection(map,p);
- return {owner:p.id,weapon:kind,throwable:kind,kind:'shell',popper:true,x:p.x,y:p.y+eyeHeight(p)-.15,z:p.z,vx:d.x*c.speed,vy:d.y*c.speed+c.lift,vz:d.z*c.speed,gravity:c.gravity,hitRadius:c.hitRadius,damage:kind==='smoke'?0:c.damage,buildDamage:kind==='smoke'?0:c.buildDamage,fuse:kind==='smoke'?SMOKE_RULES.fuse:c.fuse,bounces:0,travelled:0,resting:false};
+ return {owner:p.id,weapon:kind,throwable:kind,kind:'shell',popper:true,...eyePosition(p),y:eyePosition(p).y-.15,vx:d.x*c.speed,vy:d.y*c.speed+c.lift,vz:d.z*c.speed,gravity:c.gravity,hitRadius:c.hitRadius,damage:kind==='smoke'?0:c.damage,buildDamage:kind==='smoke'?0:c.buildDamage,fuse:kind==='smoke'?SMOKE_RULES.fuse:c.fuse,bounces:0,travelled:0,resting:false};
 }
 // The preview and authoritative projectile use exactly the same swept bounce.
 export function stepThrowable(b,map,dt,vehicleHit){

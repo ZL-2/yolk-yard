@@ -9,7 +9,7 @@ import {arenaSpawnPoints} from './arena-spawns.js';
 import {activityEvent,newActivity,observeInput,observeMotion,meaningfulActivity,activityRemaining} from './activity.js';
 import {sightRay,thirdPersonActive} from './perspective.js';
 import {RemoteInputBuffer} from './remote-input.js';
-import {resetStance,eyeHeight,canFight} from './stance.js';
+import {resetStance,eyeHeight,eyePosition,canFight} from './stance.js';
 import {updateCombatAccuracy,firedAccuracy,pelletOffsets,falloffAt,structureDamage,weaponReadyAt,rememberShot,triggerRequested} from './combat.js';
 import {arenaBonuses,resetBonuses,updateBonuses,awardBonus} from './streaks.js';
 import {botInput as tacticalBotInput} from './bots.js';
@@ -462,7 +462,7 @@ export class Simulation {
   }
   recordPoses(){
     this.poseHistory??=new Map();
-    for(const p of this.players.values()){let h=this.poseHistory.get(p.id);if(!h){h=[];this.poseHistory.set(p.id,h);}if(h.at(-1)?.time>this.time-1/30)continue;h.push({time:this.time,x:p.x,y:p.y,z:p.z,yaw:p.yaw,flight:p.flight,vx:p.vx,vz:p.vz,sprinting:p.sprinting,crouching:p.crouching,lowCrouch:p.lowCrouch,sliding:p.sliding,downed:p.downed});while(h.length>10)h.shift();}
+    for(const p of this.players.values()){let h=this.poseHistory.get(p.id);if(!h){h=[];this.poseHistory.set(p.id,h);}if(h.at(-1)?.time>this.time-1/30)continue;h.push({time:this.time,x:p.x,y:p.y,z:p.z,yaw:p.yaw,lean:p.lean||0,flight:p.flight,vx:p.vx,vz:p.vz,sprinting:p.sprinting,crouching:p.crouching,lowCrouch:p.lowCrouch,sliding:p.sliding,downed:p.downed});while(h.length>10)h.shift();}
     for(const id of this.poseHistory.keys())if(!this.players.has(id))this.poseHistory.delete(id);
   }
   shotPose(target,shooter,w){
@@ -472,7 +472,7 @@ export class Simulation {
     if(!history?.length)return target;
     const after=history.find(v=>v.time>=time)||history.at(-1),before=history.findLast(v=>v.time<=time)||history[0],f=clamp((time-before.time)/(after.time-before.time||1),0,1);
     if(Math.hypot(target.x-before.x,target.y-before.y,target.z-before.z)>5)return target;
-    return {...target,yaw:before.yaw??target.yaw,flight:before.flight??target.flight,vx:before.vx??target.vx,vz:before.vz??target.vz,sprinting:before.sprinting??target.sprinting,crouching:before.crouching??target.crouching,lowCrouch:before.lowCrouch??target.lowCrouch,sliding:before.sliding??target.sliding,downed:before.downed??target.downed,x:before.x+(after.x-before.x)*f,y:before.y+(after.y-before.y)*f,z:before.z+(after.z-before.z)*f};
+    return {...target,lean:(before.lean||0)+((after.lean||0)-(before.lean||0))*f,yaw:before.yaw??target.yaw,flight:before.flight??target.flight,vx:before.vx??target.vx,vz:before.vz??target.vz,sprinting:before.sprinting??target.sprinting,crouching:before.crouching??target.crouching,lowCrouch:before.lowCrouch??target.lowCrouch,sliding:before.sliding??target.sliding,downed:before.downed??target.downed,x:before.x+(after.x-before.x)*f,y:before.y+(after.y-before.y)*f,z:before.z+(after.z-before.z)*f};
   }
   updateAccuracy(p, previous, dt) {
     const w=gun(p),a=p.accuracyState[p.slot]??={};
@@ -581,7 +581,7 @@ export class Simulation {
       path = this.shotPath(p, w, aim),
       d = popper ? direction(p.yaw, p.pitch) : path.d;
     const origin = popper
-      ? { x: p.x, y: p.y + eyeHeight(p) - 0.15, z: p.z }
+      ? {...eyePosition(p),y:eyePosition(p).y-.15}
       : path.origin;
     if (!popper && path.blocked) {
       this.emit("impact", {
@@ -929,7 +929,7 @@ export class Simulation {
       players: [...this.players.values()].map((p) => {
         // A stable field layout avoids dictionary allocations on every player/frame.
         return {inputQueue:this.remoteInputs.get(p.id)?.queue.length||0,
-          perspective:p.perspective,
+          perspective:p.perspective,lean:p.lean||0,swimming:!!p.swimming,
           viewBlend:p.viewBlend,
           viewBoom:p.viewBoom,
           cameraEye:p.cameraEye,

@@ -1,3 +1,4 @@
+import {leanAmount,LEAN} from './stance.js';
 import {emotePose} from './emotes.js';
 import {groundAt} from './terrain.js';
 import * as T from 'three';
@@ -287,6 +288,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  }
  if(emote){const pose=emotePose(emote.id,emote.t,1);b.hips.position.x+=pose.sway;b.hips.position.y+=pose.bob;b.chest.rotation.z=pose.sway*.5;}
  }
+ const lean=menu?0:leanAmount(p);b.spine.position.x+=lean*LEAN.shift;b.spine.rotation.z-=lean*LEAN.angle;
  if(motion&&['locomotion','land'].includes(motion.id)){
   h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert();
   const ankles=['L','R'].map(S=>b['foot'+S].getWorldPosition(V()).applyMatrix4(inverse));

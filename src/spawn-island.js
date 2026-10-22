@@ -1,7 +1,8 @@
+import {deepenWaterBed,WATER_LEVEL} from './terrain.js';
 import {environmentCollision} from './environment-collision.js';
 // Kestrel Forward Airfield. One static mesh/collision authoring for every client.
 const size=68,cell=2,n=69,heights=new Float32Array(n*n);
-for(let z=0;z<n;z++)for(let x=0;x<n;x++){const wx=x*cell-size,wz=z*cell-size,edge=Math.max(Math.abs(wx)/63,Math.abs(wz)/62);heights[z*n+x]=Math.max(0,Math.min(3.2,(1-edge)*24));}
+for(let z=0;z<n;z++)for(let x=0;x<n;x++){const wx=x*cell-size,wz=z*cell-size,edge=Math.max(Math.abs(wx)/63,Math.abs(wz)/62);heights[z*n+x]=deepenWaterBed(Math.max(0,Math.min(3.2,(1-edge)*24)));}
 const boxes=[],props=[],trees=[],navLinks=[],signs=[];
 const box=(x,z,w,d,h,y=3.2,color=0x5b7077,kind='building',material='metal')=>{const b={x,z,w,d,h,y,color,kind,material,objectId:'departure-'+boxes.length};boxes.push(b);return b;};
 const prop=(kind,x,z,w=2,d=2,h=1.3,y=3.2)=>{props.push({kind,x,z,w,d,h,y,seed:props.length});box(x,z,w,d,h,y,0x677b71,'prop',kind==='rock'?'brick':['car','truck','lamp','container','generator'].includes(kind)?'metal':'wood').prop=props.length-1;};
@@ -53,4 +54,4 @@ export function distributedSpawn(players,random=Math.random,points=spawns){
 }
 
 for(const b of boxes){const shape=environmentCollision(b,{props,trees});if(shape)b.collisionShape=shape;}
-export const SPAWN_ISLAND={id:'hatchery-atoll',name:'Kestrel Forward Airfield',revision:5,size,navCell:1.5,navMax:25,theme:'royale',sky:0xb0c7d1,ground:0x798a70,accent:0xe0b866,boxes,props,trees,navLinks,spawns,pickups:[],floorLoot:[],chests:[],buildings:[],shelters:[],lanes:[],landmarks:[],doors:[],traversal:[],bases:[[-20,0],[20,0]],zone:[0,0,0],districts:[{name:'Kestrel Airfield',x:-25,z:0,color:0xdab975}],roads,signs,parkedTransport,terrain:{size,cell,n,heights,max:3.2}};
+export const SPAWN_ISLAND={id:'hatchery-atoll',name:'Kestrel Forward Airfield',revision:6,waterLevel:WATER_LEVEL,size,navCell:1.5,navMax:25,theme:'royale',sky:0xb0c7d1,ground:0x798a70,accent:0xe0b866,boxes,props,trees,navLinks,spawns,pickups:[],floorLoot:[],chests:[],buildings:[],shelters:[],lanes:[],landmarks:[],doors:[],traversal:[],bases:[[-20,0],[20,0]],zone:[0,0,0],districts:[{name:'Kestrel Airfield',x:-25,z:0,color:0xdab975}],roads,signs,parkedTransport,terrain:{size,cell,n,heights,max:3.2}};

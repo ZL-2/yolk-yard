@@ -25,7 +25,7 @@ export class RemotePoses {
    if(p.presentationAt!==undefined&&p.health>0){
     let older=null,newer=null,olderTime=0,newerTime=0;
     for(const sample of this.samples){const row=sample.players.get(p.id);if(!row)continue;const stamp=row.presentationAt??sample.time;if(stamp<=target){older=row;olderTime=stamp;}else{newer=row;newerTime=stamp;break;}}
-    if(older){if(!continuous(older,p)||newer&&!continuous(older,newer))return p;const pose={...p};if(newer&&newerTime>olderTime){const f=Math.max(0,Math.min(1,(target-olderTime)/(newerTime-olderTime)));for(const axis of ['x','y','z','pitch'])pose[axis]=older[axis]+(newer[axis]-older[axis])*f;pose.yaw=older.yaw+Math.atan2(Math.sin(newer.yaw-older.yaw),Math.cos(newer.yaw-older.yaw))*f;}
+    if(older){if(!continuous(older,p)||newer&&!continuous(older,newer))return p;const pose={...p};if(newer&&newerTime>olderTime){const f=Math.max(0,Math.min(1,(target-olderTime)/(newerTime-olderTime)));for(const axis of ['x','y','z','pitch'])pose[axis]=older[axis]+(newer[axis]-older[axis])*f;pose.lean=(older.lean||0)+((newer.lean||0)-(older.lean||0))*f;pose.yaw=older.yaw+Math.atan2(Math.sin(newer.yaw-older.yaw),Math.cos(newer.yaw-older.yaw))*f;}
      else{const age=Math.max(0,Math.min(.12,target-olderTime));pose.x=older.x+(older.vx||0)*age;pose.y=older.y+(older.vy||0)*age;pose.z=older.z+(older.vz||0)*age;pose.yaw=older.yaw;pose.pitch=older.pitch;}
      return pose;
     }
@@ -35,6 +35,7 @@ export class RemotePoses {
    const f=b.time>a.time?Math.max(0,Math.min(1,(target-a.time)/(b.time-a.time))):1;
    const pose={...p};
    for(const axis of ['x','y','z','pitch'])pose[axis]=previous[axis]+(next[axis]-previous[axis])*f;
+   pose.lean=(previous.lean||0)+((next.lean||0)-(previous.lean||0))*f;
    const angle=Math.atan2(Math.sin(next.yaw-previous.yaw),Math.cos(next.yaw-previous.yaw));
    pose.yaw=previous.yaw+angle*f;
    return pose;

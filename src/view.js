@@ -30,7 +30,7 @@ import {stairCamera} from './stair-camera.js';
 import {cameraDistance,cameraNearPlane,smoothCameraDistance} from './camera-collision.js';
 import {LobbyMotion} from './lobby-motion.js';
 import {FrontierAtmosphere} from './atmosphere.js';
-import {eyeHeight,bodyHeight,canFight} from './stance.js';
+import {eyeHeight,bodyHeight,canFight,eyePosition,leanPoint,leanAmount,LEAN} from './stance.js';
 import * as THREE from "three";
 import {equipPose,itemDrawProfile,drawTransform} from "./equip.js";
 import { makeArms, updateArms, reloadProgress, utilityArms, throwArms, armAppearance } from "./arms.js";
@@ -825,12 +825,13 @@ export class View {
       this.predictedVehicle=p.predictedVehicle||null;
       this.stairEye=stairCamera(this.stairEye,p,dt,`${state.round}:${p.id}:${local.health>0}`);
       const desiredEye=eyeHeight(p);this.stanceEye=this.stanceEye===undefined?desiredEye:THREE.MathUtils.lerp(this.stanceEye,desiredEye,1-Math.exp(-dt*17));
+      const leanedEye=eyePosition(p,this.stanceEye);
       this.camera.position.set(
-        p.x,
-        this.stairEye.y + this.stanceEye + (local.health <= 0 ? 0.8 : 0),
-        p.z,
+        leanedEye.x,
+        this.stairEye.y + leanedEye.y-p.y + (local.health <= 0 ? 0.8 : 0),
+        leanedEye.z,
       );
-      this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), 0, "YXZ");
+      this.camera.rotation.set(p.pitch+(p.recoilPitch||0), p.yaw+(p.recoilYaw||0), -leanAmount(p)*LEAN.angle, "YXZ");
       let cameraBoom=false;
       if (killer || local.downed || local.emote || hold || victory || !weaponCameraAllowed(p)) {
         const cameraYaw=victory?p.yaw+Math.PI+.35:local.emote?(this.emoteLook?.yaw??p.yaw):p.yaw;
@@ -853,6 +854,7 @@ export class View {
       this.thirdPersonEnabled=!killer&&!hold&&!victory&&!p.zVehicle&&thirdPersonActive(p);
       const key=`${state.round}:${state.options.map}:${p.id}:${this.thirdPersonEnabled}`;
       if(this.thirdPersonEnabled){
+        this.camera.rotation.z=0;
         const previous=this.thirdPersonState,same=previous?.key===key&&Math.hypot(p.x-previous.x,p.y-previous.y,p.z-previous.z)<8;
         const blend=same?previous.blend+(Number(aiming)-previous.blend)*(1-Math.exp(-THIRD_PERSON.transition*dt)):Number(aiming);
         p.viewBlend=blend;const map=this.buildMap?.id===state.options.map?this.buildMap:getMap(state.options.map),raw=cameraPose(map,p,{unclampedBoom:true});
@@ -879,7 +881,7 @@ export class View {
       const front = -VIEWMODEL.z + w.muzzle * VIEWMODEL.scale;
       const wall = wallDistance(
         getMap(state.options.map),
-        { x: p.x, y: p.y + eyeHeight(p), z: p.z },
+        eyePosition(p),
         direction(p.yaw, p.pitch),
         front,
       );
@@ -1021,6 +1023,7 @@ export class View {
           model.userData.held.visible=draw.visible&&canFight(p)&&!p.emote&&(!p.vehicleId||p.vehicleSeat>0)&&(!p.zVehicle||p.zVehicleSeat>0);
           model.userData.held.rotation.set(p.pitch + hands.rotation[0] + recoil * .045 + draw.rotation[0], hands.rotation[1]+draw.rotation[1], hands.rotation[2]+draw.rotation[2]);
           model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
+          const heldLean=leanPoint(p,model.userData.held.position.x,model.userData.held.position.y);model.userData.held.position.x=heldLean.x;model.userData.held.position.y=heldLean.y;model.userData.held.rotation.z-=leanAmount(p)*LEAN.angle;
           const sprint=p.sprintBlend||0;model.userData.held.position.y-=sprint*.3;model.userData.held.position.x+=sprint*.08;model.userData.held.rotation.x+=sprint*.65;model.userData.held.rotation.z+=sprint*.2;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1){
             const gesture=Math.sin(Math.PI*throwT);

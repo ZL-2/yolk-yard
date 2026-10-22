@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'203',title:'Deep water & tactical leaning',changes:[
+  'Ravel Coast and the staging island now have deeper river, lake and coastal beds. Water cushions falls and supports swimming at the surface. Move to shore or jump to climb out; landing on a bridge or deck still applies normal fall damage.',
+  'Hold Q or E to lean left or right while standing or crouching. Leaning moves the camera, weapon origin, visible upper body and hit regions together, with wall collision and multiplayer synchronization. Scoped sights work while leaning.',
+  'Lean bindings are in Settings → Movement. Untouched default weapon swap moves to backtick and poppers use G; custom bindings are preserved. Version 6.15.0 / protocol 75.'
+ ]},
  {number:'202',title:'Impact, flight & field fixes',changes:[
   'ATVs and Kestrel helicopters ram at ordinary driving speed as well as during boost. Damage and launch strength scale with incoming speed. Swept hull contacts, cover checks and a per-target cooldown prevent missed fast impacts, damage through walls and repeated tick damage.',
   'Vehicle impacts damage the structure actually contacted. Boost can break through fully built metal walls while preserving momentum when the opening clears; nearby untouched structures and protected objects remain intact. Kestrel boost now has animated twin exhaust flames.',

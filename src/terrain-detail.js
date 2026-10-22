@@ -281,7 +281,7 @@ export function createDetailedOcean(map){
   `);
  };
  material.customProgramCacheKey=()=>`ravel-ocean-${TERRAIN_DETAIL_REVISION}`;material.addEventListener('dispose',()=>coast.dispose());
- const mesh=new T.Mesh(new T.PlaneGeometry(1800,1800),material);mesh.name='Breakwater ocean';mesh.rotation.x=-Math.PI/2;mesh.position.y=.5;mesh.userData={keepDynamic:true,terrainOcean:true,ownedMaterial:true,revision:TERRAIN_DETAIL_REVISION};mesh.updateMatrix();mesh.matrixAutoUpdate=false;return mesh;
+ const mesh=new T.Mesh(new T.PlaneGeometry(1800,1800),material);mesh.name='Breakwater ocean';mesh.rotation.x=-Math.PI/2;mesh.position.y=map.waterLevel??.5;mesh.userData={keepDynamic:true,terrainOcean:true,ownedMaterial:true,revision:TERRAIN_DETAIL_REVISION};mesh.updateMatrix();mesh.matrixAutoUpdate=false;return mesh;
 }
 
 // One uniform write, no per-frame object walk/allocations/geometry rebuilds.
