@@ -1,7 +1,7 @@
 import {Simulation} from './simulation.js';
 import {weapon} from './data.js';
 import {inventory} from './building.js';
-import {canStand} from './physics.js';
+import {canStand,candidates,boxTop} from './physics.js';
 import {groundAt} from './terrain.js';
 import {initializeBossAwareness} from './boss-awareness.js';
 export const HENCHMEN=Object.freeze({count:4,health:100,shield:25,weapon:'sprinter',rarity:1,notice:28,leash:20,reaction:2,burst:.13,cycle:4.2,aimError:.095});
@@ -30,4 +30,11 @@ export function henchmanAwake(sim,p){
   sim.guardOccupancy={at:sim.time+.5,sites};
  }
  return sim.guardOccupancy.sites[p.bossId]||sim.time-(p.attackerAt??-100)<3;
+}
+
+// A sleeping district cannot freeze guards over a destroyed floor. The existing
+// spatial query is tiny; awake/airborne guards continue through normal physics.
+export function henchmanSupported(sim,p){
+ if(p.y-groundAt(sim.map,p.x,p.z)<.06)return true;
+ return candidates(sim.map,p).some(b=>Math.abs(boxTop(b,p.x,p.z,.32)-p.y)<.06);
 }

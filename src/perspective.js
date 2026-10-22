@@ -11,7 +11,8 @@ export const THIRD_PERSON=Object.freeze({distance:3.15,aimDistance:1.65,shoulder
 const clamp01=n=>Math.max(0,Math.min(1,Number.isFinite(n)?n:0));
 export const perspectiveMode=value=>value==='third'?'third':'first';
 export const helicopterPassenger=p=>!!p?.vehicleId&&p.vehicleType==='helicopter'&&p.vehicleSeat>0;
-export const weaponCameraAllowed=p=>(!p?.vehicleId||helicopterPassenger(p))&&!p?.zVehicle;
+export const vehiclePassenger=p=>!!p?.vehicleId&&p.vehicleSeat>0;
+export const weaponCameraAllowed=p=>(!p?.vehicleId||vehiclePassenger(p))&&!p?.zVehicle;
 export function scopedPerspective(p){return !!p?.aim&&!p.reloadEnd&&!p.use&&!p.sprinting&&!p.reviving&&!p.mantle&&!p.traversal&&!p.building&&!p.editing&&(!p.inventory||p.inventory[p.slot]?.weapon)&&['scope','prism'].includes(gun(p).optic);}
 export function thirdPersonActive(p){return p?.perspective==='third'&&p.health>0&&!p.spectating&&!p.downed&&!p.emote&&weaponCameraAllowed(p)&&(!p.flight||p.flight==='ground')&&!scopedPerspective(p);}
 export function cameraPose(map,p,{unclampedBoom=false}={}){

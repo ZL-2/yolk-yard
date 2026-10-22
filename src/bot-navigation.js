@@ -1,3 +1,4 @@
+import {isBreakable} from './building-rules.js';
 import {nearbyPlayers} from './bot-work.js';
 import {wallDistance,worldHit,dist,candidates,canStand} from './physics.js';
 import {groundAt} from './terrain.js';
@@ -38,7 +39,7 @@ function pathBudget(sim,p){
 export function navigate(sim,p,brain,goal,skill){
  if(!goal)return {mx:0,mz:0,jump:false};
  const breach=brain.breach;
- if(breach){const box=breach.box,alive=sim.map.boxes.includes(box)&&!sim.worldDamage?.[box.objectId]?.destroyed;
+ if(breach){const box=breach.box,alive=isBreakable(box)&&sim.map.boxes.includes(box)&&!sim.worldDamage?.[box.objectId]?.destroyed;
   if(alive&&sim.time<breach.until&&Math.hypot(p.x-breach.point.x,p.z-breach.point.z)<3.1)return {mx:0,mz:0,jump:false,breach:breach.point};
   brain.breach=null;brain.pathAt=0;
  }
@@ -76,7 +77,7 @@ export function navigate(sim,p,brain,goal,skill){
   if(stuck&&p.inventory){
    const length=Math.hypot(goal.x-p.x,goal.z-p.z)||1,dx=(goal.x-p.x)/length,dz=(goal.z-p.z)/length;
    for(const d of [{x:dx,y:0,z:dz},{x:-dz,y:0,z:dx},{x:dz,y:0,z:-dx}]){const hit=worldHit(sim.map,{x:p.x,y:p.y+1,z:p.z},d,2.8),b=hit?.box;
-    if(b&&(b.objectId||b.buildId)&&!b.doorId&&!b.vaultId&&b.kind!=='boundary'&&!sim.worldDamage?.[b.objectId]?.destroyed){brain.breach={box:b,point:hit.point,until:now+10};break;}
+    if(isBreakable(b)&&!b.doorId&&!sim.worldDamage?.[b.objectId]?.destroyed){brain.breach={box:b,point:hit.point,until:now+10};break;}
    }
   }
   brain.lastX=p.x;brain.lastZ=p.z;brain.checkAt=now+Math.max(.7,skill.decision*.6);

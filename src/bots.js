@@ -1,3 +1,4 @@
+import {isBreakable} from './building-rules.js';
 import {restores,recoverySwapSlot} from './bot-recovery.js';
 import {isWarmup} from './royale-phases.js';
 import {itemById} from './nearby-items.js';
@@ -84,7 +85,7 @@ export function botInput(sim,p){
  if(task.kind==='chest'&&(unarmed&&distance>8||!visible&&now-(brain.attackedAt??-100)>2)){const chest=itemById(sim,'chests',task.id);if(!chest||chest.opened)brain.decision=0;else if(sim.accessible(p,chest,3.3)){interact=true;move.mx=move.mz=0;move.jump=false;}}
  if(task.kind==='harvest'&&!visible){
   const box=sim.map.boxes.find(b=>b.objectId===task.id),enough=p.materials[task.material]>=teamPolicy.materialTarget||Object.values(p.materials).reduce((a,b)=>a+b,0)>=teamPolicy.totalMaterials;
-  if(!box||sim.worldDamage?.[task.id]?.destroyed||enough){brain.decision=0;fire=false;}
+  if(!isBreakable(box)||box.doorId||sim.worldDamage?.[task.id]?.destroyed||enough){brain.decision=0;fire=false;}
   else{const aim=task.aim,d=Math.hypot(p.x-aim.x,p.z-aim.z);slot=0;yaw=Math.atan2(p.x-aim.x,p.z-aim.z);pitch=Math.atan2(aim.y-p.y-eyeHeight(p),d);fire=d<3.1;if(fire)move.mx=move.mz=0;}
  }
  if(visible&&!evacuation?.urgent){

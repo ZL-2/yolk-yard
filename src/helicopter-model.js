@@ -78,10 +78,20 @@ export function makeHelicopter({detail=2,environment=null}={}){
  const tailRotor=new T.Group();tailRotor.name='heli-tail-rotor';tailRotor.position.set(.25,2.28,5.18);for(let i=0;i<4;i++){const b=box(tailRotor,0,Math.cos(i*Math.PI/2)*.42,Math.sin(i*Math.PI/2)*.42,.05,.86,.13,'dark');b.rotation.x=i*Math.PI/2;}batch(tailRotor);g.add(tailRotor);
  for(const [name,r,x,y,z]of [['heli-blur',4.96,0,3.30,.07],['heli-tail-blur',.88,.27,2.28,5.18]]){const m=new T.Mesh(new T.RingGeometry(.23,r,40),new T.MeshBasicMaterial({color:0x263936,transparent:true,opacity:.12,depthWrite:false,side:T.DoubleSide}));m.name=name;m.position.set(x,y,z);m.rotation[name==='heli-blur'?'x':'y']=Math.PI/2;m.visible=false;m.geometry.userData.shared=true;m.material.userData.shared=true;g.add(m);}
  const dust=new T.Mesh(new T.RingGeometry(2.0,7.8,40),new T.MeshBasicMaterial({color:0xb5a886,transparent:true,opacity:.10,depthWrite:false,side:T.DoubleSide}));dust.name='heli-downwash';dust.rotation.x=-Math.PI/2;dust.position.y=.06;dust.visible=false;dust.geometry.userData.shared=true;dust.material.userData.shared=true;g.add(dust);
+ // Two reusable exhaust batches, with no particles, lights or per-frame buffers.
+ const boost=new T.Group();boost.name='heli-boost';boost.position.set(0,2.37,1.58);boost.visible=false;
+ for(const [radius,length,color,opacity]of [[.24,2.1,0xff9638,.78],[.12,1.45,0xb7ecff,.95]]){
+  const parts=[-1,1].map(side=>{const geometry=new T.ConeGeometry(radius,length,10);geometry.rotateX(Math.PI/2);geometry.translate(side*.69,0,length/2);return geometry;});
+  const geometry=mergeGeometries(parts);parts.forEach(p=>p.dispose());geometry.userData.shared=true;
+  const material=new T.MeshBasicMaterial({color,transparent:true,opacity,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide});material.userData.shared=true;
+  boost.add(new T.Mesh(geometry,material));
+ }
+ g.add(boost);
  models.set(key,g);return g.clone();
 }
 export function animateHelicopter(m,v,time,dt){
  const rpm=v.rotor||0;m.getObjectByName('heli-main-rotor').rotation.y+=dt*rpm*38;m.getObjectByName('heli-tail-rotor').rotation.x+=dt*rpm*73;
  m.getObjectByName('heli-blur').visible=rpm>.5;m.getObjectByName('heli-tail-blur').visible=rpm>.5;
  const dust=m.getObjectByName('heli-downwash');dust.visible=rpm>.3&&(v.grounded||v.groundClearance<7);dust.scale.setScalar(.85+Math.sin(time*9)*.05+rpm*.2);
+ const boost=m.getObjectByName('heli-boost');boost.visible=!!v.boosting&&!v.falling&&!v.wrecked;boost.scale.z=.9+Math.sin(time*53)*.12+Math.sin(time*31)*.06;
 }
