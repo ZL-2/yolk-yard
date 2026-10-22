@@ -6,7 +6,7 @@ export function sanitizeSlotPreferences(value){
  const result={};for(const key of SLOT_GROUPS)result[key]=Number.isInteger(value?.[key])&&value[key]>=1&&value[key]<=5?value[key]:0;return result;
 }
 export function itemGroup(item){
- if(item?.weapon)return ['scatter','doubleyolk'].includes(item.id)?'shotgun':['sprinter','duet','comet','anchor','peeper','needle'].includes(item.id)?'rifle':null;
+ if(item?.weapon)return ['scatter','doubleyolk'].includes(item.id)?'shotgun':['sprinter','duet','comet','anchor','peeper','needle','stormspike'].includes(item.id)?'rifle':null;
  const kind=ITEMS[item?.id]?.kind;return ['heal','shield','splash'].includes(kind)?'healing':['winch','shadowstep','jumpRig','impulse','launchpad'].includes(kind)?'mobility':null;
 }
 export function vacantSlot(p,item){

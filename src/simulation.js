@@ -545,7 +545,7 @@ export class Simulation {
     for(const offset of offsets){
       const aim=direction(p.yaw+yaw+offset.yaw,p.pitch+pitch+offset.pitch),path=this.shotPath(p,w,aim);
       origin=path.origin;
-      if(path.blocked){blocked=true;if(path.blocked.box)this.damageWorld?.(path.blocked.box,structureDamage(w,path.blocked.distance||0));this.emit('impact',{...path.blocked.point,normal:path.blocked.normal,surface:path.blocked.box?.material||'stone',weapon:w.id});continue;}
+      if(path.blocked){blocked=true;if(w.id==='stormspike')this.lodgeStormspike?.({...path.blocked.point,owner:p.id,damage:w.damage},path.blocked.box,path.blocked.normal);if(path.blocked.box)this.damageWorld?.(path.blocked.box,structureDamage(w,path.blocked.distance||0));this.emit('impact',{...path.blocked.point,normal:path.blocked.normal,surface:path.blocked.box?.material||'stone',weapon:w.id});continue;}
       if(w.hitscan){
         const hit=worldHit(this.map,origin,path.d,w.range);
         let distance=hit?.distance??w.range,victim=null,pose=null,region=null;
@@ -559,7 +559,7 @@ export class Simulation {
         const point={x:origin.x+path.d.x*distance,y:origin.y+path.d.y*distance,z:origin.z+path.d.z*distance};
         if(victim){const critical=w.critical>1&&region==='head';this.damage(victim,p,w.damage*falloffAt(w,distance)*(critical?w.critical:1),w.name,critical,p.shotGroup);}
         else if(supply)this.damageSupply?.(supply.chest,structureDamage(w,distance),p);
-        else if(vehicle)this.damageVehicle?.(vehicle.vehicle,structureDamage(w,distance),p);
+        else if(vehicle)this.damageVehicle?.(vehicle.vehicle,structureDamage(w,distance)*(vehicle.multiplier||1),p);
         else if(hit?.box)this.damageWorld?.(hit.box,structureDamage(w,distance));
         shots.push({id:++this.projectileId,vx:path.d.x*w.tracerSpeed,vy:path.d.y*w.tracerSpeed,vz:path.d.z*w.tracerSpeed,end:point});
         if(victim||hit||vehicle||supply)this.emit('impact',{...point,normal:victim?{x:-path.d.x,y:-path.d.y,z:-path.d.z}:supply?.normal||vehicle?.normal||hit.normal,weapon:w.id,surface:supply?'fabric':vehicle?'metal':hit?.box?.material||'stone',tag:!!victim});
@@ -677,6 +677,7 @@ export class Simulation {
       b.travelled = (b.travelled || 0) + distance;
       if (victim || hit || vehicle || supply) {
         if (b.kind === "bolt") {
+          if(b.weapon==='stormspike'&&!victim&&!vehicle&&!supply)this.lodgeStormspike?.(b,hit?.box,hit?.normal);
           if (victim) {
             const w=weapon(b.weapon),precision=(b.critical??w.critical)>1&&region==='head',hitFactor=falloffAt(w,b.travelled)*(precision?(b.critical??w.critical):1);
             this.damage(
@@ -688,7 +689,7 @@ export class Simulation {
             );
           }
           if(!victim&&supply)this.damageSupply?.(supply.chest,b.buildDamage??b.damage,attacker);
-          else if(!victim&&vehicle)this.damageVehicle?.(vehicle.vehicle,b.buildDamage??b.damage,attacker);
+          else if(!victim&&vehicle)this.damageVehicle?.(vehicle.vehicle,(b.buildDamage??b.damage)*(vehicle.multiplier||1),attacker);
           else if(!victim&&hit?.box)this.damageWorld?.(hit.box,(b.buildDamage??weapon(b.weapon).buildDamage)*((b.buildFalloff??weapon(b.weapon).buildFalloff)?falloffAt(weapon(b.weapon),b.travelled):1));
           this.emit("impact", {
             x: b.x,
@@ -955,6 +956,7 @@ export class Simulation {
           mobilityKind:p.mobilityKind,
           vehicleId:p.vehicleId,
           vehicleSeat:p.vehicleSeat,
+          vehicleType:p.vehicleType,
           vehicleLock:p.vehicleLock,
           downed:p.downed,
           lifeState:p.lifeState,

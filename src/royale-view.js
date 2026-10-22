@@ -1,3 +1,5 @@
+import {dressHelipad} from './helipad-view.js';
+import {updateStormspikeView} from './stormspike-view.js';
 import {createSmokeCloud,updateSmokeCloud} from './smoke-view.js';
 import {createKestrel,animateKestrel} from './kestrel-model.js';
 import {updateOperationView} from './field-operations-view.js';
@@ -89,6 +91,7 @@ function* streamedIslandSteps(world,map,kit){
  const architecture=architectureKit(kit);
  world.add(createDetailedOcean(map));
  yield* buildDetailedTerrain(world,map);
+ const helipad=dressHelipad(world,map.helipad,architecture);if(helipad)bake(helipad,false,false);
  const towers=new Map((map.watchtowers||[]).map(t=>[t.id,t]));
  const cells=new Map(),cellFor=(x,z)=>{const ix=Math.floor(x/64),iz=Math.floor(z/64),key=ix+':'+iz;if(!cells.has(key))cells.set(key,{key,x:(ix+.5)*64,z:(iz+.5)*64,radius:48,boxes:[],buildings:[],watchtowers:[],trees:[],props:[],coarse:new THREE.Group()});return cells.get(key);};
  for(const b of map.boxes){if(b.editorObject)continue;const parent=b.watchtowerId?towers.get(b.watchtowerId):b.building===undefined?b:map.buildings[b.building];cellFor(parent.x,parent.z).boxes.push(b);}
@@ -180,7 +183,7 @@ export class RoyaleView{
  chestModel(supply=false,epic=false){const g=chestModel(this.kit,supply,epic);bake(g.userData.lid,false,true);bake(g,false,true);return g;}
  update(state,local,dt,playing){
   this.root.visible=playing&&!!state?.royale;if(!this.root.visible)return;
-  const r=state.royale,t=this.view.clock,kit=this.kit;updateOperationView(this,state);updateGrapplers(this,state,local);updateVehicles(this,state,local,dt);
+  const r=state.royale,t=this.view.clock,kit=this.kit;updateOperationView(this,state);updateGrapplers(this,state,local);updateVehicles(this,state,local,dt);updateStormspikeView(this,state);
   this.seasonMeshes??=new Map();const activeSeason=new Set();
   for(const s of [...state.players.filter(p=>p.bossWindup).map(p=>({id:p.id,x:p.x,y:p.y+.06,z:p.z,kind:'telegraph'})),...state.players.filter(p=>p.bossVeil).map(p=>({id:p.id,x:p.x,y:p.y+1.55,z:p.z,goal:p.bossVeil.goal,kind:'laser'})),...(r.smokes||[]).map(x=>({...x,kind:'smoke'})),...(r.relays||[]).map(x=>({...x,kind:'relay'}))]){const key=s.kind+s.id;activeSeason.add(key);let mesh=this.seasonMeshes.get(key);if(!mesh){if(s.kind==='laser'){mesh=new THREE.Group();const line=new THREE.Line(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3)),new THREE.LineBasicMaterial({color:0xff554c,transparent:true,opacity:.9}));line.frustumCulled=false;line.userData.ownedMaterial=true;const marker=new THREE.Mesh(new THREE.RingGeometry(.18,.3,16),new THREE.MeshBasicMaterial({color:0xff554c,side:THREE.DoubleSide}));marker.rotation.x=-Math.PI/2;marker.userData.ownedMaterial=true;mesh.add(line,marker);}else if(s.kind==='telegraph'){mesh=new THREE.Mesh(new THREE.RingGeometry(1.1,1.35,24),new THREE.MeshBasicMaterial({color:0xffc563,transparent:true,opacity:.8,side:THREE.DoubleSide}));mesh.rotation.x=-Math.PI/2;}else if(s.kind==='smoke'){mesh=createSmokeCloud(s);}else{const g=new THREE.Group(),k=artKit(this.kit);k.rounded(g,0,.6,0,.75,1.2,.6,0x304b54,.06);k.rounded(g,0,1.05,-.32,.5,.3,.06,0x65d6c8,.02);k.beam(g,[0,1.2,0],[0,4,0],.045,0xa7c2bd);k.torus(g,0,3.5,0,.4,.04,0xdfb567);bake(g,false,true);mesh=g;}this.root.add(mesh);this.seasonMeshes.set(key,mesh);}mesh.position.set(s.x,s.y,s.z);if(s.kind==='laser'){const a=mesh.children[0].geometry.attributes.position;a.setXYZ(0,0,0,0);a.setXYZ(1,s.goal.x-s.x,s.goal.y+.08-s.y,s.goal.z-s.z);a.needsUpdate=true;mesh.children[1].position.set(s.goal.x-s.x,s.goal.y+.08-s.y,s.goal.z-s.z);}if(s.kind==='smoke'){updateSmokeCloud(mesh,s,state.time);}}
   for(const [key,m]of this.seasonMeshes)if(!activeSeason.has(key)){m.removeFromParent();this.view.disposeGroup(m);this.seasonMeshes.delete(key);}
@@ -211,7 +214,7 @@ export class RoyaleView{
  event(e){
   if(!this.root.visible)return;
   if(e.type==='royale-fx'||e.type==='royale-cue'&&['shield-break','complete-splash','launch','chest-open'].includes(e.cue)){
-   const color=e.kind==='splash'||e.cue==='complete-splash'?0x73e8d4:e.cue==='chest-open'?0xffd574:0xb6a5ff;
+   const color=e.kind==='stormspike-burst'?0x78eaff:e.kind==='splash'||e.cue==='complete-splash'?0x73e8d4:e.cue==='chest-open'?0xffd574:0xb6a5ff;
    const ring=this.view.renderPool.acquire('royale-ring',()=>new THREE.Mesh(new THREE.TorusGeometry(.5,.045,6,40),new THREE.MeshBasicMaterial({transparent:true,opacity:.8,depthWrite:false})));ring.material.color.setHex(color);ring.material.opacity=.8;ring.rotation.x=Math.PI/2;ring.position.set(e.x||0,(e.y||0)+.3,e.z||0);ring.userData.ownedMaterial=true;this.root.add(ring);this.fx.push({mesh:ring,age:0});
   }
  }

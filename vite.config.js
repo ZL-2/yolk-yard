@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import { RELEASE_NOTES } from "./src/releases.js";
 import { nextReleaseHistory, migrateReleaseBranding } from "./src/release-history.js";
 export default defineConfig(async ({ command }) => {
+  const packageInfo=JSON.parse(readFileSync(new URL("./package.json",import.meta.url),"utf8"));
   const build = process.env.GITHUB_SHA || `local-${Date.now()}`;
   let previous;
   if (command === "build" && process.env.GITHUB_REPOSITORY) {
@@ -16,7 +17,7 @@ export default defineConfig(async ({ command }) => {
   const version = JSON.stringify({ build, protocol:VERSION, appVersion:JSON.parse(readFileSync(new URL("./package.json",import.meta.url),"utf8")).version, release: history.releases[0].number });
   return {
     base: "./",
-    define: { __BUILD_ID__: JSON.stringify(build), __RELEASE_HISTORY__: JSON.stringify(history.releases) },
+    define: { __APP_VERSION__: JSON.stringify(packageInfo.version), __RUNTIME_LIBRARIES__:JSON.stringify(Object.entries(packageInfo.dependencies)), __BUILD_ID__: JSON.stringify(build), __RELEASE_HISTORY__: JSON.stringify(history.releases) },
     plugins: [{
       name: "ravelfront-build-version",
       transformIndexHtml(html) { return command === "serve" ? html.replace("https://0.peerjs.com wss://0.peerjs.com", "https://0.peerjs.com wss://0.peerjs.com http://127.0.0.1:9000 ws://127.0.0.1:9000 http://127.0.0.1:9002 ws://127.0.0.1:9002") : html; },

@@ -35,6 +35,7 @@ export function motionSelection(p,time,speed){
  if(p.reviving)return {id:'revive',freeHands:true};
  if(p.mantle)return {id:'mantle',progress:clamp((p.mantle.elapsed||0)/Math.max(.01,p.mantle.duration||.44),0,1),freeHands:true,levelRoot:true};
  if(p.traversal)return {id:'hang',freeHands:false,levelRoot:true};
+ if(p.vehicleType==='helicopter'&&p.vehicleSeat>0)return {id:'idle',freeHands:false};
  if(p.vehicleId||p.zVehicle)return {id:'sit',freeHands:false};
  if(p.emote)return {id:p.emote.id==='shuffle'?'shuffle':p.emote.id,at:Math.max(0,time-(p.emote.start??time)),freeHands:p.emote.id!=='crown'};
  if(p.sliding)return {id:'slide',at:clamp(p.slideAge||0,0,.12)+.18,freeHands:false};

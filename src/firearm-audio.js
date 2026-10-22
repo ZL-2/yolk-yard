@@ -2,6 +2,7 @@
 // Each design has different envelopes, action timing and spectral structure;
 // none uses a sampled commercial game sound or a pitch-shifted shared recording.
 export const FIREARM_SOUNDS={
+ stormspike:{duration:.58,body:83,crack:.85,bass:.6,tail:.23,decay:10,action:.24,metal:.32,bands:[.24,.46,.30],energy:true,seed:199},
  sprinter:{duration:.27,body:118,crack:.72,bass:.36,tail:.10,decay:19,action:.067,metal:.19,bands:[.17,.53,.30],seed:31},
  scatter:{duration:.49,body:68,crack:.91,bass:.65,tail:.24,decay:11,action:.16,metal:.10,bands:[.48,.41,.11],pellets:5,seed:47},
  needle:{duration:.65,body:49,crack:1,bass:.75,tail:.28,decay:8,action:.34,metal:.26,bands:[.33,.32,.35],seed:73},
@@ -40,5 +41,5 @@ export function synthesizeShot(id,sampleRate=44100,variation=0){
 export function reloadSequence(id,duration,empty=true){
  const shell=['scatter','doubleyolk'].includes(id),bolt=['needle','peeper'].includes(id),launcher=id==='thumper',pistol=id==='pip';
  if(shell)return [{cue:'reload-out',at:.02,scale:.8},{cue:'reload-in',at:duration*.3,scale:.75},{cue:'reload-in',at:duration*.56,scale:.8},...(empty?[{cue:'pump-action',at:duration*.86,scale:1}]:[])];
- return [{cue:launcher?'launcher-open':'reload-out',at:.01,scale:pistol?.7:1},{cue:id==='comet'?'cell-seat':'reload-in',at:duration*.64,scale:pistol?.8:1},...(empty?[{cue:bolt?'bolt-action':'reload-bolt',at:duration*.87,scale:launcher?.7:.85}]:[])];
+ return [{cue:launcher?'launcher-open':'reload-out',at:.01,scale:pistol?.7:1},{cue:['comet','stormspike'].includes(id)?'cell-seat':'reload-in',at:duration*.64,scale:pistol?.8:1},...(empty?[{cue:bolt?'bolt-action':'reload-bolt',at:duration*.87,scale:launcher?.7:.85}]:[])];
 }

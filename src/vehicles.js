@@ -1,8 +1,9 @@
-import {canOccupy,candidates,rayBox,dist,direction,boxTop} from './physics.js';
+import {HELICOPTER,isHelicopter,spawnHelicopter,helicopterSeatPose,stepHelicopter,helicopterHit} from './helicopter.js';
+import {canOccupy,candidates,rayBox,dist,direction,boxTop,wallDistance} from './physics.js';
 import {groundAt} from './terrain.js';
 import {clamp} from './data.js';
 import {teammates} from './teams.js';
-export const ATV=Object.freeze({count:6,health:400,speed:17,reverse:7,boostSpeed:31,acceleration:16,steer:1.65,boostDrain:34,boostCharge:12,enterRange:3.2});
+export const ATV=Object.freeze({count:6,health:400,speed:8.5,reverse:3.5,boostSpeed:15.5,acceleration:16,steer:1.65,boostDrain:34,boostCharge:12,enterRange:3.2});
 export const ATV_SITES=Object.freeze([
  {id:'borough',x:-61,z:8,yaw:Math.PI,name:'Relay Borough garage'},
  {id:'farm',x:-119,z:-118,yaw:-Math.PI/2,name:'Northfield farm road'},
@@ -21,46 +22,52 @@ export function vehicleSupportHeight(map,v){
  return height;
 }
 export function initializeVehicles(sim){
- sim.vehicles=[];for(const p of sim.players.values()){p.vehicleId=null;p.vehicleSeat=null;p.vehicleLock=0;}
+ sim.vehicles=[];for(const p of sim.players.values()){p.vehicleId=null;p.vehicleSeat=null;p.vehicleType=null;p.vehicleLock=0;}
  if(sim.map.id!=='sunnybreak')return;
  for(const [index,site]of ATV_SITES.entries()){
   let spot;for(const radius of [0,3,6,9,12,16]){for(let i=0;i<(radius?12:1);i++){const angle=i*Math.PI/6,x=site.x+Math.cos(angle)*radius,z=site.z+Math.sin(angle)*radius,y=groundAt(sim.map,x,z),probe={x,y,z,yaw:site.yaw};if(y>1.3&&fits(sim.map,probe)&&canOccupy(sim.map,{x,y:y+.1,z},2.1,1.8)){spot=probe;break;}}if(spot)break;}
   if(!spot)throw Error('ATV parking blocked: '+site.id);
   sim.vehicles.push({id:'atv-'+index,site:site.id,name:site.name,...spot,vx:0,vz:0,vy:0,speed:0,steering:0,boost:100,boosting:false,health:ATV.health,seats:[null,null],grounded:true,pitch:0,roll:0,revision:0});
  }
+ sim.vehicles.push(spawnHelicopter(sim.map));
 }
-export function seatPose(v,seat=0){const q=vehicleLocal(v,0,.08,seat===0?-.32:.44);return {x:v.x+q.x,y:v.y+q.y,z:v.z+q.z};}
-export function seatPlayer(p,v){Object.assign(p,seatPose(v,p.vehicleSeat));p.vehicleYaw=v.yaw;p.vx=v.vx;p.vz=v.vz;p.vy=v.vy;p.grounded=v.grounded;p.flight='ground';p.sliding=p.sprinting=p.crouching=false;p.fall={apex:p.y,immune:true,source:'vehicle'};p.landing=null;}
+export function seatPose(v,seat=0){if(isHelicopter(v))return helicopterSeatPose(v,seat);const q=vehicleLocal(v,0,.08,seat===0?-.32:.44);return {x:v.x+q.x,y:v.y+q.y,z:v.z+q.z};}
+export function seatPlayer(p,v){p.vehicleType=v.type||'atv';Object.assign(p,seatPose(v,p.vehicleSeat));p.vehicleYaw=v.yaw;p.vx=v.vx;p.vz=v.vz;p.vy=v.vy;p.grounded=v.grounded;p.flight='ground';p.redeploy=p.forceGlider=false;p.sliding=p.sprinting=p.crouching=false;p.fall={apex:p.y,immune:true,source:'vehicle'};p.landing=null;}
 export function exitVehicle(sim,p,{force=false}={}){
- const v=sim.vehicles?.find(v=>v.id===p.vehicleId);if(!v){p.vehicleId=null;p.vehicleSeat=null;return true;}
- let spot;for(const side of [1,-1])for(const away of [1.75,2.4,3.2]){const x=v.x+Math.cos(v.yaw)*side*away,z=v.z-Math.sin(v.yaw)*side*away,y=Math.max(v.y+.15,groundAt(sim.map,x,z));if(canOccupy(sim.map,{x,y,z},1.85,.32)){spot={x,y,z};break;}if(spot)break;}
+ const v=sim.vehicles?.find(v=>v.id===p.vehicleId);if(!v){p.vehicleId=null;p.vehicleSeat=null;p.vehicleType=null;return true;}
+ let spot;for(const side of [1,-1])for(const away of (isHelicopter(v)?[3.2,4,5]:[1.75,2.4,3.2])){const x=v.x+Math.cos(v.yaw)*side*away,z=v.z-Math.sin(v.yaw)*side*away,y=Math.max(v.y+.15,groundAt(sim.map,x,z));if(canOccupy(sim.map,{x,y,z},1.85,.32)){spot={x,y,z};break;}if(spot)break;}
  if(!spot&&!force)return false;
  if(p.health<=0)spot={x:p.x,y:p.y,z:p.z};
- const seat=p.vehicleSeat;if(v.seats[seat]===p.id)v.seats[seat]=null;v.revision++;p.vehicleId=null;p.vehicleSeat=null;p.vehicleLock=sim.time+.6;p.vehicleInteractHeld=true;p.interactLatch=true;
- Object.assign(p,spot||{x:v.x,y:v.y+1.65,z:v.z});p.vy=Math.max(0,v.vy);p.grounded=false;p.fall={apex:p.y,immune:true,source:'vehicle-exit'};p.launchVelocity={x:v.vx*.5,z:v.vz*.5};
+ const seat=p.vehicleSeat;if(v.seats[seat]===p.id)v.seats[seat]=null;v.revision++;p.vehicleId=null;p.vehicleSeat=null;p.vehicleType=null;p.vehicleLock=sim.time+.6;p.vehicleInteractHeld=true;p.interactLatch=true;
+ Object.assign(p,spot||{x:v.x,y:v.y+1.65,z:v.z});p.vy=Math.max(0,v.vy);p.grounded=false;p.fall={apex:p.y,immune:!isHelicopter(v),source:isHelicopter(v)?'helicopter-exit':'vehicle-exit'};p.launchVelocity={x:v.vx*.5,z:v.vz*.5};
  sim.emit?.('royale-cue',{cue:'vehicle-exit',player:p.id,x:v.x,y:v.y,z:v.z});return true;
 }
 export function vehiclePrompt(vehicles,p){
  if(p.vehicleId)return null;
- const v=vehicles?.filter(v=>v.health>0&&v.seats.some(s=>!s)&&dist(p,v)<ATV.enterRange).sort((a,b)=>dist(p,a)-dist(p,b))[0];
- return v?{kind:'vehicle',text:v.seats[0]?'RIDE ATV · PASSENGER':'DRIVE ATV',id:v.id}:null;
+ const v=vehicles?.filter(v=>v.health>0&&!v.falling&&v.seats.some(s=>!s)&&dist(p,v)<(isHelicopter(v)?HELICOPTER.enterRange:ATV.enterRange)).sort((a,b)=>dist(p,a)-dist(p,b))[0];
+ return v?{kind:'vehicle',text:isHelicopter(v)?(v.seats[0]?'BOARD KESTREL · PASSENGER':'PILOT KESTREL H-05'):(v.seats[0]?'RIDE ATV · PASSENGER':'DRIVE ATV'),id:v.id}:null;
 }
 export function vehicleInteract(sim,p,input){
  const fresh=!!input.interact&&!p.vehicleInteractHeld;p.vehicleInteractHeld=!!input.interact;
- if(p.vehicleId){const v=sim.vehicles.find(v=>v.id===p.vehicleId);if(!v||v.health<=0||p.downed||p.health<=0||p.connected===false){exitVehicle(sim,p,{force:true});return false;}
-  if(fresh&&sim.time>=(p.vehicleLock||0)){exitVehicle(sim,p);return true;}
-  const swap=!!input.reload&&!p.vehicleSeatHeld;p.vehicleSeatHeld=!!input.reload;
-  if(swap&&sim.time>=(p.vehicleLock||0)){const other=1-p.vehicleSeat;if(!v.seats[other]){v.seats[other]=p.id;v.seats[p.vehicleSeat]=null;p.vehicleSeat=other;p.vehicleLock=sim.time+.6;v.revision++;seatPlayer(p,v);}}
+ if(p.vehicleId){const v=sim.vehicles.find(v=>v.id===p.vehicleId);if(!v||v.wrecked||!isHelicopter(v)&&v.health<=0||p.downed||p.health<=0||p.connected===false){exitVehicle(sim,p,{force:true});return false;}
+  if(isHelicopter(v)){
+   if(input.heliExit){p.vehicleExitSince??=sim.time;if(sim.time-p.vehicleExitSince>=HELICOPTER.exitHold&&sim.time>=(p.vehicleLock||0)){exitVehicle(sim,p);p.vehicleExitSince=null;return true;}}else p.vehicleExitSince=null;
+   if(input.heliHorn&&!p.vehicleHornHeld&&p.vehicleSeat===0&&!v.falling)v.loudspeaker=!v.loudspeaker;p.vehicleHornHeld=!!input.heliHorn;
+  }else if(fresh&&sim.time>=(p.vehicleLock||0)){exitVehicle(sim,p);return true;}
+  const swapping=isHelicopter(v)?input.heliSeat:input.reload;
+  const swap=!!swapping&&!p.vehicleSeatHeld;p.vehicleSeatHeld=!!swapping;
+  if(swap&&sim.time>=(p.vehicleLock||0)){const other=Array.from({length:v.seats.length-1},(_,i)=>(p.vehicleSeat+i+1)%v.seats.length).find(i=>!v.seats[i]);if(other!==undefined){v.seats[other]=p.id;v.seats[p.vehicleSeat]=null;p.vehicleSeat=other;p.vehicleLock=sim.time+.6;v.revision++;seatPlayer(p,v);}}
   return true;
  }
  if(!fresh||p.bot||p.health<=0||p.downed||p.spectating||p.flight!=='ground'||p.traversal||p.grapple||sim.time<(p.vehicleLock||0))return false;
- const prompt=vehiclePrompt(sim.vehicles,p);if(!prompt)return false;const v=sim.vehicles.find(v=>v.id===prompt.id),seat=v.seats[0]?1:0;
- v.seats[seat]=p.id;v.revision++;p.vehicleId=v.id;p.vehicleSeat=seat;p.vehicleLock=sim.time+.6;p.vehicleSeatHeld=!!input.reload;p.interactLatch=true;p.emote=null;p.use=null;p.reloadEnd=0;p.burstLeft=0;p.mantle=null;p.shadowstep=null;p.building=p.editing=false;seatPlayer(p,v);
+ const prompt=vehiclePrompt(sim.vehicles,p);if(!prompt)return false;const v=sim.vehicles.find(v=>v.id===prompt.id),seat=v.seats.findIndex(s=>!s);
+ v.seats[seat]=p.id;v.revision++;p.vehicleId=v.id;p.vehicleSeat=seat;p.vehicleLock=sim.time+.6;p.vehicleSeatHeld=!!(isHelicopter(v)?input.heliSeat:input.reload);p.vehicleExitSince=null;p.vehicleHornHeld=!!input.heliHorn;p.interactLatch=true;p.emote=null;p.use=null;p.reloadEnd=0;p.burstLeft=0;p.mantle=null;p.shadowstep=null;p.building=p.editing=false;seatPlayer(p,v);
  sim.emit?.('royale-cue',{cue:'vehicle-enter',player:p.id,x:v.x,y:v.y,z:v.z});return true;
 }
-// Shared by authority and guest prediction. Only six vehicles exist, with no
+// Shared by authority and guest prediction. Six ATVs and one helicopter exist, with no
 // simulation work for an empty, settled vehicle. Thin cover uses swept steps.
 export function stepVehicle(v,input,map,dt){
+ if(isHelicopter(v)){stepHelicopter(v,input,map,dt);return;}
  const count=Math.max(1,Math.ceil(Math.min(.1,dt)/(1/60))),step=Math.min(.1,dt)/count;
  for(let tick=0;tick<count;tick++){
   const throttle=clamp(input.forward||0,-1,1),steer=clamp(input.strafe||0,-1,1),brake=!!input.jump;
@@ -86,10 +93,17 @@ export function stepVehicle(v,input,map,dt){
  }
 }
 export function tickVehicles(sim,dt){
- for(const v of sim.vehicles||[]){if(v.health<=0)continue;
-  for(let seat=0;seat<2;seat++){const p=sim.players.get(v.seats[seat]);if(v.seats[seat]&&(!p||p.vehicleId!==v.id))v.seats[seat]=null;else if(p&&(p.health<=0||p.downed||p.spectating||p.connected===false))exitVehicle(sim,p,{force:true});}
+ for(const v of sim.vehicles||[]){if(v.wrecked||v.health<=0&&!isHelicopter(v))continue;
+  for(let seat=0;seat<v.seats.length;seat++){const p=sim.players.get(v.seats[seat]);if(v.seats[seat]&&(!p||p.vehicleId!==v.id))v.seats[seat]=null;else if(p&&(p.health<=0||p.downed||p.spectating||p.connected===false))exitVehicle(sim,p,{force:true});}
   const driver=sim.players.get(v.seats[0]),raw=driver&&sim.inputs.get(driver.id),input=raw&&sim.time-driver.lastInput<.4?raw:{};
-  if(driver||Math.abs(v.speed)>.05||!v.grounded){stepVehicle(v,input,sim.map,dt);
+  if(isHelicopter(v)){
+   if(driver||v.rotor>0||!v.grounded)stepHelicopter(v,input,sim.map,dt);
+   if(v.impactSpeed>8&&sim.time>=(v.crashAt||0)){v.crashAt=sim.time+.5;damageVehicle(sim,v,Math.min(160,v.impactSpeed*3),null);sim.emit?.('royale-cue',{cue:'helicopter-impact',x:v.x,y:v.y,z:v.z});
+    if(v.boosting)for(const b of candidates(sim.map,v,null,0,5))if((b.buildId||b.objectId)&&Math.abs(b.x-v.x)<b.w/2+3&&Math.abs(b.z-v.z)<b.d/2+3&&b.y<v.y+3&&b.y+b.h>v.y)sim.damageWorld?.(b,150);
+   }
+   if(v.falling&&(v.grounded||v.crashTime>9))wreckHelicopter(sim,v);
+   if(v.speed>8&&!v.falling&&sim.time>=(v.ramAt||0)){v.ramAt=sim.time+.3;for(const p of sim.players.values())if(p.health>0&&!p.spectating&&!p.vehicleId&&!teammates(sim.options,p,driver)&&Math.abs(p.y-v.y)<2.4&&Math.hypot(v.x-p.x,v.z-p.z)<2.4)sim.damage(p,driver,Math.min(60,v.speed*1.5),'Kestrel impact');}
+  }else if(driver||Math.abs(v.speed)>.05||!v.grounded){stepVehicle(v,input,sim.map,dt);
    if(v.boosting&&Math.abs(v.speed)>12&&sim.time>=(v.ramAt||0)){v.ramAt=sim.time+.1;for(const p of sim.players.values())if(p.health>0&&!p.spectating&&!p.vehicleId&&!teammates(sim.options,p,driver)&&dist(v,p)<1.75){sim.damage(p,driver,Math.min(40,Math.abs(v.speed)*1.1),'ATV ram');p.grounded=false;p.vy=7;p.launchVelocity={x:v.vx*.6,z:v.vz*.6};p.fall={apex:p.y,immune:true,source:'vehicle-ram'};}}
    if(v.impactBoost&&v.impactSpeed>12&&sim.time>=(v.crashAt||0)){v.crashAt=sim.time+.25;const d=direction(v.yaw);for(const b of candidates(sim.map,{x:v.x+d.x*1.5,y:v.y,z:v.z+d.z*1.5}))if((b.buildId||b.objectId)&&!b.doorId&&Math.abs(v.x+d.x*1.5-b.x)<b.w/2+1&&Math.abs(v.z+d.z*1.5-b.z)<b.d/2+1)sim.damageWorld?.(b,150);}
   }else{v.speed=v.vx=v.vz=0;v.boosting=false;}
@@ -97,12 +111,21 @@ export function tickVehicles(sim,dt){
  }
 }
 export function vehicleHit(sim,origin,direction,range,attacker){
- let best;for(const v of sim.vehicles||[]){if(v.health<=0||attacker?.vehicleId===v.id)continue;const c=Math.abs(Math.cos(v.yaw)),s=Math.abs(Math.sin(v.yaw)),box={x:v.x,y:v.y+.35,z:v.z,w:1.4*c+2.5*s,d:1.4*s+2.5*c,h:.85},distance=rayBox(origin,direction,box,range);
+ let best;for(const v of sim.vehicles||[]){if(v.health<=0||attacker?.vehicleId===v.id)continue;if(isHelicopter(v)){const contact=helicopterHit(v,origin,direction,range);if(contact&&(!best||contact.distance<best.distance))best={vehicle:v,...contact,normal:{x:-direction.x,y:-direction.y,z:-direction.z}};continue;}const c=Math.abs(Math.cos(v.yaw)),s=Math.abs(Math.sin(v.yaw)),box={x:v.x,y:v.y+.35,z:v.z,w:1.4*c+2.5*s,d:1.4*s+2.5*c,h:.85},distance=rayBox(origin,direction,box,range);
   if(Number.isFinite(distance)&&distance<=range&&(!best||distance<best.distance))best={vehicle:v,distance,normal:{x:-direction.x,y:-direction.y,z:-direction.z}};
  }return best;
 }
 export function damageVehicle(sim,v,amount,attacker){
  if(v.health<=0||!Number.isFinite(amount)||amount<=0)return false;
  if(attacker&&v.seats.some(id=>teammates(sim.options,attacker,sim.players.get(id))))return false;
- const applied=Math.min(v.health,amount);v.health=Math.max(0,v.health-amount);v.revision++;if(attacker)sim.emit?.('vehicle-hit',{player:attacker.id,target:v.id,amount:applied,x:v.x,y:v.y+1.3,z:v.z,destroyed:v.health<=0});if(v.health<=0){v.speed=v.vx=v.vz=0;v.boosting=false;for(const id of [...v.seats]){const p=sim.players.get(id);if(p)exitVehicle(sim,p,{force:true});}sim.emit?.('royale-fx',{kind:'explosion',x:v.x,y:v.y+.7,z:v.z});sim.emit?.('royale-cue',{cue:'vehicle-destroyed',x:v.x,y:v.y,z:v.z});}return true;
+ const applied=Math.min(v.health,amount);v.health=Math.max(0,v.health-amount);v.revision++;if(attacker)sim.emit?.('vehicle-hit',{player:attacker.id,target:v.id,amount:applied,x:v.x,y:v.y+1.3,z:v.z,destroyed:v.health<=0});if(v.health<=0&&isHelicopter(v)){v.falling=true;v.lastAttacker=attacker?.id;v.boostTime=0;v.loudspeaker=false;v.crashTime=0;sim.emit?.('royale-cue',{cue:'helicopter-failing',x:v.x,y:v.y,z:v.z});return true;}if(v.health<=0){v.speed=v.vx=v.vz=0;v.boosting=false;for(const id of [...v.seats]){const p=sim.players.get(id);if(p)exitVehicle(sim,p,{force:true});}sim.emit?.('royale-fx',{kind:'explosion',x:v.x,y:v.y+.7,z:v.z});sim.emit?.('royale-cue',{cue:'vehicle-destroyed',x:v.x,y:v.y,z:v.z});}return true;
+}
+
+function wreckHelicopter(sim,v){
+ if(v.wrecked)return;v.wrecked=true;v.health=0;v.rotor=0;v.boosting=false;v.loudspeaker=false;
+ for(const id of [...v.seats]){const p=sim.players.get(id);if(p)exitVehicle(sim,p,{force:true});}
+ const attacker=sim.players.get(v.lastAttacker),origin={x:v.x,y:v.y+1.2,z:v.z};
+ for(const p of sim.players.values()){if(p.health<=0||p.spectating)continue;const dx=p.x-origin.x,dy=p.y+1-origin.y,dz=p.z-origin.z,d=Math.hypot(dx,dy,dz);if(d<6&&wallDistance(sim.map,origin,{x:dx/(d||1),y:dy/(d||1),z:dz/(d||1)},d)>=d-.2)sim.damage(p,attacker,70*(1-d/6),'Kestrel explosion');}
+ const seen=new Set();for(const b of candidates(sim.map,v,null,0,6)){const id=b.buildId||b.objectId;if(!id||seen.has(id))continue;const d=Math.hypot(Math.max(0,Math.abs(v.x-b.x)-b.w/2),Math.max(0,b.y-v.y,v.y-b.y-b.h),Math.max(0,Math.abs(v.z-b.z)-b.d/2));if(d<6){seen.add(id);sim.damageWorld?.(b,450*(1-d/6));}}
+ sim.emit?.('royale-fx',{kind:'explosion',...origin});sim.emit?.('royale-cue',{cue:'vehicle-destroyed',...origin});
 }

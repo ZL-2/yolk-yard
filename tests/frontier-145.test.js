@@ -21,7 +21,7 @@ function battle(){const s=new RoyaleSimulation({capacity:4,bots:3,seed:145}),p=s
 function flat(){const {s,p}=battle();s.map={id:'flat',theme:'royale',size:100,boxes:[]};s.vehicles=[];s.players=new Map([[p.id,p]]);Object.assign(p,{x:0,y:0,z:0,yaw:0,pitch:0,inventory:inventory(),slot:1,vx:0,vz:0});return {s,p};}
 function quad(){return {id:'test-atv',x:0,y:0,z:0,yaw:0,vy:0,vx:0,vz:0,speed:0,boost:100,health:400,seats:[null,null],grounded:true,pitch:0,roll:0,revision:0};}
 test('six strategically distributed ATVs spawn clear of cover, never on Spawn Island',()=>{
- const {s}=battle();assert.equal(s.vehicles.length,6);for(const v of s.vehicles){const site=ATV_SITES.find(x=>x.id===v.site);assert.ok(Math.hypot(v.x-site.x,v.z-site.z)<=16.01);assert.equal(v.y,groundAt(s.map,v.x,v.z));assert.ok(canStand(s.map,{...v,y:v.y+.1}));assert.deepEqual(v.seats,[null,null]);}
+ const {s}=battle();assert.equal(s.vehicles.filter(v=>v.type!=='helicopter').length,6);for(const v of s.vehicles.filter(v=>v.type!=='helicopter')){const site=ATV_SITES.find(x=>x.id===v.site);assert.ok(Math.hypot(v.x-site.x,v.z-site.z)<=16.01);assert.equal(v.y,groundAt(s.map,v.x,v.z));assert.ok(canStand(s.map,{...v,y:v.y+.1}));assert.deepEqual(v.seats,[null,null]);}
  s.map=getMap('hatchery-atoll');initializeVehicles(s);assert.equal(s.vehicles.length,0);
 });
 test('ATV boarding reserves two separate seats and holding Use never immediately ejects',()=>{

@@ -1,3 +1,4 @@
+import {updateHelicopterAudio} from './helicopter-audio.js';
 import {ZombieSamples} from './zombies-samples.js';
 import {ZOMBIE_SOUNDS,updateZombiesAudio} from './zombies-audio.js';
 import {AdaptiveScore} from './adaptive-score.js';
@@ -68,6 +69,10 @@ export const SOUND_CUES={...ZOMBIE_SOUNDS,
  'door-close':[noise(240,.12,.1),note(90,.08,.035,'sine',60)],
  'vault-unlock':[note(440,.15,.06),note(660,.18,.06,'sine',0,.18),noise(200,.5,.08,.35)],
  'vault-opening':[noise(100,.18,.12,.1),note(65,.38,.07,'triangle',55,.28),noise(210,1.55,.08,.65),note(48,1.5,.055,'triangle',38,.65),noise(85,.22,.13,2.22)],
+ 'spike-stick':[noise(2300,.19,.11),note(720,.22,.06,'triangle',180)],
+ 'spike-burst':[noise(800,.34,.17),note(120,.28,.13,'sawtooth',45)],
+ 'helicopter-impact':[noise(180,.24,.16),note(78,.3,.12)],
+ 'helicopter-failing':[note(720,.35,.12,'square',450)],
  'vehicle-enter':[noise(280,.08,.075),note(90,.2,.045,'triangle',140)],
  'vehicle-exit':[noise(500,.09,.04),note(100,.1,.03)],
  'vehicle-destroyed':[noise(70,.6,.21),noise(1300,.22,.075,.07)],
@@ -184,16 +189,16 @@ export class Sound {
  pickup(){this.cue('pickup-1');}eliminate(){this.cue('elimination');}
  reload(duration=1.2,id='sprinter',empty=true){this.cancelReload();this.reloadVoices=[];for(const e of reloadSequence(id,duration,empty))for(const p of SOUND_CUES[e.cue]||[]){const voice=this.layer({...p,at:e.at+(p.at||0)},null,'effects',e.scale);if(voice)this.reloadVoices.push(voice);}}
  cancelReload(){for(const source of this.reloadVoices||[])try{source.stop();}catch{}this.reloadVoices=[];}
- loop(id,target,{freq=300,volume=.06,noise:useNoise=true}={}){
+ loop(id,target,{freq=300,volume=.06,noise:useNoise=true,pan=0,pulse=0}={}){
   if(!this.ctx)return;
   let loop=this.loops.get(id);
   if(!loop&&target>0){const c=this.ctx,source=useNoise?c.createBufferSource():c.createOscillator(),filter=c.createBiquadFilter(),gain=c.createGain();
    if(useNoise){source.buffer=this.noiseBuffer;source.loop=true;}else{source.type='sine';source.frequency.value=freq;}
-   filter.type='lowpass';filter.frequency.value=freq;gain.gain.value=0;source.connect(filter).connect(gain).connect(this.master);source.start();loop={source,filter,gain,useNoise};this.loops.set(id,loop);
+   filter.type='lowpass';filter.frequency.value=freq;gain.gain.value=0;const panner=c.createStereoPanner();source.connect(filter).connect(gain).connect(panner).connect(this.master);let modulator,modulation,amplitude;if(pulse){filter.disconnect();amplitude=c.createGain();amplitude.gain.value=.55;modulator=c.createOscillator();modulator.frequency.value=pulse;modulation=c.createGain();modulation.gain.value=.45;modulator.connect(modulation).connect(amplitude.gain);filter.connect(amplitude).connect(gain);modulator.start();}source.start();loop={source,filter,gain,useNoise,panner,modulator,modulation,amplitude};this.loops.set(id,loop);
   }
-  if(loop){loop.filter.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);if(!loop.useNoise)loop.source.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);loop.gain.gain.setTargetAtTime(Math.max(0,target)*volume*this.ambienceVolume,this.ctx.currentTime,.3);if(!target){if(!loop.silentAt)loop.silentAt=this.clock;if(this.clock-loop.silentAt>1.5){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();this.loops.delete(id);}}else loop.silentAt=0;}
+  if(loop){loop.panner?.pan.setTargetAtTime(pan,this.ctx.currentTime,.1);if(loop.modulator)loop.modulator.frequency.setTargetAtTime(pulse||4,this.ctx.currentTime,.15);loop.filter.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);if(!loop.useNoise)loop.source.frequency.setTargetAtTime(freq,this.ctx.currentTime,.12);loop.gain.gain.setTargetAtTime(Math.max(0,target)*volume*this.ambienceVolume,this.ctx.currentTime,.3);if(!target){if(!loop.silentAt)loop.silentAt=this.clock;if(this.clock-loop.silentAt>1.5){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();loop.panner?.disconnect();loop.modulator?.stop();loop.modulator?.disconnect();loop.modulation?.disconnect();loop.amplitude?.disconnect();this.loops.delete(id);}}else loop.silentAt=0;}
  }
- stopWorld(){this.score.stop();this.occlusion.clear();this.bossAudio.stop();this.fieldSamples.stop();this.zombieSamples.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();}this.loops.clear();this.stepClocks?.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;this.nextBirdAt=this.clock+8;}
+ stopWorld(){this.score.stop();this.occlusion.clear();this.bossAudio.stop();this.fieldSamples.stop();this.zombieSamples.stop();for(const loop of this.loops.values()){loop.source.stop();loop.source.disconnect();loop.filter.disconnect();loop.gain.disconnect();loop.panner?.disconnect();loop.modulator?.stop();loop.modulator?.disconnect();loop.modulation?.disconnect();loop.amplitude?.disconnect();}this.loops.clear();this.stepClocks?.clear();this.wasStorm=false;this.lastAlive=0;this.lastStormTick=null;this.nextBirdAt=this.clock+8;}
  event(e,me,state){
   if(e.type==='z-cue'){if(e.player&&e.player!==me?.id&&e.x===undefined)return;this.cue('z-'+e.cue,e.x===undefined?null:e,e.cue==='attack'?.55:1);return;}
   if(e.type==='boss-voice'){const listener=me?.spectating?state.players.find(p=>p.id===this.listener?.id)||me:me;return this.bossAudio.event(e,state,listener);}
@@ -229,7 +234,7 @@ export class Sound {
   this.loop('uplink',nearUplink,{freq:uplink?.contested?146:220,volume:.023,noise:false});
   this.loop('recovery',me.use&&['medkit','flask'].includes(me.use.id)?.35:0,{freq:me.use?.id==='flask'?900:1600,volume:.035});
   this.loop('island',royale?.18:0,{freq:900,volume:.055});
-  const vehicle=royale?.vehicles?.find(v=>v.id===me.vehicleId);this.loop('atv-engine',vehicle?(.3+Math.min(1,Math.abs(vehicle.speed)/31)*.6):0,{freq:vehicle?65+Math.abs(vehicle.speed)*5:65,volume:.07,noise:false});this.loop('atv-boost',vehicle?.boosting?.65:0,{freq:480,volume:.07});
+  const vehicle=royale?.vehicles?.find(v=>v.id===me.vehicleId&&v.type!=='helicopter');updateHelicopterAudio(this,royale,me);this.loop('atv-engine',vehicle?(.3+Math.min(1,Math.abs(vehicle.speed)/31)*.6):0,{freq:vehicle?65+Math.abs(vehicle.speed)*5:65,volume:.07,noise:false});this.loop('atv-boost',vehicle?.boosting?.65:0,{freq:480,volume:.07});
   this.loop('transport',me.flight==='transport'?1:0,{freq:72,volume:.13,noise:false});
   this.loop('rotor',me.flight==='transport'?(.7+Math.sin(this.clock*20)*.2):0,{freq:220,volume:.08});
   this.loop('wind',me.flight==='dive'?1:me.flight==='glide'?.5:!me.grounded&&me.vy<-4?Math.min(.35,(-me.vy-4)/45):0,{freq:me.flight==='dive'?1700:700,volume:.14});

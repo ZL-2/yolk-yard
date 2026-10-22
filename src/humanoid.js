@@ -265,7 +265,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   if(h.slide>.01)foot.lerp(V(sideSign*.17,.12,-.67),h.slide);
   if(h.down>.01)foot.lerp(V(sideSign*.2,.12,.43+Math.sin(phase)*.10*moving),h.down);
   if(h.revive>.01)foot.lerp(V(sideSign*.15,sideSign<0?.10:.13,sideSign<0?-.32:.25),h.revive);
-  if(p.vehicleId||p.zVehicle)foot=V(sideSign*.4,.43,-.35);
+  if(p.vehicleId&&!(p.vehicleType==='helicopter'&&p.vehicleSeat>0)||p.zVehicle)foot=V(sideSign*.4,.43,-.35);
   if(dead)foot=V(sideSign*.23,.12,-.12);
   if(emote)foot=V(...emotePose(emote.id,emote.t,sideSign).foot);
   // Contact locks in world space through aim turns and velocity changes.

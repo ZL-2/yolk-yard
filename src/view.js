@@ -840,8 +840,8 @@ export class View {
         const cameraYaw=victory?p.yaw+Math.PI+.35:local.emote?(this.emoteLook?.yaw??p.yaw):p.yaw;
         const back = this.cameraBack??=new THREE.Vector3();back.set(Math.sin(cameraYaw)*Math.cos((p.vehicleId||p.zVehicle)?p.pitch*.55:0),(p.vehicleId||p.zVehicle)?.4-Math.sin(p.pitch*.55):local.emote?.2:.35,Math.cos(cameraYaw)*Math.cos((p.vehicleId||p.zVehicle)?p.pitch*.55:0)).normalize();
         const origin = this.cameraOrigin??=new THREE.Vector3();origin.set(p.x,p.y+Math.min(1.6,eyeHeight(p)),p.z);
-        this.placeCameraBehind(state,p,origin,back,(p.vehicleId||p.zVehicle)?6.2:victory?5.2:hold?4.8:local.emote?4.2:3.5,dt,(p.vehicleId||p.zVehicle)?'vehicle':victory?'victory':hold?'elimination':local.emote?'emote':'spectator');cameraBoom=true;
-        if(p.vehicleId||p.zVehicle){const aim=direction(p.yaw,p.pitch);this.camera.lookAt(p.x+aim.x*30,p.y+eyeHeight(p)+aim.y*30,p.z+aim.z*30);}else this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
+        this.placeCameraBehind(state,p,origin,back,p.vehicleType==='helicopter'?16:(p.vehicleId||p.zVehicle)?6.2:victory?5.2:hold?4.8:local.emote?4.2:3.5,dt,(p.vehicleId||p.zVehicle)?'vehicle':victory?'victory':hold?'elimination':local.emote?'emote':'spectator');cameraBoom=true;
+        if(p.vehicleId||p.zVehicle){const aim=direction(p.yaw,p.pitch);this.camera.lookAt(p.x+aim.x*30,p.y+eyeHeight(p)+aim.y*30-(p.vehicleType==='helicopter'?2:0),p.z+aim.z*30);}else this.camera.lookAt(p.x, p.y+(p.downed?.5:1.05), p.z);
       }
       const draw=equipPose(local,state.time);
       this.drawPresentation=draw;
@@ -1022,7 +1022,7 @@ export class View {
           if(harvesting&&model.userData.shopTool)animatePickaxe(model.userData.shopTool,model.userData.arms,p.pickaxe,state.time-(p.swingAt??-100));
           const throwT=(this.clock-(model.userData.throwStart??-Infinity))/.78;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1)throwArms(model.userData.arms,throwT);
-          model.userData.held.visible=draw.visible&&canFight(p)&&!p.emote&&(!p.vehicleId||p.vehicleSeat===1)&&(!p.zVehicle||p.zVehicleSeat>0);
+          model.userData.held.visible=draw.visible&&canFight(p)&&!p.emote&&(!p.vehicleId||p.vehicleSeat>0)&&(!p.zVehicle||p.zVehicleSeat>0);
           model.userData.held.rotation.set(p.pitch + hands.rotation[0] + recoil * .045 + draw.rotation[0], hands.rotation[1]+draw.rotation[1], hands.rotation[2]+draw.rotation[2]);
           model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
           const sprint=p.sprintBlend||0;model.userData.held.position.y-=sprint*.3;model.userData.held.position.x+=sprint*.08;model.userData.held.rotation.x+=sprint*.65;model.userData.held.rotation.z+=sprint*.2;
@@ -1085,10 +1085,10 @@ export class View {
             sprinter: [.005,.055,.22], scatter: [.005,.018,.06],
             needle: [.006,.09,.35], zipper: [.004,.04,.14],
             anchor: [.006,.065,.28], duet: [.005,.06,.23],
-            pip: [.005,.03,.12],comet:[.007,.065,.26],
+            pip: [.005,.03,.12],comet:[.007,.065,.26],stormspike:[.028,.40,.9],
           };
           const [radius, length, trail] = profiles[b.weapon] || profiles.sprinter;
-          if(bolt)mesh = this.renderPool.acquire('bolt:'+b.weapon,()=>new THREE.Mesh(new THREE.CapsuleGeometry(radius,length,3,6),new THREE.MeshStandardMaterial({color:0xe4bc78,roughness:.4,metalness:.55})));
+          if(bolt)mesh = this.renderPool.acquire('bolt:'+b.weapon,()=>new THREE.Mesh(new THREE.CapsuleGeometry(radius,length,3,6),new THREE.MeshStandardMaterial({color:b.weapon==='stormspike'?0x96eaff:0xe4bc78,emissive:b.weapon==='stormspike'?0x1682c4:0,emissiveIntensity:1.8,roughness:.4,metalness:.55})));
           else if(b.popper){mesh=this.royaleView.itemModel({id:b.throwable==='smoke'?'smoke':'popper',count:1},false);mesh.scale.setScalar(.65);}
           else mesh=this.rocketModel();
           this.effects.add(mesh);
@@ -1097,7 +1097,7 @@ export class View {
             const tail = new THREE.Mesh(
               new THREE.CylinderGeometry(radius * 0.35, 0, trail, 5),
               new THREE.MeshBasicMaterial({
-                color: 0xdddcd2, transparent: true, opacity: 0.20,
+                color: b.weapon==='stormspike'?0x65dfff:0xdddcd2, transparent: true, opacity: b.weapon==='stormspike'?.65:.20,
                 depthWrite: false, toneMapped: false,
               }),
             );
