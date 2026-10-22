@@ -5,7 +5,7 @@ import {worldDoorBox,cacheDoorCollisions,updateDoorCollisions} from './world-rul
 import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates,playerBoxOverlap,canOccupy,pruneBuildPhases} from './physics.js';
 import {bodyHeight,eyeHeight,canFight} from './stance.js';
 import {groundAt} from './terrain.js';
-import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,propAt,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
+import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,isBreakable,propAt,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
 import {PIECES,pieceBoxes,validEdit,editRay,wallPattern} from './building-shapes.js';
 export {MATERIALS,GRID,COST,CAP,PIECES,pieceBoxes};
 export const pickaxe=()=>({id:'pickaxe',pickaxe:true,count:1,rarity:0});
@@ -134,7 +134,7 @@ export function collapse(sim){
  if(supported.size!==sim.builds.length){sim.builds=sim.builds.filter(b=>supported.has(b.id));sim.buildVersion++;rebuildMap(sim);}
 }
 export function damageObject(sim,box,amount,harvester=null){
- if(!box||box.indestructible||!Number.isFinite(amount)||amount<=0)return;
+ if(!isBreakable(box)||!Number.isFinite(amount)||amount<=0)return;
  const built=box.buildId?sim.builds.find(b=>b.id===box.buildId):null;
  if(box.buildId&&!built)return; // Stale references can never become environmental resources.
  if(!built&&!sim.worldBoxes.some(b=>b.objectId===box.objectId))return;

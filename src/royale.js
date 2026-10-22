@@ -1,7 +1,7 @@
 import {supplyHit,damageSupply,tickSupplyDrops,blastSupply} from './supply-drops.js';
 import {SMOKE_RULES} from './throwables.js';
 import {recordCombatDamage} from './combat-feedback.js';
-import {henchmanAwake} from './henchmen.js';
+import {henchmanAwake,henchmanSupported} from './henchmen.js';
 import {sanitizeSlotPreferences,vacantSlot,targetLoot,USE_CANCEL_REASONS,canAutoStack} from './inventory-policy.js';
 import {vaultOpen} from './vaults.js';
 import {lodgeStormspike,tickStormspikes} from './stormspike.js';
@@ -493,7 +493,7 @@ export class RoyaleSimulation extends Simulation {
    if(p.health<=0||p.spectating)continue;
    let actorDt=dt;
    if(p.henchman){
-    if(!henchmanAwake(this,p)){p.moving=false;p.vx=p.vz=0;p.guardLastTick=this.time;p.guardNextAt=this.time;if(!warmup&&this.storm.active&&Math.hypot(p.x-this.storm.x,p.z-this.storm.z)>this.storm.radius)this.damage(p,null,this.storm.dps*dt,'Storm');continue;}
+    if(p.grounded&&!p.fall&&!p.landing&&henchmanSupported(this,p)&&!henchmanAwake(this,p)){p.moving=false;p.vx=p.vz=0;p.guardLastTick=this.time;p.guardNextAt=this.time;if(!warmup&&this.storm.active&&Math.hypot(p.x-this.storm.x,p.z-this.storm.z)>this.storm.radius)this.damage(p,null,this.storm.dps*dt,'Storm');continue;}
     if(this.time<(p.guardNextAt||0))continue;
     actorDt=Math.min(.12,Math.max(dt,this.time-(p.guardLastTick??this.time-.1)));p.guardLastTick=this.time;p.guardNextAt=this.time+.1;
    }

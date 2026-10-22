@@ -11,7 +11,7 @@ import {seesPoint,hostile} from './bot-perception.js';
 import {isWarmup} from './royale-phases.js';
 import {BOT_WORLD_SENSES,ROYALE_TEAM_BOT as teamPolicy} from './bot-config.js';
 import {squadAnchor,followGoal} from './bot-team.js';
-import {harvestDefinition} from './building-rules.js';
+import {harvestDefinition,isBreakable} from './building-rules.js';
 import {eyeHeight} from './stance.js';
 import {coverPoint} from './bot-cover.js';
 import {searchObjective} from './bot-tactics.js';
@@ -118,7 +118,7 @@ export function chooseObjective(sim,p,brain,skill,target){
   const weapons=p.inventory.filter(i=>i?.weapon),needs=weapons.length<2||!weapons.some(i=>i.ammo+p.bank[ammoType(i.id)]>10)||p.shield<35;
   if(needs){const chest=chestObjective(sim,p,brain,nearSquad);if(chest)return chest;}
   if(!underFire&&weapons.length&&Object.values(p.materials).reduce((a,b)=>a+b,0)<teamPolicy.totalMaterials){
-   const resource=[...candidates(sim.map,p,null,0,teamPolicy.harvestRadius)].filter(b=>b.objectId&&!(brain.unreachable?.[b.objectId]>sim.time)&&!b.buildId&&b.kind!=='boundary'&&nearSquad(b)&&dist(p,b)<teamPolicy.harvestRadius&&!sim.worldDamage?.[b.objectId]?.destroyed&&p.materials[harvestDefinition(b,sim.map).material]<teamPolicy.materialTarget).map(b=>harvestObjective(sim,p,b)).filter(Boolean).sort((a,b)=>dist(p,a.goal)-dist(p,b.goal))[0];if(resource)return resource;
+   const resource=[...candidates(sim.map,p,null,0,teamPolicy.harvestRadius)].filter(b=>isBreakable(b)&&!b.doorId&&b.objectId&&!(brain.unreachable?.[b.objectId]>sim.time)&&!b.buildId&&b.kind!=='boundary'&&nearSquad(b)&&dist(p,b)<teamPolicy.harvestRadius&&!sim.worldDamage?.[b.objectId]?.destroyed&&p.materials[harvestDefinition(b,sim.map).material]<teamPolicy.materialTarget).map(b=>harvestObjective(sim,p,b)).filter(Boolean).sort((a,b)=>dist(p,a.goal)-dist(p,b.goal))[0];if(resource)return resource;
   }
   if(needs){let anchor=null,nearest=Infinity;for(const q of sim.map.floorLoot||[])if(nearSquad(q)&&q.role==='weapon'&&sim.time-(brain.visited[q.id]??-100)>35){const d=dist(p,q);if(d<nearest){nearest=d;anchor=q;}}if(anchor)return {kind:'search-room',goal:anchor,id:anchor.id};}
  }
@@ -134,6 +134,7 @@ export function chooseObjective(sim,p,brain,skill,target){
  const q=choices[0]||{x:0,z:0};return {kind:royale?'rotate-poi':'patrol',id:q.id||q.name,goal:{x:q.x,y:q.y??groundAt(sim.map,q.x,q.z),z:q.z}};
 }
 export function harvestObjective(sim,p,b){
+ if(!isBreakable(b)||b.doorId||sim.worldDamage?.[b.objectId]?.destroyed)return null;
  // Aim at the near surface: an object's own collision blocks LOS to its center.
  const dx=p.x-b.x,dz=p.z-b.z,scale=Math.max(Math.abs(dx)/Math.max(.05,b.w/2),Math.abs(dz)/Math.max(.05,b.d/2),.001);
  const sx=b.x+dx/scale,sz=b.z+dz/scale,len=Math.hypot(dx,dz)||1;

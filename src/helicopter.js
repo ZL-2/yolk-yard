@@ -1,4 +1,5 @@
-import {canOccupy,candidates,boxTop,rayBox,direction} from './physics.js';
+import {vehicleFits} from './vehicle-collision.js';
+import {candidates,boxTop,rayBox,direction} from './physics.js';
 import {groundAt} from './terrain.js';
 // Classic five-seat Choppa behavior; flight constants are original Ravel Coast
 // tuning in metres/seconds, not claimed to be Epic's unpublished engine values.
@@ -30,17 +31,13 @@ export function helicopterFloor(map,v){
  }
  return floor;
 }
-export function helicopterFits(map,v){
- for(const [x,y,z,h,r]of [[0,.4,-.9,2.2,1.28],[0,.4,1.1,1.9,1.18],[0,1.25,3.35,.65,.36],[0,1.6,5,.6,.2]]){
-  const q=heliLocal(v,x,y,z);if(q.y<groundAt(map,q.x,q.z)-.035||!canOccupy(map,q,h,r))return false;
- }
- return true;
-}
+export const helicopterFits=vehicleFits;
+
 export function spawnHelicopter(map){
  const site=map.helipad||HELIPAD,v={id:'kestrel-01',type:'helicopter',site:site.id,name:'Kestrel H-05',x:site.x,y:site.y??groundAt(map,site.x,site.z),z:site.z,yaw:site.yaw??HELIPAD.yaw,vx:0,vy:0,vz:0,speed:0,pitch:0,roll:0,health:HELICOPTER.health,seats:Array(5).fill(null),grounded:true,boost:100,boosting:false,boostTime:0,boostCooldown:0,rotor:0,fuel:100,revision:0,loudspeaker:false,falling:false,wrecked:false};
  v.y=helicopterFloor(map,v);return v;
 }
-export function stepHelicopter(v,input,map,dt){
+export function stepHelicopter(v,input,map,dt,onImpact=null){
  if(v.wrecked)return;
  const count=Math.max(1,Math.ceil(Math.min(.1,dt)*60)),step=Math.min(.1,dt)/count;
  v.impactSpeed=0;
@@ -67,9 +64,13 @@ export function stepHelicopter(v,input,map,dt){
   const swept=Math.max(1,Math.ceil(Math.hypot(v.vx,v.vy,v.vz)*step/.30));
   for(let j=0;j<swept;j++){
    const q={...v,x:v.x+v.vx*step/swept,z:v.z+v.vz*step/swept};
-   if(Math.abs(q.x)<map.size-7&&Math.abs(q.z)<map.size-7&&helicopterFits(map,q)){v.x=q.x;v.z=q.z;}else{v.impactSpeed=Math.max(v.impactSpeed,Math.hypot(v.vx,v.vz));v.vx*=.35;v.vz*=.35;}
+   const inBounds=Math.abs(q.x)<map.size-7&&Math.abs(q.z)<map.size-7;let clear=inBounds&&helicopterFits(map,q);
+   if(inBounds&&!clear&&onImpact){onImpact(q,Math.hypot(v.vx,v.vz));clear=helicopterFits(map,q);}
+   if(clear){v.x=q.x;v.z=q.z;}else{v.impactSpeed=Math.max(v.impactSpeed,Math.hypot(v.vx,v.vz));v.vx*=.35;v.vz*=.35;}
    const floor=helicopterFloor(map,v),ny=clamp(v.y+v.vy*step/swept,floor,HELICOPTER.ceiling);
-   if(helicopterFits(map,{...v,y:ny})||ny<=v.y&&ny===floor)v.y=ny;else{v.impactSpeed=Math.max(v.impactSpeed,Math.abs(v.vy));v.vy=0;}
+   const vertical={...v,y:ny};let verticalClear=helicopterFits(map,vertical);
+   if(!verticalClear&&ny>floor&&onImpact){onImpact(vertical,Math.abs(v.vy));verticalClear=helicopterFits(map,vertical);}
+   if(verticalClear||ny<=v.y&&ny===floor)v.y=ny;else{v.impactSpeed=Math.max(v.impactSpeed,Math.abs(v.vy));v.vy=0;}
    v.grounded=v.y<=floor+.03;
    if(v.grounded){if(v.vy<-8)v.impactSpeed=Math.max(v.impactSpeed,-v.vy*1.4);v.y=floor;v.vy=Math.max(0,v.vy);}
    if(v.y>=HELICOPTER.ceiling)v.vy=Math.min(0,v.vy);

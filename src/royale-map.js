@@ -52,7 +52,7 @@ const heliDistrict={id:HELIPAD.id,name:HELIPAD.name,x:190,z:56,kind:'dock',risk:
 landmarks.push({...heliDistrict,x:HELIPAD.x,z:HELIPAD.z});
 const hangar=addBuilding(heliDistrict,[0,0,24,18,1,'hangar'],0);helipad.hangarY=hangar.baseY;
 addBuilding(heliDistrict,[-4,29,12,10,2,'office'],1);
-const terrain=createTerrain(buildings,DISTRICTS,[{x:HELIPAD.x,z:HELIPAD.z,w:36,d:36,baseY:helicopterBase+.2}]),surface={terrain};
+const terrain=createTerrain(buildings,DISTRICTS,[{x:HELIPAD.x,z:HELIPAD.z,w:40,d:40,baseY:helicopterBase-.12}]),surface={terrain};
 const yAt=(x,z)=>groundAt(surface,x,z);
 function prop(kind,x,z,w=2,d=1.5,h=1.4,y=yAt(x,z),extra={}){
  const material=['truck','car','tank','container','lamp','barrels','shield-barrel','console','generator','pump','radio','silo','crane','telescope','dome','beacon','drill','solar'].includes(kind)?'metal':['rock','planter'].includes(kind)?'brick':'wood';
@@ -179,4 +179,4 @@ for(const [x,z,kind] of [[116,-173,'crate'],[122,-172,'barrels'],[145,-127,'crat
 for(const [i,b]of boxes.entries())b.objectId=b.doorId?'world-door-'+b.doorId:'world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
 for(const b of boxes){const shape=environmentCollision(b,{props,trees});if(shape)b.collisionShape=shape;}
-export const ROYALE_MAP={id:'sunnybreak',revision:12,helipad,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[80,80]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,...outposts,material:'brick'};
+export const ROYALE_MAP={id:'sunnybreak',revision:13,helipad,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[80,80]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,...outposts,material:'brick'};

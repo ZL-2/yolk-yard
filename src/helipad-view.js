@@ -10,7 +10,7 @@ export function dressHelipad(world,site,kit){
  a.fillStyle='#e4bd62';for(let i=0;i<16;i++){a.save();a.translate(512,512);a.rotate(i*Math.PI/8);a.fillRect(-12,-472,24,40);a.restore();}
  a.font='700 38px sans-serif';a.fillStyle='#e7e4cd';a.fillText('KESTREL  /  H–05',512,952);a.font='600 22px sans-serif';a.fillText('KEEP CLEAR  •  ACTIVE FLIGHT DECK',512,80);
  const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;tex.anisotropy=4;
- const deck=new T.Mesh(new T.PlaneGeometry(32,32),new T.MeshStandardMaterial({map:tex,roughness:.87,polygonOffset:true,polygonOffsetFactor:-2}));deck.rotation.x=-Math.PI/2;deck.position.set(x,y+.012,z);deck.receiveShadow=true;g.add(deck);
+ const deck=new T.Mesh(new T.PlaneGeometry(32,32),new T.MeshStandardMaterial({map:tex,roughness:.87,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));deck.rotation.x=-Math.PI/2;deck.position.set(x,y+.035,z);deck.receiveShadow=true;g.add(deck);
  for(let i=0;i<12;i++){const angle=i*Math.PI/6,lx=x+Math.cos(angle)*16.5,lz=z+Math.sin(angle)*16.5;kit.cylinder(g,lx,y+.12,lz,.20,.24,0x25333b);kit.cylinder(g,lx,y+.28,lz,.115,.12,0xffd888);}
  // Recessed apron drains, cable channels, striped barriers and fueling equipment.
  for(const side of [-1,1]){kit.block(g,x+side*17,y+.035,z,.16,.04,34,0x121f27);for(let n=-7;n<=7;n++)kit.block(g,x+side*17,y+.06,z+n*2,.23,.025,.06,0x8c9c9e);}

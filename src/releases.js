@@ -1,4 +1,10 @@
 export const RELEASE_NOTES = [
+ {number:'202',title:'Impact, flight & field fixes',changes:[
+  'ATVs and Kestrel helicopters ram at ordinary driving speed as well as during boost. Damage and launch strength scale with incoming speed. Swept hull contacts, cover checks and a per-target cooldown prevent missed fast impacts, damage through walls and repeated tick damage.',
+  'Vehicle impacts damage the structure actually contacted. Boost can break through fully built metal walls while preserving momentum when the opening clears; nearby untouched structures and protected objects remain intact. Kestrel boost now has animated twin exhaust flames.',
+  'Bosses and sentinels take normal fall damage directly to health. Distant guards keep simulating when airborne or when their supporting floor disappears. Bots reject unbreakable objects when harvesting or trying to escape, including previously selected targets.',
+  'The helipad has a physical gap above its graded terrain, with clear deck markings. ATV passengers use their selected first- or third-person view, can aim and scope, and return to their chosen view after releasing the optic. The passenger HUD shows the aim binding. Version 6.14.2 / protocol 74.'
+ ]},
  {number:'201',title:'Sticky impacts & Kestrel controls',changes:[
   'Helicopter controls take priority over shared build bindings. Hold-to-exit shows progress and keeps trying while the exit is obstructed. Side passengers use their selected first- or third-person camera, with normal aiming, scoped sights, accurate fire and working reloads.',
   'The pilot loudspeaker has an on/off indicator and audible activation cues. Its original musical signal carries outside the aircraft and uses Effects volume, including while parked. Short multiplayer taps survive input batching.',

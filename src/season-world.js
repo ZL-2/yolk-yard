@@ -68,12 +68,12 @@ export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
  if(p.health<=0||!Number.isFinite(amount)||amount<=0)return;
  if((attacker?.boss||attacker?.henchman)&&attacker.bossId===p.bossId)return;
  const def=bossDefinition(p.bossId||p.id);if(p.bossWindup&&source!=='Storm'){p.bossWindup.damage=(p.bossWindup.damage||0)+amount;if(p.bossWindup.damage>=125){p.bossWindup=null;p.abilityAt=sim.time+5;sim.emit('boss-interrupted',{player:attacker?.id,target:p.id});}}
- const shield=source==='Storm'?0:Math.min(p.shield,amount);p.shield-=shield;const dealt=Math.min(p.health,amount-shield);p.health-=dealt;p.lastDamage=sim.time;if(attacker?.contestant){p.attackerId=attacker.id;p.attackerAt=sim.time;p.scanAt=0;}
+ const shield=source==='Storm'||source==='Fall'?0:Math.min(p.shield,amount);p.shield-=shield;const dealt=Math.min(p.health,amount-shield);p.health-=dealt;p.lastDamage=sim.time;if(attacker?.contestant){p.attackerId=attacker.id;p.attackerAt=sim.time;p.scanAt=0;}
  if(p.health>0)alertBossToDamage(sim,p,attacker);
  sim.emit('hit',{player:attacker?.id,target:p.id,amount:shield+dealt,precision,shield:shield>0,shieldBreak:shield>0&&p.shield===0,shotId,weapon:source,x:p.x,y:p.y+1.4,z:p.z,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z});
  if(shield&&p.shield===0)sim.emit('royale-cue',{cue:'shield-break',player:p.id,x:p.x,y:p.y,z:p.z});
  if(p.health===0&&!p.bossDefeated){p.bossDefeated=true;p.spectating=true;p.flight='out';p.reloadEnd=0;p.bossWindup=null;p.bossVeil=null;p.bossAlert='unaware';p.bossSuspicion=0;p.targetId=null;
-  if(p.henchman){sim.dropLoot(p,{id:'sprinter',weapon:true,rarity:1,count:1,ammo:gun(p).magazine});sim.dropAmmo(p,'medium',18);sim.emit('henchman-defeated',{player:attacker?.id,target:p.id,name:attacker?.name||'Storm',targetName:p.name,weapon:source,x:p.x,y:p.y,z:p.z});return;}
+  if(p.henchman){sim.dropLoot(p,{id:'sprinter',weapon:true,rarity:1,count:1,ammo:gun(p).magazine});sim.dropAmmo(p,'medium',18);sim.emit('henchman-defeated',{player:attacker?.id,target:p.id,name:attacker?.name||source,targetName:p.name,weapon:source,x:p.x,y:p.y,z:p.z});return;}
   sim.dropLoot(p,{id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:gun(p).magazine});
   if(def.ability==='rig'){sim.dropLoot(p,{id:'jumpRig',rarity:5,count:1,charges:SEASON.rig.charges,rechargeAt:0,readyAt:0});sim.dropAmmo(p,'medium',60);sim.dropLoot(p,{id:'asterKeycard',count:1,rarity:4});}
   if(def.ability==='winch'){sim.dropLoot(p,{id:'anchorWinch',rarity:5,count:1,readyAt:0});sim.dropLoot(p,{id:'rookKeycard',count:1,rarity:4});sim.dropAmmo(p,'shells',12);sim.dropLoot(p,{id:'metal',resource:'metal',count:60,rarity:0});}

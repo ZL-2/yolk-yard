@@ -1,3 +1,5 @@
+import {vehicleFits} from './vehicle-collision.js';
+import {impactStructures,ramPlayers} from './vehicle-impact.js';
 import {HELICOPTER,isHelicopter,spawnHelicopter,helicopterSeatPose,stepHelicopter,helicopterHit} from './helicopter.js';
 import {canOccupy,candidates,rayBox,dist,direction,boxTop,wallDistance} from './physics.js';
 import {groundAt} from './terrain.js';
@@ -12,7 +14,7 @@ export const ATV_SITES=Object.freeze([
  {id:'woods',x:-90,z:132,yaw:Math.PI/2,name:'Sable Woods trailhead'},
  {id:'works',x:-125,z:60,yaw:0,name:'Ironwake service road'},
 ]);
-function fits(map,v){const d=direction(v.yaw);for(const offset of [-.72,0,.72])if(!canOccupy(map,{x:v.x+d.x*offset,y:v.y+.38,z:v.z+d.z*offset},1.05,.66))return false;return true;}
+const fits=vehicleFits;
 function floorAt(map,v){let y=groundAt(map,v.x,v.z);for(const b of candidates(map,v)){const top=boxTop(b,v.x,v.z,.5);if(top<=v.y+.52)y=Math.max(y,top);}return y;}
 export const ATV_WHEELS=Object.freeze([[-.85,-.76],[.85,-.76],[-.85,.76],[.85,.76]]);
 export function vehicleLocal(v,x,y,z){const cr=Math.cos(v.roll||0),sr=Math.sin(v.roll||0),cp=Math.cos(v.pitch||0),sp=Math.sin(v.pitch||0),cy=Math.cos(v.yaw),sy=Math.sin(v.yaw),xx=x*cr-y*sr,yy=(x*sr+y*cr)*cp-z*sp,zz=(x*sr+y*cr)*sp+z*cp;return {x:xx*cy+zz*sy,y:yy,z:-xx*sy+zz*cy};}
@@ -69,8 +71,9 @@ export function vehicleInteract(sim,p,input){
 }
 // Shared by authority and guest prediction. Six ATVs and one helicopter exist, with no
 // simulation work for an empty, settled vehicle. Thin cover uses swept steps.
-export function stepVehicle(v,input,map,dt){
- if(isHelicopter(v)){stepHelicopter(v,input,map,dt);return;}
+export function stepVehicle(v,input,map,dt,onImpact=null){
+ if(isHelicopter(v)){stepHelicopter(v,input,map,dt,onImpact);return;}
+ v.impactSpeed=0;v.impactBoost=false;
  const count=Math.max(1,Math.ceil(Math.min(.1,dt)/(1/60))),step=Math.min(.1,dt)/count;
  for(let tick=0;tick<count;tick++){
   const throttle=clamp(input.forward||0,-1,1),steer=clamp(input.strafe||0,-1,1),brake=!!input.jump;
@@ -83,9 +86,11 @@ export function stepVehicle(v,input,map,dt){
   v.steering=steer;v.yaw-=steer*ATV.steer*clamp(Math.abs(v.speed)/8,0,1)*Math.sign(v.speed||1)*step*(v.grounded?1:.25);
   const d=direction(v.yaw),travel=Math.abs(v.speed*step),sweeps=Math.max(1,Math.ceil(travel/.24));let wall=false;
   for(let i=0;i<sweeps;i++){const q={...v,x:v.x+d.x*v.speed*step/sweeps,z:v.z+d.z*v.speed*step/sweeps};const floor=floorAt(map,q);if(v.grounded&&floor-v.y<=.52&&floor-v.y>-.52)q.y=floor;
-   if(Math.abs(q.x)>map.size-2||Math.abs(q.z)>map.size-2||!fits(map,q)){wall=true;break;}v.x=q.x;v.y=q.y;v.z=q.z;
+   const inBounds=Math.abs(q.x)<=map.size-2&&Math.abs(q.z)<=map.size-2;let clear=inBounds&&fits(map,q);
+   if(inBounds&&!clear&&onImpact){onImpact(q,Math.abs(v.speed));clear=fits(map,q);}
+   if(!clear){wall=true;break;}v.x=q.x;v.y=q.y;v.z=q.z;
   }
-  v.impactBoost=wall&&v.boosting;v.impactSpeed=wall?Math.abs(v.speed):0;if(wall){v.speed*=.12;v.boosting=false;}
+  v.impactBoost||=wall&&v.boosting;v.impactSpeed=Math.max(v.impactSpeed,wall?Math.abs(v.speed):0);if(wall){v.speed*=.12;v.boosting=false;}
   const floor=vehicleSupportHeight(map,v);if(v.grounded&&v.y-floor<.52){v.y=floor;v.vy=0;}else{v.vy-=22*step;if(v.boosting)v.vy+=Math.sin(clamp(input.pitch||0,-.55,.9))*22*step;const q={...v,y:v.y+v.vy*step};if(fits(map,q))v.y=q.y;else v.vy=0;}
   v.grounded=v.y<=floor+.02;if(v.grounded){v.y=floor;v.vy=0;}
   const ahead={...v,x:v.x+d.x*.8,z:v.z+d.z*.8},behind={...v,x:v.x-d.x*.8,z:v.z-d.z*.8},right={...v,x:v.x+Math.cos(v.yaw)*.65,z:v.z-Math.sin(v.yaw)*.65},left={...v,x:v.x-Math.cos(v.yaw)*.65,z:v.z+Math.sin(v.yaw)*.65};
@@ -99,17 +104,15 @@ export function tickVehicles(sim,dt){
  for(const v of sim.vehicles||[]){if(v.wrecked||v.health<=0&&!isHelicopter(v))continue;
   for(let seat=0;seat<v.seats.length;seat++){const p=sim.players.get(v.seats[seat]);if(v.seats[seat]&&(!p||p.vehicleId!==v.id))v.seats[seat]=null;else if(p&&(p.health<=0||p.downed||p.spectating||p.connected===false))exitVehicle(sim,p,{force:true});}
   const driver=sim.players.get(v.seats[0]),raw=driver&&sim.inputs.get(driver.id),input=raw&&sim.time-driver.lastInput<.4?raw:{};
+  const before={x:v.x,y:v.y,z:v.z,yaw:v.yaw,type:v.type,vx:v.vx,vy:v.vy,vz:v.vz};
+  const impact=(probe,speed)=>impactStructures(sim,v,probe,speed);
   if(isHelicopter(v)){
-   if(driver||v.rotor>0||!v.grounded)stepHelicopter(v,input,sim.map,dt);
-   if(v.impactSpeed>8&&sim.time>=(v.crashAt||0)){v.crashAt=sim.time+.5;damageVehicle(sim,v,Math.min(160,v.impactSpeed*3),null);sim.emit?.('royale-cue',{cue:'helicopter-impact',x:v.x,y:v.y,z:v.z});
-    if(v.boosting)for(const b of candidates(sim.map,v,null,0,5))if((b.buildId||b.objectId)&&Math.abs(b.x-v.x)<b.w/2+3&&Math.abs(b.z-v.z)<b.d/2+3&&b.y<v.y+3&&b.y+b.h>v.y)sim.damageWorld?.(b,150);
-   }
+   if(driver||v.rotor>0||!v.grounded)stepHelicopter(v,input,sim.map,dt,impact);
+   if(v.impactSpeed>8&&sim.time>=(v.crashAt||0)){v.crashAt=sim.time+.5;damageVehicle(sim,v,Math.min(160,v.impactSpeed*3),null);sim.emit?.('royale-cue',{cue:'helicopter-impact',x:v.x,y:v.y,z:v.z});}
    if(v.falling&&(v.grounded||v.crashTime>9))wreckHelicopter(sim,v);
-   if(v.speed>8&&!v.falling&&sim.time>=(v.ramAt||0)){v.ramAt=sim.time+.3;for(const p of sim.players.values())if(p.health>0&&!p.spectating&&!p.vehicleId&&!teammates(sim.options,p,driver)&&Math.abs(p.y-v.y)<2.4&&Math.hypot(v.x-p.x,v.z-p.z)<2.4)sim.damage(p,driver,Math.min(60,v.speed*1.5),'Kestrel impact');}
-  }else if(driver||Math.abs(v.speed)>.05||!v.grounded){stepVehicle(v,input,sim.map,dt);
-   if(v.boosting&&Math.abs(v.speed)>12&&sim.time>=(v.ramAt||0)){v.ramAt=sim.time+.1;for(const p of sim.players.values())if(p.health>0&&!p.spectating&&!p.vehicleId&&!teammates(sim.options,p,driver)&&dist(v,p)<1.75){sim.damage(p,driver,Math.min(40,Math.abs(v.speed)*1.1),'ATV ram');p.grounded=false;p.vy=7;p.launchVelocity={x:v.vx*.6,z:v.vz*.6};p.fall={apex:p.y,immune:true,source:'vehicle-ram'};}}
-   if(v.impactBoost&&v.impactSpeed>12&&sim.time>=(v.crashAt||0)){v.crashAt=sim.time+.25;const d=direction(v.yaw);for(const b of candidates(sim.map,{x:v.x+d.x*1.5,y:v.y,z:v.z+d.z*1.5}))if((b.buildId||b.objectId)&&!b.doorId&&Math.abs(v.x+d.x*1.5-b.x)<b.w/2+1&&Math.abs(v.z+d.z*1.5-b.z)<b.d/2+1)sim.damageWorld?.(b,150);}
-  }else{v.speed=v.vx=v.vz=0;v.boosting=false;}
+  }else if(driver||Math.abs(v.speed)>.05||!v.grounded)stepVehicle(v,input,sim.map,dt,impact);
+  else{v.speed=v.vx=v.vz=0;v.boosting=false;}
+  ramPlayers(sim,v,before,driver,Math.min(.1,dt));
   for(const id of v.seats){const p=sim.players.get(id);if(p)seatPlayer(p,v);}
  }
 }
