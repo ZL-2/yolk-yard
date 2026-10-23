@@ -1,5 +1,6 @@
 import {isPublicCode} from '../../src/public-royale.js';
 import {acceptFrame} from './rate-budget.js';
+import {HostWatchdog} from './host-watchdog.js';
 import {PublicHost} from './public-host.js';
 import {MatchAuthority} from './authority.js';
 import {randomUUID} from 'node:crypto';
@@ -13,7 +14,7 @@ const MAX_FRAME=2_000_000, MAX_QUEUE=4_000_000;
 const address=/^yolk-yard-v\d+-[A-Z2-9]{8}$/;
 // One persistent process owns every connected socket. No database in the data path.
 export class RealtimeRelay {
-  constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.progression=new ProgressionService(this);this.publicHost=new PublicHost(this);this.authority=new MatchAuthority(this);this.voice=new VoiceService(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
+  constructor(){this.peers=new Map();this.sessions=new Set();this.parties=new PartyService(this);this.progression=new ProgressionService(this);this.publicHost=new PublicHost(this);this.hostWatchdog=new HostWatchdog(this);this.authority=new MatchAuthority(this);this.voice=new VoiceService(this);this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref?.();}
   attach(ws){
     let peer; const started=Date.now();
     // Browser networking can answer native pings while a costly render blocks JS.
@@ -41,6 +42,7 @@ export class RealtimeRelay {
             if(this.peers.has(id)){ws.send(JSON.stringify({type:'error',error:'unavailable-id'}));ws.close(1008,'Address taken');return;}
             if(this.peers.size>=1000)throw Error('Server full');
             peer={id,token:randomUUID(),ws,links:new Map(),pending:[],pendingBytes:0,seq:0,acked:0,clientSeq:0,history:[],historyBytes:0,lastSeen:Date.now(),rateAt:Date.now(),frames:0,bytes:0};
+            if(m.hostProof){const owner=this.peers.get(m.hostProof.id);if(!owner||owner.token!==m.hostProof.token||!owner.ws)throw Error('Invalid host proof');peer.hostOwner=owner.id;}
             this.peers.set(id,peer);this.sessions.add(peer);if(this.publicHost.roomByAddress(id)&&this.publicHost.enabled)this.publicHost.registered(peer,m);void this.progression.register(peer,m.progressToken);
             // The elected alias shares its proven live member's progression identity,
             // including browsers that cannot persist a local storage credential.
@@ -101,6 +103,7 @@ export class RealtimeRelay {
     if(m.type==='authority-create'||m.type==='authority-command'){this.authority.command(peer,m);return;}
     if(m.type==='public-progress'){if(!!this.publicHost.roomByAddress(peer.id)&&this.publicHost.isTarget(peer)&&m.state?.matchId===this.publicHost.roomFor(peer)?.state?.matchId)this.progression.frame(peer,m.state);return;}
     if(m.type==='public-crown'){this.publicHost.saveCrown(peer,m.record);return;}
+    if(m.type==='match-member-ready'){this.hostWatchdog?.ready(peer,m);return;}
     if(m.type==='public-member-ready'){this.publicHost.ready(peer,m);return;}
     if(m.type==='progress')return; // Only the elected public host or legacy authority may report results.
     if(m.type==='list'){
@@ -122,7 +125,7 @@ export class RealtimeRelay {
         this.send(peer,{type:'publish-rejected'});return;
       }
       peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:r.mode,players:r.players,capacity:Math.max(2,Math.min(MAX_HUMANS,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(MAX_CONTESTANTS,Number(r.contestantCapacity)||8)),teamSize:(r.mode==='boxfight'?[2,3,4]:[2,4]).includes(r.teamSize)?r.teamSize:1,boxFormat:r.mode==='boxfight'&&r.boxFormat==='ffa'?'ffa':'teams',public:!!this.publicHost.roomByAddress(peer.id),hostRun:true,recurring:!!this.publicHost.roomByAddress(peer.id),phase:r.phase}:null;
-      peer.listedAt=Date.now();return;
+      this.hostWatchdog?.publish(peer,r);peer.listedAt=Date.now();return;
     }
     if(m.type==='connect'){
       if(typeof m.channel!=='string'||!/^[-a-z0-9]{36}$/.test(m.channel)||peer.links.size>=MAX_HUMANS+MAX_SPECTATORS)throw Error('Invalid channel');
@@ -155,6 +158,7 @@ export class RealtimeRelay {
         // A validated ticket can restore the social identity before the new
         // browser's progression credential has been bound by joined.
         if(entry.type==='data'&&['hello','profile'].includes(entry.data?.type)&&entry.data.profile)entry.data={...entry.data,profile:this.progression.rankRewards.sanitizePeer(entry.data.profile,peer,entry.data.type==='hello'?entry.data.admission?.memberId:undefined)};
+        if(entry.type==='data')this.hostWatchdog?.observe(peer,entry.data);
         this.send(other,{type:entry.type==='accept'?'opened':entry.type==='close'?'closed':'data',channel:entry.channel,...(entry.type==='data'?{data:entry.data}:{})});
         if(entry.type==='close'){peer.links.delete(entry.channel);other.links.delete(entry.channel);}
       }return;
@@ -169,7 +173,7 @@ export class RealtimeRelay {
     for(const [channel,other] of peer.links){other.links.delete(channel);this.send(other,{type:'closed',channel});}
     peer.links.clear();peer.history=[];peer.pending=[];
   }
-  sweep(){this.progression.sweep();this.publicHost.sweep();for(const peer of this.peers.values()){
+  sweep(){this.progression.sweep();this.publicHost.sweep();this.hostWatchdog.sweep();for(const peer of this.peers.values()){
     if(peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)this.remove(peer,1001,'Reconnect grace expired');
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}

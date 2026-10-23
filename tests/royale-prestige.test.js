@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Box3,Vector3} from 'three';
-import {ROYALE_PICKAXES,royaleRating,eligibleRankPickaxes,rankLoadout} from '../src/royale-ranking.js';
+import {ROYALE_PICKAXES,ROYALE_REWARDS,ROYALE_SETS,eligibleRankItems,royaleRating,eligibleRankPickaxes,rankLoadout} from '../src/royale-ranking.js';
 import {rankPublicPlayers,publicLeaderboardView} from '../server/realtime/leaderboards.js';
 import {ProgressionService} from '../server/realtime/progression.js';
 import {normalizeWallet,purchase,ownedLoadout} from '../src/egg-wallet.js';
@@ -10,7 +10,7 @@ import {leaderboardMarkup} from '../src/leaderboard-ui.js';
 import {SocialStore} from '../server/realtime/social-store.js';
 import {mkdtemp,rm} from 'node:fs/promises';
 
-const ids=ROYALE_PICKAXES.map(i=>i.id);
+const ids=ROYALE_PICKAXES.map(i=>i.id),all=ROYALE_REWARDS.map(i=>i.id),extras=all.filter(id=>!ids.includes(id));
 const account=(socialId,wins,kills)=>({socialId,publicName:socialId,publicParticipant:true,publicTotals:{version:1,wins,kills}});
 function fixture(){const identities=new Map(),sent=[],updates=[],users=new Map(),parties={store:{identities,save(){}},users,send:(u,m)=>{if(u)sent.push([u.id,m]);},sync(){}};const relay={parties,peers:new Map(),send:(p,m)=>updates.push([p.id,m])},service=new ProgressionService(relay,{path:null});relay.progression=service;
  const add=(id,wins=0,kills=0)=>{identities.set(id,{profile:{name:id,pickaxe:''}});users.set(id,{id,profile:identities.get(id).profile});service.accounts.set(id,account(id,wins,kills));service.rankRewards.invalidate();};return {service,relay,identities,sent,updates,add};}
@@ -30,10 +30,10 @@ test('Royale score has unique stable places, rewards wins in a score tie and lea
 });
 test('claims are cumulative; dropping and regaining thresholds revoke and re-offer only affected rewards',async()=>{
  const f=fixture(),r=f.service.rankRewards;f.add('champion',2,20);f.add('rival',1,0);
- assert.deepEqual(r.status('champion').pending,ids);r.claim('champion',ids,ids[3]);assert.equal(f.identities.get('champion').profile.pickaxe,ids[3]);assert.deepEqual(r.status('champion').pending,[]);
+ assert.deepEqual(r.status('champion').pending,all);r.claim('champion',ids,ids[3]);assert.equal(f.identities.get('champion').profile.pickaxe,ids[3]);assert.deepEqual(r.status('champion').pending,extras);
  f.service.recordPublicStat({identity:'rival'},'wins');f.service.recordPublicStat({identity:'rival'},'wins');r.refresh();let status=r.status('champion');assert.equal(status.rank,2);assert.deepEqual(status.claimed,ids.slice(0,3));assert.equal(f.identities.get('champion').profile.pickaxe,'');assert.throws(()=>r.claim('champion',[ids[3]],ids[3]),/rank changed/);
  for(let i=0;i<25;i++)f.add('ahead-'+i,10,10);r.refresh();status=r.status('champion');assert.deepEqual(status.eligible,[]);assert.deepEqual(status.claimed,[]);
- f.service.accounts.get('champion').publicTotals.wins=50;r.invalidate();r.refresh();assert.deepEqual(r.status('champion').pending,ids);assert.equal(r.status('champion').claimed.length,0);assert.throws(()=>r.claim('champion',[ids[0]],ids[3]),/Choose one/);await f.service.close();
+ f.service.accounts.get('champion').publicTotals.wins=50;r.invalidate();r.refresh();assert.deepEqual(r.status('champion').pending,all);assert.equal(r.status('champion').claimed.length,0);assert.throws(()=>r.claim('champion',[ids[0]],ids[3]),/Choose one/);await f.service.close();
 });
 test('revocation reaches an active authoritative actor and a browser-hosted guest connection',async()=>{
  const f=fixture(),r=f.service.rankRewards;f.add('champion',1,1);r.claim('champion',ids,ids[3]);
@@ -50,7 +50,7 @@ test('all four trophy tools have distinct detailed geometry and a bounded shared
 test('claims survive a complete store reload and are still revoked against restored rankings',async()=>{
  const directory=await mkdtemp('/tmp/ravel-prestige-');let store=new SocialStore(directory+'/social.json'),service;
  try{const {identity,token}=store.identify(null,{name:'Persisted Champion',pickaxe:''}),relay={parties:{store},peers:new Map()};service=new ProgressionService(relay,{path:directory+'/progress.json'});await service.ready;service.accounts.set('champion',account(identity.id,2,25));service.dirty=true;service.rankRewards.invalidate();service.rankRewards.claim(identity.id,ids,ids[3]);await store.flush();await service.close();
-  store=new SocialStore(directory+'/social.json');relay.parties.store=store;service=new ProgressionService(relay,{path:directory+'/progress.json'});await service.ready;const restored=store.identify(token,identity.profile);assert.equal(restored.identity.id,identity.id);assert.deepEqual(service.rankRewards.status(identity.id).claimed,ids);assert.deepEqual(service.rankRewards.status(identity.id).pending,[]);assert.equal(restored.identity.profile.pickaxe,ids[3]);service.accounts.set('rival',account('rival',10,0));service.rankRewards.invalidate();service.rankRewards.refresh();assert.equal(restored.identity.profile.pickaxe,'');assert.deepEqual(service.rankRewards.status(identity.id).claimed,ids.slice(0,3));
+  store=new SocialStore(directory+'/social.json');relay.parties.store=store;service=new ProgressionService(relay,{path:directory+'/progress.json'});await service.ready;const restored=store.identify(token,identity.profile);assert.equal(restored.identity.id,identity.id);assert.deepEqual(service.rankRewards.status(identity.id).claimed,ids);assert.deepEqual(service.rankRewards.status(identity.id).pending,extras);assert.equal(restored.identity.profile.pickaxe,ids[3]);service.accounts.set('rival',account('rival',10,0));service.rankRewards.invalidate();service.rankRewards.refresh();assert.equal(restored.identity.profile.pickaxe,'');assert.deepEqual(service.rankRewards.status(identity.id).claimed,ids.slice(0,3));
  }finally{await service?.close();await store.flush();clearTimeout(store.timer);await rm(directory,{recursive:true,force:true});}
 });
 

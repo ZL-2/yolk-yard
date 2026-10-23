@@ -24,3 +24,12 @@ test('scroll pulses support discrete actions but cannot become held movement or 
  for(const action of ['forward','aim','sprint','scores'])assert.ok(assignBinding(normalizeBindings(),action,0,'WheelDown').error);
  assert.ok(assignBinding(normalizeBindings(),'jump',0,'Escape').error);
 });
+
+test('shared vehicle bindings migrate custom choices and preserve passenger combat',async()=>{
+ const {helicopterActions,CONTROL_GROUPS,CONTROLS}=await import('../src/keybinds.js');
+ const b=normalizeBindings({heliSeat:['KeyL',null],heliBoost:['ShiftRight',null],heliExit:['KeyE',null],interact:['KeyF',null]});assert.deepEqual(b.vehicleSeat,['KeyL',null]);assert.deepEqual(b.vehicleBoost,['ShiftRight',null]);assert.equal(b.heliExit,undefined);assert.deepEqual(normalizeBindings(b),b);
+ const defaults=normalizeBindings();assert.deepEqual(defaults.vehicleSeat,['ControlLeft',null]);assert.deepEqual(defaults.vehicleBoost,['ShiftLeft',null]);
+ for(const type of ['atv','helicopter']){const driver={vehicleId:'v',vehicleType:type,vehicleSeat:0};assert.deepEqual(helicopterActions(driver,defaults,'ControlLeft'),['vehicleSeat']);assert.deepEqual(helicopterActions(driver,defaults,'KeyF'),['interact']);assert.deepEqual(helicopterActions(driver,defaults,'ShiftLeft'),['vehicleBoost']);assert.deepEqual(helicopterActions({...driver,vehicleSeat:1},defaults,'ShiftLeft'),[]);assert.deepEqual(helicopterActions({...driver,vehicleSeat:1},defaults,'Mouse2'),[]);}
+ assert.equal(assignBinding(defaults,'vehicleSeat',0,'KeyF').bindings.interact[0],null,'An exit binding cannot also switch seats');
+ const categories=CONTROL_GROUPS.flatMap(([,ids])=>ids);assert.equal(new Set(categories).size,CONTROLS.length);
+});

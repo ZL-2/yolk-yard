@@ -105,7 +105,7 @@ import './lobby-status.css';
 import './egg-shop.css';
 import './ravelfront.css';
 import {RoyaleRewards} from './royale-rewards-ui.js';
-import {rankPickaxe,rankingMetrics} from './royale-ranking.js';
+import {rankItem,PRESTIGE_SLOTS,rankingMetrics} from './royale-ranking.js';
 import {EggShop} from './egg-shop.js';
 import {EggWallet,ownedLoadout} from './egg-wallet.js';
 import {KeybindEditor} from "./keybind-editor.js";
@@ -208,7 +208,7 @@ let crownStatus=read('ravelfront-crown-status',{season:1,wins:0,owned:false,unlo
 let menuSection=['locker','shop','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
 let privateMatchDrafts={},leaderboardSelection={playMode:null,mode:'royale'},leaderboardDataMode='',leaderboards=null,leaderboardTab='rating',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
 const menuShopStates={};
-let pendingRankPickaxe=rankPickaxe(profile.pickaxe)?profile.pickaxe:null;
+let pendingRankLoadout=Object.fromEntries(PRESTIGE_SLOTS.filter(slot=>rankItem(profile[slot])).map(slot=>[slot,profile[slot]]));
 Object.assign(profile,ownedLoadout(eggWallet.value,profile));
 let eggShop,party,activeLaunch=null,lastEarnAction=-Infinity,earnMatch=0;
 let view,
@@ -236,7 +236,7 @@ sound.setVolumes(settings);
 const keys = new Set();
 const vehicleControlCodes=new Set();
 const actionToggles=new ActionToggles();
-const actionDown = action => settings.keybinds[action].some(code=>code&&keys.has(code)&&(action.startsWith('heli')||!vehicleControlCodes.has(code)));
+const actionDown = action => settings.keybinds[action].some(code=>code&&keys.has(code)&&(action.startsWith('heli')||action.startsWith('vehicle')||action==='atvBrake'||action==='interact'||!vehicleControlCodes.has(code)));
 const controlLabel = action => settings.keybinds[action].filter(Boolean).map(bindingLabel).join(' / ') || 'Unbound';
 let bindingEditor = null;
 // Preserve brief actions until a simulation tick consumes them, even after a slow frame.
@@ -289,8 +289,9 @@ async function openOwnerMapEditor(overview){
 }
 let briefingsComplete=false;
 const rankRewards=new RoyaleRewards({getView:()=>view,getProfile:()=>profile,connected:()=>!!party?.ready,request:(...args)=>party?.ready?party.request(...args):Promise.reject(Error('Connect to claim your rank rewards.')),ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]'),beforeOpen:()=>{if(screen==='game'&&!paused)pauseMenu();},onAccess:record=>{
- const selected=record.equipped||(pendingRankPickaxe&&record.claimed.includes(pendingRankPickaxe)?pendingRankPickaxe:'');pendingRankPickaxe=null;
- if(selected&&profile.pickaxe!==selected||rankPickaxe(profile.pickaxe)&&profile.pickaxe!==selected){profile={...profile,pickaxe:selected};remember();if(screen==='menu')view.preview(profile);}
+ const next={...profile,royaleRank:record.rank<=25?record.rank:0};
+ for(const slot of PRESTIGE_SLOTS){const selected=record.loadout?.[slot]||(record.claimed.includes(pendingRankLoadout[slot])?pendingRankLoadout[slot]:'');if(selected||rankItem(profile[slot]))next[slot]=selected;}
+ pendingRankLoadout={};if(JSON.stringify(next)!==JSON.stringify(profile)){profile=next;remember();if(screen==='menu')view.preview(profile);}
 },onChange:()=>{if(eggShop?.root?.isConnected&&eggShop.tab==='locker')eggShop.render();leaderboardFetchedAt=0;void refreshLeaderboards();}});
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
@@ -646,7 +647,7 @@ function bindPublicCrowns(sim){bindCrownStore(sim,{load:id=>sim.players.get(id)?
 function callbacks() {
   return {
     onProgress:(type,event)=>{
-      if(type==='rank-cosmetic'){const p=sim?.players.get(event.player);if(p){p.pickaxe=event.pickaxe;if(p.nextProfile)p.nextProfile.pickaxe=event.pickaxe;}if(event.player===localId){profile={...profile,pickaxe:event.pickaxe};save('yolk-profile',profile);}return;}
+      if(type==='rank-cosmetic'){const cosmetics=Object.fromEntries([...PRESTIGE_SLOTS,'royaleRank'].filter(slot=>Object.hasOwn(event.cosmetics||{},slot)).map(slot=>[slot,event.cosmetics[slot]]));const p=sim?.players.get(event.player);if(p){Object.assign(p,cosmetics);if(p.nextProfile)Object.assign(p.nextProfile,cosmetics);}if(event.player===localId){profile={...profile,...cosmetics};save('yolk-profile',profile);}return;}
       if(type==='reward'){
         const r=event.receipt;if(!r||eggWallet.value.receipts.includes(r.id))return;
         void eggWallet.awardVerified(r).then(({applied})=>{
@@ -1399,7 +1400,7 @@ async function launchParty(launch){
 function initializeParty(){
  if(needsPlayerName(profile.name))return;
  if(party){party.updateProfile(profile);return;}
- party=new PartyClient(pendingRankPickaxe?{...profile,pickaxe:pendingRankPickaxe}:profile,{
+ party=new PartyClient({...profile,...pendingRankLoadout},{
   'royale-rank':m=>rankRewards.receive(m.record),
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
   status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
@@ -1677,7 +1678,7 @@ document.addEventListener("pointerlockchange", () => {
 function pressControl(code) {
  const rider=state?.players.find(p=>p.id===localId);
  const vehicleActions=helicopterActions(rider,settings.keybinds,code);
- if(vehicleActions.length){keys.add(code);vehicleControlCodes.add(code);for(const id of vehicleActions)if(id==='heliSeat'||id==='heliHorn')queuedActions.add(id);return;}
+ if(vehicleActions.length){keys.add(code);vehicleControlCodes.add(code);for(const id of vehicleActions)if(id==='vehicleSeat'||id==='heliHorn')queuedActions.add(id);return;}
  const passengerAim=rider?.vehicleSeat>0&&settings.keybinds.aim.includes(code);
  if(rider?.vehicleId&&!passengerAim&&Object.entries(settings.keybinds).some(([id,codes])=>id.startsWith('build')&&codes.includes(code)))return;
   if(state?.boxfight&&state.players.find(p=>p.id===localId)?.spectating&&['ArrowLeft','ArrowRight'].includes(code)){switchSpectator(code==='ArrowLeft'?-1:1);return;}
@@ -1971,7 +1972,7 @@ function frameInput() {
 
   if(state?.boxfight&&input.roundSeen!==state.round){const p=state.players.find(p=>p.id===localId);input.roundSeen=state.round;if(p?.boxSpawn){input.yaw=p.boxSpawn.yaw;input.pitch=state.zonewars?-.35:0;input.slot=state.zonewars?0:1;pendingInputs=[];predicted=null;}}
   const nextInput = {
-    heliUp:active&&actionDown('heliUp'),heliDown:active&&actionDown('heliDown'),heliBoost:active&&actionDown('heliBoost'),heliSeat:active&&(actionDown('heliSeat')||queuedActions.has('heliSeat')),heliExit:active&&actionDown('heliExit'),heliHorn:active&&(actionDown('heliHorn')||queuedActions.has('heliHorn')),
+    heliUp:active&&actionDown('heliUp'),heliDown:active&&actionDown('heliDown'),heliBoost:active&&actionDown('vehicleBoost'),heliSeat:active&&(actionDown('vehicleSeat')||queuedActions.has('vehicleSeat')),heliExit:active&&!!localRider?.vehicleId&&actionDown('interact'),heliHorn:active&&(actionDown('heliHorn')||queuedActions.has('heliHorn')),
     seq: ++seq,
     round:state?.round,
     ...localPerspective(),
@@ -1990,7 +1991,7 @@ function frameInput() {
         touch.x
       : 0,
     jump:
-      active && (actionDown("jump") || touch.jump || queuedActions.has("jump")),
+      active && (actionDown(localRider?.vehicleId&&localRider.vehicleType!=='helicopter'?'atvBrake':'jump') || touch.jump || queuedActions.has("jump")),
     fire: combat && !buildControls.editing && !buildControls.suppressBuildFire && (actionDown("fire") || touch.fire || queuedActions.has("fire")),
     aim: combat && !buildControls.editing && (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim),
     reload:
@@ -2004,8 +2005,8 @@ function frameInput() {
     buildMode:combat&&buildControls.buildMode,buildType:buildControls.buildType,buildMaterial:buildControls.buildMaterial,buildRotation:buildControls.buildRotation,buildAnchor:buildControls.buildAnchor,editing:buildControls.editing,
     slot: input.slot,
     crouch:active&&(actionToggles.value('crouch',actionDown('crouch'),settings)||touch.crouch),
-    sprint:active&&(actionToggles.value('sprint',actionDown('sprint'),settings)||touch.sprint),
-    interact:active&&(actionToggles.value('interact',actionDown('interact'),settings)||touch.interact||queuedActions.has('interact')),
+    sprint:active&&(localRider?.vehicleId?actionDown('vehicleBoost'):actionToggles.value('sprint',actionDown('sprint'),settings)||touch.sprint),
+    interact:active&&(localRider?.vehicleId?actionDown('interact'):actionToggles.value('interact',actionDown('interact'),settings)||touch.interact||queuedActions.has('interact')),
     drop:active&&queuedActions.has('drop'),swapSlot:active?swapSlot:-1,
   };
   swapSlot=-1;

@@ -1,5 +1,5 @@
 import {rankPublicPlayers} from './leaderboards.js';
-import {eligibleRankPickaxes,rankPickaxe,rankLoadout} from '../../src/royale-ranking.js';
+import {eligibleRankItems,rankItem,rankLoadout,PRESTIGE_SLOTS} from '../../src/royale-ranking.js';
 // Entitlements belong to the authenticated social identity, never the local wallet.
 export class RoyaleRankRewards{
  constructor(progression){this.progression=progression;this.relay=progression.relay;this.sent=new Map();this.dirty=true;}
@@ -7,19 +7,23 @@ export class RoyaleRankRewards{
  ranks(){if(this.dirty||!this.rows){this.rows=rankPublicPlayers(this.progression.accounts,this.relay.parties?.store.identities,'royale').rating;this.byIdentity=new Map(this.rows.filter(p=>p.socialId).map(p=>[p.socialId,p]));this.dirty=false;}return this.rows;}
  status(id){
   this.ranks();const store=this.relay.parties?.store,identity=store?.identities.get(id);if(!identity)return null;
-  const row=this.byIdentity.get(id),eligible=eligibleRankPickaxes(row?.rank,row?.rating),old=identity.royaleRankRewards||{eligible:[],claimed:[],epoch:0,revision:0};
-  if(JSON.stringify(old.eligible)!==JSON.stringify(eligible)){
-   identity.royaleRankRewards={eligible,claimed:(old.claimed||[]).filter(x=>eligible.includes(x)),epoch:old.epoch+1,revision:old.revision+1};store.save?.();
+  const row=this.byIdentity.get(id),eligible=eligibleRankItems(row?.rank,row?.rating),old=identity.royaleRankRewards||{eligible:[],claimed:[],epoch:0,revision:0};
+  const rank=row?.rating>0?row.rank:0,rating=row?.rating||0,changed=JSON.stringify(old.eligible)!==JSON.stringify(eligible);
+  if(changed||old.rank!==rank||old.rating!==rating){
+   identity.royaleRankRewards={eligible,claimed:(old.claimed||[]).filter(x=>eligible.includes(x)),rank,rating,epoch:old.epoch+(changed?1:0),revision:old.revision+1};store.save?.();
   }
   const record=identity.royaleRankRewards||old,claimed=(record.claimed||[]).filter(x=>eligible.includes(x));
-  return {identity:id,rank:row?.rating>0?row.rank:0,rating:row?.rating||0,wins:row?.wins||0,kills:row?.kills||0,eligible,claimed,equipped:claimed.includes(identity.profile?.pickaxe)?identity.profile.pickaxe:'',pending:eligible.filter(x=>!claimed.includes(x)),epoch:record.epoch,revision:record.revision};
+  return {identity:id,rank:row?.rating>0?row.rank:0,rating:row?.rating||0,wins:row?.wins||0,kills:row?.kills||0,eligible,claimed,equipped:claimed.includes(identity.profile?.pickaxe)?identity.profile.pickaxe:'',loadout:Object.fromEntries(PRESTIGE_SLOTS.filter(slot=>claimed.includes(identity.profile?.[slot])).map(slot=>[slot,identity.profile[slot]])),pending:eligible.filter(x=>!claimed.includes(x)),epoch:record.epoch,revision:record.revision};
  }
- sanitize(profile,id){return rankLoadout(profile,this.status(id)?.claimed||[]);}
+ sanitize(profile,id){const status=this.status(id);return {...rankLoadout(profile,status?.claimed||[]),royaleRank:status?.rank>0&&status.rank<=25?status.rank:0};}
  sanitizePeer(profile,peer,admittedIdentity){return this.sanitize(profile,admittedIdentity||this.progression.accounts.get(peer?.progressId)?.socialId);}
  sync(id,force=false){
-  const status=this.status(id);if(!status)return null;
-  const parties=this.relay.parties,identity=parties.store.identities.get(id),user=parties.users?.get(id),approved=rankLoadout(identity.profile,status.claimed);
-  if(approved!==identity.profile){identity.profile=approved;if(user)user.profile=approved;parties.store.save?.();this.apply(id,'');if(user)parties.sync?.(parties.parties?.get(user.party));}
+  let status=this.status(id);if(!status)return null;
+  const parties=this.relay.parties,identity=parties.store.identities.get(id),user=parties.users?.get(id),approved=this.sanitize(identity.profile,id);
+  if(JSON.stringify(approved)!==JSON.stringify(identity.profile)){
+   const changes=Object.fromEntries([...PRESTIGE_SLOTS,'royaleRank'].filter(slot=>approved[slot]!==identity.profile?.[slot]).map(slot=>[slot,approved[slot]]));
+   identity.profile=approved;if(user)user.profile=approved;parties.store.save?.();this.apply(id,changes);if(user)parties.sync?.(parties.parties?.get(user.party));status=this.status(id);
+  }
   const key=JSON.stringify(status);if(force||this.sent.get(id)!==key){this.sent.set(id,key);parties.send?.(user,{type:'royale-rank',record:status});}
   return status;
  }
@@ -31,20 +35,21 @@ export class RoyaleRankRewards{
  }
  claim(id,ids,equip){
   const status=this.sync(id),requested=[...new Set(Array.isArray(ids)?ids:[])];
-  if(!status||!requested.length||requested.length>4||requested.some(x=>!rankPickaxe(x)||!status.eligible.includes(x)))throw Error('Your Royale rank changed. Refresh your rewards to see current access.');
-  if(equip&&!requested.includes(equip))throw Error('Choose one of the rewards being claimed.');
+  if(!status||!requested.length||requested.length>24||requested.some(x=>!rankItem(x)||!status.eligible.includes(x)))throw Error('Your Royale rank changed. Refresh your rewards to see current access.');
+  // A set is an explicit slot -> item map, never an ambiguous "equip all".
+  const choices=typeof equip==='string'?{[rankItem(equip)?.slot||'pickaxe']:equip}:equip&&typeof equip==='object'&&!Array.isArray(equip)?equip:{};
+  if(equip&&(!Object.keys(choices).length||Object.entries(choices).some(([slot,item])=>!PRESTIGE_SLOTS.includes(slot)||rankItem(item)?.slot!==slot||!requested.includes(item))))throw Error('Choose one of the rewards being claimed for each equipment slot.');
   const store=this.relay.parties.store,identity=store.identities.get(id),record=identity.royaleRankRewards;
-  record.claimed=[...new Set([...status.claimed,...requested])];record.revision++;store.save?.();
-  if(equip){identity.profile={...identity.profile,pickaxe:equip};const u=this.relay.parties.users?.get(id);if(u){u.profile=identity.profile;this.relay.parties.sync?.(this.relay.parties.parties?.get(u.party));}this.apply(id,equip);}
-  return this.sync(id,true);
+  record.claimed=[...new Set([...status.claimed,...requested])];record.revision++;
+  if(Object.keys(choices).length){identity.profile={...identity.profile,...choices};const u=this.relay.parties.users?.get(id);if(u){u.profile=identity.profile;this.relay.parties.sync?.(this.relay.parties.parties?.get(u.party));}this.apply(id,choices);}
+  store.save?.();return this.sync(id,true);
  }
- apply(id,pickaxe){
-  // Update an already equipped tool, including a browser-hosted match, without
-  // respawning anyone or changing weapons/combat state.
+ apply(id,cosmetics){
+  // Apply only changed appearance slots. Inventory, health and movement survive.
   for(const peer of this.relay.peers?.values()||[]){if(this.progression.accounts.get(peer.progressId)?.socialId!==id)continue;
-   const room=this.relay.authority?.roomFor(peer),p=room?.sim.players.get(peer.authorityId||peer.id);if(p){p.pickaxe=pickaxe;if(p.nextProfile)p.nextProfile.pickaxe=pickaxe;}
-   const player=peer.listing?'host':peer.id;this.relay.send?.(peer,{type:'rank-cosmetic',player,pickaxe});
-   for(const host of peer.links?.values()||[])if(host.listing)this.relay.send?.(host,{type:'rank-cosmetic',player:peer.id,pickaxe});
+   const room=this.relay.authority?.roomFor(peer),p=room?.sim.players.get(peer.authorityId||peer.id);if(p){Object.assign(p,cosmetics);if(p.nextProfile)Object.assign(p.nextProfile,cosmetics);}
+   const player=peer.listing?'host':peer.id,message={type:'rank-cosmetic',player,cosmetics,...(Object.hasOwn(cosmetics,'pickaxe')?{pickaxe:cosmetics.pickaxe}:{})};this.relay.send?.(peer,message);
+   for(const host of peer.links?.values()||[])if(host.listing)this.relay.send?.(host,{...message,player:peer.id});
   }
  }
  close(){clearTimeout(this.timer);this.sent.clear();}

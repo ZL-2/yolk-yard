@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {prestigeOutfit} from './royale-prestige-models.js';
 // Everything below is baked into the same anatomical skinned mesh. Cloth,
 // glass, leather and metal select surface-atlas regions, never extra draw calls.
 export function addOperatorDesign(item,c,{add,panel,ellipsoid,rings}){
@@ -43,6 +44,7 @@ export function addOperatorDesign(item,c,{add,panel,ellipsoid,rings}){
  const fur=(color='#d5ceba')=>{for(const s of [-1,1])for(let j=0;j<8;j++){const x=s*(.068+j*.020),y=1.48-j*.014,z=.026-Math.sin(j/7*Math.PI)*.08;ellipsoid(x,y,z,.023,.028,.036,j%3===0?'#b9b19e':color,'chest',6,'cloth');}};
  const knee=(color,s,heavy=false)=>{const bone=s<0?'shinL':'shinR';facet(s*.12,.497,-.092,heavy?.14:.12,heavy?.16:.12,.024,color,bone);for(const x of [-.038,.038])rivet(s*.12+x,.533,-.10,bone);};
  const buckle=(x,y,z,bone,color=trim)=>{plate(x,y,z,.031,.034,.01,color,bone,0,0,'metal');plate(x,y,z-.007,.018,.020,.012,dark,bone,0,0,'leather');};
+ if(item.rankReward){prestigeOutfit(item,c,{helmet,mask,visor,hood,shoulders,bracers,facet,plate,cord,ring,knee,rings,ellipsoid});return;}
  if(model?.startsWith('guard-')){
   if(model==='guard-nyx'){helmet(dark,.127,.17,.12,'polymer');hood();mask(dark);for(const s of [-1,1])plate(s*.035,1.705,-.177,.067,.010,.009,trim,'head',s*.60,0,'glass');}
   else{helmet(armor,.137,.173,.129,'polymer');visor(trim,.20,.063);facet(0,1.611,-.133,.10,.069,.027,dark,'head',undefined,'polymer');for(const s of [-1,1])ellipsoid(s*.133,1.682,.001,.024,.039,.029,dark,'head',8,'rubber');}

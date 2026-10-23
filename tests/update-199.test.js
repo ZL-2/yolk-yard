@@ -51,7 +51,7 @@ test('five seats, held exit, crash and passenger input survive network snapshots
  for(let i=1;i<5;i++){const rider=s.addPlayer('rider'+i,{name:'Rider '+i});Object.assign(rider,{health:100,flight:'ground',spectating:false,connected:true,x:1,y:0,z:0});vehicleInteract(s,rider,{interact:true});assert.equal(rider.vehicleSeat,i);}
  const clean=sanitizeInput({heliUp:true,heliDown:true,heliBoost:true,heliSeat:true,heliExit:true,heliHorn:true});for(const key of ['heliUp','heliDown','heliBoost','heliSeat','heliExit','heliHorn'])assert.equal(clean[key],true);
  const encoder=new SnapshotEncoder(),decoder=new SnapshotDecoder(),round=decoder.decode(JSON.parse(JSON.stringify(encoder.encode({state:s.snapshot(),checkpoint:s.checkpoint()}).frame)));assert.equal(round.state.royale.vehicles[0].seats.length,5);assert.equal(round.state.players.find(p=>p.id==='human').vehicleType,'helicopter');const copy=new RoyaleSimulation().restore(s.checkpoint());assert.deepEqual(copy.vehicles,s.vehicles);
- v.y=30;v.grounded=false;s.time+=1;vehicleInteract(s,p,{heliExit:true});assert.equal(p.vehicleId,v.id);s.time+=.5;vehicleInteract(s,p,{heliExit:true});assert.equal(p.vehicleId,null);assert.equal(p.fall.immune,false);assert.equal(p.flight,'ground');
+ v.y=30;v.grounded=false;s.time+=1;vehicleInteract(s,p,{});vehicleInteract(s,p,{heliExit:true});assert.equal(p.vehicleId,v.id);s.time+=.5;vehicleInteract(s,p,{heliExit:true});assert.equal(p.vehicleId,null);assert.equal(p.fall.immune,false);assert.equal(p.flight,'ground');
  damageVehicle(s,v,1501);assert.equal(v.falling,true);assert.equal(v.wrecked,false);assert.ok(v.seats.some(Boolean));for(let i=0;i<360&&!v.wrecked;i++){s.time+=1/60;tickVehicles(s,1/60);}assert.equal(v.wrecked,true);assert.ok(v.seats.every(x=>!x));
 });
 test('guest prediction matches authority flight without mutating its received snapshot',()=>{
@@ -59,7 +59,7 @@ test('guest prediction matches authority flight without mutating its received sn
 });
 test('announcement, settings and controls expose the update in the intended locations',()=>{
  assert.equal(LOBBY_NEWS[0].action,'midseason-briefing');assert.ok(LOBBY_NEWS.some(s=>s.action==='voice-briefing'));assert.ok(!LOBBY_NEWS.some(s=>s.action==='perspective-briefing'));
- const categorized=CONTROL_GROUPS.flatMap(([,ids])=>ids);assert.equal(new Set(categorized).size,CONTROLS.length);assert.deepEqual([...categorized].sort(),CONTROLS.map(c=>c[0]).sort());const b=normalizeBindings();assert.ok(b.heliUp.includes('Mouse0'));assert.ok(b.fire.includes('Mouse0'));assert.ok(b.heliSeat.includes('ControlLeft'));assert.ok(b.sprint.includes('ControlLeft'));
+ const categorized=CONTROL_GROUPS.flatMap(([,ids])=>ids);assert.equal(new Set(categorized).size,CONTROLS.length);assert.deepEqual([...categorized].sort(),CONTROLS.map(c=>c[0]).sort());const b=normalizeBindings();assert.ok(b.heliUp.includes('Mouse0'));assert.ok(b.fire.includes('Mouse0'));assert.ok(b.vehicleSeat.includes('ControlLeft'));assert.ok(b.sprint.includes('ControlLeft'));
  const settings=SETTINGS_CATEGORIES.flatMap(([, , ,groups])=>groups.flatMap(([,ids])=>ids));assert.equal(settings.length,new Set(settings).size);assert.ok(SETTINGS_CATEGORIES.find(c=>c[0]==='social')[3][0][1].includes('voiceSettings'));
 });
 

@@ -68,7 +68,7 @@ export class RelayPeer extends Events {
   ws.addEventListener('error',()=>{});
   ws.addEventListener('close',event=>{
    if(this.destroyed||ws!==this.socket)return;
-   const reasons=['Server stopping','Server restarting','Connection too slow','Rate limit','Command sequence','Invalid relay message','Expired resume','Register first','Public host stopped advancing','Public host transferred','Reconnect grace expired','Invalid public host state','Invalid frame'];
+   const reasons=['Host unresponsive for 10 seconds','No active player available to host','Server stopping','Server restarting','Connection too slow','Rate limit','Command sequence','Invalid relay message','Expired resume','Register first','Public host stopped advancing','Public host transferred','Reconnect grace expired','Invalid public host state','Invalid frame'];
    this.emit('transport-close',{code:Number.isInteger(event.code)?event.code:0,reason:reasons.includes(event.reason)?event.reason:'unspecified'});
    clearInterval(this.heartbeat);
    const fatal=event.code===1008||['Expired resume','Command sequence','Invalid frame','Invalid relay message'].includes(event.reason);
@@ -109,7 +109,7 @@ export class RelayPeer extends Events {
   if(m.type==='deployment'){this.emit('deployment',m.deployment);return;}
   if(m.type==='authority-frame'){this.authorityDecoder??=new SnapshotDecoder();const message=this.authorityDecoder.decode(m.frame);if(message){this.authorityReset=false;this.emit('authority-state',message.state);}else if(!this.authorityReset){this.authorityReset=true;this.control({type:'authority-command',command:{type:'snapshot-reset'}});}return;}
   if(['authority-ready','authority-owner','authority-notice','authority-error'].includes(m.type)){this.emit(m.type,m);return;}
-  if(['reward','afk','afk-enforce','rank-cosmetic'].includes(m.type)){this.emit(m.type,m);return;}
+  if(['reward','afk','afk-enforce','rank-cosmetic','host-transfer'].includes(m.type)){this.emit(m.type,m);return;}
   if(m.type==='command-ack'){const sent=this.sentTimes.get(m.seq);if(sent!==undefined)this.relayLatency=performance.now()-sent;for(const seq of this.unacked.keys())if(seq<=m.seq){this.unacked.delete(seq);this.sentTimes.delete(seq);this.unackedBytes=Math.max(0,(this.unackedBytes||0)-(this.wireCommands?.get(seq)?.bytes||0));this.wireCommands?.delete(seq);}this.drainControls();this.finishRecovery();this.flush();return;}
   if(m.type==='alive'){this.resumeConfirmed=true;this.finishRecovery();return;}
   if(m.type==='rotate-request'){this.flush();this.rotating=true;this.control({type:'rotate'});return;}

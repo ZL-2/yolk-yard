@@ -147,7 +147,7 @@ export class Simulation {
     if([...this.players.values()].some(other=>other.id!==id&&!other.bot&&nameKey(other.name)===nameKey(safe.name)))return false;
     this.reserveHumanName(safe.name,id);
     p.nextProfile = safe;
-    p.pickaxe=safe.pickaxe; // Cosmetic changes can apply immediately without changing the combat loadout.
+    for(const slot of ['outfit','pickaxe','wrap','backbling','glider','trail','royaleRank'])p[slot]=safe[slot]; // Cosmetics never change the combat loadout.
     p.name=safe.name;
     if (this.phase === "lobby" || p.health <= 0) Object.assign(p, safe);
     this.teamAppearance(p);
@@ -1004,6 +1004,7 @@ export class Simulation {
           outfit:p.outfit,
           wrap:p.wrap,
           pickaxe:p.pickaxe,
+          royaleRank:p.royaleRank,
           backbling:p.backbling,
           glider:p.glider,
           trail:p.trail,

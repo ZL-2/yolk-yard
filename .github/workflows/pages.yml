@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      prestige_sets_update: ${{ steps.scope.outputs.prestige_sets_update }}
       rank_match_fix: ${{ steps.scope.outputs.rank_match_fix }}
       royale_prestige_update: ${{ steps.scope.outputs.royale_prestige_update }}
       combat_performance_update: ${{ steps.scope.outputs.combat_performance_update }}
@@ -350,6 +351,15 @@ jobs:
             out.write('rank_match_fix='+str(rank_match_fix).lower()+'\n')
             if rank_match_fix: out.write('focused=true\n')
           print('Rank pickaxe match entry hotfix:',rank_match_fix)
+          prestige_sets_files=set(subprocess.check_output(['git','diff','--name-only','ef91689be4102645878f3ca07c902b608ae8aa98','HEAD'],text=True).splitlines())
+          prestige_sets_allowed=['.github/workflows/pages.yml', 'docs/UPDATE_208.md', 'package-lock.json', 'package.json', 'public/CREDITS.txt', 'scripts/match-entry-check.mjs', 'scripts/royale-prestige-browser-check.mjs', 'scripts/update-201-browser-check.mjs', 'scripts/update-202-browser-check.mjs', 'scripts/update-202-network-check.mjs', 'server/realtime/host-watchdog.js', 'server/realtime/public-host.js', 'server/realtime/relay.js', 'server/realtime/royale-rank-rewards.js', 'src/credits.js', 'src/data.js', 'src/egg-wallet.js', 'src/host-timeout.js', 'src/humanoid.js', 'src/keybinds.js', 'src/main.js', 'src/match-connection-ui.js', 'src/network.js', 'src/operator-designs.js', 'src/relay-peer.js', 'src/releases.js', 'src/royale-prestige-models.js', 'src/royale-ranking.css', 'src/royale-ranking.js', 'src/royale-rewards-ui.js', 'src/royale-ui.js', 'src/shop-catalog.js', 'src/shop-front.js', 'src/shop-models.js', 'src/simulation.js', 'src/vehicles.js', 'src/view.js', 'tests/frontier-145.test.js', 'tests/host-watchdog.test.js', 'tests/keybinds.test.js', 'tests/prestige-sets.test.js', 'tests/public-disconnect.test.js', 'tests/royale-prestige.test.js', 'tests/update-199.test.js', 'tests/update-201.test.js']
+          prestige_sets_required={'src/royale-prestige-models.js','src/royale-ranking.js','server/realtime/host-watchdog.js','tests/host-watchdog.test.js','tests/prestige-sets.test.js','scripts/match-entry-check.mjs','scripts/royale-prestige-browser-check.mjs'}
+          prestige_sets_update=prestige_sets_required<=prestige_sets_files<=set(prestige_sets_allowed) and json.loads(Path('package.json').read_text()).get('version')=='6.18.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('prestige_sets_update='+str(prestige_sets_update).lower()+'\n')
+            if prestige_sets_update: out.write('focused=true\n')
+          print('Complete rank collections, host transfer and shared vehicle controls:',prestige_sets_update)
+
 
 
           PY
@@ -536,6 +546,11 @@ jobs:
           name: match-flow-performance
           path: test-results/match194/performance.json
           retention-days: 14
+      - name: Complete prestige sets, migration, host recovery and vehicle bindings
+        if: needs.scope.outputs.prestige_sets_update == 'true'
+        run: |
+          node --test --test-concurrency=2 tests/prestige-sets.test.js tests/royale-prestige.test.js tests/pickaxe-animation.test.js tests/host-watchdog.test.js tests/public-host.test.js tests/public-disconnect.test.js tests/keybinds.test.js tests/update-201.test.js tests/egg-shop.test.js tests/shop-overhaul.test.js tests/release-history.test.js
+          node --test --test-name-pattern='ATV' tests/frontier-145.test.js
       - name: Every pickaxe animation, rank entitlements and release history
         if: needs.scope.outputs.rank_match_fix == 'true'
         run: node --test tests/pickaxe-animation.test.js tests/royale-prestige.test.js tests/release-history.test.js
@@ -649,14 +664,25 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true'
+        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true'
       - name: Install the headless desktop runtime with a missing-library fallback
-        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true'
+        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           # Ubuntu runners already carry the Chromium libraries. Avoid a full
           # font/system upgrade on slow mirrors; install dependencies if needed.
           node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium
+      - name: Complete set rewards, live rank changes, match entry and vehicle controls
+        if: needs.scope.outputs.prestige_sets_update == 'true'
+        run: |
+          node scripts/royale-prestige-browser-check.mjs
+          node scripts/match-entry-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.prestige_sets_update == 'true'
+        with:
+          name: prestige-sets-desktop-evidence
+          path: test-results/update-208
+          retention-days: 14
       - name: Actual Play entry, all four rank tools, perspectives, guest reconnect and battle advancement
         if: needs.scope.outputs.rank_match_fix == 'true'
         run: node scripts/match-entry-check.mjs
@@ -1120,9 +1146,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true'
+        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true'
       - name: Install the focused headless desktop runtime
-        if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true'
+        if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium

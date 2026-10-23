@@ -19,7 +19,7 @@ function shoot(s,p,extra={}){s.projectiles=[{id:100,owner:p.id,shotId:5,weapon:'
 function board(s,p){const v=spawnHelicopter(s.map);s.vehicles=[v];Object.assign(p,{x:3,y:0,z:0});vehicleInteract(s,p,{interact:true});s.time+=1;return v;}
 test('helicopter controls override shared build keys; passengers keep right-click aiming',()=>{
  const b=normalizeBindings({buildEdit:['KeyE',null],buildRoof:['KeyB',null]});const pilot={vehicleId:'h',vehicleType:'helicopter',vehicleSeat:0},passenger={...pilot,vehicleSeat:1};
- assert.deepEqual(helicopterActions(pilot,b,'KeyE'),['heliExit']);assert.deepEqual(helicopterActions(pilot,b,'KeyB'),['heliHorn']);assert.deepEqual(helicopterActions(pilot,b,'Mouse2'),['heliDown']);assert.deepEqual(helicopterActions(passenger,b,'Mouse2'),[]);assert.ok(b.aim.includes('Mouse2'));
+ assert.deepEqual(helicopterActions(pilot,b,'KeyF'),['interact']);assert.deepEqual(helicopterActions(pilot,b,'KeyB'),['heliHorn']);assert.deepEqual(helicopterActions(pilot,b,'Mouse2'),['heliDown']);assert.deepEqual(helicopterActions(passenger,b,'Mouse2'),[]);assert.ok(b.aim.includes('Mouse2'));
 });
 test('hold exit cancels on release, remains held when blocked, and clears the seat once space opens',()=>{
  const {s,p}=battle(),v=board(s,p);vehicleInteract(s,p,{heliExit:true});s.time+=.2;vehicleInteract(s,p,{});assert.equal(p.vehicleExitSince,null);assert.equal(p.vehicleId,v.id);
