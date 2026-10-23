@@ -11,6 +11,15 @@ const event=f.app.relay.tournament;
 const vite=await createServer({plugins:[{name:'tournament-local-relay',configureServer(s){s.middlewares.use((req,res,next)=>{if(!req.url?.split('?')[0].endsWith('/network-config.js'))return next();res.setHeader('Content-Type','text/javascript');res.end(`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${f.app.server.address().port}/game'};`);});}}],server:{host:'127.0.0.1',port:5276,strictPort:true,watch:null}});await vite.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const errors=[],checks=[];let snapshotClock;
+// Review one WebGL viewport at a time. Both clients keep real sockets, HUD,
+// input and snapshot processing, but the off-screen client's renderer must not
+// saturate SwiftShader while Chromium captures the visible client's canvas.
+// This uses the existing dev-only fixture hook, never production game code.
+async function renderOnly(target){
+ for(const p of browser.contexts().flatMap(c=>c.pages()))await p.evaluate(active=>window.__yolkTest.loadingFixture(v=>{const r=v.renderer;r.__reviewRender??=r.render;r.render=active?r.__reviewRender:()=>{};}),p===target);
+ const before=await target.evaluate(()=>window.__yolkTest.loadingFixture(v=>v.renderer.info.render.frame));
+ await target.waitForFunction(before=>window.__yolkTest.loadingFixture(v=>v.renderer.info.render.frame)>before+1,before);
+}
 async function page(name){const context=await browser.newContext({bypassCSP:true,deviceScaleFactor:.6,viewport:{width:1440,height:900}}),p=await context.newPage();p.setDefaultTimeout(90000);p.on('pageerror',e=>errors.push(e.message));await p.route('**/network-config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${f.app.server.address().port}/game'};`}));await p.addInitScript(name=>{localStorage.setItem('yolk-profile',JSON.stringify({name,weapon:'sprinter'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,fpsLimit:30,perspective:'third'}));localStorage.setItem('ravelfront-stormspike-kestrel-199-dismissed','yes');},name);await p.goto(origin+'/?qa');await p.waitForFunction(()=>window.__yolkTest);await p.locator('.tournament-card').waitFor();await p.waitForFunction(()=>window.__yolkTest.party().ready);await p.waitForFunction(()=>!document.querySelector('#loading')||document.querySelector('#loading').hidden);return p;}
 try{
  const p=await page('Cup Browser');
@@ -24,7 +33,8 @@ try{
  const authority=f.app.relay.authority;clearInterval(authority.timer);clearImmediate(authority.catchup);
  snapshotClock=setInterval(()=>{if(event.room){event.room.age+=.1;authority.broadcast(event.room);}},100);
  now=E.startsAt;event.tick();assert.equal(event.phase,'running');await p.waitForTimeout(2000);await p.screenshot({path:out+'/tournament-start.png'});
- const late=await page('Cup Late Viewer');await late.getByRole('button',{name:'SPECTATE MATCH',exact:true}).click();await until(()=>[...event.room.sim.players.values()].some(p=>p.name==='Cup Late Viewer'&&p.lateSpectator),'Late browser spectates',90000);await late.waitForTimeout(1200);await late.screenshot({path:out+'/late-spectator.png'});
+ const late=await page('Cup Late Viewer');await renderOnly(late);await late.getByRole('button',{name:'SPECTATE MATCH',exact:true}).click();await until(()=>[...event.room.sim.players.values()].some(p=>p.name==='Cup Late Viewer'&&p.lateSpectator),'Late browser spectates',90000);await late.waitForTimeout(1200);await late.screenshot({path:out+'/late-spectator.png'});
+ await renderOnly(p);
  const sim=event.room.sim,me=[...sim.players.values()].find(p=>p.name==='Cup Browser');assert.equal(event.phase,'running');assert.equal([...sim.players.values()].filter(p=>p.contestant&&!p.bot).length,3);me.flight='ground';sim.damage(me,null,10000,'Disconnected');await p.getByRole('button',{name:'SPECTATE',exact:true}).click();await p.waitForTimeout(1000);await p.screenshot({path:out+'/eliminated-spectator.png'});assert.equal(me.spectating,true);
  const others=[...sim.players.values()].filter(p=>p.contestant&&p.health>0&&!p.bot);others[0].flight='ground';sim.damage(others[0],null,10000,'Disconnected');sim.finish();event.tick();assert.equal(event.locked,false);
  await p.getByRole('button',{name:'RETURN TO LOBBY',exact:true}).click();await p.waitForFunction(()=>document.querySelector('.tournament-card')?.textContent.includes('MATCHMAKING OPEN'));await p.screenshot({path:out+'/finished.png'});
