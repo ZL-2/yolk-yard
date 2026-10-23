@@ -1,4 +1,8 @@
 export const RELEASE_NOTES = [
+ {number:'207',title:'Match entry and rank pickaxe crash fix',changes:[
+  'Fixed a gameplay crash when a Royale Prestige pickaxe was equipped or visible on another player. All four rank tools now have explicit swing animations, and tools without a legacy shape safely use the standard animation.',
+  'Verified actual public match entry, host-to-guest updates, reconnects and continued gameplay with ranked tools in first- and third-person views. Version 6.17.1 / protocol 77.'
+ ]},
  {number:'205',title:'Royale Prestige: hold your place',changes:[
   'Four exclusive original pickaxes follow your live public Royale rank: Top 25 Tempest Talon, Top 10 Rift Reaver, Top 5 Solar Dominion and #1 Apex Sovereign. Rewards stack, so the leader can wield all four. Drop below a cutoff to lose access; climb back to reclaim it.',
   'Victory Score combines 1,000 points per public Royale win with 100 times the square root of public Royale kills, rounded to whole points. Wins have consistent weight and kills have diminishing returns. A new Royale score column, score tab and in-game explanation show the formula, examples and tiebreaks.',
