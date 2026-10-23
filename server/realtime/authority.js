@@ -165,7 +165,7 @@ export class MatchAuthority{
   const room=this.roomFor(peer),id=peer.authorityId;if(!room||room.members.get(id)!==peer)return false;
   if(room.zombies)settleZombiesPlayer(this.relay,room,room.sim.players.get(id),peer);
   if(room.tournament)this.relay.tournament.disconnected(room,room.sim.players.get(id));
-  if(!room.tournament||room.sim.stage==='spawn-island'||room.sim.stage==='starting')room.sim.leavePlayer(id);else {const p=room.sim.players.get(id);if(p){p.connected=false;room.sim.suspendPlayer(id);}}room.members.delete(id);room.encoders.delete(id);room.eventCursors.delete(id);delete peer.authorityRoom;delete peer.authorityId;
+  if(!room.tournament||room.sim.players.get(id)?.lateSpectator||room.sim.stage==='spawn-island'||room.sim.stage==='starting')room.sim.leavePlayer(id);else {const p=room.sim.players.get(id);if(p){p.connected=false;room.sim.suspendPlayer(id);}}room.members.delete(id);room.encoders.delete(id);room.eventCursors.delete(id);delete peer.authorityRoom;delete peer.authorityId;
   if(room.tournament){this.broadcast(room);return false;}
   if(room.recurring){room.sim.setConnectedHumans([...room.members].filter(([,p])=>p.ws).map(([id])=>id));this.resetEmptyPublicRound(room);this.broadcast(room);return false;}
   if(!room.members.size){this.rooms.delete(room.key);this.capacity.releaseRoom(room.key);room.hostPeer.virtualRoom=false;room.hostPeer.listing=null;if(room.hostPeer!==peer)this.relay.remove(room.hostPeer);return false;}

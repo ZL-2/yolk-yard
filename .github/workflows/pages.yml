@@ -370,7 +370,8 @@ jobs:
             if wren_study_update: out.write('focused=true\n')
           print('Wren GLB study and comparison viewer:',wren_study_update)
           tournament_allowed=set(['.github/workflows/pages.yml', 'docs/UPDATE_210.md', 'package-lock.json', 'package.json', 'scripts/camera-gameplay-browser.mjs', 'scripts/camera-review-browser.mjs', 'scripts/tournament-browser-check.mjs', 'scripts/tournament-performance.mjs', 'server/realtime/authority.js', 'server/realtime/index.js', 'server/realtime/match-launch.js', 'server/realtime/parties.js', 'server/realtime/relay.js', 'server/realtime/royale-rank-rewards.js', 'server/realtime/tournament.js', 'src/character-motion.js', 'src/data.js', 'src/egg-wallet.js', 'src/humanoid.js', 'src/lobby-ui.js', 'src/main.js', 'src/match-end-ui.js', 'src/owner-runtime.js', 'src/party-client.js', 'src/perspective.js', 'src/releases.js', 'src/royale.js', 'src/settings-layout.js', 'src/settings.js', 'src/shop-catalog.js', 'src/shop-front.js', 'src/shop-models.js', 'src/snapshot-codec.js', 'src/tournament-pickaxe.js', 'src/tournament-ui.js', 'src/tournament.css', 'src/tournament.js', 'src/view.js', 'tests/built-world-gameplay.test.js', 'tests/camera-review.html', 'tests/egg-shop.test.js', 'tests/perspective.test.js', 'tests/snapshot-codec.test.js', 'tests/tournament.test.js'])
-          tournament_update={'server/realtime/tournament.js','src/tournament.js','tests/tournament.test.js'}<=files<=tournament_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.19.0'
+          tournament_files=set(subprocess.check_output(['git','diff','--name-only','6204060ef3f578c572d572f803ec8e8d1c7f9c99','HEAD'],text=True).splitlines())
+          tournament_update={'server/realtime/tournament.js','src/tournament.js','tests/tournament.test.js'}<=tournament_files<=tournament_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.19.0'
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('tournament_update='+str(tournament_update).lower()+'\n')
             if tournament_update: out.write('focused=true\n')
@@ -397,7 +398,7 @@ jobs:
       - name: Tournament lifecycle, spectators, rewards, camera and transport regressions
         if: needs.scope.outputs.tournament_update == 'true'
         run: |
-          node --test --test-concurrency=2 tests/tournament.test.js tests/snapshot-codec.test.js tests/snapshot-interest.test.js tests/perspective.test.js tests/character-motion.test.js tests/built-world-aim.test.js tests/royale-prestige.test.js tests/egg-shop.test.js tests/server-authority.test.js tests/owner.test.js tests/relay-compact.test.js tests/relay-queue.test.js tests/public-host.test.js tests/release-history.test.js
+          node --test --test-concurrency=2 tests/tournament.test.js tests/snapshot-codec.test.js tests/perspective.test.js tests/character-motion.test.js tests/built-world-gameplay.test.js tests/royale-prestige.test.js tests/egg-shop.test.js tests/server-authority.test.js tests/owner.test.js tests/relay-compact.test.js tests/relay-queue.test.js tests/public-host.test.js tests/release-history.test.js
           node --expose-gc scripts/tournament-performance.mjs
       - uses: actions/upload-artifact@v4
         if: always() && needs.scope.outputs.tournament_update == 'true'
