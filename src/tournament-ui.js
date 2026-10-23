@@ -12,4 +12,24 @@ export function standingsMarkup(e,{compact=false,identity='',query=''}={}){
  if(!rows.length)return `<p class="compete-empty">${e.phase==='cancelled'?'Event cancelled. No tournament rewards awarded.':live?'Waiting for the first standings update.':'Placements appear here after the match. Rewards below show what each placement earns.'}</p>`;
  return `<div class="tournament-standings ${compact?'compact':''}" tabindex="0" role="region" aria-label="Tournament placements and rewards"><table><thead><tr><th>PLACE</th><th>PLAYER</th>${compact?'':'<th>ELIMS</th>'}<th>${live?'STATUS / PROJECTED REWARD':'REWARD AWARDED'}</th></tr></thead><tbody>${filtered.map(r=>`<tr class="${r.identity===identity?'is-you':''}"><td>${live&&r.alive?'—':'#'+(r.place||'—')}</td><td>${esc(r.name)}${r.identity===identity?' <small>YOU</small>':''}</td>${compact?'':`<td>${r.kills??'—'}</td>`}<td>${live?r.alive?'Still competing':`Eliminated · ${(e.prizes[(r.place||0)-1]||0).toLocaleString()} Marks if placement holds`:esc(placementReward(e,r))}</td></tr>`).join('')||'<tr><td colspan="4">No players match your search.</td></tr>'}</tbody></table></div>${!live&&!e.standingsComplete?'<p class="compete-note">Archived podium only. This event’s original release did not save placements below third.</p>':''}${live?'<p class="compete-note">Live standings are provisional. Survivors are not assigned final places until the match ends.</p>':''}`;
 }
-export function updateTournamentCard(root,event,online,now){const slot=root.querySelector('[data-tournament-slot]');if(!slot)return;const scroll=slot.querySelector('.tournament-standings')?.scrollTop||0;slot.innerHTML=tournamentCard(event,online,now);const table=slot.querySelector('.tournament-standings');if(table)table.scrollTop=scroll;}
+// Keep controls and the scrolling standings region mounted as the clock ticks.
+// Replacing innerHTML every second can interrupt pointer clicks or keyboard focus.
+function patchCardNode(current,next){
+ if(current.nodeType!==next.nodeType||current.nodeName!==next.nodeName){current.replaceWith(next.cloneNode(true));return;}
+ if(current.nodeType===3){if(current.nodeValue!==next.nodeValue)current.nodeValue=next.nodeValue;return;}
+ if(current.nodeType!==1)return;
+ for(const a of [...current.attributes])if(!next.hasAttribute(a.name))current.removeAttribute(a.name);
+ for(const a of next.attributes)if(current.getAttribute(a.name)!==a.value)current.setAttribute(a.name,a.value);
+ const old=[...current.childNodes],fresh=[...next.childNodes];
+ for(let i=0;i<Math.max(old.length,fresh.length);i++){
+  if(!fresh[i])old[i].remove();else if(!old[i])current.append(fresh[i].cloneNode(true));else patchCardNode(old[i],fresh[i]);
+ }
+}
+export function updateTournamentCard(root,event,online,now){
+ const slot=root.querySelector('[data-tournament-slot]');if(!slot)return;
+ const html=tournamentCard(event,online,now),card=slot.firstElementChild;
+ if(!html){if(card)slot.replaceChildren();return;}
+ const template=slot.ownerDocument.createElement('template');template.innerHTML=html;
+ if(!card){slot.append(template.content);return;}
+ patchCardNode(card,template.content.firstElementChild);
+}
