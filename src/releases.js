@@ -1,4 +1,8 @@
 export const RELEASE_NOTES = [
+ {number:'209',title:'Wren: first textured 3D model study',changes:[
+  'A separate Wren comparison page at wren-study.html places the original character art beside a new rotatable, textured and skinned GLB. Inspect front, side and back views, topology and the game’s idle, walk, run, crouch, aim and glide animations.',
+  'This is a modeling prototype, not a claim of an identical or final character. The custom Blender mesh replaces the old shared-body construction in this study; its projected reference texture, hair, side seams and deformation still need refinement. The production Wren outfit remains unchanged. Version 6.18.1 / protocol 78.'
+ ]},
  {number:'208',title:'Royale Prestige: the complete collections',changes:[
   'Top 25 Tempest, Top 10 Rift, Top 5 Solar and #1 Apex now each include a unique matching outfit, wrap, rank cape, glider, dive trail and pickaxe. Capes display the wearer’s current Royale rank. The four collections use the same gameplay models in rewards and the Locker.',
   'Existing pickaxe owners are offered their newly earned set pieces. Inspect six items, claim individually, claim a collection, equip a complete set or claim everything. Rank rewards stack; dropping below a cutoff revokes every item in that collection, including equipped pieces and presets. Regaining the rank offers that collection again. Claims persist online and update connected matches.',

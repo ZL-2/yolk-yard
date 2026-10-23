@@ -4,3 +4,10 @@ test-results/
 .DS_Store
 
 node_modules
+
+# Reproducible Wren study renders, editor backups and Python cache.
+art/wren/model-*.png
+art/wren/browser-*.png
+art/wren/*.blend1
+scripts/art/__pycache__/
+art/wren/wren-albedo.png

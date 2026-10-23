@@ -1,0 +1,9 @@
+{
+  "asset": "wren-prototype.glb",
+  "status": "prototype",
+  "vertices": 19598,
+  "triangles": 35178,
+  "bones": 32,
+  "materials": 1,
+  "glbBytes": 5989284
+}

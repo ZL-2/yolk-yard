@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      wren_study_update: ${{ steps.scope.outputs.wren_study_update }}
       prestige_sets_update: ${{ steps.scope.outputs.prestige_sets_update }}
       rank_match_fix: ${{ steps.scope.outputs.rank_match_fix }}
       royale_prestige_update: ${{ steps.scope.outputs.royale_prestige_update }}
@@ -359,6 +360,15 @@ jobs:
             out.write('prestige_sets_update='+str(prestige_sets_update).lower()+'\n')
             if prestige_sets_update: out.write('focused=true\n')
           print('Complete rank collections, host transfer and shared vehicle controls:',prestige_sets_update)
+          wren_study_files=set(subprocess.check_output(['git','diff','--name-only','d61d1f24680f5f8d315c063d621bdc62ec26b433','HEAD'],text=True).splitlines())
+          wren_study_allowed=['.github/workflows/pages.yml', '.gitignore', 'art/wren/README.md', 'art/wren/prompt.txt', 'art/wren/report.json', 'art/wren/turnaround.png', 'art/wren/wren-albedo.png', 'art/wren/wren-prototype.blend', 'docs/UPDATE_209.md', 'package-lock.json', 'package.json', 'public/CREDITS.txt', 'public/models/operators/wren-prototype.glb', 'scripts/art/build-wren.py', 'scripts/wren-study-browser-check.mjs', 'src/credits.js', 'src/releases.js', 'src/wren-study-model.js', 'src/wren-study.css', 'src/wren-study.js', 'vite.config.js', 'wren-study.html']
+          wren_study_required={'src/wren-study-model.js','src/wren-study.js','wren-study.html','public/models/operators/wren-prototype.glb','scripts/wren-study-browser-check.mjs'}
+          wren_study_update=wren_study_required<=wren_study_files<=set(wren_study_allowed) and json.loads(Path('package.json').read_text()).get('version')=='6.18.1'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('wren_study_update='+str(wren_study_update).lower()+'\n')
+            if wren_study_update: out.write('focused=true\n')
+          print('Wren GLB study and comparison viewer:',wren_study_update)
+
 
 
 
@@ -546,6 +556,9 @@ jobs:
           name: match-flow-performance
           path: test-results/match194/performance.json
           retention-days: 14
+      - name: Wren study release history
+        if: needs.scope.outputs.wren_study_update == 'true'
+        run: node --test tests/release-history.test.js
       - name: Complete prestige sets, migration, host recovery and vehicle bindings
         if: needs.scope.outputs.prestige_sets_update == 'true'
         run: |
@@ -664,14 +677,23 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true'
+        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true'
       - name: Install the headless desktop runtime with a missing-library fallback
-        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true'
+        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           # Ubuntu runners already carry the Chromium libraries. Avoid a full
           # font/system upgrade on slow mirrors; install dependencies if needed.
           node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium
+      - name: Actual Wren GLB, deformation, cameras and game animations
+        if: needs.scope.outputs.wren_study_update == 'true'
+        run: node scripts/wren-study-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.wren_study_update == 'true'
+        with:
+          name: wren-study-desktop-evidence
+          path: test-results/wren-study
+          retention-days: 14
       - name: Complete set rewards, live rank changes, match entry and vehicle controls
         if: needs.scope.outputs.prestige_sets_update == 'true'
         run: |
@@ -1146,9 +1168,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true'
+        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true'
       - name: Install the focused headless desktop runtime
-        if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true'
+        if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium
