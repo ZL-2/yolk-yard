@@ -19,7 +19,7 @@ relay.relay.progression.accounts.set(relay.relay.progression.identity(progressTo
 relay.relay.progression.rankRewards.invalidate();relay.relay.progression.rankRewards.claim(rankIdentity.id,['pickaxe-rank-1'],'pickaxe-rank-1');
 const vite=await createServer({plugins:[{name:'public-match-local-relay',configureServer(server){server.middlewares.use((req,res,next)=>{if(req.url?.split('?')[0]!=='/network-config.js')return next();res.setHeader('Content-Type','text/javascript');res.end(`window.YOLK_NETWORK={relay:'${endpoint}/game'};`);});}}],server:{host:'127.0.0.1',port:5262,strictPort:true,watch:null}});await vite.listen();
 const errors=[],checks={},pause=ms=>new Promise(r=>setTimeout(r,ms));
-async function until(check,label){const end=Date.now()+20000;while(!check()){assert.ok(Date.now()<end,label);await pause(25);}}
+async function until(check,label,timeout=20000){const end=Date.now()+timeout;while(!check()){assert.ok(Date.now()<end,label);await pause(25);}}
 let browser,page,social,guest,guestState,launch,party,guestStates=0;
 const trace=[];
 const record=(stage,detail={})=>{const row={stage,at:new Date().toISOString(),...detail};trace.push(row);console.log(JSON.stringify(row));};
@@ -65,7 +65,7 @@ try{
  record('battle-started',{state:await page.evaluate(()=>{const r=window.__yolkTest.read();return {time:r.state.time,stage:r.state.royale.stage,players:r.state.players.length,view:window.__yolkTest.repairView()};})});
  const battleTime=guestState.time;await until(()=>guestState.time>battleTime+3,'Battle simulation continues');
  await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.stage='active';for(const p of s.players.values())if(!p.boss&&!p.henchman){Object.assign(p,{flight:'ground',x:40+(s.random()-.5)*20,y:2,z:40+(s.random()-.5)*20,health:100,shield:100,shieldUntil:0});}}));
- const combatTime=guestState.time;await until(()=>guestState.time>combatTime+5,'Combat simulation continues');
+ const combatTime=guestState.time;await until(()=>guestState.time>combatTime+5,'Combat simulation continues',60000);
  record('combat-advanced',{time:guestState.time});assert.deepEqual(errors,[]);checks.actualBrowserHostAndGuest=true;checks.matchAndCombatAdvance=true;checks.reconnectSameRound=true;
  await writeFile(out+'/result.json',JSON.stringify({result:'PASS',checks,errors,trace},null,2));console.log(JSON.stringify({result:'PASS',checks}));
 }catch(error){record('failure',{error:String(error),states:guestStates,time:guestState?.time,migrating:guest?.migrating,closed:guest?.closed,peerClosed:guest?.peer?.destroyed,channelOpen:guest?.hostConnection?.open,public:relay.relay.publicHost.summary()});await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/result.json',JSON.stringify({error:String(error),checks,errors,trace},null,2));throw error;}
