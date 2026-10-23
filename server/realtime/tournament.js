@@ -1,8 +1,9 @@
-import {randomUUID} from 'node:crypto';
+import {randomUUID,randomInt} from 'node:crypto';
 import {VERSION} from '../../src/data.js';
 import {RoyaleSimulation} from '../../src/royale.js';
 import {ChatRoom} from '../../src/chat.js';
 import {TOURNAMENT,TOURNAMENTS,tournamentPhase,eventAnnouncement,eventTime,visibleTournament} from '../../src/tournament.js';
+import {validateTournament,TOURNAMENT_RULE_FIELDS} from '../../src/tournament-schedule.js';
 
 // The result and prizes commit in one durable transaction. The same event can
 // never restart or pay twice, including after a process restart.
@@ -12,7 +13,7 @@ class TournamentEvent{
   this.state=this.db.meta(this.key,{phase:'scheduled'});this.entitled=this.db.meta('tournament-entitlements',{});
   if(this.state.phase==='running')this.complete('cancelled','The tournament was interrupted by a server restart. Normal matchmaking is open.');
  }
- get phase(){return tournamentPhase(this.now(),this.state,this.event);}
+ get phase(){return this.event.removed?'cancelled':tournamentPhase(this.now(),this.state,this.event);}
  get locked(){return ['preparing','entry','starting','running'].includes(this.phase);}
  assertNormal(target){if(this.locked&&(!target||target!==this.room?.key))throw Error(eventAnnouncement(this.event));}
  standings(){return [...this.roster.values()].map(e=>{const p=this.room?.sim.players.get(e.player);return {identity:e.identity,name:e.name,place:p?.place||null,kills:p?.kills||0,alive:!!p&&!p.eliminated&&p.health>0,connected:p?.connected!==false};}).sort((a,b)=>Number(b.alive)-Number(a.alive)||(a.place||Infinity)-(b.place||Infinity)||b.kills-a.kills||a.name.localeCompare(b.name));}
@@ -75,17 +76,17 @@ class TournamentEvent{
  complete(phase,message='',results=[]){
   if(['finished','cancelled'].includes(this.state.phase))return;
   const EVENT=this.event,entitled=this.db.meta('tournament-entitlements',{});
-  const awarded=results.map(r=>{const bonusMarks=r.place===1&&entitled[r.identity]?.includes(EVENT.pickaxe)?EVENT.duplicateReward||0:0;return {...r,marks:(EVENT.prizes[r.place-1]||0)+bonusMarks,bonusMarks,pickaxeAwarded:r.place===1&&!bonusMarks?EVENT.pickaxe:null};});
+  const awarded=results.map(r=>{const bonusMarks=r.place===1&&EVENT.pickaxe&&entitled[r.identity]?.includes(EVENT.pickaxe)?EVENT.duplicateReward||0:0;return {...r,marks:(EVENT.prizes[r.place-1]||0)+bonusMarks,bonusMarks,pickaxeAwarded:r.place===1&&!bonusMarks?EVENT.pickaxe:null};});
   const next={phase,message,results:awarded,endedAt:this.now(),startedAt:this.state.startedAt||null,standingsComplete:true};
   this.db.transaction(()=>{
-   for(const result of awarded){const amount=result.marks;if(!amount)continue;
-    this.db.run('INSERT OR IGNORE INTO grants VALUES(?,?,?,?,?)',`${EVENT.id}:${result.identity}`,result.identity,this.now(),amount,`Frontier Cup · place ${result.place}`);
-    if(result.place===1)entitled[result.identity]=[...new Set([...(entitled[result.identity]||[]),EVENT.pickaxe])];
+   for(const result of awarded){const amount=result.marks;
+    if(amount)this.db.run('INSERT OR IGNORE INTO grants VALUES(?,?,?,?,?)',`${EVENT.id}:${result.identity}`,result.identity,this.now(),amount,`${EVENT.name} · place ${result.place}`);
+    if(result.place===1&&EVENT.pickaxe)entitled[result.identity]=[...new Set([...(entitled[result.identity]||[]),EVENT.pickaxe])];
    }
    this.db.setMeta('tournament-entitlements',entitled);this.db.setMeta(this.key,next);
   });
   this.state=next;this.entitled=entitled;
-  for(const result of awarded){const user=this.relay.parties.users.get(result.identity);this.relay.parties.send(user,{type:'owner-grants',record:this.relay.owner.grantSummary(result.identity)});this.syncRewards(result.identity);this.relay.parties.send(user,{type:'party-notice',message:`Frontier Cup: #${result.place} — ${result.marks.toLocaleString()} Marks${result.pickaxeAwarded?' and the Frontier Champion pickaxe':result.bonusMarks?' (includes 10,000 repeat-winner bonus)':''}!`});}
+  for(const result of awarded){const user=this.relay.parties.users.get(result.identity);this.relay.parties.send(user,{type:'owner-grants',record:this.relay.owner.grantSummary(result.identity)});this.syncRewards(result.identity);this.relay.parties.send(user,{type:'party-notice',message:`${EVENT.name}: #${result.place} — ${result.marks.toLocaleString()} Marks${result.pickaxeAwarded?' and the Frontier Champion pickaxe':result.bonusMarks?' (includes '+result.bonusMarks.toLocaleString()+' repeat-winner bonus)':''}!`});}
   this.relay.owner.systemEvent('tournament-'+phase,message||'Frontier Cup completed; matchmaking reopened','',{results});this.publish();
  }
  tick(){
@@ -118,25 +119,66 @@ class TournamentEvent{
   }catch(error){this.error=error.message;this.relay.owner.systemEvent('tournament-error',error.message);}
  }
  close(){clearInterval(this.timer);}
+ releaseRoom(message){
+  const room=this.room;if(!room)return;this.room=null;const r=this.relay;r.authority.rooms.delete(room.key);
+  for(const [token,t]of r.parties.tickets)if(t.eventId===this.id)r.parties.tickets.delete(token);
+  for(const u of r.parties.users.values())if(u.tournamentLaunch?.code===this.event.code){r.parties.send(u,{type:'owner-session-ended',message});u.inMatch=false;u.ready=false;delete u.matchPeer;delete u.tournamentLaunch;delete u.ticket;delete u.joined;const party=r.parties.parties.get(u.party);if(party){party.state='idle';delete party.launch;r.parties.sync(party);}}
+  for(const peer of [...room.members.values()]){r.send(peer,{type:'authority-notice',event:'kicked'});r.remove(peer);}r.remove(room.hostPeer);
+ }
 }
 
 // Each dated event has independent durable results and idempotent reward keys.
 export class TournamentService{
  constructor(relay,{now=Date.now,autoStart=true,events=TOURNAMENTS}={}){
-  this.relay=relay;this.now=now;this.events=events.map(event=>new TournamentEvent(relay,{event,now:()=>this.now(),onPublish:()=>this.publish()}));
+  this.relay=relay;this.now=now;this.db=relay.owner.db;
+  this.catalog=this.db.meta('tournament-schedule',{revision:0,events:events.map(e=>({...e}))});
+  this.events=this.catalog.events.map(event=>new TournamentEvent(relay,{event,now:()=>this.now(),onPublish:()=>this.publish()}));
   if(autoStart){this.tick();this.timer=setInterval(()=>this.tick(),250);this.timer.unref?.();}
  }
  get active(){return this.events.find(e=>e.locked)||this.events.find(e=>!['finished','cancelled'].includes(e.phase))||this.events.at(-1);}
  get id(){return this.active.id;} get room(){return this.active.room;} get phase(){return this.active.phase;} get state(){return this.active.state;} get roster(){return this.active.roster;} get locked(){return this.events.some(e=>e.locked);}
  event(id){return this.events.find(e=>e.id===id)||null;}
- summary(){const events=this.events.map(e=>e.summary()),focus=visibleTournament(events,this.now())||this.active.summary();return {...focus,serverNow:this.now(),locked:this.locked,events};}
+ summary(){const events=this.events.filter(e=>!e.event.removed).map(e=>e.summary()),focus=visibleTournament(events,this.now())||events.find(e=>e.phase==='scheduled')||events.at(-1);return {...focus,serverNow:this.now(),locked:this.locked,events,scheduleRevision:this.catalog.revision};}
+ overview(){return {revision:this.catalog.revision,serverNow:this.now(),events:this.events.map(e=>({...e.summary(),definition:{...e.event,description:e.event.description||''}}))};}
+ manage(body,audit){
+  if(body.revision!==this.catalog.revision)throw Object.assign(Error('The schedule changed in another session. Refresh before saving.'),{status:409});
+  const existing=body.eventId?this.event(body.eventId):null,before=existing?.event||null;
+  if(body.eventId&&!existing)throw Error('Tournament not found.');
+  let next,cancelState;
+  if(body.action==='tournament-save'){
+   if(existing?.event.removed)throw Error('This event was removed. Duplicate it to schedule a new event.');
+   const id=existing?.id||'cup-'+randomUUID();let code=existing?.event.code;
+   if(!code)do{code=Array.from({length:8},()=> 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[randomInt(32)]).join('');}while(this.events.some(e=>e.event.code===code)||this.relay.peers.has(`yolk-yard-v${VERSION}-${code}`));
+   const frozen=existing&&existing.phase!=='scheduled';
+   next=validateTournament(body.event,{id,code,...(!frozen?{now:this.now()}:{})});
+   if(frozen&&TOURNAMENT_RULE_FIELDS.some(k=>JSON.stringify(next[k])!==JSON.stringify(before[k])))throw Error('Dates, seats and rewards are locked after matchmaking closes. Cancel an active event or duplicate a past event; saved results cannot be rewritten.');
+   if(!frozen)for(const other of this.events){if(other===existing||other.event.removed||['finished','cancelled'].includes(other.phase))continue;const e=other.event;if(next.lockAt<e.startsAt+32*60000&&next.startsAt+32*60000>e.lockAt)throw Error('This overlaps '+e.name+'. Reserve 32 minutes after its start for the match and room cleanup.');}
+  }else if(body.action==='tournament-cancel'){
+   if(!existing||['finished','cancelled'].includes(existing.phase))throw Error('Only an upcoming or active event can be cancelled.');
+   // If the simulation already decided the result, let the normal result writer
+   // commit it instead of allowing a last-millisecond cancellation to erase it.
+   if(existing.room?.sim.phase==='results')throw Error('This match has completed. Refresh to see its durable result.');
+   next={...before};cancelState={phase:'cancelled',message:`${before.name} cancelled by the owner: ${String(body.reason).slice(0,300)}. Normal matchmaking is open.`,endedAt:this.now(),startedAt:existing.state.startedAt||null,results:[],standingsComplete:true};
+  }else if(body.action==='tournament-remove'){
+   if(!existing||existing.locked)throw Error('Cancel the active tournament before removing it from Compete.');
+   next={...before,removed:true};
+   if(existing.phase==='scheduled')cancelState={phase:'cancelled',message:'Removed from the schedule by the owner.',endedAt:this.now(),results:[],standingsComplete:true};
+  }else throw Error('Unknown tournament action.');
+  const events=existing?this.catalog.events.map(e=>e.id===next.id?next:e):[...this.catalog.events,next];events.sort((a,b)=>a.opensAt-b.opensAt);
+  const catalog={revision:this.catalog.revision+1,events},result={ok:true,eventId:next.id,revision:catalog.revision};
+  this.db.transaction(()=>{this.db.setMeta('tournament-schedule',catalog);if(cancelState)this.db.setMeta(existing.key,cancelState);audit(result,before,next);});
+  this.catalog=catalog;
+  if(existing){existing.event=next;if(cancelState){existing.state=cancelState;existing.releaseRoom(cancelState.message);}}
+  else this.events.push(new TournamentEvent(this.relay,{event:next,now:()=>this.now(),onPublish:()=>this.publish()}));
+  this.events.sort((a,b)=>a.event.opensAt-b.event.opensAt);this.lastKey=null;this.publish();return result;
+ }
  publish(){if(!this.events)return;const event=this.summary(),key=JSON.stringify({...event,serverNow:0,events:event.events.map(e=>({...e,serverNow:0}))});if(key===this.lastKey&&this.now()-(this.lastPublish||0)<15000)return;this.lastKey=key;this.lastPublish=this.now();for(const u of this.relay.parties.users.values())this.relay.parties.send(u,{type:'tournament',event});}
  assertNormal(target){for(const e of this.events)e.assertNormal(target);}
- queue(u,options={}){const e=options.eventId?this.event(options.eventId):this.active;if(!e)throw Error('Tournament not found.');return e.queue(u,options);}
+ queue(u,options={}){const e=options.eventId?this.event(options.eventId):this.active;if(!e||e.event.removed)throw Error('Tournament not found.');return e.queue(u,options);}
  claim(t,peer){return (this.event(t?.eventId)||this.active).claim(t,peer);}
  admitted(peer,player,admission){return (this.event(admission.eventId)||this.active).admitted(peer,player,admission);}
  disconnected(room,player){this.events.find(e=>e.room===room)?.disconnected(room,player);}
- rewards(id){return this.active.rewards(id);} syncRewards(id){return this.active.syncRewards(id);} sanitize(profile,id){return this.active.sanitize(profile,id);}
+ rewards(id){return {identity:id,owned:this.db.meta('tournament-entitlements',{})[id]||[]};} syncRewards(id){const p=this.relay.parties;p.send(p.users.get(id),{type:'tournament-rewards',record:this.rewards(id)});} sanitize(profile,id){return profile?.pickaxe===TOURNAMENT.pickaxe&&!this.rewards(id).owned.includes(TOURNAMENT.pickaxe)?{...profile,pickaxe:''}:profile;}
  tick(){for(const e of this.events)e.tick();this.publish();}
  close(){clearInterval(this.timer);for(const e of this.events)e.close();}
 }

@@ -81,9 +81,10 @@ export class OwnerService {
  }
  async action(req,body){
   this.db.assert();if(!/^[a-f0-9-]{36}$/.test(body.requestId||''))throw Error('A unique action identifier is required');
-  const fingerprint=createHash('sha256').update(JSON.stringify([body.action,body.player,body.room,body.amount,body.hours,body.reason,body.revision,body.controls])).digest('hex');
+  const fingerprint=createHash('sha256').update(JSON.stringify([body.action,body.player,body.room,body.amount,body.hours,body.reason,body.revision,body.controls,...(body.action?.startsWith('tournament-')?[body.eventId,body.event]:[])])).digest('hex');
   const old=this.db.get('SELECT data FROM events WHERE id=?','action:'+body.requestId);if(old){const saved=JSON.parse(old.data);if(saved.fingerprint!==fingerprint)throw Object.assign(Error('Action identifier already used for different values'),{status:409});return saved.result;}
   const reason=reasonOf(body),r=this.relay;let result={ok:true};
+  if(body.action?.startsWith('tournament-'))return r.tournament.manage(body,(result,before,after)=>{this.audit(req,body,body.action,reason,after.id,{before,after});this.db.event('action',reason,after.id,{action:body.action,result,fingerprint,actor:this.actor(req,body)},'action:'+body.requestId);});
   if(body.action==='settings'){
    if(body.revision!==this.controls.revision)throw Object.assign(Error('Controls changed in another session. Refresh before saving.'),{status:409});
    const p=body.controls;if(!p||typeof p.maintenance!=='boolean'||typeof p.chatEnabled!=='boolean'||!Number.isInteger(p.chatSlowSeconds)||p.chatSlowSeconds<0||p.chatSlowSeconds>120)throw Error('Invalid service controls');
@@ -140,6 +141,7 @@ export class OwnerService {
    if(route==='/owner/storage'){json(res,200,this.db.storage(),origin);return;}
    this.db.assert();
    if(route==='/owner/summary'){json(res,200,this.summary(body),origin);return;}
+   if(route==='/owner/tournaments'&&req.method==='POST'){json(res,200,relay.tournament.overview(),origin);return;}
    if(route==='/owner/players'){json(res,200,this.players(body),origin);return;}
    if(route==='/owner/history'){json(res,200,this.db.history(body.type,body),origin);return;}
    if(route==='/owner/action'&&req.method==='POST'){json(res,200,await this.action(req,body),origin);return;}

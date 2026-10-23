@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'212',title:'Owner-managed Compete schedule',changes:[
+  'Owner Access now includes Compete schedule: create, edit, duplicate, cancel, remove and export tournaments. Set New York dates, matchmaking closure, entry windows, competitor and spectator seats, podium Marks, the exclusive winner pickaxe and repeat-winner bonus.',
+  'Saved changes update the public Compete calendar, event details and lobby cards without a deployment. Schedules persist on the server, detect conflicting edits and prevent overlapping tournaments. Every change is authenticated, confirmed and recorded in the audit trail.',
+  'Tournament matches run on the Render server. Active rules and paid results are protected; explicit cancellation returns tournament players to the lobby without awarding a false winner. Today’s results and Monday’s event remain unchanged. Version 6.21.0 / protocol 81.'
+ ]},
  {number:'211',title:'Compete: the Frontier Cup calendar',changes:[
   'Compete now sits before Career with upcoming and past tournaments, week and month calendars, saved events, detailed schedules, rules, placement rewards and searchable live or final standings. The Frontier Champion preview is rendered from its actual gameplay mesh.',
   'The next Frontier Cup is Monday, October 26. Other matches close at 11:57 a.m. New York time, entry is 12:00–12:01 p.m., and one Solo Royale begins at 12:01. First wins 5,000 Marks and Frontier Champion; an existing owner receives 10,000 extra Marks instead. Second wins 2,500 and third 1,000.',
