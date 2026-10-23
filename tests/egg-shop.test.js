@@ -7,8 +7,8 @@ import {Simulation} from '../src/simulation.js';
 import {RoyaleSimulation} from '../src/royale.js';
 import {makeShopPickaxe,makeShopBack,makeShopGlider,makeShopTrail} from '../src/shop-models.js';
 test('legacy and new cosmetics have unique IDs, supported palettes and priced categories',()=>{
- assert.equal(SHOP_ITEMS.filter(i=>!i.featured&&!i.rankReward).length,84);assert.equal(new Set(SHOP_ITEMS.map(i=>i.id)).size,SHOP_ITEMS.length);
- for(const item of SHOP_ITEMS.filter(i=>!i.rankReward)){assert.ok(item.price>=200&&item.price<=1600);assert.match(item.color,/^#[0-9a-f]{6}$/i);assert.ok(SHOP_SLOTS.includes(item.slot));}
+ assert.equal(SHOP_ITEMS.filter(i=>!i.featured&&!i.rankReward&&!i.tournamentReward).length,84);assert.equal(new Set(SHOP_ITEMS.map(i=>i.id)).size,SHOP_ITEMS.length);
+ for(const item of SHOP_ITEMS.filter(i=>!i.rankReward&&!i.tournamentReward)){assert.ok(item.price>=200&&item.price<=1600);assert.match(item.color,/^#[0-9a-f]{6}$/i);assert.ok(SHOP_SLOTS.includes(item.slot));}
 });
 test('wallet migrates eggs once, deducts exactly once and rejects overspending',()=>{
  let wallet=normalizeWallet(null,70);assert.equal(wallet.balance,370);

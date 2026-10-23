@@ -9,6 +9,7 @@ export function normalizeWallet(value,legacyEggs=0){
 }
 export function purchase(wallet,id,expectedPrice){
  const quote=quoteOffer(wallet,id);if(!quote)throw Error('That item is unavailable.');
+ if(quote.offer.tournamentReward)throw Error('This exclusive pickaxe is awarded only to the Frontier Cup winner.');
  if(quote.offer.rankReward)throw Error('Earn and claim this item through the live Royale rankings.');
  if(quote.owned)throw Error('You already own this item.');
  if(expectedPrice!==undefined&&expectedPrice!==quote.price)throw Error('Your collection changed. Review the updated price and confirm again.');
@@ -32,6 +33,7 @@ export class EggWallet {
   const result=globalThis.navigator?.locks?await globalThis.navigator.locks.request(WALLET_KEY,run):run();
   if(result.error)throw result.error;return result.value;
  }
+ syncTournamentRewards(record){if(!record?.identity||!Array.isArray(record.owned))return Promise.resolve();return this.change(w=>({...w,owned:[...new Set([...w.owned.filter(id=>!shopItem(id)?.tournamentReward),...record.owned.filter(id=>shopItem(id)?.tournamentReward)])]}));}
  syncReferrals(record){if(!record?.id||!Number.isSafeInteger(record.marks)||record.marks<0)return Promise.resolve({amount:0});let amount=0;return this.change(w=>{const paid=w.referralCredits?.[record.id]||0;amount=Math.max(0,record.marks-paid);return {...w,balance:w.balance+amount,earned:w.earned+amount,referralCredits:{...w.referralCredits,[record.id]:Math.max(paid,record.marks)},referralNotices:{...w.referralNotices,[record.id]:w.referralNotices?.[record.id]??paid}};}).then(()=>({amount}));}
  syncOwnerGrants(record){if(!record?.id||!Number.isSafeInteger(record.marks)||record.marks<0||record.marks>1e9)return Promise.resolve({amount:0});let amount=0;return this.change(w=>{const paid=integer(w.ownerCredits?.[record.id]);amount=Math.max(0,record.marks-paid);if(w.balance+amount>1e9)throw Error('Spend some Marks before collecting the remaining owner grant.');return {...w,balance:w.balance+amount,earned:Math.min(1e9,w.earned+amount),ownerCredits:{...w.ownerCredits,[record.id]:Math.max(paid,record.marks)}};}).then(()=>({amount}));}
  pendingReferralReward(id){const w=this.read(),through=w.referralCredits?.[id]||0,amount=through-(w.referralNotices?.[id]??through);return amount>0?{id,amount,through}:null;}

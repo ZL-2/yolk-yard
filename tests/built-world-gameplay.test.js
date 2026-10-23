@@ -2,18 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
 import WebSocket from 'ws';
-import {SLIDER_DEFAULTS,perspectiveFov,resetSliders} from '../src/settings.js';
+import {SLIDER_DEFAULTS,perspectiveFov,resetSliders,migrateThirdPersonFov} from '../src/settings.js';
 import {validatePlayerName} from '../src/player-name.js';
 import {canSpectate,spectatorTargets,watcherAction} from '../src/spectator-status.js';
 import {startRealtimeServer} from '../server/realtime/index.js';
 import {VERSION} from '../src/data.js';
 
-test('first and third person keep independent saved FOVs with a 65-degree third-person default',()=>{
+test('third-person horizontal framing converts to vertical FOV independently from first person',()=>{
  const settings={...SLIDER_DEFAULTS,fov:103};
- assert.equal(perspectiveFov(settings),103);assert.equal(perspectiveFov(settings,true),65);
- settings.thirdPersonFov=78;assert.equal(perspectiveFov(settings),103);assert.equal(perspectiveFov(settings,true),78);
- resetSliders(settings,'thirdPersonFov');assert.equal(settings.fov,103);assert.equal(settings.thirdPersonFov,65);
- assert.equal(perspectiveFov({fov:96},true),65);assert.equal(perspectiveFov({thirdPersonFov:Infinity},true),65);
+ const horizontal=(v,a)=>2*Math.atan(Math.tan(v*Math.PI/360)*a)*180/Math.PI;
+ assert.equal(perspectiveFov(settings),103);
+ for(const aspect of [16/9,16/10,21/9])assert.ok(Math.abs(horizontal(perspectiveFov(settings,true,aspect),aspect)-80)<1e-9);
+ settings.thirdPersonFov=78;assert.equal(perspectiveFov(settings),103);assert.ok(Math.abs(horizontal(perspectiveFov(settings,true),16/9)-78)<1e-9);
+ resetSliders(settings,'thirdPersonFov');assert.equal(settings.fov,103);assert.equal(settings.thirdPersonFov,80);
+ assert.equal(perspectiveFov({fov:96},true),perspectiveFov(settings,true));assert.equal(perspectiveFov({thirdPersonFov:Infinity},true),perspectiveFov(settings,true));
+ const oldDefault=migrateThirdPersonFov({fov:90},{thirdPersonFov:65});assert.equal(oldDefault.thirdPersonFov,80);assert.equal(oldDefault.fov,90);
+ const custom=migrateThirdPersonFov({},{thirdPersonFov:70});assert.ok(Math.abs(perspectiveFov(custom,true)-70)<1e-9);
+ custom.thirdPersonFov=90;migrateThirdPersonFov(custom,{thirdPersonFov:90});assert.equal(custom.thirdPersonFov,90,'migration runs once');
 });
 test('name rejection returns specific useful reasons without silently accepting a replacement',()=>{
  for(const [name,reason]of [['','empty'],['Longer Than Eighteen Characters','length'],['Player','reserved'],['Scout/','format'],['Scout12345','privacy'],['idiot','language']]){

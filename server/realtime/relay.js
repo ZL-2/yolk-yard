@@ -33,6 +33,7 @@ export class RealtimeRelay {
             const old=peer.ws;peer.ws=null;old?.close(1000,'Resumed elsewhere');
             this.ack(peer,m.cursor);peer.ws=ws;
           }else{
+            if(m.id)this.tournament?.assertNormal();
             const id=m.id??`player-${randomUUID()}`;
             if(typeof id!=='string'||m.id!==undefined&&!address.test(id))throw Error('Invalid address');
             // Public room codes are reserved across protocol versions and require
@@ -111,6 +112,7 @@ export class RealtimeRelay {
       this.send(peer,{type:'rooms',request:m.request,rooms});return;
     }
     if(m.type==='publish'){
+      this.tournament?.assertNormal(peer.id);
       if(this.authority.rooms.has(peer.id))return;
       if(!address.test(peer.id))throw Error('Not a room');
       const r=m.room;
@@ -128,6 +130,7 @@ export class RealtimeRelay {
       this.hostWatchdog?.publish(peer,r);peer.listedAt=Date.now();return;
     }
     if(m.type==='connect'){
+      this.tournament?.assertNormal(m.target);
       if(typeof m.channel!=='string'||!/^[-a-z0-9]{36}$/.test(m.channel)||peer.links.size>=MAX_HUMANS+MAX_SPECTATORS)throw Error('Invalid channel');
       const other=this.peers.get(m.target);
       if(!other||other===peer||other.links.size>=MAX_HUMANS+MAX_SPECTATORS){this.send(peer,{type:'error',channel:m.channel,error:'peer-unavailable'});return;}
@@ -178,5 +181,5 @@ export class RealtimeRelay {
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
-  close({preserveSessions=false}={}){this.closing=true;this.voice.close();this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()]){if(preserveSessions)peer.ws?.close(1001,'Server restarting');else this.remove(peer,1001,'Server stopping');}return Promise.all([this.progression.close(),this.parties.close()]);}
+  close({preserveSessions=false}={}){this.closing=true;this.tournament?.close();this.voice.close();this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()]){if(preserveSessions)peer.ws?.close(1001,'Server restarting');else this.remove(peer,1001,'Server stopping');}return Promise.all([this.progression.close(),this.parties.close()]);}
 }

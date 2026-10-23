@@ -229,14 +229,14 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  b.hips.position.y-=lower+.025*moving*(1-Math.max(h.slide,h.down,h.crouch))+h.land*.075+h.death*.58;
  b.hips.rotation.x=-.06*moving-acceleration-(p.tacticalSprint?.18:p.sprinting?.08:0)-h.crouch*.12+h.slide*.27-h.down*1.14-h.revive*.12+h.death*.85;
  const turn=Math.atan2(Math.sin((p.yaw||0)-(h.lastYaw??p.yaw??0)),Math.cos((p.yaw||0)-(h.lastYaw??p.yaw??0)))/Math.max(.016,dt);h.lastYaw=p.yaw||0;h.turn=(h.turn||0)+(turn-(h.turn||0))*blend;b.spine.rotation.z=T.MathUtils.clamp(-h.side*.008-h.turn*.005,-.07,.07);b.hips.rotation.y=T.MathUtils.clamp(h.turn*.008,-.07,.07);b.chest.rotation.y=Math.sin(h.phase)*.025*moving;b.chest.rotation.x=Math.sin(time*1.8)*.008+(p.lastDamage&&time-p.lastDamage<.18?-.09*(1-(time-p.lastDamage)/.18):0)+(p.shotRecoil||0)*.018;
- b.head.rotation.x=(menu?Math.sin(time*.7)*.025:-(p.pitch||0)*.3)+h.down*1.04+h.revive*.14;
+ b.head.rotation.x=(menu?Math.sin(time*.7)*.025:(p.pitch||0)*.3)+h.down*1.04+h.revive*.14;
  if(menu){b.head.rotation.y=p.scan||0;b.chest.rotation.y+=(p.scan||0)*.3;}
  // Turn the pelvis into the stride while the shoulders retain aim. Feet are
  // still solved against their planted world targets; no cosmetic root motion.
  if(!menu&&!airborne&&!dead&&!emote&&!p.downed&&!p.sliding&&!p.vehicleId){
   const strideYaw=pelvisTurn(h.forward,h.side,moving);h.strideYaw=(h.strideYaw||0)+(strideYaw-(h.strideYaw||0))*blend;
   b.hips.rotation.y+=h.strideYaw;b.spine.rotation.y-=h.strideYaw*.7;b.chest.rotation.y-=h.strideYaw*.3;
-  b.chest.rotation.x-=(p.pitch||0)*.12;
+  b.chest.rotation.x+=(p.pitch||0)*.12;
  }
  const patrol=menu?p.lobbyPatrol:null;
  if(patrol){
@@ -297,7 +297,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   const strideScale=walking?.7:1;
   for(const foot of ankles){foot.x=b.hips.position.x+(foot.x-b.hips.position.x)*strideScale;foot.z=b.hips.position.z+(foot.z-b.hips.position.z)*strideScale;foot.y=.09+Math.max(0,foot.y-minimum)*(walking?.7:1);}
   let height=b.hips.position.y+T.MathUtils.clamp(.09-minimum,-.10,.10);
-  if(walking){height=.89;for(let i=0;i<2;i++){const foot=ankles[i],dx=foot.x-(i?.115:-.115)-b.hips.position.x,dz=foot.z-b.hips.position.z;height=Math.min(height,foot.y+.03+Math.sqrt(Math.max(.1,.785**2-dx*dx-dz*dz)));}}
+  if(walking){height=.89+(h.motionRootOffset||0);for(let i=0;i<2;i++){const foot=ankles[i],dx=foot.x-(i?.115:-.115)-b.hips.position.x,dz=foot.z-b.hips.position.z,reach=h.motionLegLength||.785;height=Math.min(height,foot.y+.03+Math.sqrt(Math.max(.1,reach**2-dx*dx-dz*dz)));}}
   h.contactHeight??=height;h.contactHeight+=(height-h.contactHeight)*(1-Math.exp(-dt*22));
   b.hips.position.y=h.contactHeight;
   for(let i=0;i<2;i++){

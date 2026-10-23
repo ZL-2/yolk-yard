@@ -22,7 +22,7 @@ const descriptions={
  quality:'High enables sun shadows and richer surfaces. Resolution adapts to sustained frame load; menus and HUD text stay sharp. Low favors frame rate.',
  fpsLimit:'Choose 30, 60, 90, 120, 144 FPS or Unlimited. Defaults to 60. Higher limits need a capable computer and display. Simulation, controls and multiplayer timing stay consistent.',
  fov:'First-person field of view. Your existing setting is preserved. Scoped optics use this value for their zoom.',
- thirdPersonFov:'Third-person field of view. Defaults to 65°. Adjust independently from first person; changes apply immediately.',
+ thirdPersonFov:'Horizontal field of view for the shoulder camera. Defaults to 80°. Adjust independently from first person; changes apply immediately.',
  volume:'Controls the overall game volume. Individual sound channels are multiplied by this level.',
  effectsVolume:'Weapon effects, impacts and gameplay cues.',ambienceVolume:'Environmental sound, wind and vehicle engines.',musicVolume:'Menu music and match fanfares.',
  sensitivity:'How quickly the camera turns when you move the mouse.',adsSensitivity:'Adjust unscoped aiming independently from magnified optics.',scopeSensitivity:'Adjust aiming sensitivity while looking through a scope.',invert:'Reverse the direction of vertical mouse movement.',

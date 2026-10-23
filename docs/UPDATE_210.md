@@ -1,0 +1,13 @@
+# Update 210 — Frontier Cup and third-person aim
+
+Version 6.19.0 / protocol 79. The website and relay must publish the same commit.
+
+The October 23, 2026 Frontier Cup uses America/New_York daylight time (UTC−04:00): ordinary matchmaking closes and existing rooms are cleared at 12:07; entries open at 12:10; entries close and battle starts at 12:11. The relay owns the clock and simulation. The one-minute window cannot finish early because the room is full or simulation time advances. One Solo match, 48 human competitors maximum, no filler bots, and 16 additional late spectator seats. Eliminated players retain their contestant seats and can spectate or reconnect without respawning. At least two players must finish loading before the cutoff.
+
+Podium prizes are 5,000 / 2,500 / 1,000 Marks. The champion receives the original Frontier Champion pickaxe. Grants, event result and cosmetic entitlement are committed in one SQLite transaction, keyed by event and identity. Repeated completion and reconnects cannot duplicate awards. The item cannot be purchased or equipped by an unauthorized identity. Normal matchmaking reopens as soon as results are committed. A restart during the match or a missing viable roster cancels the event and reopens normal matchmaking without inventing a winner; a 30-minute recovery limit prevents a permanent matchmaking lock. The event does not recur.
+
+Simulation remains 60 Hz. Competitor snapshots are 20 Hz with up to 32 connections and 15 Hz above that threshold; spectator snapshots are capped at 10 Hz, with interpolation on the client. Shared world normalization reduces repeated work. Slow socket backpressure remains isolated per recipient. The world is prepared during the 12:07–12:10 lock, before entry opens. Keep subsequent character deployments out of the active tournament window.
+
+Camera changes lower and shorten the shoulder view, preserve horizontal framing across aspect ratios, and converge the muzzle/character aim on the screen-center reticle through pitch, crouch and ADS. This matches the approved camera review; exact proprietary Fortnite BR parameters are not asserted.
+
+Validation: dated boundary tests, real-socket shutdown/admission/cutoff/reconnect/spectating/awards/reopen, exclusive cosmetic enforcement, wallet idempotency, full browser event, desktop/mobile lobby, actual gameplay camera convergence, snapshot codec, public host, authority, owner and release-history regressions. The CPU capacity fixture reports the 48-player plus 16-spectator moving simulation separately from browser rendering. Software-rendered headless FPS is not a player's hardware benchmark.

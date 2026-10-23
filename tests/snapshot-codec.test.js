@@ -4,6 +4,13 @@ import {SnapshotEncoder,SnapshotDecoder,SnapshotBatch} from '../src/snapshot-cod
 import {Simulation} from '../src/simulation.js';
 import {RoyaleSimulation} from '../src/royale.js';
 const wire=value=>JSON.parse(JSON.stringify(value));
+test('shared world normalization preserves separate player baselines and lossless mutations',()=>{
+ const encoders=[new SnapshotEncoder(),new SnapshotEncoder()],decoders=[new SnapshotDecoder(),new SnapshotDecoder()];
+ for(let frame=0;frame<3;frame++){const batch=new SnapshotBatch(),royale={matchId:'cup',loot:[{uid:1,count:3-frame}],vehicles:[{id:'atv',x:frame}]};
+  for(let i=0;i<2;i++){const message={type:'authority-state',state:{time:frame,royale,players:[{id:'me'+i,x:frame+i,ack:frame}],events:[]}},encoded=encoders[i].encode(message,batch);assert.deepEqual(decoders[i].decode(wire(encoded.frame)),message);}
+  assert.equal(encoders[0].previous.state.royale,encoders[1].previous.state.royale);
+ }
+});
 test('batched encoding shares work while staggered baselines, team events and skipped recipients stay independent',()=>{
  const sim=new RoyaleSimulation({capacity:16,fill:true,seed:42});sim.addPlayer('host',{name:'Host'});sim.addPlayer('guest',{name:'Guest'});sim.startRound();
  const encoders=Array.from({length:16},()=>new SnapshotEncoder()),decoders=encoders.map(()=>new SnapshotDecoder());

@@ -13,7 +13,7 @@ const section=(shop,title,eyebrow,items,large=false)=>`<section class="shop-coll
 export function renderShop(shop){
  const wallet=shop.wallet.value,p=shop.getProfile(),owned=new Set(wallet.owned),discovery=shop.tab==='shop'&&shop.category==='all'&&!shop.search&&shop.sort==='featured';
  const categories=[...(shop.tab==='locker'?[['royale-prestige','Royale prestige']]:[]),['all',shop.tab==='locker'?'My collection':'Discover'],...(shop.tab==='shop'?[['bosses','Bosses'],['originals','Originals'],['bundles','Bundles']]:[]),...Object.entries(SHOP_LABELS),['favorites','Favorites'],...(shop.tab==='shop'?[['archive','Field archive']]:[])];
- let items=(shop.category==='bundles'?SHOP_BUNDLES:SHOP_ITEMS).filter(i=>!i.rankReward&&!(i.styleRoot&&i.id!==i.styleRoot));
+ let items=(shop.category==='bundles'?SHOP_BUNDLES:SHOP_ITEMS).filter(i=>!i.rankReward&&(!i.tournamentReward||shop.tab==='locker')&&!(i.styleRoot&&i.id!==i.styleRoot));
  if(shop.tab==='locker')items=items.filter(i=>owned.has(i.id));
  items=items.filter(i=>{
   const set=SHOP_SETS.find(s=>s.id===i.set),category=shop.category;

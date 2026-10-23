@@ -1,3 +1,4 @@
+import {updateTournamentCard} from './tournament-ui.js';
 import {problemText,captureDialogPosition,restoreDialogPosition} from './problem-reports.js';
 import {modeAvailable,PAUSED_MODES} from './mode-availability.js';
 import {VoiceChat} from './voice-chat.js';
@@ -85,7 +86,7 @@ import {arenaBonuses,BONUS_NAMES,bonusStatus} from './streaks.js';
 import { connectionReport } from './connection-report.js';
 import {RoyaleSimulation} from './royale.js';
 import {RoyaleUI} from './royale-ui.js';
-import {SLIDERS, SLIDER_DEFAULTS, resetSliders, royalePanelAction} from './settings.js';
+import {SLIDERS, SLIDER_DEFAULTS, resetSliders, royalePanelAction, migrateThirdPersonFov} from './settings.js';
 import {queueCandidates,ITEMS,itemInfo} from './royale-data.js';
 import { ChatPanel } from "./chat-ui.js";
 import { moderateText, safeName } from "./moderation.js";
@@ -116,6 +117,7 @@ import './field-stability.css';
 import './lobby-deploy.css';
 import './menu-refresh.css';
 import './experience-200.css';
+import './tournament.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
@@ -185,6 +187,7 @@ const settings = {
   ...read("yolk-settings", {}),
 };
 applyComfort(document.documentElement,settings);
+migrateThirdPersonFov(settings,read('yolk-settings',{}));
 // Migrate the former alternate aim key to dedicated sprint exactly once.
 if(!settings.royaleBindings){if(settings.keybinds?.aim)settings.keybinds.aim=settings.keybinds.aim.map(k=>k==='ShiftLeft'?null:k);settings.royaleBindings=true;}
 migratePerspectiveBindings(settings);
@@ -198,7 +201,7 @@ settings.sensitivity = clamp(Number(settings.sensitivity) || 1, 0.2, 3);
 settings.scopeSensitivity = clamp(Number(settings.scopeSensitivity) || 0.65, 0.1, 2);
 settings.fpsLimit=fpsLimit(settings.fpsLimit)||'unlimited';
 settings.fov = clamp(Number(settings.fov) || 85, 65, 110);
-settings.thirdPersonFov = clamp(Number(settings.thirdPersonFov) || 65, 65, 110);
+settings.thirdPersonFov = clamp(Number(settings.thirdPersonFov) || 80, 65, 110);
 settings.volume = clamp(Number(settings.volume) || 0, 0, 1);
 let stats = read("yolk-stats", { matches: 0, kills: 0, wins: 0 }),
   options = matchOptions({map:"yard", mode:"ffa", fill:true});
@@ -345,7 +348,7 @@ function syncSocialActivity(me){if(!party?.ready)return;const activity=screen===
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();if(screen==='menu')renderMenu();}});
 function currentLeaderboardMode(){leaderboardSelection=syncRankingSelection(leaderboardSelection,party?.party?.selection?.mode);return leaderboardSelection.mode;}
 function trainingBoard(){const p={rank:1,name:profile.name,kills:stats.training?.kills||0,wins:stats.training?.wins||0,you:true};return {mode:'training',...Object.fromEntries(['kills','wins'].map(k=>[k,{total:1,offset:0,rows:[p],self:p,hasMore:false}]))};}
-function menuModel(){const selected=currentLeaderboardMode();if(leaderboardDataMode!==selected){leaderboardTab=rankingMetrics(selected)[0];leaderboards=selected==='training'?trainingBoard():null;leaderboardPageBoards=leaderboards;leaderboardDataMode=selected;leaderboardFetchedAt=0;leaderboardOffset=0;}return {leaderboardMode:selected,profile,party:party?.party,id:party?.id,online:!!party?.ready,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
+function menuModel(){const selected=currentLeaderboardMode();if(leaderboardDataMode!==selected){leaderboardTab=rankingMetrics(selected)[0];leaderboards=selected==='training'?trainingBoard():null;leaderboardPageBoards=leaderboards;leaderboardDataMode=selected;leaderboardFetchedAt=0;leaderboardOffset=0;}return {leaderboardMode:selected,profile,party:party?.party,id:party?.id,online:!!party?.ready,tournament:party?.tournament,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
 function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}installLeaderboardScrollbars();}
 async function refreshLeaderboards(force=false){
  if(screen!=='menu'||menuSection!=='play'&&dialogType!=='leaderboards'||!party?.ready||leaderboardPending||!force&&leaderboards&&performance.now()-leaderboardFetchedAt<15000)return;
@@ -1401,6 +1404,8 @@ function initializeParty(){
  if(needsPlayerName(profile.name))return;
  if(party){party.updateProfile(profile);return;}
  party=new PartyClient({...profile,...pendingRankLoadout},{
+  tournament:event=>{const changed=ownerRuntime.tournament?.phase!==event.phase;ownerRuntime.tournament=event;if(changed&&screen==='menu')renderMenu();updateTournamentCard(document,event,!!party?.ready);},
+  'tournament-rewards':m=>{void eggWallet.syncTournamentRewards(m.record).then(()=>{if(screen==='menu')renderMenu();});},
   'royale-rank':m=>rankRewards.receive(m.record),
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
   status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
@@ -1487,6 +1492,8 @@ const actions = {
  'lobby-options':()=>lobbyOptionsMenu(),
  'lobby-play':()=>queueParty(false),
  'public-join':()=>queuePublicRoyale(false),
+ 'tournament-join':()=>{if(state)return toast('Return to the lobby to join the tournament.');void partyRequest('tournament-join');},
+ 'tournament-spectate':()=>{if(state)return;void partyRequest('tournament-join',{spectate:true});},
  'public-spectate':()=>queuePublicRoyale(true),
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
  'duo-fill':()=>partyRequest('select',{...party.party.selection,teamFill:true,duoFill:true}),

@@ -11,6 +11,7 @@ export class PartyClient {
    else if(m.type==='reply'){const pending=this.pending.get(m.request);if(pending){clearTimeout(pending.timer);this.pending.delete(m.request);m.error?pending.reject(Error(m.error)):pending.resolve(m.result);}}
    else if(m.type==='referrals'){this.referrals=m.referrals;this.handlers.referrals?.(m.referrals);}
    else if(m.type==='deployment')this.handlers.deployment?.(m.deployment);
+   else if(m.type==='tournament'){this.tournament=m.event;this.handlers.tournament?.(m.event);}
    else if(m.type==='public-match'){this.publicMatch=m.match;this.publicMatchAt=performance.now();this.handlers['public-match']?.(m.match);}
    else if(m.type==='mode-counts'){this.modeCounts=m.counts;this.handlers['mode-counts']?.(m.counts);}
    else if(m.type==='party'){this.party=m.party;this.handlers.change?.(m.party);}
