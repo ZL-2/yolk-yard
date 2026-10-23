@@ -1,0 +1,124 @@
+/* The home screen owns its layout. Shared game/dialog styles stay untouched. */
+#menu{--home-panel:#14202deb;--home-raised:#233241;--home-line:#a9bfce26;--home-text:#eef3f7;--home-muted:#a6b6c5;--home-gold:#edc775}
+#menu .yard-nav{height:76px;min-height:76px;padding:0 24px;gap:30px;background:#101b27ed;border-bottom:1px solid var(--home-line);box-shadow:none;flex-wrap:nowrap}
+#menu .yard-logo{transform:none;border:0;padding:0;font-size:23px;line-height:.89;letter-spacing:-.7px;color:var(--home-gold)}
+#menu .yard-logo span{color:var(--home-text)}
+#menu .yard-nav nav{gap:4px;align-self:stretch}
+#menu .yard-nav button{border-radius:6px;font-size:12px;font-style:normal;font-weight:750;letter-spacing:.03em;color:var(--home-muted);padding:12px 14px;background:transparent;border:1px solid transparent;box-shadow:none;text-shadow:none}
+#menu .yard-nav nav button{position:relative;margin:17px 0}
+#menu .yard-nav nav button.active{color:var(--home-gold);background:#edc77512;border-color:#edc77533}
+#menu .yard-nav button:hover{color:var(--home-text);background:#ffffff0c}
+#menu .yard-nav-tools{margin-left:auto;gap:8px}
+#menu .yard-nav-tools .yard-wallet{color:var(--home-text);border-color:var(--home-line);background:#ffffff05}
+#menu[data-section=play]{--lobby-gap:24px;--lobby-left:280px;--lobby-right:292px;--lobby-top:100px;color:var(--home-text)}
+#menu[data-section=play] .yard-lobby-backdrop{background:linear-gradient(90deg,#08121d88,transparent 35%,transparent 64%,#08121d88),linear-gradient(0deg,#091421ad,transparent 45%)}
+#menu .yard-sun{display:none}
+#menu .lobby-deployment-rail{position:absolute;left:var(--lobby-gap);top:var(--lobby-top);bottom:var(--lobby-footer-height,64px);width:var(--lobby-left);display:flex;flex-direction:column;gap:16px;overflow:auto;scrollbar-width:thin;scrollbar-color:#607183 transparent;overscroll-behavior:contain}
+#menu .lobby-deployment-rail .lobby-news{position:relative;left:auto;top:auto;width:100%;flex:none;border:1px solid var(--home-line);border-radius:12px;background:var(--home-panel);box-shadow:0 6px 18px #0002}
+#menu .lobby-news-story{aspect-ratio:1.9}
+#menu .lobby-news-controls{height:32px;background:#14202d;gap:5px}
+#menu .lobby-news-controls button{color:#b6c4d0}
+#menu .lobby-news-story[data-action=season-guide]>span{display:none}
+#menu .news-dot[aria-pressed=true]:after{background:var(--home-gold)}
+#menu .lobby-deployment-rail .lobby-deploy{position:relative;inset:auto;width:100%;margin-top:auto;flex:none;padding:18px;gap:10px;background:var(--home-panel);border:1px solid var(--home-line);border-radius:12px;box-shadow:0 8px 24px #0002;backdrop-filter:none}
+#menu .lobby-mode-kicker{font-size:9px;letter-spacing:.14em;color:var(--home-muted);font-weight:700}
+#menu .lobby-deploy h1{font-size:25px;line-height:1.12;font-style:normal;letter-spacing:-.7px;font-weight:800;margin:0 0 4px;color:var(--home-text)}
+#menu .lobby-options-button,#menu .lobby-privacy-toggle{min-height:38px;padding:9px 12px!important;margin:0!important;border:1px solid var(--home-line)!important;border-radius:6px!important;background:var(--home-raised)!important;color:var(--home-text)!important;font-size:12px!important;font-weight:650;box-shadow:none}
+#menu .lobby-privacy-toggle>span,#menu .lobby-privacy-toggle>b{color:var(--home-muted)}
+#menu .lobby-mode-picker{min-height:55px;align-items:center;padding:11px 12px;border-radius:6px;border:1px solid var(--home-line);background:#192a39;gap:6px}
+#menu .lobby-mode-picker img{opacity:.16;filter:saturate(.45)}
+#menu .lobby-mode-picker:after{background:linear-gradient(90deg,#14202ddd,#14202d55)}
+#menu .lobby-mode-picker small{display:none}
+#menu .lobby-mode-picker strong{font-size:11px;font-weight:750;letter-spacing:.04em}
+#menu .lobby-play-status{font-size:11px;line-height:1.45;font-style:normal;color:var(--home-muted);text-align:left;margin:0;min-height:16px}
+#menu .lobby-deploy .lobby-play{min-height:52px;background:var(--home-gold)!important;color:#18212b!important;border:1px solid #f2d48e;border-radius:7px;font-size:24px;font-weight:850;letter-spacing:.04em;box-shadow:none;text-shadow:none}
+#menu .lobby-deploy .lobby-play:hover:not(:disabled){background:#f6d894!important}
+#menu .yard-party-stack{top:var(--lobby-top);bottom:var(--lobby-footer-height,64px);padding:0;gap:12px;width:var(--lobby-right);scrollbar-color:#607183 transparent}
+#menu .yard-party-stack .yard-party,#menu .yard-party-stack .frontier-leaderboard{border:1px solid var(--home-line);border-radius:12px;background:var(--home-panel);box-shadow:0 8px 24px #0002;padding:16px;backdrop-filter:none}
+#menu .yard-section-label{font-size:11px;letter-spacing:.08em;color:var(--home-text)}
+#menu .yard-section-label>span{color:var(--home-muted)}
+#menu .yard-member{padding:11px 0;gap:10px}
+#menu .yard-member strong{font-size:13px;color:var(--home-text);font-weight:750}
+#menu .yard-member small{font-size:10px;color:var(--home-muted);gap:5px;flex-wrap:wrap}
+#menu .operator-insignia{width:34px;height:36px;border-radius:6px;background:#edc7751a;border:1px solid #edc77545;color:var(--home-gold);box-shadow:none}
+#menu .yard-invite{min-height:36px;border:1px solid var(--home-line);border-radius:6px;background:#ffffff05;color:var(--home-text);font-size:11px;padding:8px 10px}
+#menu .yard-invite b{font-size:17px;color:var(--home-gold)}
+#menu .yard-party-link{color:var(--home-muted);font-size:9px;letter-spacing:.05em;margin-top:9px;padding:2px 0}
+#menu .yard-party-stack .yard-community-actions{display:grid;grid-template-columns:1fr;gap:0;margin:0;border:1px solid var(--home-line);background:var(--home-panel);border-radius:9px;flex:none;overflow:hidden}
+#menu .yard-community-actions .yard-feature-top{display:flex;align-items:center;justify-content:space-between;margin:0;padding:10px 13px;min-height:34px;font-size:9px;letter-spacing:.04em;color:var(--home-muted);background:transparent;border:0;border-radius:0;text-align:left}
+#menu .yard-community-actions .yard-feature-top+button{border-top:1px solid var(--home-line)}
+#menu .yard-community-actions .yard-feature-top span{color:var(--home-gold);margin-left:6px;font-size:9px}
+#menu .yard-community-actions .yard-feature-top:before{content:none}
+#menu .yard-community-actions .yard-feature-top span{display:inline}
+#menu .yard-party-link{min-height:16px}
+#menu .yard-invite b{font-family:system-ui,sans-serif}
+#menu .yard-party-stack .frontier-leaderboard{min-height:330px;gap:0}
+#menu .frontier-board-heading{grid-template-columns:minmax(0,1fr) 110px;gap:9px!important;align-items:center!important;margin-bottom:0}
+#menu .frontier-trophy{display:none}
+#menu .frontier-board-heading h2{font-size:13px!important;font-style:normal;letter-spacing:-.3px;color:var(--home-text);max-width:none;margin:0;white-space:nowrap}
+#menu .frontier-board-heading .eyebrow{display:none}
+#menu .frontier-board-filter{width:110px}
+#menu .frontier-board-live{display:none}
+#menu .frontier-board-filter select{background:#233241;border-color:var(--home-line);color:var(--home-text);font-size:9px;min-height:30px}
+#menu .frontier-board-tabs{gap:3px;margin:12px 0 7px;padding:3px;border-radius:7px;background:#090f1844;border:1px solid var(--home-line)}
+#menu .frontier-board-tabs button{padding:7px 3px;border:0;border-radius:4px;background:transparent;font-size:8px;color:var(--home-muted);font-weight:750;letter-spacing:0;box-shadow:none;white-space:nowrap}
+#menu .frontier-board-tabs button[aria-selected=true]{background:#edc77520!important;color:var(--home-gold)}
+#menu .royale-board-actions{margin:0 0 7px;gap:5px}
+#menu .royale-board-actions button{font-size:8px;color:var(--home-muted);background:transparent;padding:4px 0}
+#menu .frontier-rank{min-height:32px;border-color:#a9bfce12;background:none;color:#cfdae3;font-size:10px}
+#menu .frontier-rank strong{font-size:10px;font-weight:650}
+#menu .frontier-rank.podium,#menu .frontier-rank.podium strong{color:#cfdae3}
+#menu .frontier-rank.is-you{background:#edc7750c}
+#menu .frontier-rank.is-you strong,#menu .frontier-rank-number{color:var(--home-gold)}
+#menu .frontier-rank small{color:var(--home-muted)}
+#menu .frontier-board-self{border-color:var(--home-line);background:#edc77508}
+#menu .frontier-board-tools{padding-top:9px;border-top:1px solid var(--home-line);gap:5px}
+#menu .frontier-board-tools>span{font-size:8px;color:var(--home-muted)}
+#menu .frontier-board-tools button{font-size:8px;background:var(--home-raised);color:var(--home-text);border:1px solid var(--home-line);border-radius:5px;padding:6px}
+#menu .frontier-board-note{font-size:8px;color:var(--home-muted);margin:8px 0 0}
+#menu .yard-party-stack .frontier-board-scroll{min-height:70px}
+#menu .yard-character-label{left:calc((100% + var(--lobby-left) - var(--lobby-right))/2);bottom:calc(var(--lobby-footer-height,64px) + 12px);gap:7px}
+#menu .yard-character-label strong{font-size:22px;letter-spacing:-.4px}
+#menu .yard-character-label button{padding:7px 12px;font-size:9px;letter-spacing:.07em;border:1px solid #ffffff26;border-radius:5px;background:#14202da6;color:var(--home-text)}
+#menu .yard-footer{height:48px;min-height:48px;padding:0 24px;gap:20px;background:#101b27ed;border-top:1px solid var(--home-line);flex-wrap:nowrap;overflow:visible}
+#menu .yard-footer button,#menu .lobby-more summary{font-size:10px;letter-spacing:.04em;font-style:normal;font-weight:700;color:var(--home-muted);padding:9px 0;background:none;border:0;cursor:pointer}
+#menu .yard-footer .lobby-update{margin-right:auto;color:var(--home-gold);font-size:10px}
+#menu .lobby-more{position:relative}
+#menu .lobby-more summary{list-style:none;display:flex;gap:10px;align-items:center}
+#menu .lobby-more summary::-webkit-details-marker{display:none}
+#menu .lobby-more-menu{position:absolute;bottom:43px;right:0;display:grid;min-width:210px;padding:7px;border:1px solid var(--home-line);border-radius:9px;background:#14202d;box-shadow:0 10px 35px #0006;z-index:50}
+#menu .lobby-more-menu button{text-align:left;padding:11px 12px;border-radius:5px}
+#menu .lobby-more-menu button:hover{background:#233241;color:var(--home-text)}
+#menu :is(button,a,summary,select):focus-visible{outline:2px solid var(--home-gold);outline-offset:3px}
+body:has(#menu:not([hidden])) .lobby-comms{top:auto;bottom:7px;left:50%;width:min(400px,36vw);transform:translateX(-50%)}
+body:has(#menu:not([hidden])) .lobby-comms-actions{gap:6px}
+body:has(#menu:not([hidden])) .lobby-comms-actions :is(.lobby-chat-toggle,#voice-open){min-width:80px;min-height:34px;padding:7px 12px;border:1px solid #a9bfce26;background:#ffffff05;color:#b8c7d4;font:700 10px/1.3 Inter,system-ui,sans-serif;letter-spacing:.04em;border-radius:5px!important;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+body:has(#menu:not([hidden])) .lobby-chat-panel{position:absolute;bottom:45px;width:100%;margin:0;background:#14202dfc;border-color:#a9bfce33}
+body:has(#menu[data-section=play]:not([hidden])) .lobby-service-status{right:calc(24px + 292px + 16px);bottom:130px;width:min(320px,calc(100vw - 640px));background:#14202df5;font-size:12px}
+#menu .tournament-card{top:var(--lobby-top);max-height:calc(100dvh - 310px);overflow:auto;border:1px solid #edc77550;border-radius:12px;background:#14202df5;box-shadow:0 8px 24px #0003}
+@media(min-width:761px) and (max-width:1150px){
+ #menu .yard-nav{gap:18px;padding:0 18px}#menu .yard-nav button{font-size:10px;padding:10px}#menu .yard-nav-tools{gap:3px}
+ #menu[data-section=play]{--lobby-gap:18px;--lobby-left:242px;--lobby-right:260px;--lobby-top:94px}
+ #menu .lobby-deployment-rail .lobby-deploy{padding:14px}#menu .lobby-deploy h1{font-size:22px}#menu .yard-party-stack .yard-party,#menu .yard-party-stack .frontier-leaderboard{padding:12px}
+ #menu .frontier-board-filter{width:101px}#menu .frontier-board-heading{grid-template-columns:minmax(0,1fr) 101px}#menu .frontier-board-heading h2{font-size:11px!important}#menu .yard-footer{padding:0 18px}
+}
+@media(min-width:761px){#menu .yard-nav-tools [data-action=social]>span,#menu .yard-nav-tools [data-action=settings]>span{display:inline}}
+@media(min-width:761px) and (max-height:760px){
+ #menu[data-section=play]{--lobby-top:90px}#menu .lobby-deployment-rail{gap:12px}#menu .lobby-news-story{aspect-ratio:2.5}#menu .lobby-news-controls{height:27px}
+ #menu .lobby-deployment-rail .lobby-deploy{padding:14px;gap:8px}#menu .lobby-deploy h1{font-size:22px}#menu .lobby-mode-picker{min-height:40px}#menu .lobby-deploy .lobby-play{min-height:46px}
+ #menu .yard-party-stack{gap:10px}#menu .yard-party-stack .yard-party{padding:12px}#menu .yard-member{padding:8px 0}#menu .yard-party-stack .frontier-leaderboard{min-height:300px;padding:12px}
+ #menu .yard-community-actions .yard-feature-top{padding:8px 12px;min-height:30px}
+}
+@media(min-width:761px) and (max-height:640px){
+ #menu .lobby-news-story{aspect-ratio:3.2}#menu .lobby-deployment-rail .lobby-deploy{padding:12px;gap:6px}#menu .lobby-mode-kicker{display:none}#menu .lobby-options-button,#menu .lobby-privacy-toggle{min-height:32px;padding:7px 10px!important}#menu .lobby-play-status{font-size:10px}
+ #menu .yard-party-stack .frontier-leaderboard{min-height:300px}#menu .yard-party-link{margin-top:5px}#menu .yard-member{padding:6px 0}#menu .yard-community-actions .yard-feature-top{min-height:27px;padding:6px 10px}
+}
+/* Keep narrow screens usable without changing desktop composition. */
+@media(max-width:760px){
+ #menu .yard-nav{height:auto;min-height:104px;flex-wrap:wrap;padding:12px 14px;gap:8px}#menu .yard-logo{font-size:20px}#menu .yard-nav nav{order:3;width:100%;justify-content:center}#menu .yard-nav nav button{margin:0;padding:9px;font-size:10px}#menu .yard-nav-tools button{font-size:10px;padding:8px}#menu .yard-nav-tools>button>span{display:none}
+ #menu[data-section=play]{--lobby-top:124px;--lobby-left:calc(50vw - 21px);--lobby-right:calc(50vw - 21px);--lobby-gap:14px}
+ #menu .lobby-deployment-rail{bottom:90px}#menu .lobby-deployment-rail .lobby-deploy{display:flex;padding:10px;gap:8px}#menu .lobby-deploy h1{font-size:18px}#menu .lobby-news-story{aspect-ratio:1.5}#menu .lobby-play-status{font-size:10px}
+ #menu .yard-party-stack{top:var(--lobby-top);bottom:90px}#menu .yard-party-stack .yard-party,#menu .yard-party-stack .frontier-leaderboard{padding:9px}#menu .yard-community-actions .yard-feature-top{font-size:8px;flex-wrap:wrap;gap:5px}#menu .frontier-board-heading{flex-wrap:wrap}#menu .frontier-board-filter{width:100%;flex-direction:row;align-items:center}#menu .frontier-board-filter select{flex:1;width:0}#menu .frontier-board-heading h2{max-width:none}
+ #menu .yard-character-label{display:none}#menu .yard-footer{height:80px;padding:0 14px 35px;gap:12px}body:has(#menu:not([hidden])) .lobby-comms{width:min(400px,90vw);bottom:5px}
+ #menu:has(.tournament-card) .lobby-deployment-rail,#menu:has(.tournament-card) .yard-party-stack{top:370px}#menu .tournament-card{max-height:230px;top:124px}
+}
