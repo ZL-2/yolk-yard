@@ -30,6 +30,7 @@ test('real sockets: clear ordinary rooms, enforce cutoff, spectate after death/l
   sim.time+=65;sim.advanceWarmupClock();assert.equal(sim.stage,'spawn-island','Simulation time cannot close entry early');
   set(E.startsAt-1);assert.equal(t.summary().joinable,true);set(E.startsAt);assert.equal(t.phase,'running');assert.equal(sim.stage,'battle-bus');
   await late.ask('tournament-join');const watch=await f.game(late);assert.equal(sim.players.get(watch.net.id).lateSpectator,true);assert.equal(sim.players.get(watch.net.id).contestant,false);
+  const watchId=watch.net.id;watch.net.destroy();await until(()=>!sim.players.has(watchId),'Departed viewer releases their spectator seat');await late.ask('returned');await late.ask('tournament-join');const watchAgain=await f.game(late);assert.equal(sim.players.get(watchAgain.net.id).lateSpectator,true);assert.equal(t.summary().spectators,1);
   const p3=sim.players.get(gc.net.id);p3.flight='ground';sim.damage(p3,null,10000,'Disconnected');assert.equal(p3.spectating,true);assert.equal(p3.place,3);
   const frames=gc.states;await until(()=>gc.states>frames,'Eliminated competitor keeps receiving live snapshots');
   const oldId=gc.net.id;gc.net.destroy();await until(()=>!p3.connected,'Eliminated client leaves');await c.ask('returned');await c.ask('tournament-join');const rejoined=await f.game(c);assert.equal(rejoined.net.id,oldId);assert.equal(sim.players.get(oldId).health,0);assert.equal(sim.players.get(oldId).spectating,true);

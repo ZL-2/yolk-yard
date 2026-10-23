@@ -17,7 +17,10 @@ try{
   await page.evaluate(p=>{const q=window.__yolkTest;q.pose({reloadEnd:0,equipUntil:0,equipStarted:-100,equipHolster:0});q.look(0,p);},pitch);
   if(aim)await page.locator('#world').dispatchEvent('mousedown',{button:2});else await page.locator('#world').dispatchEvent('mouseup',{button:2});
   if(crouch)await page.keyboard.down('AltLeft');else await page.keyboard.up('AltLeft');
-  await page.waitForTimeout(900);
+  // Software-rendered CI can spend more than 900 ms compiling one frame.
+  // Wait for actual animation frames, keeping the geometric checks unchanged.
+  const frame=await page.evaluate(()=>window.__yolkTest.framePacing().frames);
+  await page.waitForFunction(frame=>window.__yolkTest.framePacing().frames>=frame+20,frame,{timeout:60000});
   const result=await page.evaluate(async()=>{const {Vector3,Quaternion}=await import('/node_modules/three/build/three.module.js');return window.__yolkTest.loadingFixture(v=>{const p=v.renderLocalActor,m=v.models.get(p.id),t=new Vector3(v.thirdPersonTarget.x,v.thirdPersonTarget.y,v.thirdPersonTarget.z),muzzle=m.userData.blaster.userData.muzzle.getWorldPosition(new Vector3()),dir=new Vector3(0,0,-1).applyQuaternion(m.userData.held.getWorldQuaternion(new Quaternion())).normalize(),error=t.clone().sub(muzzle).normalize().distanceTo(dir),ndc=t.project(v.camera);return {error,reticleError:Math.hypot(ndc.x,ndc.y),fov:v.camera.fov,body:m.visible,firstPersonWeapon:v.gunGroup.visible};});});
   checks.push({name,...result});assert.ok(result.error<.003,name+' gun follows crosshair');assert.ok(result.reticleError<.003,name+' camera target is screen centre');assert.ok(result.body&&!result.firstPersonWeapon);await page.screenshot({path:out+'/'+name+'.png'});
  }
