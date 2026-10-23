@@ -1,4 +1,5 @@
 import {updateTournamentCard} from './tournament-ui.js';
+import {competeMarkup,createCompeteState,bindCompete} from './compete-ui.js';
 import {problemText,captureDialogPosition,restoreDialogPosition} from './problem-reports.js';
 import {modeAvailable,PAUSED_MODES} from './mode-availability.js';
 import {VoiceChat} from './voice-chat.js';
@@ -118,6 +119,7 @@ import './lobby-deploy.css';
 import './menu-refresh.css';
 import './experience-200.css';
 import './tournament.css';
+import './compete.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
@@ -208,7 +210,8 @@ let stats = read("yolk-stats", { matches: 0, kills: 0, wins: 0 }),
 const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},stats.eggs||0),matchEarnings={total:0,status:'Match verification pending'};
 let progressMatch='';
 let crownStatus=read('ravelfront-crown-status',{season:1,wins:0,owned:false,unlocked:false}),crownStatusKey='';
-let menuSection=['locker','shop','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
+let menuSection=['locker','shop','compete','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
+const competeState=createCompeteState();let tournamentReceivedAt=0;
 let privateMatchDrafts={},leaderboardSelection={playMode:null,mode:'royale'},leaderboardDataMode='',leaderboards=null,leaderboardTab='rating',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
 const menuShopStates={};
 let pendingRankLoadout=Object.fromEntries(PRESTIGE_SLOTS.filter(slot=>rankItem(profile[slot])).map(slot=>[slot,profile[slot]]));
@@ -368,8 +371,9 @@ function renderMenu(force=false) {
  }
  root.dataset.section=menuSection;
  if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);lobbyNews.mount(root.querySelector('.lobby-news'));view.lobbyLabels=[...root.querySelectorAll('[data-lobby-player]')];installLeaderboardScrollbars();const footer=root.querySelector('.yard-footer');if(footer){lobbyFooterObserver=new ResizeObserver(()=>document.documentElement.style.setProperty('--lobby-footer-height',Math.ceil(footer.getBoundingClientRect().height)+16+'px'));lobbyFooterObserver.observe(footer);}void refreshLeaderboards();return;}
- root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':'Career'}" tabindex="-1">${menuSection==='career'?careerMarkup({stats,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
+ root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':menuSection==='compete'?'Compete':'Career'}" tabindex="-1">${menuSection==='compete'?competeMarkup(model,competeState):menuSection==='career'?careerMarkup({stats,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
  if(menuSection==='career')$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};
+ else if(menuSection==='compete')bindCompete(root.querySelector('.compete-page'),competeState,refreshCompete,id=>{void partyRequest('tournament-join',{eventId:id});});
  else {
   eggShop??=new EggShop({wallet:eggWallet,view,rankRewards,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
   eggShop.embedded=true;eggShop.onTab=tab=>selectMenuSection(tab==='locker'?'locker':'shop');eggShop.tab=menuSection==='locker'?'locker':'shop';
@@ -382,11 +386,13 @@ function selectMenuSection(section,push=true){
  if(screen!=='menu')return;
  if(eggShop?.pending){toast('Your purchase is saving. Please wait.');return;}
  if(['shop','locker'].includes(menuSection)&&eggShop)menuShopStates[menuSection]=Object.fromEntries(['category','search','sort','page','selected'].map(k=>[k,eggShop[k]]));
- if(dialog.open)closeDialog();menuSection=['play','locker','shop','career'].includes(section)?section:'play';
+ if(dialog.open)closeDialog();menuSection=['play','locker','shop','compete','career'].includes(section)?section:'play';
  if(push&&location.hash!=='#'+menuSection)history.pushState({menuSection},'',location.pathname+location.search+'#'+menuSection);
  renderMenu(true);$('#menu .hub-page')?.focus({preventScroll:true});
 }
 window.addEventListener('popstate',()=>{if(screen==='menu')selectMenuSection(location.hash.slice(1)||'play',false);});
+function refreshCompete(search=false,reset=false){if(screen!=='menu'||menuSection!=='compete')return;const hub=$('#menu .hub-page'),scroll=reset?0:hub?.scrollTop||0,table=hub?.querySelector('.tournament-standings')?.scrollTop||0,focused=hub?.contains(document.activeElement)?document.activeElement:null,focusKey=focused?JSON.stringify(focused.dataset):null,pos=focused?.selectionStart;renderMenu(true);const next=$('#menu .hub-page');next.scrollTop=scroll;const list=next.querySelector('.tournament-standings');if(list)list.scrollTop=table;if(search){const input=next.querySelector('[data-compete-search]');input?.focus({preventScroll:true});input?.setSelectionRange(pos,pos);}else if(focusKey){[...next.querySelectorAll('button,input')].find(n=>JSON.stringify(n.dataset)===focusKey)?.focus({preventScroll:true});}}
+setInterval(()=>{if(screen!=='menu'||menuSection!=='play')return;const e=party?.tournament;if(e)updateTournamentCard(document,e,!!party?.ready,e.serverNow+Math.max(0,performance.now()-tournamentReceivedAt));},1000);
 
 function profileMenu(){
   modal('Player details',`<label for="player-name">YOUR NAME</label><input class="field" id="player-name" aria-describedby="name-safety" maxlength="128" value="${esc(profile.name)}" autocomplete="off"><p id="name-safety" role="alert"></p><button class="primary" data-action="save-profile-name">SAVE NAME</button>`,'profile');
@@ -1404,7 +1410,7 @@ function initializeParty(){
  if(needsPlayerName(profile.name))return;
  if(party){party.updateProfile(profile);return;}
  party=new PartyClient({...profile,...pendingRankLoadout},{
-  tournament:event=>{const changed=ownerRuntime.tournament?.phase!==event.phase;ownerRuntime.tournament=event;if(changed&&screen==='menu')renderMenu();updateTournamentCard(document,event,!!party?.ready);},
+  tournament:event=>{const changed=ownerRuntime.tournament?.locked!==event.locked||ownerRuntime.tournament?.phase!==event.phase;tournamentReceivedAt=performance.now();ownerRuntime.tournament=event;if(changed&&screen==='menu')renderMenu();updateTournamentCard(document,event,!!party?.ready);refreshCompete();},
   'tournament-rewards':m=>{void eggWallet.syncTournamentRewards(m.record).then(()=>{if(screen==='menu')renderMenu();});},
   'royale-rank':m=>rankRewards.receive(m.record),
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
@@ -1487,13 +1493,15 @@ const actions = {
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
  'start-training':()=>{try{ownerRuntime.admission('training');}catch(error){return errorToast(error.message);}if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
  'career':()=>selectMenuSection('career'),
+ 'compete':()=>{competeState.selected='';selectMenuSection('compete');},
+ 'compete-event':b=>{competeState.selected=b.dataset.eventId;competeState.tab='details';selectMenuSection('compete');},
  'find-public':()=>lobbyOptionsMenu(),
  'choose-mode':playMenu,
  'lobby-options':()=>lobbyOptionsMenu(),
  'lobby-play':()=>queueParty(false),
  'public-join':()=>queuePublicRoyale(false),
- 'tournament-join':()=>{if(state)return toast('Return to the lobby to join the tournament.');void partyRequest('tournament-join');},
- 'tournament-spectate':()=>{if(state)return;void partyRequest('tournament-join',{spectate:true});},
+ 'tournament-join':b=>{if(state)return toast('Return to the lobby to join the tournament.');void partyRequest('tournament-join',{eventId:b.dataset.eventId});},
+ 'tournament-spectate':b=>{if(state)return;void partyRequest('tournament-join',{eventId:b.dataset.eventId,spectate:true});},
  'public-spectate':()=>queuePublicRoyale(true),
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
  'duo-fill':()=>partyRequest('select',{...party.party.selection,teamFill:true,duoFill:true}),
@@ -1609,7 +1617,7 @@ document.addEventListener("click", (e) => {
   }
   if (b.dataset.action) {
     sound.unlock();
-    actions[b.dataset.action]?.();
+    actions[b.dataset.action]?.(b);
   }
   if (b.dataset.weapon) {
     profile.weapon = b.dataset.weapon;

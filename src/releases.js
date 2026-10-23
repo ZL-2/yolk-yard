@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'211',title:'Compete: the Frontier Cup calendar',changes:[
+  'Compete now sits before Career with upcoming and past tournaments, week and month calendars, saved events, detailed schedules, rules, placement rewards and searchable live or final standings. The Frontier Champion preview is rendered from its actual gameplay mesh.',
+  'The next Frontier Cup is Monday, October 26. Other matches close at 11:57 a.m. New York time, entry is 12:00–12:01 p.m., and one Solo Royale begins at 12:01. First wins 5,000 Marks and Frontier Champion; an existing owner receives 10,000 extra Marks instead. Second wins 2,500 and third 1,000.',
+  'Tournament cards appear one hour before entry and remain for two hours after completion with scrollable placements and awarded rewards. Complete future standings and each event’s prizes are saved independently. October 23’s recorded podium is preserved; unrecorded lower placements are not invented. Version 6.20.0 / protocol 80.'
+ ]},
  {number:'210',title:'Frontier Cup and centered third-person aim',changes:[
   'Third-person camera framing now uses a lower shoulder position and a consistent horizontal field of view. The held weapon, character aim and screen-center reticle converge in hip fire, aim and crouch, including looking up and down.',
   'The October 23 Frontier Cup clears other matches at 12:07 p.m. New York time. Entry opens at 12:10 and closes at 12:11, when one Solo Royale begins. Late arrivals and eliminated players can spectate. Normal matchmaking automatically reopens after the result.',

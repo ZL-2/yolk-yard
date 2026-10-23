@@ -120,7 +120,7 @@ export class MatchAuthority{
    if(!peer.ws||peer.ws.bufferedAmount>65536||peer.pendingBytes>0||peer.historyBytes>65536)continue;
    const encoder=room.encoders.get(id);includeLoot ||= !encoder||encoder.lootKey!==lootKey;includeBuilds ||= !encoder||encoder.buildKey!==buildKey;
   }
-  const state=sim.snapshot({includeLoot,includeBuilds});if(room.tournament)state.tournament={id:this.relay.tournament.id};state.visibility=room.visibility;state.chatEnabled=room.chat.enabled;state.chatMuted=[...room.chat.muted];state.network={hostId:room.owner,members:this.members(room),chatSequence:room.chat.sequence,authority:'server',timing:room.timing};
+  const state=sim.snapshot({includeLoot,includeBuilds});if(room.tournament)state.tournament={id:room.eventId||this.relay.tournament.id};state.visibility=room.visibility;state.chatEnabled=room.chat.enabled;state.chatMuted=[...room.chat.muted];state.network={hostId:room.owner,members:this.members(room),chatSequence:room.chat.sequence,authority:'server',timing:room.timing};
   const groups=new Map(),batch=new SnapshotBatch();
   for(const [id,peer]of room.members){
    // Do not encode dependent deltas faster than a socket can deliver them.

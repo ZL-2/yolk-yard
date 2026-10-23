@@ -6,7 +6,7 @@ import {fixture,until,pause} from '../tests/helpers/public-match.js';
 import {TOURNAMENT as E} from '../src/tournament.js';
 const origin='http://127.0.0.1:5276',out='test-results/tournament';await mkdir(out,{recursive:true});
 let now=E.lockAt-60000;
-const f=await fixture({serverOptions:{origins:[origin,'https://zl-2.github.io'],tournamentOptions:{now:()=>now}}});
+const f=await fixture({serverOptions:{origins:[origin,'https://zl-2.github.io'],tournamentOptions:{events:[E],now:()=>now}}});
 const event=f.app.relay.tournament;
 const vite=await createServer({plugins:[{name:'tournament-local-relay',configureServer(s){s.middlewares.use((req,res,next)=>{if(!req.url?.split('?')[0].endsWith('/network-config.js'))return next();res.setHeader('Content-Type','text/javascript');res.end(`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${f.app.server.address().port}/game'};`);});}}],server:{host:'127.0.0.1',port:5276,strictPort:true,watch:null}});await vite.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
