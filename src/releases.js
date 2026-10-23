@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'213',title:'A cleaner home screen',changes:[
+  'Rebuilt the lobby around consistent slate panels, restrained gold highlights, aligned columns and clearer typography. Play stays on the left, your operator stays in the center, and party and rankings stay on the right.',
+  'The header now focuses on navigation, Marks, Social and Settings. Crew referrals and feature requests sit beneath your party. Chat and voice share the bottom bar; secondary tools are grouped under Help & More.',
+  'News, matchmaking controls and rankings adapt to laptop-height windows with usable scrolling. Tournament cards retain their central position and the existing owner-managed schedule. Version 6.21.1 / protocol 81.'
+ ]},
  {number:'212',title:'Owner-managed Compete schedule',changes:[
   'Owner Access now includes Compete schedule: create, edit, duplicate, cancel, remove and export tournaments. Set New York dates, matchmaking closure, entry windows, competitor and spectator seats, podium Marks, the exclusive winner pickaxe and repeat-winner bonus.',
   'Saved changes update the public Compete calendar, event details and lobby cards without a deployment. Schedules persist on the server, detect conflicting edits and prevent overlapping tournaments. Every change is authenticated, confirmed and recorded in the audit trail.',

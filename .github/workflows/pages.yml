@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      lobby_home_update: ${{ steps.scope.outputs.lobby_home_update }}
       tournament_update: ${{ steps.scope.outputs.tournament_update }}
       wren_study_update: ${{ steps.scope.outputs.wren_study_update }}
       prestige_sets_update: ${{ steps.scope.outputs.prestige_sets_update }}
@@ -378,6 +379,12 @@ jobs:
             out.write('tournament_update='+str(tournament_update).lower()+'\n')
             if tournament_update: out.write('focused=true\n')
           print('Frontier Cup, camera and bounded snapshot delivery:',tournament_update)
+          home_allowed={'tests/public-pools.test.js','src/lobby-ui.js','src/lobby-home.css','src/main.js','src/releases.js','package.json','package-lock.json','scripts/lobby-home-browser-check.mjs','tests/leaderboards.test.js','docs/UPDATE_213.md','.github/workflows/pages.yml'}
+          home_update={'src/lobby-ui.js','src/lobby-home.css'}<=files<=home_allowed
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('lobby_home_update='+str(home_update).lower()+'\n')
+            if home_update: out.write('focused=true\n')
+          print('Home screen layout and existing lobby controls:',home_update)
 
 
 
@@ -403,6 +410,9 @@ jobs:
           node --test --test-concurrency=2 tests/tournament.test.js tests/compete.test.js tests/snapshot-codec.test.js tests/perspective.test.js tests/character-motion.test.js tests/built-world-gameplay.test.js tests/royale-prestige.test.js tests/egg-shop.test.js tests/server-authority.test.js tests/owner.test.js tests/relay-compact.test.js tests/relay-queue.test.js tests/public-host.test.js tests/release-history.test.js
           node --test tests/tournament-owner.test.js tests/owner-network.test.js tests/owner-request.test.js
           node --expose-gc scripts/tournament-performance.mjs
+      - name: Home navigation, party controls, rankings and release history
+        if: needs.scope.outputs.lobby_home_update == 'true'
+        run: node --test --test-concurrency=2 tests/private-social.test.js tests/public-pools.test.js tests/career.test.js tests/leaderboards.test.js tests/compete.test.js tests/release-history.test.js
       - uses: actions/upload-artifact@v4
         if: always() && needs.scope.outputs.tournament_update == 'true'
         with:
@@ -700,9 +710,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true'
+        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true'
       - name: Install the headless desktop runtime with a missing-library fallback
-        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true'
+        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           # Ubuntu runners already carry the Chromium libraries. Avoid a full
@@ -715,6 +725,15 @@ jobs:
           node scripts/compete-browser-check.mjs
           node scripts/tournament-browser-check.mjs
           node scripts/camera-gameplay-browser.mjs
+      - name: Home screen layouts and interactive controls
+        if: needs.scope.outputs.lobby_home_update == 'true'
+        run: node scripts/lobby-home-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.lobby_home_update == 'true'
+        with:
+          name: lobby-home-review
+          path: test-results/lobby-home
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         if: always() && needs.scope.outputs.tournament_update == 'true'
         with:
@@ -1208,9 +1227,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true'
+        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true'
       - name: Install the focused headless desktop runtime
-        if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true'
+        if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium

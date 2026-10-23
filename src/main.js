@@ -120,6 +120,7 @@ import './menu-refresh.css';
 import './experience-200.css';
 import './tournament.css';
 import './compete.css';
+import './lobby-home.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
@@ -1597,6 +1598,8 @@ const actions = {
   about:()=>modal('Credits & about',creditsHTML(),'about'),
 };
 document.addEventListener("click", (e) => {
+  const more=document.querySelector('.lobby-more[open]');
+  if(more&&(!more.contains(e.target)||e.target.closest('[data-action]')))more.open=false;
   const loadout=e.target.closest('[data-z-action^="z:loadout:"]');if(loadout){sendPlayerAction(loadout.dataset.zAction);return;}
   const b = e.target.closest("button,[data-action]");
   if (!b) return;
@@ -1785,6 +1788,8 @@ function pointerPanelToggle(e){
 document.addEventListener('mousedown',pointerPanelToggle,true);
 document.addEventListener('wheel',pointerPanelToggle,{capture:true,passive:false});
 document.addEventListener("keydown", (e) => {
+  const more=document.querySelector('.lobby-more[open]');
+  if(e.key==='Escape'&&more&&!dialog.open){more.open=false;more.querySelector('summary').focus();e.preventDefault();return;}
   if(e.code==='F8'&&dialogType!=='problem-report'&&!e.target.matches('input,textarea,[contenteditable=true]')){const connection=!matchConnectionUI.root.hidden,problem=dialog.open&&!!dialog.querySelector('[data-action=report-problem]')||performance.now()<toastUntil&&!!$('#toast [data-action=report-problem]');if(connection||problem){e.preventDefault();if(!e.repeat)(connection?actions['report-connection']:reportProblemMenu)();return;}}
   if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();menuModel();const metrics=rankingMetrics(currentLeaderboardMode());leaderboardTab=metrics[e.key==='Home'?0:e.key==='End'?metrics.length-1:(metrics.indexOf(leaderboardTab)+(e.key==='ArrowLeft'?-1:1)+metrics.length)%metrics.length];renderLeaderboard(true);void refreshLeaderboards(true);return;}
   if (chat.opened || e.target.matches("input,select,textarea,[contenteditable=true]")) return;
