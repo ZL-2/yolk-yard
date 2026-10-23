@@ -6,9 +6,10 @@ import {mkdir,mkdtemp,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import WebSocket from 'ws';
 import {Network} from '../src/network.js';
+import {ROYALE_SETS} from '../src/royale-ranking.js';
 import {VERSION,safeProfile} from '../src/data.js';
 
-const out='test-results/update-207',origin='http://127.0.0.1:5262',temp=await mkdtemp(tmpdir()+'/ravel-public-ui-');
+const out='test-results/update-208/gameplay',origin='http://127.0.0.1:5262',temp=await mkdtemp(tmpdir()+'/ravel-public-ui-');
 await mkdir(out,{recursive:true});
 process.env.RAVEL_SOCIAL_DATA_PATH=temp+'/social.json';process.env.RAVEL_REWARD_DATA_PATH=temp+'/rewards.json';process.env.YOLK_OWNER_DATA_PATH=temp+'/owner.json';
 const relay=await startRealtimeServer({port:0,host:'127.0.0.1',origins:[origin]}),endpoint=`ws://127.0.0.1:${relay.server.address().port}`;
@@ -43,18 +44,19 @@ try{
  await until(()=>party,'Guest lobby connected');social.send(JSON.stringify({type:'queue',publicRoyale:true,request:1}));await until(()=>launch,'Guest admitted to the same public room');assert.equal(launch.host,false);
  guest=new Network({onState:s=>{guestState=s;guestStates++;},onError:e=>errors.push(e),onStatus:s=>record('guest-status',{status:s})});await guest.join(launch.code,safeProfile({name:'Public UI Guest'}),launch.ticket);social.send(JSON.stringify({type:'joined',id:launch.id,request:2}));
  await until(()=>guestState?.players.some(p=>p.id===guest.id),'Browser sends guest state');
- for(const id of ['pickaxe-rank-25','pickaxe-rank-10','pickaxe-rank-5','pickaxe-rank-1']){
-  await page.evaluate(id=>window.__yolkTest.social('rank-claim',{ids:[id],equip:id}),id);
+ for(const set of ROYALE_SETS){
+  const id=set.items.at(-1).id,equip=Object.fromEntries(set.items.map(i=>[i.slot,i.id]));
+  await page.evaluate(equip=>window.__yolkTest.social('rank-claim',{ids:Object.values(equip),equip}),equip);
   await page.waitForFunction(id=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId)?.pickaxe===id;},id);
-  await until(()=>guestState.players.find(p=>p.id==='host')?.pickaxe===id,'Equipped tool reaches guest');
+  await until(()=>Object.entries(equip).every(([slot,id])=>guestState.players.find(p=>p.id==='host')?.[slot]===id),'All six equipped slots reach guest');assert.equal(guestState.players.find(p=>p.id==='host').royaleRank,1);
   for(const perspective of ['first','third']){
    await page.evaluate(p=>window.__yolkTest.setPerspective(p),perspective);
    const before=await page.evaluate(()=>({frames:window.__yolkTest.framePacing().frames,time:window.__yolkTest.read().state.time}));
    await page.waitForFunction(before=>window.__yolkTest.framePacing().frames>before.frames+2&&window.__yolkTest.read().state.time>before.time,before);
   }
-  record('rank-tool-playing',{id});
+  record('rank-set-playing',{rank:set.rank});
  }
- checks.allFourToolsAndPerspectives=true;
+ checks.allFourSetsAndPerspectives=true;
  const matchId=guestState.royale.matchId;assert.equal(await page.evaluate(()=>window.__yolkTest.read().state.royale.matchId),matchId);
  const before=guestState.time,beforeStates=guestStates;record('interrupt',{time:before,states:beforeStates,stage:guestState.royale.stage});guest.hostConnection.close();await until(()=>!guest.migrating&&guestStates>beforeStates&&guestState.time>before,'Guest reconnects to the browser host');record('reconnected',{time:guestState.time,states:guestStates});
  assert.equal(guestState.royale.matchId,matchId);assert.equal(guestState.players.find(p=>p.id===guest.id).lateSpectator,false);
@@ -64,8 +66,22 @@ try{
  await page.locator('#loading-screen').waitFor({state:'hidden'});
  record('battle-started',{state:await page.evaluate(()=>{const r=window.__yolkTest.read();return {time:r.state.time,stage:r.state.royale.stage,players:r.state.players.length,view:window.__yolkTest.repairView()};})});
  const battleTime=guestState.time;await until(()=>guestState.time>battleTime+3,'Battle simulation continues');
- await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.stage='active';for(const p of s.players.values())if(!p.boss&&!p.henchman){Object.assign(p,{flight:'ground',x:40+(s.random()-.5)*20,y:2,z:40+(s.random()-.5)*20,health:100,shield:100,shieldUntil:0});}}));
+ await page.evaluate(()=>window.__yolkTest.fixture(s=>{s.stage='active';for(const p of s.players.values())if(!p.boss&&!p.henchman){Object.assign(p,{flight:'ground',x:40+(s.random()-.5)*20,y:2,z:40+(s.random()-.5)*20,health:100,shield:100,shieldUntil:p.bot?0:1e9,eliminated:false,spectating:false,fall:{apex:2,immune:true,source:'fixture'}});}}));
  const combatTime=guestState.time;await until(()=>guestState.time>combatTime+5,'Combat simulation continues',60000);
+ for(const set of ROYALE_SETS){
+  const equip=Object.fromEntries(set.items.map(i=>[i.slot,i.id]));await page.evaluate(equip=>window.__yolkTest.social('rank-claim',{ids:Object.values(equip),equip}),equip);
+  await page.evaluate(()=>{const q=window.__yolkTest;q.setPerspective('third');q.fixture(s=>{const p=s.players.get(q.read().localId);Object.assign(p,{flight:'glide',x:0,y:250,z:0,health:100,shield:100,shieldUntil:1e9,eliminated:false,spectating:false,grounded:false,vy:0,fall:{apex:250,immune:true,source:'fixture'}});});});
+  await page.waitForFunction(equip=>{const q=window.__yolkTest;return q.loadingFixture(v=>{const g=v.royaleView.gliders.get(q.read().localId);return g?.userData.style===equip.glider+':'+equip.trail&&g.visible;});},equip);
+ }
+ checks.allSetGlidersAndTrails=true;
+ for(const type of ['atv','helicopter']){
+  await page.evaluate(async type=>{const {exitVehicle}=await import('/src/vehicles.js');const q=window.__yolkTest;q.fixture(s=>{const p=s.players.get(q.read().localId),v=s.vehicles.find(v=>(v.type||'atv')===type);exitVehicle(s,p,{force:true});Object.assign(p,{x:v.x+3,y:v.y,z:v.z,vehicleLock:0,vehicleInteractHeld:false,flight:'ground',health:100,shieldUntil:1e9,eliminated:false,spectating:false,grounded:true,vy:0,fall:{apex:v.y,immune:true,source:'fixture'}});});await q.resume();},type);
+  await page.keyboard.down('KeyF');await page.waitForFunction(()=>{const r=window.__yolkTest.read();return !!r.state.players.find(p=>p.id===r.localId).vehicleId;});await page.keyboard.up('KeyF');
+  await page.waitForFunction(()=>{const r=window.__yolkTest.read(),p=r.state.players.find(p=>p.id===r.localId);return r.state.time>p.vehicleLock+.1;});await page.keyboard.press('ControlLeft');
+  await page.waitForFunction(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).vehicleSeat===1;});
+  await page.waitForFunction(()=>{const r=window.__yolkTest.read(),p=r.state.players.find(p=>p.id===r.localId);return r.state.time>p.vehicleLock+.1;});await page.keyboard.down('KeyF');await page.waitForFunction(()=>{const r=window.__yolkTest.read();return !r.state.players.find(p=>p.id===r.localId).vehicleId;});await page.keyboard.up('KeyF');record('shared-vehicle-controls',{type});
+ }
+ checks.sharedVehicleControls=true;
  record('combat-advanced',{time:guestState.time});assert.deepEqual(errors,[]);checks.actualBrowserHostAndGuest=true;checks.matchAndCombatAdvance=true;checks.reconnectSameRound=true;
  await writeFile(out+'/result.json',JSON.stringify({result:'PASS',checks,errors,trace},null,2));console.log(JSON.stringify({result:'PASS',checks}));
 }catch(error){record('failure',{error:String(error),states:guestStates,time:guestState?.time,migrating:guest?.migrating,closed:guest?.closed,peerClosed:guest?.peer?.destroyed,channelOpen:guest?.hostConnection?.open,public:relay.relay.publicHost.summary()});await page?.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/result.json',JSON.stringify({error:String(error),checks,errors,trace},null,2));throw error;}

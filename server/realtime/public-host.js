@@ -71,18 +71,15 @@ export class PublicRoom {
   if(this.host&&(peer.id===this.host.peer||peer.id===this.host.address)){
    const old=this.host;this.host=null;
    const other=this.relay.peers.get(peer.id===old.peer?old.address:old.peer);
-   if(other&&other!==peer)this.relay.remove(other,1001,'Public host transferred');
+   if(other&&other!==peer)this.relay.remove(other,this.transferReason?1008:1001,this.transferReason||'Public host transferred');
   }
   if(!this.members.size&&!this.host){this.state=null;this.pending=null;}
  }
  sweep(){
   if(!this.enabled)return;
   if(this.pending){const p=this.relay.parties.parties.get(this.pending.party);if(!p||p.state!=='queueing'||!p.launch?.recurring||p.launch.code!==this.code)this.pending=null;else if(this.pending.expires<Date.now()){this.pending=null;this.relay.parties.cancel(p,'The public host did not finish loading. Try joining again.');}}
-  // Simulation cadence is not transport liveness. Preparing the battle map or
-  // compiling shaders can pause frames while the browser still answers pings.
-  // A guest's checkpoint does not authorize evicting that connected host.
-  // The relay's native ping, resume grace and explicit leave own removal; once
-  // they remove a host, the existing lease election transfers the same round.
+  // HostWatchdog owns simulation timeout removal. This registry still owns
+  // admission, current-round readiness and the single successor lease.
 
  }
  saveCrown(peer,value){if(this.options.mode!=='royale'||!peer.publicMember||this.members.get(peer.id)?.admission.spectator)return;this.relay.progression.account(peer.progressId).crowns=crownRecord(value);this.relay.progression.dirty=true;void this.relay.progression.save();}

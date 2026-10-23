@@ -9,7 +9,7 @@ export function normalizeWallet(value,legacyEggs=0){
 }
 export function purchase(wallet,id,expectedPrice){
  const quote=quoteOffer(wallet,id);if(!quote)throw Error('That item is unavailable.');
- if(quote.offer.rankReward)throw Error('Earn and claim this pickaxe through the live Royale rankings.');
+ if(quote.offer.rankReward)throw Error('Earn and claim this item through the live Royale rankings.');
  if(quote.owned)throw Error('You already own this item.');
  if(expectedPrice!==undefined&&expectedPrice!==quote.price)throw Error('Your collection changed. Review the updated price and confirm again.');
  if(wallet.balance<quote.price)throw Error(`You need ${quote.price-wallet.balance} more Marks.`);

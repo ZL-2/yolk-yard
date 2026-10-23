@@ -104,7 +104,7 @@ function cylinder(parent, x, y, z, radius, height, color, segments = 16) {
 // Compatibility export; all callers now construct the shared human rig.
 export function makeEgg(profile, team = -1, withWeapon = true) {
   const group=makeHumanoid({...profile,teamColor:team>=0?(team===0?'#3d8ce8':'#d94949'):null});
-  if(shopItem(profile.backbling)){const back=makeShopBack(profile.backbling);back.position.set(0,-.09,.18);group.userData.human.bones.chest.add(back);group.userData.back=back;}
+  if(shopItem(profile.backbling)){const back=makeShopBack(profile.backbling,profile.royaleRank);back.position.set(0,-.09,.18);group.userData.human.bones.chest.add(back);group.userData.back=back;}
   if(withWeapon){
     const held=new THREE.Group(),blaster=makeBlaster(profile.weapon,profile.wrap),arms=makeArms(profile.weapon,profile,false);
     held.position.set(VIEWMODEL.x,EYE+VIEWMODEL.y,VIEWMODEL.z);held.scale.setScalar(VIEWMODEL.scale);
@@ -510,18 +510,18 @@ export class View {
   shopPortrait(item,angle=0){
     this.shopPortraits??=new Map();const key=(item.previewKey||item.id)+':'+angle;if(this.shopPortraits.has(key))return this.shopPortraits.get(key);if(this.shopPortraits.size>140)this.shopPortraits.delete(this.shopPortraits.keys().next().value);
     if(!this.portraitRenderer){this.portraitRenderer=makeRenderer({alpha:true,antialias:true});this.portraitRenderer.setPixelRatio(1);}
-    const resolution=item.characterInspection||item.rankReward?600:320;this.portraitRenderer.setSize(resolution,resolution);
+    const resolution=item.characterInspection?600:item.rankReward?400:320;this.portraitRenderer.setSize(resolution,resolution);
     const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0x768697,3));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(-3,5,-4);scene.add(light);
     let model;
     if(item.starter){const kit={block,ball,cylinder,mat,palette};model=item.slot==='pickaxe'?lootModel({id:'pickaxe',pickaxe:true},kit,{ground:false}):item.slot==='glider'?gliderModel(kit):item.slot==='wrap'?makeBlaster('sprinter'):makeEgg({...item.profile,outfit:''},-1,!!item.characterInspection&&item.showWeapon!==false);}
     else if(item.slot==='outfit')model=makeEgg({...item.profile,outfit:item.id},-1,!!item.characterInspection&&item.showWeapon!==false);
     else if(item.slot==='wrap')model=makeBlaster('sprinter',item.id);
     else if(item.slot==='pickaxe')model=makeShopPickaxe(item.id);
-    else if(item.slot==='backbling')model=makeShopBack(item.id);
+    else if(item.slot==='backbling')model=makeShopBack(item.id,item.royaleRank);
     else if(item.slot==='glider')model=makeShopGlider(item.id);
-    else if(item.slot==='trail'){model=makeEgg({color:item.color,eyewear:6},-1,false);model.add(makeShopTrail(item.id));}
+    else if(item.slot==='trail'){model=makeEgg({color:item.color,eyewear:6,...(item.rankReward?{outfit:'outfit-rank-'+item.rank}:{})},-1,false);model.add(makeShopTrail(item.id));}
     else model=makeEgg({color:'#fff6da',accent:'#3d8ce8',eyewear:6,...item.profile},-1,false);
-    model.rotation.y=angle+(item.slot==='wrap'?1.15:item.slot==='backbling'?Math.PI:-.35);scene.add(model);
+    model.rotation.y=angle+(item.slot==='wrap'?1.15:item.slot==='backbling'?Math.PI:-.35);if(item.rankReward&&item.slot==='glider')model.rotation.x=-.45;scene.add(model);
     const bounds=new THREE.Box3().setFromObject(model),center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());model.position.sub(center);
     const d=Math.max(size.x,size.y,size.z)*.65,camera=new THREE.OrthographicCamera(-d,d,d,-d,.01,30);camera.position.set(-2,1,-6);camera.lookAt(0,0,0);this.portraitRenderer.render(scene,camera);
     const result=this.portraitRenderer.domElement.toDataURL();this.disposeGroup(model);this.shopPortraits.set(key,result);return result;
@@ -882,7 +882,7 @@ export class View {
         if(playing&&!this.actorFrustum.intersectsSphere(this.actorBounds)){const hidden=this.models.get(p.id);if(hidden)hidden.visible=false;continue;}
         const sig =
           p.name + (!!state.zonewars) + p.color +
-          p.hat + JSON.stringify([p.pattern,p.finish,p.eyewear,p.accent,p.outfit,p.wrap,p.backbling,p.pickaxe]) +
+          p.hat + JSON.stringify([p.pattern,p.finish,p.eyewear,p.accent,p.outfit,p.wrap,p.backbling,p.pickaxe,p.royaleRank]) +
           (p.team+":"+p.teamSlot) +
           mode(state.options.mode).teams;
         let model = this.models.get(p.id);

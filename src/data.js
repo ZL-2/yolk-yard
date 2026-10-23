@@ -5,7 +5,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
 // Shared camera targeting and remote commands require matching host/client releases.
-export const VERSION = 77;
+export const VERSION = 78;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -207,6 +207,7 @@ export function safeProfile(p = {}) {
     eyewear: p.eyewear == null ? NO_EYEWEAR : cosmeticIndex(p.eyewear, EYEWEAR),
     accent: COLORS.includes(p.accent) ? p.accent : COLORS[1],
     ...cosmeticProfile(p),
+    royaleRank:Number.isInteger(p.royaleRank)&&p.royaleRank>0&&p.royaleRank<=25?p.royaleRank:0,
   };
 }
 export function rng(seed) {

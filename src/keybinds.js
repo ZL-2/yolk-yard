@@ -21,7 +21,7 @@ export const CONTROLS = [
   ['scores', 'Scoreboard', 'Tab', null],
   ['sprint','Tactical sprint','ControlLeft',null],
   ['startNow','Start private Royale (host)','KeyU',null],
-  ['interact','Search / pick up / revive (Royale)','KeyF',null],
+  ['interact','Interact / enter / exit vehicle','KeyF',null],
   ['map','Island map (Royale)','KeyM',null],
   ['inventory','Inventory (Royale)','KeyI',null],
   ['dismissFlight','Close flight tips (Royale)','KeyL',null],
@@ -44,18 +44,20 @@ export const CONTROLS = [
   ['chat', 'Open chat', 'Enter', 'KeyT'],
   ['heliUp','Helicopter: ascend','Mouse0','Space'],
   ['heliDown','Helicopter: descend','Mouse2',null],
-  ['heliBoost','Helicopter: boost','ShiftLeft',null],
-  ['heliSeat','Helicopter: switch seat','ControlLeft',null],
-  ['heliExit','Helicopter: hold to exit','KeyE',null],
+  ['vehicleBoost','Vehicle: boost','ShiftLeft',null],
+  ['vehicleSeat','Vehicle: switch seat','ControlLeft',null],
+  ['atvBrake','ATV: handbrake','Space',null],
   ['heliHorn','Helicopter: loudspeaker','KeyB',null],
 ];
 export const validBinding = code => typeof code === 'string' && /^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Tab|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Mouse[0-4]|Wheel(Up|Down)|Numpad([0-9]|Add|Subtract|Multiply|Divide|Decimal|Enter)|Enter|CapsLock|Backquote|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Home|End|PageUp|PageDown|Insert|F([1-9]|1[01]))$/.test(code);
-const heldActions=new Set(['leanLeft','leanRight','heliUp','heliDown','heliBoost','heliExit','forward','back','left','right','aim','sprint','scores','crouch','interact']);
+const heldActions=new Set(['leanLeft','leanRight','heliUp','heliDown','vehicleBoost','atvBrake','forward','back','left','right','aim','sprint','scores','crouch','interact']);
 export const bindingAllowed=(action,code)=>validBinding(code)&&!(code.startsWith('Wheel')&&heldActions.has(action));
 // These bindings are disjoint by gameplay context; everything else stays exclusive.
 export function shareBinding(a,b,code){
  if(a===b)return false;
- if(a.startsWith('heli')!==b.startsWith('heli'))return true;
+ const vehicle=id=>id.startsWith('heli')||id.startsWith('vehicle')||id==='atvBrake';
+ if(a==='atvBrake'&&b.startsWith('heli')||b==='atvBrake'&&a.startsWith('heli'))return true;
+ if(vehicle(a)!==vehicle(b)&&a!=='interact'&&b!=='interact')return true;
  if([a,b].includes('buildReset')&&[a,b].includes('aim'))return true;
  const edit=new Set(['buildEdit','buildReset']),scroll=new Set(['nextSlot','previousSlot']);
  return code?.startsWith('Wheel')&&((edit.has(a)&&edit.has(b))||(edit.has(a)&&scroll.has(b))||(edit.has(b)&&scroll.has(a)));
@@ -84,6 +86,7 @@ export function migratePerspectiveBindings(settings){
  settings.perspectiveBindings157=true;return settings;
 }
 export function normalizeBindings(saved) {
+  if(saved&&!Object.hasOwn(saved,'vehicleSeat'))saved={...saved,vehicleSeat:saved.heliSeat||['ControlLeft',null],vehicleBoost:saved.heliBoost||['ShiftLeft',null]};
   // Migrate only untouched old defaults once; explicit custom Q/E bindings win.
   if(saved&&!Object.hasOwn(saved,'leanLeft')&&!Object.hasOwn(saved,'leanRight')){
     saved={...saved};
@@ -103,8 +106,9 @@ export function normalizeBindings(saved) {
 export const bindingDown = (bindings, keys, action) => bindings[action].some(code => code && keys.has(code));
 // Vehicle controls win over bindings used on foot, including custom edit keys.
 export function helicopterActions(player,bindings,code){
- if(!player?.vehicleId||player.vehicleType!=='helicopter')return [];
- const actions=player.vehicleSeat===0?['heliUp','heliDown','heliBoost','heliSeat','heliExit','heliHorn']:['heliSeat','heliExit'];
+ if(!player?.vehicleId)return [];
+ const actions=['vehicleSeat','interact'];
+ if(player.vehicleSeat===0)actions.push('vehicleBoost',...(player.vehicleType==='helicopter'?['heliUp','heliDown','heliHorn']:['atvBrake']));
  return actions.filter(id=>bindings[id]?.includes(code));
 }
 export function bindingLabel(code) {
@@ -118,5 +122,7 @@ export const CONTROL_GROUPS=[
  ['Equipment & inventory',['primary','sidearm','slot3','slot4','slot5','swap','nextSlot','previousSlot','pickaxe','drop','inventory']],
  ['Building & editing',['buildToggle','buildWall','buildFloor','buildStairs','buildRoof','buildRotate','buildMaterial','buildEdit','buildReset','buildRepair']],
  ['World & squad',['interact','map','marker','danger','emotes','chat','scores','startNow','dismissFlight']],
- ['Kestrel helicopter',['heliUp','heliDown','heliBoost','heliSeat','heliExit','heliHorn']]
+ ['Vehicles · ATV & Kestrel',['vehicleSeat','vehicleBoost']],
+ ['ATV',['atvBrake']],
+ ['Kestrel helicopter',['heliUp','heliDown','heliHorn']]
 ];

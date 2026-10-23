@@ -1,4 +1,10 @@
 export const RELEASE_NOTES = [
+ {number:'208',title:'Royale Prestige: the complete collections',changes:[
+  'Top 25 Tempest, Top 10 Rift, Top 5 Solar and #1 Apex now each include a unique matching outfit, wrap, rank cape, glider, dive trail and pickaxe. Capes display the wearer’s current Royale rank. The four collections use the same gameplay models in rewards and the Locker.',
+  'Existing pickaxe owners are offered their newly earned set pieces. Inspect six items, claim individually, claim a collection, equip a complete set or claim everything. Rank rewards stack; dropping below a cutoff revokes every item in that collection, including equipped pieces and presets. Regaining the rank offers that collection again. Claims persist online and update connected matches.',
+  'A host that stops advancing the match is removed after ten seconds on the waiting-for-host display. The relay transfers the current match to an active synchronized player; if none is available, the match ends. Hosts receive a clear disconnect explanation. Public and private transfers keep a single host and the existing recovery checkpoint.',
+  'ATV and Kestrel share vehicle controls: Left Control switches seats, Left Shift boosts, and the interaction key enters or exits (F by default; hold to leave the helicopter). Passengers retain their chosen camera and scope controls. Helicopter ascent, descent and loudspeaker and ATV handbrake retain separate bindings. Version 6.18.0 / protocol 78.'
+ ]},
  {number:'207',title:'Match entry and rank pickaxe crash fix',changes:[
   'Fixed a gameplay crash when a Royale Prestige pickaxe was equipped or visible on another player. All four rank tools now have explicit swing animations, and tools without a legacy shape safely use the standard animation.',
   'Verified actual public match entry, host-to-guest updates, reconnects and continued gameplay with ranked tools in first- and third-person views. Version 6.17.1 / protocol 77.'
