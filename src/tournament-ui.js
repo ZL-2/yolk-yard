@@ -1,9 +1,35 @@
-import {TOURNAMENT as EVENT} from './tournament.js';
+import {tournamentEvents,visibleTournament,eventTime,eventDate,placementReward} from './tournament.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function tournamentCard(event,online=false){
- const e=event||{...EVENT,phase:'scheduled',serverNow:Date.now()},phase=e.phase,entry=phase==='entry',live=phase==='running',done=['finished','cancelled'].includes(phase),seconds=Math.max(0,Math.ceil(((entry?e.startsAt:e.opensAt)-e.serverNow)/1000));
+export function tournamentCard(event,online=false,now=event?.serverNow||Date.now()){
+ const e=visibleTournament(tournamentEvents(event),now);if(!e)return '';
+ const phase=e.phase,entry=phase==='entry',live=phase==='running',done=['finished','cancelled'].includes(phase),seconds=Math.max(0,Math.ceil(((entry?e.startsAt:e.opensAt)-now)/1000));
  const timer=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
- const status=done?'MATCHMAKING OPEN':live?`${e.alive} STILL STANDING`:entry?`ENTRY CLOSES IN ${timer}`:phase==='preparing'?`ENTRY OPENS IN ${timer}`:'TODAY · OCT 23';
- return `<section class="public-royale-card tournament-card" aria-label="Frontier Cup tournament"><div class="public-royale-heading"><span class="eyebrow">ONE MATCH · SOLO ROYALE</span><strong class="public-royale-live">${esc(status)}</strong></div><div class="public-royale-title"><strong>FRONTIER CUP</strong><small>Join 12:10–12:11 p.m. · New York (EDT)</small></div><div class="public-royale-facts"><span><b>1ST</b> 5,000 Marks + exclusive pickaxe</span><span><b>2ND</b> 2,500 · <b>3RD</b> 1,000 Marks</span></div><div class="public-royale-action"><span>${done?(e.results?.[0]?`CHAMPION · ${esc(e.results[0].name)}`:'EVENT CLOSED'):live?`${e.spectators} / ${EVENT.spectators} spectator seats`:entry?`${e.players} / ${EVENT.capacity} players`:'FRONTIER CHAMPION PICKAXE'}</span>${done?'':`<button class="primary" data-action="${live?'tournament-spectate':'tournament-join'}" ${!online||!entry&&!live?'disabled':''}>${live?'SPECTATE MATCH':entry?'JOIN TOURNAMENT':'OPENS AT 12:10'}</button>`}</div><p class="public-royale-hint">${done?esc(e.message):'Other matches close at 12:07. Battle starts at 12:11. Watch after elimination or if you miss entry. Matchmaking reopens after the final result.'}</p><details class="tournament-rules"><summary>EVENT RULES</summary><p>48 players maximum. No filler bots. At least two players must finish loading before 12:11. Spectating has 16 additional seats; eliminated competitors keep their seats. One entry per identity. Simultaneous eliminations use placement, survival time, eliminations, then identity to break a tie. Prizes are saved to your identity automatically. The champion’s pickaxe appears in the Locker.</p></details></section>`;
+ const status=done?'MATCHMAKING OPEN':live?`${e.alive} STILL STANDING`:entry?`ENTRY CLOSES IN ${timer}`:`ENTRY OPENS IN ${timer}`;
+ return `<section class="public-royale-card tournament-card ${done?'tournament-finished':''}" aria-label="Frontier Cup tournament"><div class="public-royale-heading"><span class="eyebrow">${esc(eventDate(e.opensAt))} · SOLO ROYALE</span><strong class="public-royale-live">${esc(status)}</strong></div><div class="public-royale-title"><strong>FRONTIER CUP</strong><small>Join ${esc(eventTime(e.opensAt))}–${esc(eventTime(e.startsAt))} · New York</small></div><div class="public-royale-facts"><span><b>1ST</b> 5,000 Marks + Frontier Champion</span><span><b>2ND</b> 2,500 · <b>3RD</b> 1,000 Marks</span>${e.duplicateReward?'<span>Already own the pickaxe? Win 10,000 extra Marks.</span>':''}</div><div class="public-royale-action"><span>${done?(e.results?.[0]?`CHAMPION · ${esc(e.results[0].name)}`:'EVENT CLOSED'):live?`${e.spectators} / ${e.spectatorCapacity||16} spectator seats`:entry?`${e.players} / ${e.capacity} players`:'ONE MINUTE TO ENTER'}</span>${done?'':`<button class="primary" data-action="${live?'tournament-spectate':'tournament-join'}" data-event-id="${esc(e.id)}" ${!online||!entry&&!live?'disabled':''}>${live?'SPECTATE MATCH':entry?'JOIN TOURNAMENT':'OPENS '+esc(eventTime(e.opensAt))}</button>`}</div>${done?standingsMarkup(e,{compact:true}):''}<p class="public-royale-hint">${done?esc(e.message):`Other matches close at ${esc(eventTime(e.lockAt))}. Battle starts at ${esc(eventTime(e.startsAt))}. Watch after elimination or if you miss entry.`}</p><button class="tournament-details-link" data-action="compete-event" data-event-id="${esc(e.id)}">EVENT DETAILS & REWARDS ↗</button></section>`;
 }
-export function updateTournamentCard(root,event,online){const slot=root.querySelector('[data-tournament-slot]');if(!slot)return;const old=slot.querySelector('.tournament-rules'),open=old?.open;slot.innerHTML=tournamentCard(event,online);if(open)slot.querySelector('.tournament-rules').open=true;}
+export function standingsMarkup(e,{compact=false,identity='',query=''}={}){
+ const live=e.phase==='running',rows=(live?e.standings:e.results)||[],filtered=rows.filter(r=>!query||r.name.toLowerCase().includes(query.toLowerCase()));
+ if(!rows.length)return `<p class="compete-empty">${e.phase==='cancelled'?'Event cancelled. No tournament rewards awarded.':live?'Waiting for the first standings update.':'Placements appear here after the match. Rewards below show what each placement earns.'}</p>`;
+ return `<div class="tournament-standings ${compact?'compact':''}" tabindex="0" role="region" aria-label="Tournament placements and rewards"><table><thead><tr><th>PLACE</th><th>PLAYER</th>${compact?'':'<th>ELIMS</th>'}<th>${live?'STATUS / PROJECTED REWARD':'REWARD AWARDED'}</th></tr></thead><tbody>${filtered.map(r=>`<tr class="${r.identity===identity?'is-you':''}"><td>${live&&r.alive?'—':'#'+(r.place||'—')}</td><td>${esc(r.name)}${r.identity===identity?' <small>YOU</small>':''}</td>${compact?'':`<td>${r.kills??'—'}</td>`}<td>${live?r.alive?'Still competing':`Eliminated · ${(e.prizes[(r.place||0)-1]||0).toLocaleString()} Marks if placement holds`:esc(placementReward(e,r))}</td></tr>`).join('')||'<tr><td colspan="4">No players match your search.</td></tr>'}</tbody></table></div>${!live&&!e.standingsComplete?'<p class="compete-note">Archived podium only. This event’s original release did not save placements below third.</p>':''}${live?'<p class="compete-note">Live standings are provisional. Survivors are not assigned final places until the match ends.</p>':''}`;
+}
+// Keep controls and the scrolling standings region mounted as the clock ticks.
+// Replacing innerHTML every second can interrupt pointer clicks or keyboard focus.
+function patchCardNode(current,next){
+ if(current.nodeType!==next.nodeType||current.nodeName!==next.nodeName){current.replaceWith(next.cloneNode(true));return;}
+ if(current.nodeType===3){if(current.nodeValue!==next.nodeValue)current.nodeValue=next.nodeValue;return;}
+ if(current.nodeType!==1)return;
+ for(const a of [...current.attributes])if(!next.hasAttribute(a.name))current.removeAttribute(a.name);
+ for(const a of next.attributes)if(current.getAttribute(a.name)!==a.value)current.setAttribute(a.name,a.value);
+ const old=[...current.childNodes],fresh=[...next.childNodes];
+ for(let i=0;i<Math.max(old.length,fresh.length);i++){
+  if(!fresh[i])old[i].remove();else if(!old[i])current.append(fresh[i].cloneNode(true));else patchCardNode(old[i],fresh[i]);
+ }
+}
+export function updateTournamentCard(root,event,online,now){
+ const slot=root.querySelector('[data-tournament-slot]');if(!slot)return;
+ const html=tournamentCard(event,online,now),card=slot.firstElementChild;
+ if(!html){if(card)slot.replaceChildren();return;}
+ const template=slot.ownerDocument.createElement('template');template.innerHTML=html;
+ if(!card){slot.append(template.content);return;}
+ patchCardNode(card,template.content.firstElementChild);
+}

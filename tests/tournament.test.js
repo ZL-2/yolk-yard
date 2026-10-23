@@ -17,7 +17,7 @@ test('dated EDT event has exact lockdown, one-minute entry, and no next-day recu
  assert.equal(tournamentPhase(E.lockAt-1),'scheduled');assert.equal(tournamentPhase(E.lockAt),'preparing');assert.equal(tournamentPhase(E.opensAt),'entry');assert.equal(tournamentPhase(E.startsAt),'starting');assert.equal(tournamentPhase(E.startsAt+86400000,{phase:'finished'}),'finished');
 });
 test('real sockets: clear ordinary rooms, enforce cutoff, spectate after death/late join, pay podium once and reopen',async()=>{
- const f=await fixture({serverOptions:{tournamentOptions:{now:()=>E.lockAt-1,autoStart:false}}});try{
+ const f=await fixture({serverOptions:{tournamentOptions:{events:[E],now:()=>E.lockAt-1,autoStart:false}}});try{
   const {t,set}=clock(f),a=await f.user('Cup Alpha'),b=await f.user('Cup Bravo'),c=await f.user('Cup Charlie'),late=await f.user('Cup Watcher'),messages=[];
   a.ws.on('message',raw=>messages.push(JSON.parse(raw)));
   await a.ask('select',{mode:'ffa',access:'private'});await a.ask('queue');const normal=await f.game(a);
@@ -39,15 +39,15 @@ test('real sockets: clear ordinary rooms, enforce cutoff, spectate after death/l
   assert.equal(f.app.owner.grantSummary(a.id).marks,5000);assert.equal(f.app.owner.grantSummary(b.id).marks,2500);assert.equal(f.app.owner.grantSummary(c.id).marks,1000);assert.equal(f.app.owner.grantSummary(late.id).marks,0);
   assert.deepEqual(t.rewards(a.id).owned,[E.pickaxe]);assert.deepEqual(t.rewards(b.id).owned,[]);assert.equal(t.sanitize({pickaxe:E.pickaxe},b.id).pickaxe,'');assert.equal(t.sanitize({pickaxe:E.pickaxe},a.id).pickaxe,E.pickaxe);
   for(let i=0;i<3;i++)t.tick();assert.equal(f.app.owner.grantSummary(a.id).marks,5000);
-  const restored=new TournamentService(f.app.relay,{now:()=>E.startsAt+10000,autoStart:false});assert.equal(restored.phase,'finished');assert.deepEqual(restored.rewards(a.id).owned,[E.pickaxe]);restored.close();
+  const restored=new TournamentService(f.app.relay,{events:[E],now:()=>E.startsAt+10000,autoStart:false});assert.equal(restored.phase,'finished');assert.deepEqual(restored.rewards(a.id).owned,[E.pickaxe]);restored.close();
   const fresh=await f.user('Cup After');await fresh.ask('select',{mode:'ffa',access:'public'});await fresh.ask('queue');assert.ok(fresh.launches.length,'Ordinary matchmaking reopened');
  }finally{await f.close();}
 });
 test('empty/one-player event cancels, releases lock and cannot fabricate a winner',async()=>{
- const f=await fixture({serverOptions:{tournamentOptions:{now:()=>E.lockAt-1,autoStart:false}}});try{const {t,set}=clock(f);set(E.opensAt);const a=await f.user('Cup Solo');await join(f,a);set(E.startsAt);assert.equal(t.phase,'cancelled');assert.equal(t.locked,false);assert.deepEqual(t.state.results,[]);assert.equal(f.app.owner.grantSummary(a.id).marks,0);}finally{await f.close();}
+ const f=await fixture({serverOptions:{tournamentOptions:{events:[E],now:()=>E.lockAt-1,autoStart:false}}});try{const {t,set}=clock(f);set(E.opensAt);const a=await f.user('Cup Solo');await join(f,a);set(E.startsAt);assert.equal(t.phase,'cancelled');assert.equal(t.locked,false);assert.deepEqual(t.state.results,[]);assert.equal(f.app.owner.grantSummary(a.id).marks,0);}finally{await f.close();}
 });
 test('unclaimed last-second ticket cannot admit a contestant after the cutoff',async()=>{
- const f=await fixture({serverOptions:{tournamentOptions:{now:()=>E.lockAt-1,autoStart:false}}});try{const {t,set}=clock(f);set(E.opensAt);const a=await f.user('Cup First'),b=await f.user('Cup Second'),c=await f.user('Cup Last');await join(f,a);await join(f,b);await c.ask('tournament-join');const ticket=f.app.relay.parties.tickets.get(f.app.relay.parties.users.get(c.id).ticket);set(E.startsAt);assert.equal(t.claim(ticket,{id:'late-peer'}),false);await c.ask('tournament-join');const g=await f.game(c);assert.equal(t.room.sim.players.get(g.net.id).lateSpectator,true);}finally{await f.close();}
+ const f=await fixture({serverOptions:{tournamentOptions:{events:[E],now:()=>E.lockAt-1,autoStart:false}}});try{const {t,set}=clock(f);set(E.opensAt);const a=await f.user('Cup First'),b=await f.user('Cup Second'),c=await f.user('Cup Last');await join(f,a);await join(f,b);await c.ask('tournament-join');const ticket=f.app.relay.parties.tickets.get(f.app.relay.parties.users.get(c.id).ticket);set(E.startsAt);assert.equal(t.claim(ticket,{id:'late-peer'}),false);await c.ask('tournament-join');const g=await f.game(c);assert.equal(t.room.sim.players.get(g.net.id).lateSpectator,true);}finally{await f.close();}
 });
 test('winner pickaxe is exclusive, one merged mesh and owner grants credit full prizes exactly once',async()=>{
  assert.equal(shopItem(E.pickaxe).tournamentReward,true);assert.throws(()=>purchase(normalizeWallet(null),E.pickaxe),/only/);
