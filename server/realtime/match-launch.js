@@ -9,6 +9,7 @@ const address=code=>`yolk-yard-v${VERSION}-${code}`;
 const newCode=()=>Array.from({length:8},()=> 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[randomInt(32)]).join('');
 
 export function queueMatch(service,u,m){
+ service.relay.tournament?.assertNormal();
  const p=service.parties.get(u.party),authority=service.relay.authority,capacity=authority?.capacity;
  if(service.relay.deployment?.snapshot().updating)throw Error('Ravelfront is updating. Matchmaking will reopen when publishing finishes.');
  if(p.members.some(id=>!service.connected(service.users.get(id))))throw Error('Wait for your party members to reconnect.');
@@ -74,6 +75,8 @@ export function spectateFriend(service,u,m){
  if(!service.store.friends.get(u.id)?.has(m.id)||service.store.blocked(u.id,m.id))throw Error('Only friends can be spectated.');
  const friend=service.users.get(m.id),location=service.matchLocation(friend);
  if(!location||friend.spectateLaunch)throw Error('Your friend is no longer in a match.');
+ if(location.room?.tournament)return service.relay.tournament.queue(u,{spectate:true});
+ service.relay.tournament?.assertNormal(location.key);
  const room=location.room,capacity=service.relay.authority?.capacity,key=location.key;
  assertModeAvailable(location.listing.mode);
  service.relay.owner?.assertAdmission(u.id,location.listing.mode,location.listing.public===false?'private':'public');

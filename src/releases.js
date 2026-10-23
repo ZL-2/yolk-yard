@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'210',title:'Frontier Cup and centered third-person aim',changes:[
+  'Third-person camera framing now uses a lower shoulder position and a consistent horizontal field of view. The held weapon, character aim and screen-center reticle converge in hip fire, aim and crouch, including looking up and down.',
+  'The October 23 Frontier Cup clears other matches at 12:07 p.m. New York time. Entry opens at 12:10 and closes at 12:11, when one Solo Royale begins. Late arrivals and eliminated players can spectate. Normal matchmaking automatically reopens after the result.',
+  'First place earns 5,000 Marks and the exclusive Frontier Champion pickaxe; second earns 2,500 and third earns 1,000. The server records prizes once per identity. No filler bots, independent spectator delivery and bounded snapshots reserve server capacity for the tournament. Version 6.19.0 / protocol 79.'
+ ]},
  {number:'209',title:'Wren: first textured 3D model study',changes:[
   'A separate Wren comparison page at wren-study.html places the original character art beside a new rotatable, textured and skinned GLB. Inspect front, side and back views, topology and the game’s idle, walk, run, crouch, aim and glide animations.',
   'This is a modeling prototype, not a claim of an identical or final character. The custom Blender mesh replaces the old shared-body construction in this study; its projected reference texture, hair, side seams and deformation still need refinement. The production Wren outfit remains unchanged. Version 6.18.1 / protocol 78.'

@@ -3,7 +3,7 @@ import {ShaderPreparation} from './shader-preparation.js';
 import {buildZoneDistrict,updateZoneDistrict} from './zone-wars-view.js';
 import {buildBoxArena,updateBoxArena} from './box-fight-view.js';
 import {buildBlacktide,ZombiesView} from './zombies-view.js';
-import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay,weaponCameraAllowed} from './perspective.js';
+import {cameraPose,thirdPersonActive,THIRD_PERSON,sightRay,weaponCameraAllowed,reticleTarget,weaponAimAt} from './perspective.js';
 import {warmArchitectureSurfaces} from './architecture-surfaces.js';
 import {RenderBudget,shadowAnchor} from './render-budget.js';
 import {perspectiveFov} from './settings.js';
@@ -38,7 +38,7 @@ import { makeArms, updateArms, reloadProgress, utilityArms, throwArms, armAppear
 import { patternedShell, addHeadwear, addEyewear, optionProfile } from "./cosmetics.js";
 import { getMap } from "./maps.js";
 import { gun, weapon, TEAM_COLORS, mode, clamp, NO_EYEWEAR } from "./data.js";
-import { EYE, VIEWMODEL, direction, wallDistance, worldHit } from "./physics.js";
+import { EYE, VIEWMODEL, direction, wallDistance, worldHit, rayEgg } from "./physics.js";
 import {weaponPortrait} from "./weapons.js";
 import {makeBlaster,setResonance} from "./zombies-weapons.js";
 import { buildArena } from "./arenas.js";
@@ -788,12 +788,17 @@ export class View {
         this.thirdPersonState={key,blend,fraction,x:p.x,y:p.y,z:p.z};this.thirdPersonDistance=pose.length*fraction;
         this.gunGroup.visible=false;
         this.clearOutgoing(this);
-        // Bounded, local-only close-cover feedback. Physics still owns damage.
-        if(this.clock>=(this.coverCheckAt||0)){this.coverCheckAt=this.clock+.08;const ray=sightRay(map,p,80),hit=worldHit(map,ray.origin,ray.d,ray.range),distance=hit?.distance??ray.range,point=hit?.point||{x:ray.origin.x+ray.d.x*distance,y:ray.origin.y+ray.d.y*distance,z:ray.origin.z+ray.d.z*distance},dx=point.x-ray.eye.x,dy=point.y-ray.eye.y,dz=point.z-ray.eye.z,len=Math.hypot(dx,dy,dz)||1;this.coverCheck=wallDistance(map,ray.eye,{x:dx/len,y:dy/len,z:dz/len},len)<len-.12;}
+        // One local reticle solve also drives the visible weapon/arm IK.
+        // Match rendered recoil and converge on players as well as geometry.
+        const {point,ray}=reticleTarget(map,p,200,{origin:pose.origin,d:direction(this.camera.rotation.y,this.camera.rotation.x)});
+        let targetDistance=Math.hypot(point.x-ray.origin.x,point.y-ray.origin.y,point.z-ray.origin.z);
+        for(const target of state.players)if(target.id!==p.id&&target.health>0&&!target.spectating&&!teammates(state.options,p,target))targetDistance=Math.min(targetDistance,rayEgg(ray.origin,ray.d,target));
+        this.thirdPersonTarget={x:ray.origin.x+ray.d.x*targetDistance,y:ray.origin.y+ray.d.y*targetDistance,z:ray.origin.z+ray.d.z*targetDistance};
+        if(this.clock>=(this.coverCheckAt||0)){this.coverCheckAt=this.clock+.08;const point=this.thirdPersonTarget,dx=point.x-ray.eye.x,dy=point.y-ray.eye.y,dz=point.z-ray.eye.z,len=Math.hypot(dx,dy,dz)||1;this.coverCheck=wallDistance(map,ray.eye,{x:dx/len,y:dy/len,z:dz/len},len)<len-.12;}
         this.coverBlocked=!!this.coverCheck;
-      }else this.thirdPersonState=null;
-      const baseFov=perspectiveFov(this.settings,this.thirdPersonEnabled);
-      const fov=victory?65:aiming?adsFov(w,baseFov):baseFov;
+      }else {this.thirdPersonState=null;this.thirdPersonTarget=null;}
+      const baseFov=perspectiveFov(this.settings,this.thirdPersonEnabled,this.camera.aspect);
+      const fov=victory?65:aiming?(this.thirdPersonEnabled?Math.min(baseFov,2*Math.atan(Math.tan(baseFov*Math.PI/360)/1.18)*180/Math.PI):adsFov(w,baseFov)):baseFov;
       this.camera.fov+=(fov-this.camera.fov)*(1-Math.exp(-Math.log(20)*dt/w.adsTime));
       this.camera.updateProjectionMatrix();
       const motion=weaponMotion(this.weaponMotionState??={},p,dt,this.clock,this.aimBlend,this.settings,`${state.round}:${p.id}`);
@@ -949,6 +954,10 @@ export class View {
           model.userData.held.rotation.set(p.pitch + hands.rotation[0] + recoil * .045 + draw.rotation[0], hands.rotation[1]+draw.rotation[1], hands.rotation[2]+draw.rotation[2]);
           model.userData.held.position.set(VIEWMODEL.x+draw.position[0],eyeHeight(p)+VIEWMODEL.y-hands.dip+draw.position[1]*.5,VIEWMODEL.z+draw.position[2]);
           const heldLean=leanPoint(p,model.userData.held.position.x,model.userData.held.position.y);model.userData.held.position.x=heldLean.x;model.userData.held.position.y=heldLean.y;model.userData.held.rotation.z-=leanAmount(p)*LEAN.angle;
+          if(p.id===local?.id&&this.thirdPersonEnabled&&this.thirdPersonTarget&&!harvesting&&!draw.active&&!p.use&&!p.building&&!p.editing&&!p.sprinting&&p.reloadEnd<=state.time){
+            const aim=weaponAimAt(p,this.thirdPersonTarget,model.userData.held.position);
+            model.userData.held.rotation.order='YXZ';model.userData.held.rotation.x=aim.pitch;model.userData.held.rotation.y=aim.yaw;
+          }
           const sprint=p.sprintBlend||0;model.userData.held.position.y-=sprint*.3;model.userData.held.position.x+=sprint*.08;model.userData.held.rotation.x+=sprint*.65;model.userData.held.rotation.z+=sprint*.2;
           if(state.options.mode!=='royale'&&throwT>=0&&throwT<=1){
             const gesture=Math.sin(Math.PI*throwT);

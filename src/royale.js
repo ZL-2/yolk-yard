@@ -451,7 +451,7 @@ export class RoyaleSimulation extends Simulation {
  }
  resetPublicWarmup(){this.queueEnds=0;this.stage=RP.ISLAND;this.lastCountdown=null;this.startReason=null;}
  advanceWarmupClock(unsteppedSeconds=0){
-  if(this.phase!=='playing'||!isWarmup(this.stage))return;if(this.options.training){this.queueEnds=this.time+3600;return;}
+  if(this.phase!=='playing'||!isWarmup(this.stage)||this.tournament)return;if(this.options.training){this.queueEnds=this.time+3600;return;}
   if(this.options.recurring){
    if(!this.humanContestants().length){if(this.queueEnds&&!this.recoveringHumans())this.resetPublicWarmup();return;}
    if(!this.queueEnds){this.queueEnds=this.time+PUBLIC_ROYALE.warmupSeconds;this.stage=RP.ISLAND;this.lastCountdown=null;unsteppedSeconds=0;}

@@ -7,7 +7,7 @@ import {helicopterCameraDistance} from './helicopter.js';
 
 // Original tuning in world metres. Rendering, prediction and authority share
 // this geometry; clients send only bounded blend/boom fractions, never origins.
-export const THIRD_PERSON=Object.freeze({distance:3.15,aimDistance:1.65,shoulder:.62,aimShoulder:.48,height:.22,aimHeight:.13,transition:14});
+export const THIRD_PERSON=Object.freeze({distance:3.35,aimDistance:2.05,shoulder:.62,aimShoulder:.46,height:-.16,aimHeight:-.18,transition:14});
 const clamp01=n=>Math.max(0,Math.min(1,Number.isFinite(n)?n:0));
 export const perspectiveMode=value=>value==='third'?'third':'first';
 export const helicopterPassenger=p=>!!p?.vehicleId&&p.vehicleType==='helicopter'&&p.vehicleSeat>0;
@@ -21,7 +21,10 @@ export function cameraPose(map,p,{unclampedBoom=false}={}){
  const t=clamp01(p.viewBlend??Number(!!p.aim&&!p.building&&!p.editing)),c=THIRD_PERSON;
  const distance=c.distance+(c.aimDistance-c.distance)*t,side=c.shoulder+(c.aimShoulder-c.shoulder)*t,height=c.height+(c.aimHeight-c.height)*t;
  const stance=Number.isFinite(p.cameraEye)?Math.max(.6,Math.min(1.7,p.cameraEye))-eyeHeight(p):0;
- const offset={x:-d.x*distance+Math.cos(p.yaw)*side,y:-d.y*distance+height+stance,z:-d.z*distance-Math.sin(p.yaw)*side};
+ // Rotate the vertical framing offset with the boom. A world-up offset moved
+ // the reticle away from the shoulder as pitch changed, exaggerating look-down.
+ const yaw=p.yaw||0,pitch=p.pitch||0,up={x:Math.sin(yaw)*Math.sin(pitch),y:Math.cos(pitch),z:Math.cos(yaw)*Math.sin(pitch)};
+ const offset={x:-d.x*distance+Math.cos(yaw)*side+up.x*height,y:-d.y*distance+up.y*height+stance,z:-d.z*distance-Math.sin(yaw)*side+up.z*height};
  const length=Math.hypot(offset.x,offset.y,offset.z),back={x:offset.x/length,y:offset.y/length,z:offset.z/length};
  const allowed=Math.min(map?cameraDistance(map,eye,back,length):length,helicopterCameraDistance(p,eye,back,length))/length;
  const fraction=Math.min(allowed,unclampedBoom||!Number.isFinite(p.viewBoom)?1:clamp01(p.viewBoom));
@@ -30,6 +33,20 @@ export function cameraPose(map,p,{unclampedBoom=false}={}){
 export function sightRay(map,p,range=200){
  const pose=cameraPose(map,p);
  return {...pose,range:range+(pose.third?pose.length*pose.fraction:0)};
+}
+export function reticleTarget(map,p,range=200,renderedPose=null){
+ const ray={...sightRay(map,p,range),...renderedPose},hit=map?worldHit(map,ray.origin,ray.d,ray.range):null,distance=hit?.distance??ray.range;
+ return {ray,point:hit?.point||{x:ray.origin.x+ray.d.x*distance,y:ray.origin.y+ray.d.y*distance,z:ray.origin.z+ray.d.z*distance}};
+}
+// Local-space weapon pitch/yaw, solved against the same world point as the
+// camera reticle. The arm IK follows this weapon transform instead of a second
+// approximation of the player's pitch. Reject points behind a retracted boom.
+export function weaponAimAt(p,point,anchor){
+ const dx=point.x-p.x,dz=point.z-p.z,yaw=p.yaw||0,c=Math.cos(yaw),s=Math.sin(yaw);
+ const x=c*dx-s*dz-anchor.x,y=point.y-p.y-anchor.y,z=s*dx+c*dz-anchor.z;
+ const forward=direction(0,p.pitch||0);
+ if(y*forward.y+z*forward.z<=.05)return {pitch:p.pitch||0,yaw:0};
+ return {pitch:Math.atan2(y,Math.hypot(x,z)),yaw:Math.atan2(-x,-z)};
 }
 export function reachablePoint(map,p,point,range,ignoreBuildId=null){
  const eye=eyePosition(p),delta={x:point.x-eye.x,y:point.y-eye.y,z:point.z-eye.z},length=Math.hypot(delta.x,delta.y,delta.z);

@@ -15,7 +15,7 @@ export class RoyaleRankRewards{
   const record=identity.royaleRankRewards||old,claimed=(record.claimed||[]).filter(x=>eligible.includes(x));
   return {identity:id,rank:row?.rating>0?row.rank:0,rating:row?.rating||0,wins:row?.wins||0,kills:row?.kills||0,eligible,claimed,equipped:claimed.includes(identity.profile?.pickaxe)?identity.profile.pickaxe:'',loadout:Object.fromEntries(PRESTIGE_SLOTS.filter(slot=>claimed.includes(identity.profile?.[slot])).map(slot=>[slot,identity.profile[slot]])),pending:eligible.filter(x=>!claimed.includes(x)),epoch:record.epoch,revision:record.revision};
  }
- sanitize(profile,id){const status=this.status(id);return {...rankLoadout(profile,status?.claimed||[]),royaleRank:status?.rank>0&&status.rank<=25?status.rank:0};}
+ sanitize(profile,id){const status=this.status(id);const approved={...rankLoadout(profile,status?.claimed||[]),royaleRank:status?.rank>0&&status.rank<=25?status.rank:0};return this.relay.tournament?.sanitize(approved,id)||approved;}
  sanitizePeer(profile,peer,admittedIdentity){return this.sanitize(profile,admittedIdentity||this.progression.accounts.get(peer?.progressId)?.socialId);}
  sync(id,force=false){
   let status=this.status(id);if(!status)return null;

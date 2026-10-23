@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraPose,thirdPersonActive,sightRay,reachablePoint,toolDirection,perspectiveMode} from '../src/perspective.js';
+import {cameraPose,thirdPersonActive,sightRay,reachablePoint,toolDirection,perspectiveMode,reticleTarget,weaponAimAt} from '../src/perspective.js';
 import {direction,worldHit,sanitizeInput,movePlayer,rayBox} from '../src/physics.js';
 import {eyeHeight} from '../src/stance.js';
 import {Simulation} from '../src/simulation.js';
@@ -16,6 +16,15 @@ import {wallDistance} from '../src/physics.js';
 const flat=()=>({size:500,boxes:[]});
 const player=(extra={})=>({id:'a',health:100,x:0,y:0,z:0,vx:0,vy:0,vz:0,yaw:0,pitch:0,perspective:'third',viewBlend:0,viewBoom:1,weapon:'sprinter',slot:0,grounded:true,...extra});
 function arena(){const s=new Simulation({mode:'ffa',bots:0}),a=s.addPlayer('a',{name:'Alpha',weapon:'anchor'}),b=s.addPlayer('b',{name:'Bravo'});s.startRound();s.map=flat();s.time=10;Object.assign(a,player({weapon:'anchor',ammo:[100,10],accuracyState:[{spread:0},{}],shieldUntil:0,equipUntil:0}));Object.assign(b,{x:.62,y:0,z:-10,health:100,shieldUntil:0,spectating:false});return {s,a,b};}
+test('level camera is below the eyes and weapon aim converges on the reticle through pitch and stance changes',()=>{
+ assert.ok(cameraPose(flat(),player()).origin.y<eyeHeight(player()));
+ for(const pitch of [-1.2,-.5,0,.5,1.2])for(const yaw of [-2,0,1.7])for(const crouching of [false,true])for(const viewBlend of [0,.5,1]){
+  const p=player({pitch,yaw,crouching,viewBlend}),{point}=reticleTarget(null,p,20),anchor={x:.1,y:eyeHeight(p)-.26,z:-.2},aim=weaponAimAt(p,point,anchor),d=direction(yaw+aim.yaw,aim.pitch);
+  const origin={x:p.x+Math.cos(yaw)*anchor.x+Math.sin(yaw)*anchor.z,y:p.y+anchor.y,z:p.z-Math.sin(yaw)*anchor.x+Math.cos(yaw)*anchor.z};
+  const delta={x:point.x-origin.x,y:point.y-origin.y,z:point.z-origin.z},length=Math.hypot(delta.x,delta.y,delta.z);
+  assert.ok(Math.hypot(d.x-delta.x/length,d.y-delta.y/length,d.z-delta.z/length)<1e-9);
+ }
+});
 test('default perspective and scoped/special camera transitions',()=>{
  assert.equal(perspectiveMode(undefined),'first');assert.equal(perspectiveMode('broken'),'first');
  const p=player(),map=flat(),first=cameraPose(map,{...p,perspective:'first'}),third=cameraPose(map,p),ads=cameraPose(map,{...p,aim:true,viewBlend:1});

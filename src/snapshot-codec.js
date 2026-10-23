@@ -25,7 +25,7 @@ function snapshotLayout(layout){if(!normalizedLayouts.has(layout))normalizedLayo
 // A broadcast batch owns its memo, so mutable simulation objects are never
 // cached across ticks. Recipient groups share player/world clones and diffs.
 export class SnapshotBatch {
- constructor(){this.values=new WeakMap();this.indexed=new WeakMap();this.normalized=new WeakMap();this.retained=new WeakMap();this.payloads=new WeakMap();}
+ constructor(){this.values=new WeakMap();this.indexed=new WeakMap();this.normalized=new WeakMap();this.worlds=new WeakMap();this.retained=new WeakMap();this.payloads=new WeakMap();}
  clone(source){
   if(source===null)return null;
   if(typeof source==='number')return Number.isFinite(source)?source:null;
@@ -57,7 +57,7 @@ export class SnapshotBatch {
    const name=key==='state'?'royale':'simulation';
    for(const field of Object.keys(source)){
     if(field==='zombies'&&source[field]){cached[field]=this.clone(source[field]);for(const key of zombieRecords)if(Array.isArray(cached[field][key]))cached[field][key]=this.index(cached[field][key]);}
-    else if(field===name&&source[name]){const world={};cached[name]=world;
+    else if(field===name&&source[name]){if(this.worlds.has(source[name])){cached[name]=this.worlds.get(source[name]);continue;}const world={};cached[name]=world;this.worlds.set(source[name],world);
      for(const collection of Object.keys(source[name])){if(collection==='players'&&Array.isArray(source[name][collection])){world[collection]=this.players(source[name][collection]);continue;}const cloned=this.clone(source[name][collection]);if(cloned!==undefined)world[collection]=Array.isArray(cloned)&&['loot','chests','builds','vehicles'].includes(collection)?this.index(cloned,collection==='loot'?'uid':'id'):cloned;}
     }else if(field==='mapLayouts'&&source[field])cached[field]=snapshotLayout(source[field]);else if(field==='players'&&Array.isArray(source[field]))cached[field]=this.players(source[field]);else{const cloned=this.clone(source[field]);if(cloned!==undefined)cached[field]=recordKeys.includes(field)&&Array.isArray(cloned)?this.index(cloned):cloned;}
    }

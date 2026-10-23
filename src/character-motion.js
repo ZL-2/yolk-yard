@@ -118,12 +118,15 @@ export function animateCharacterMotion(h,p,dt,time,{menu=false}={}){
   else if(p.equipUntil>time){const age=time-(p.equipStarted??time),holster=p.equipHolster||0,route=itemDrawProfile(p.inventory?.[p.slot]||{id:p.weapon,weapon:true}).route;action=(age<holster?'holster':'draw')+(route==='back'?'':'-hip');progress=clamp(age<holster?age/holster:(age-holster)/Math.max(.1,p.equipUntil-(p.equipStarted??time)-holster),0,1);}
   else if(p.building){action='build';progress=(time*.4)%1;}
   if(action&&payload.clips[action])sample(action,progress*payload.clips[action].duration,b,1,true,false);
-  b.chest.rotateX(-(p.pitch||0)*.12+(p.shotRecoil||0)*.018);b.head.rotateX(-(p.pitch||0)*.3);
+  b.chest.rotateX((p.pitch||0)*.12+(p.shotRecoil||0)*.018);b.head.rotateX((p.pitch||0)*.3);
   if(menu){b.head.rotateY(p.scan||p.lobbyPatrol?.headYaw||0);b.chest.rotateY((p.scan||0)*.3);}
  }
  if(!changed&&state.action!==action){state.blend=0;state.fromRoot.copy(state.previousRoot);state.from.forEach((q,i)=>q.copy(state.previous[i]));}
  state.blend=Math.min(1,state.blend+dt/(s.id==='slide'?.1:.16));const blend=state.blend*state.blend*(3-2*state.blend);
  b.hips.position.lerpVectors(state.fromRoot,b.hips.position,blend);
  bones.forEach((name,i)=>{q3.copy(b[name].quaternion);b[name].quaternion.copy(state.from[i]).slerp(q3,blend);state.previous[i].copy(b[name].quaternion);});state.previousRoot.copy(b.hips.position);
+ // Authored study rigs may have a different pelvis height. Apply the offset
+ // before contact/arm IK, after storing the unmodified clip-space root.
+ b.hips.position.y+=h.motionRootOffset||0;
  state.action=action;state.freeHands=s.freeHands;return state;
 }
