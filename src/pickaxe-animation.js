@@ -5,7 +5,12 @@ import {actionArms} from './arms.js';
 // Shape families share choreography across color variants. All complete inside
 // the existing .45s harvest cadence; these poses never change damage or reach.
 export const PICKAXE_STYLES=['crescent','hammer','fork','crystal','staff','hook'];
-export function pickaxeStyle(id){const item=shopItem(id);return item?.slot==='pickaxe'?PICKAXE_STYLES[item.shape%6]:'classic';}
+export function pickaxeStyle(id){
+ const item=shopItem(id);if(item?.slot!=='pickaxe')return 'classic';
+ // Model-based rewards need not have the legacy numbered shape. Never let a
+ // missing cosmetic animation stop the gameplay loop for its owner or viewers.
+ return PICKAXE_STYLES.includes(item.swingStyle)?item.swingStyle:PICKAXE_STYLES[item.shape%PICKAXE_STYLES.length]||'classic';
+}
 const styles={
  classic:{wind:[.55,-.2,-.6],strike:[-1.6,.1,.35],end:[-1.85,.2,.55],offset:[-.27,-.13,-.32]},
  crescent:{wind:[.25,-.8,-.95],strike:[-1.35,.65,.7],end:[-1.65,.9,1.05],offset:[-.4,-.05,-.28]},
