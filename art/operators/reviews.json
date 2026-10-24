@@ -17,14 +17,56 @@
     "id": "rank-25",
     "name": "Tempest Sentinel",
     "status": "ready-for-roster-integration",
-    "assetSha256": "2771c348cbc32cc093e0e32267a4b86127b1b38f030ae393de84ddf25db7f5b7",
+    "assetSha256": "96d20e90e68d3e52d7faf52cf1a4074d6b34d69354df27fda3bc2ca6200938bb",
     "checks": [
       "front, side, back and three-quarter actual mesh inspection",
       "32-joint skin weights",
-      "idle, walk, run, crouch, aim, glide",
+      "idle, walk, run, crouch, aim with real weapon, glide",
       "ground contact",
       "distance topology"
     ],
-    "notes": "Refined torso depth, side fabric mapping, cape clearance and trim. Hidden surfaces remain interpretations of the construction reference."
+    "notes": "Refined torso, clean side fabric, silver cape trim and lower cape weighting. Hidden surfaces are interpreted from construction reference."
+  },
+  {
+    "id": "rank-10",
+    "name": "Rift Revenant",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "1d0b5835deb132c90fce472e775549e3ca3bf64d55adc65991a834dbbda80599",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim with real weapon, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Open hood, shaped mask, crescent shoulder armor, tabard and traced torn cape. Hidden surfaces are interpreted from construction reference."
+  },
+  {
+    "id": "rank-5",
+    "name": "Solar Imperator",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "e62bb776bad2805502b0bd93d5daed9d4509368653f5d599de6c8e881348936a",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim with real weapon, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Layered gold helmet, sculpted sunray armor, stellar reactor, embroidered cape on both sides, corrected glove silhouettes. Hidden surfaces are interpreted from construction reference."
+  },
+  {
+    "id": "rank-1",
+    "name": "Apex Sovereign",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "187ca91224a8a57ce1b0e51d0781f3c49c043f0a35ecd5da0f768854fcd525f7",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim with actual weapon, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Separate ivory feathers, open suspended crown, gold hardware and navy/ivory cape. Corrected projection borders and boot mapping. Hidden surfaces inferred."
   }
 ]

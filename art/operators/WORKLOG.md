@@ -6,8 +6,8 @@ Keep equipment, Marks, receipts and archived ownership. Do not publish partial w
 
 Sequential order: Wren, Tempest, Rift, Solar, Apex, Voss, Rook, Nyx, Pulse, Morrow,
 Scout. Wren approved source is recovered. Tempest and Rift passed mesh views and
-six real game poses. Solar has refined cape and gloves, with final browser check
-running. Seven others have not started. Existing generic bodies do not count.
+six real game poses. Solar and Apex passed their final reviews. Voss, Rook, Nyx, Pulse, Morrow
+and Scout remain. Existing generic bodies do not count.
 
 Runtime: `/tmp/ravel-blender-env/bin/python` (bpy 4.3.0 / NumPy 1.26.4).
 Build with `scripts/art/build-<name>.py`. Actual renders and packed editable sources
@@ -21,7 +21,7 @@ workspace and rebuilt Tempest, Rift and Solar from the saved/reconstructed scrip
 All original generated references and approved Wren package remain available.
 Save each next character checkpoint to the work branch. Main remains 214.
 
-Remaining integration: all seven assets, 11-ID manifest, review hashes; full lobby,
+Remaining integration: all six remaining assets, 11-ID manifest, review hashes; full lobby,
 Locker and local-match smoke; bounded CI tests, version/release 215 bump; PR/merge
 and verify GitHub Pages and Render. Preserve owner-edited tournament schedule.
 Never restart/redeploy during an active tournament; check health/event pre-merge.
