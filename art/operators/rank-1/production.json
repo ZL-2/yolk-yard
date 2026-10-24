@@ -1,0 +1,12 @@
+{
+  "name": "Apex Sovereign",
+  "triangles": 26382,
+  "lodTriangles": 7377,
+  "bones": 32,
+  "materials": 1,
+  "glbBytes": 2590848,
+  "status": "visually-reviewed",
+  "source": "Original cover and generated construction sheet; hidden surfaces inferred",
+  "assetSha256": "187ca91224a8a57ce1b0e51d0781f3c49c043f0a35ecd5da0f768854fcd525f7",
+  "reviewRecord": "../reviews.json"
+}

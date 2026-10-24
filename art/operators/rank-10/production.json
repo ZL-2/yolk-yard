@@ -1,0 +1,12 @@
+{
+  "name": "Rift Revenant",
+  "triangles": 23130,
+  "lodTriangles": 6475,
+  "bones": 32,
+  "materials": 1,
+  "glbBytes": 2171932,
+  "status": "visually-reviewed",
+  "source": "Original cover and generated construction sheet; hidden surfaces inferred",
+  "assetSha256": "1d0b5835deb132c90fce472e775549e3ca3bf64d55adc65991a834dbbda80599",
+  "reviewRecord": "../reviews.json"
+}

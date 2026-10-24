@@ -11,3 +11,6 @@ art/wren/browser-*.png
 art/wren/*.blend1
 scripts/art/__pycache__/
 art/wren/wren-albedo.png
+
+# Blender's automatic backups are reproducible from the checked-in source.
+art/operators/**/*.blend1

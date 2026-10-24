@@ -3,9 +3,9 @@ import {Z_SPECIALS,zombiesGun} from './zombies-config.js';
 import { safeName } from './moderation.js';
 import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
-import {cosmeticProfile,SHOP_SETS} from './shop-catalog.js';
+import {cosmeticProfile,SHOP_ITEMS} from './shop-catalog.js';
 // Shared camera targeting and remote commands require matching host/client releases.
-export const VERSION = 82;
+export const VERSION = 83;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -226,6 +226,6 @@ export function rng(seed) {
 export const nameKey = value => String(value ?? '').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();
 export function randomAppearance(random = Math.random) {
  const pick = list => list[Math.floor(random() * list.length)];
- return {color:pick(COLORS),accent:pick(COLORS),outfit:'outfit-'+SHOP_SETS[Math.floor(random()*SHOP_SETS.length)].id,hat:0,pattern:0,finish:0,eyewear:NO_EYEWEAR};
+ return {color:pick(COLORS),accent:pick(COLORS),outfit:pick(SHOP_ITEMS.filter(i=>i.slot==='outfit'&&!i.rankReward)).id,hat:0,pattern:0,finish:0,eyewear:NO_EYEWEAR};
 }
 export const BOT_DIFFICULTIES = ['Casual','Intermediate','Advanced','Impossible'];

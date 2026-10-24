@@ -7,15 +7,15 @@ import {Simulation} from '../src/simulation.js';
 import {RoyaleSimulation} from '../src/royale.js';
 import {makeShopPickaxe,makeShopBack,makeShopGlider,makeShopTrail} from '../src/shop-models.js';
 test('legacy and new cosmetics have unique IDs, supported palettes and priced categories',()=>{
- assert.equal(SHOP_ITEMS.filter(i=>!i.featured&&!i.rankReward&&!i.tournamentReward).length,84);assert.equal(new Set(SHOP_ITEMS.map(i=>i.id)).size,SHOP_ITEMS.length);
- for(const item of SHOP_ITEMS.filter(i=>!i.rankReward&&!i.tournamentReward)){assert.ok(item.price>=200&&item.price<=1600);assert.match(item.color,/^#[0-9a-f]{6}$/i);assert.ok(SHOP_SLOTS.includes(item.slot));}
+ assert.equal(SHOP_ITEMS.filter(i=>!i.featured&&!i.rankReward&&!i.tournamentReward&&!i.default).length,60);assert.equal(new Set(SHOP_ITEMS.map(i=>i.id)).size,SHOP_ITEMS.length);
+ for(const item of SHOP_ITEMS.filter(i=>!i.rankReward&&!i.tournamentReward&&!i.default)){assert.ok(item.price>=200&&item.price<=1600);assert.match(item.color,/^#[0-9a-f]{6}$/i);assert.ok(SHOP_SLOTS.includes(item.slot));}
 });
 test('wallet migrates eggs once, deducts exactly once and rejects overspending',()=>{
  let wallet=normalizeWallet(null,70);assert.equal(wallet.balance,370);
  wallet=purchase(wallet,'wrap-cloud');assert.equal(wallet.balance,170);assert.equal(normalizeWallet(wallet,70).balance,170);
- assert.throws(()=>purchase(wallet,'wrap-cloud'),/already own/);assert.throws(()=>purchase(wallet,'outfit-royal'),/more Marks/);
+ assert.throws(()=>purchase(wallet,'wrap-cloud'),/already own/);assert.throws(()=>purchase(wallet,'outfit-wren'),/more Marks/);
  const next=reward(wallet,'round-a',100,'Match');assert.equal(next.balance,270);assert.equal(reward(next,'round-a',100,'Match'),next);
- assert.equal(ownedLoadout(next,{wrap:'wrap-cloud',outfit:'outfit-royal'}).outfit,'');
+ assert.equal(ownedLoadout(next,{wrap:'wrap-cloud',outfit:'outfit-wren'}).outfit,'outfit-scout');
 });
 test('failed storage does not report a purchase or deduct the in-memory balance',async()=>{
  const wallet=new EggWallet({getItem:()=>null,setItem:()=>{throw Error('quota');}});const original=wallet.value;

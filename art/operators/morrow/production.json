@@ -1,0 +1,12 @@
+{
+  "name": "Morrow",
+  "triangles": 21958,
+  "lodTriangles": 6147,
+  "bones": 32,
+  "materials": 1,
+  "glbBytes": 2180288,
+  "status": "visually-reviewed",
+  "source": "Original cover and generated construction sheet; hidden surfaces inferred",
+  "assetSha256": "eec9b230103cc9736e4c05ba4e50734c711c4a89fa12e3f9e0faed7974cc6196",
+  "reviewRecord": "../reviews.json"
+}

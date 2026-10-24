@@ -33,6 +33,6 @@ export default defineConfig(async ({ command }) => {
         this.emitFile({ type: "asset", fileName: "release-history.json", source: JSON.stringify(history) });
       },
     }],
-    build: { target: "es2022", chunkSizeWarningLimit: 750, rollupOptions: { input: { index: "index.html", wren: "wren-study.html" } } },
+    build: { target: "es2022", chunkSizeWarningLimit: 750, rollupOptions: { input: { index: "index.html", wren: "wren-study.html", operators: "operators.html" } } },
   };
 });

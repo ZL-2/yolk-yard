@@ -1,0 +1,144 @@
+[
+  {
+    "id": "wren",
+    "name": "Wren",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "448e925b27a2dc085f53f85403451a4f04ac2b1051fbbc4fddc7f29a5d234701",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Preserves the approved Wren review mesh."
+  },
+  {
+    "id": "rank-25",
+    "name": "Tempest Sentinel",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "96d20e90e68d3e52d7faf52cf1a4074d6b34d69354df27fda3bc2ca6200938bb",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim with real weapon, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Refined torso, clean side fabric, silver cape trim and lower cape weighting. Hidden surfaces are interpreted from construction reference."
+  },
+  {
+    "id": "rank-10",
+    "name": "Rift Revenant",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "1d0b5835deb132c90fce472e775549e3ca3bf64d55adc65991a834dbbda80599",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim with real weapon, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Open hood, shaped mask, crescent shoulder armor, tabard and traced torn cape. Hidden surfaces are interpreted from construction reference."
+  },
+  {
+    "id": "rank-5",
+    "name": "Solar Imperator",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "e62bb776bad2805502b0bd93d5daed9d4509368653f5d599de6c8e881348936a",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim with real weapon, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Layered gold helmet, sculpted sunray armor, stellar reactor, embroidered cape on both sides, corrected glove silhouettes. Hidden surfaces are interpreted from construction reference."
+  },
+  {
+    "id": "rank-1",
+    "name": "Apex Sovereign",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "187ca91224a8a57ce1b0e51d0781f3c49c043f0a35ecd5da0f768854fcd525f7",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim with actual weapon, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Separate ivory feathers, open suspended crown, gold hardware and navy/ivory cape. Corrected projection borders and boot mapping. Hidden surfaces inferred."
+  },
+  {
+    "id": "voss",
+    "name": "Commandant Voss",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "ba51199440edfdf47e6c2ce9051993dba13712a1f11c66cdde3b7bd70406716b",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Layered gold armor, integral crown with rear peaks, tufted ivory mantle and split cloak. Original artwork retained; hidden views inferred."
+  },
+  {
+    "id": "rook",
+    "name": "Marshal Rook",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "c53a0294efb5d3fb00fb2f84a517f568d3f867d44cbc2facfd7228e8f1012117",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Rounded dive helmet and amber visor, raised anchor, marine armor, twin pressure tanks and ribbed hoses. Refined ankle weighting and hip equipment. Hidden views inferred."
+  },
+  {
+    "id": "nyx",
+    "name": "Lieutenant Nyx",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "b1dfc02722f5d4f7b581ff4ab3c76a3317b727af979f918790ce120460fd56fe",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Pointed open hood, violet mask strokes, layered armor and split coat. Corrected sleeve fit, coat silhouette and projection seam; final UV-only refinement preserves tested geometry and rig. Hidden views inferred."
+  },
+  {
+    "id": "pulse",
+    "name": "Pulse",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "791101cdb5ee18f0880d1fec3673e4ca3ee6f846ad0b29502fa49f34a2fb7741",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Sculpted face and swept white hair locks, cropped teal jacket, articulated fingerless gloves, tool harness and cyan wrist terminal. Corrected sleeves, connected glove wrists and upper trouser fit; final UV refinement preserves tested geometry/rig. Hidden views inferred."
+  },
+  {
+    "id": "morrow",
+    "name": "Morrow",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "eec9b230103cc9736e4c05ba4e50734c711c4a89fa12e3f9e0faed7974cc6196",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Ivory owl mask, olive hood, asymmetric leaf armor, diagonal poncho and long leaf sashes. Corrected hood, shin, boot and glove projection boundaries; final texture-only refinement preserves tested geometry and rig. Hidden views inferred."
+  },
+  {
+    "id": "scout",
+    "name": "Frontier Scout",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "0ecd27c73c65a537fb461ffbd3cb549fee3324cc0be04ad50e0fb5b1a8231ddb",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "New free default: sculpted face and cropped curls, petrol field jacket, compass badge, leather utility strap, cargo trousers and boots. Portrait is rendered from this actual model. Final sleeve UV refinement preserves tested geometry and rig."
+  }
+]

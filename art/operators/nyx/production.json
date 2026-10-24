@@ -1,0 +1,12 @@
+{
+  "name": "Lieutenant Nyx",
+  "triangles": 19408,
+  "lodTriangles": 5434,
+  "bones": 32,
+  "materials": 1,
+  "glbBytes": 1847092,
+  "status": "visually-reviewed",
+  "source": "Original cover and generated construction sheet; hidden surfaces inferred",
+  "assetSha256": "b1dfc02722f5d4f7b581ff4ab3c76a3317b727af979f918790ce120460fd56fe",
+  "reviewRecord": "../reviews.json"
+}

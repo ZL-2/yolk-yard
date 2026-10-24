@@ -1,4 +1,5 @@
 import {updateTournamentCard} from './tournament-ui.js';
+import {preloadOperatorAssets} from './operator-assets.js';
 import {competeMarkup,createCompeteState,bindCompete} from './compete-ui.js';
 import {problemText,captureDialogPosition,restoreDialogPosition} from './problem-reports.js';
 import {modeAvailable,PAUSED_MODES} from './mode-availability.js';
@@ -2209,6 +2210,7 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 try {
+  await preloadOperatorAssets();
   view = new View($("#world"), settings);
   view.buildControls=buildControls;view.buildMap=getMap('sunnybreak');
   renderMenu();

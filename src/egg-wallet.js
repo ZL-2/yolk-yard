@@ -1,11 +1,12 @@
+import {DEFAULT_OUTFIT_ID} from './default-operator.js';
 import {SHOP_SLOTS,shopItem,quoteOffer,outfitStyles} from './shop-catalog.js';
 export const WALLET_KEY='yolk-egg-shop-v1';
 export const EGG_REWARDS={welcome:300};
 const integer=(value,max=1e9)=>Number.isFinite(Number(value))?Math.max(0,Math.min(max,Math.floor(Number(value)||0))):0;
 export function normalizeWallet(value,legacyEggs=0){
- if(!value||value.version!==1)return {version:1,balance:integer(legacyEggs)+EGG_REWARDS.welcome,earned:integer(legacyEggs)+EGG_REWARDS.welcome,owned:[],favorites:[],presets:[null,null,null],receipts:[],lastReward:null};
- const owned=[...new Set((Array.isArray(value.owned)?value.owned:[]).filter(id=>shopItem(id)&&!shopItem(id).rankReward).flatMap(id=>shopItem(id).styleRoot?outfitStyles(id).map(i=>i.id):[id]))];
- return {...value,identityVersion:2,migration:value.migration||{from:'legacy-v1',rate:1,ownership:'one-to-one replacement'},legacyOwned:value.legacyOwned||[...(Array.isArray(value.owned)?value.owned:[])],balance:integer(value.balance),earned:integer(value.earned),owned,favorites:[...new Set((Array.isArray(value.favorites)?value.favorites:[]).filter(id=>shopItem(id)))],presets:(Array.isArray(value.presets)?value.presets:[]).slice(0,3),receipts:(Array.isArray(value.receipts)?value.receipts:[]).filter(id=>typeof id==='string').slice(-200)};
+ if(!value||value.version!==1)return {version:1,balance:integer(legacyEggs)+EGG_REWARDS.welcome,earned:integer(legacyEggs)+EGG_REWARDS.welcome,owned:[DEFAULT_OUTFIT_ID],favorites:[],presets:[null,null,null],receipts:[],lastReward:null};
+ const owned=[...new Set([DEFAULT_OUTFIT_ID,...(Array.isArray(value.owned)?value.owned:[]).map(id=>typeof id==='string'&&id.endsWith('-alt')&&shopItem(id.slice(0,-4))?.slot==='outfit'?id.slice(0,-4):id)].filter(id=>shopItem(id)&&!shopItem(id).rankReward).flatMap(id=>shopItem(id).styleRoot?outfitStyles(id).map(i=>i.id):[id]))];
+ return {...value,rosterRevision:215,retiredOwned:[...new Set([...(Array.isArray(value.retiredOwned)?value.retiredOwned:[]),...(Array.isArray(value.owned)?value.owned:[]).filter(id=>typeof id==='string'&&id.startsWith('outfit-')&&!shopItem(id))])],identityVersion:2,migration:value.migration||{from:'legacy-v1',rate:1,ownership:'one-to-one replacement'},legacyOwned:value.legacyOwned||[...(Array.isArray(value.owned)?value.owned:[])],balance:integer(value.balance),earned:integer(value.earned),owned,favorites:[...new Set((Array.isArray(value.favorites)?value.favorites:[]).filter(id=>shopItem(id)))],presets:(Array.isArray(value.presets)?value.presets:[]).slice(0,3),receipts:(Array.isArray(value.receipts)?value.receipts:[]).filter(id=>typeof id==='string').slice(-200)};
 }
 export function purchase(wallet,id,expectedPrice){
  const quote=quoteOffer(wallet,id);if(!quote)throw Error('That item is unavailable.');
@@ -20,7 +21,7 @@ export function reward(wallet,id,amount,label){
  if(wallet.receipts.includes(id))return wallet;
  amount=integer(amount,2000);return {...wallet,balance:wallet.balance+amount,earned:wallet.earned+amount,receipts:[...wallet.receipts,id].slice(-200),lastReward:{amount,label}};
 }
-export function ownedLoadout(wallet,profile,rankAccess=[]){return Object.fromEntries(SHOP_SLOTS.map(slot=>[slot,(wallet.owned.includes(profile?.[slot])||rankAccess.includes(profile?.[slot]))&&shopItem(profile[slot])?.slot===slot?profile[slot]:'']));}
+export function ownedLoadout(wallet,profile,rankAccess=[]){return Object.fromEntries(SHOP_SLOTS.map(slot=>[slot,(wallet.owned.includes(profile?.[slot])||rankAccess.includes(profile?.[slot]))&&shopItem(profile[slot])?.slot===slot?profile[slot]:slot==='outfit'?DEFAULT_OUTFIT_ID:'']));}
 export class EggWallet {
  constructor(storage,legacyEggs=0){this.listeners=new Set();this.storage=storage;this.legacyEggs=legacyEggs;this.value=this.read();this.error='';try{this.persist(this.value);}catch(error){this.error=error.message;}}
  read(){let raw;try{raw=JSON.parse(this.storage.getItem(WALLET_KEY));}catch{}return normalizeWallet(raw,this.legacyEggs);}
