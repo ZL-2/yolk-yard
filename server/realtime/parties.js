@@ -80,6 +80,8 @@ export class PartyService{
    case 'feature-request':{this.limit(u,'features',3,15*60000);const result=this.store.featureRequest(u.id,m.text);this.relay.owner?.recordTicket(this.store.featureRequests.find(r=>r.id===result.id));return result;}
    case 'feature-updates':this.limit(u,'feature-read',30,60000);return this.store.featureUpdates(u.id);
    case 'feature-ack':this.limit(u,'feature-read',30,60000);return this.store.acknowledgeFeatures(u.id,m.ids);
+   case 'grant-ack':this.limit(u,'grant-read',60,60000);return this.relay.owner.acknowledgeGrants(u.id,m.ids);
+   case 'competitive-career':this.limit(u,'career-read',30,60000);return this.relay.tournament.career(u.id);
    case 'lobby-chat':return this.lobbyChat.submit(u,m);
    case 'lobby-history':this.limit(u,'chat-history',30,60000);return this.lobbyChat.history(u,m);
    case 'profile':{const checked=validatePlayerName(m.profile?.name);if(!checked.ok)throw Error(checked.message);const profile=this.relay.progression.rankRewards.sanitize(safeProfile({...m.profile,name:checked.name}),u.id);u.profile=profile;this.store.identities.get(u.id).profile=u.profile;this.store.save();this.relay.progression.leaderboardCache=null;this.sync(p);return;}

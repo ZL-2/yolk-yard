@@ -140,6 +140,14 @@ export class TournamentService{
  event(id){return this.events.find(e=>e.id===id)||null;}
  summary(){const events=this.events.filter(e=>!e.event.removed).map(e=>e.summary()),focus=visibleTournament(events,this.now())||events.find(e=>e.phase==='scheduled')||events.at(-1);return {...focus,serverNow:this.now(),locked:this.locked,events,scheduleRevision:this.catalog.revision};}
  overview(){return {revision:this.catalog.revision,serverNow:this.now(),events:this.events.map(e=>({...e.summary(),definition:{...e.event,description:e.event.description||''}}))};}
+ career(identity){
+  const results=this.events.filter(e=>e.state.phase==='finished').flatMap(e=>{const r=e.state.results?.find(r=>r.identity===identity);if(!r)return [];
+   const paid=this.db.get('SELECT amount FROM grants WHERE id=? AND player=?',e.id+':'+identity,identity);
+   return [{id:e.id,name:e.event.name,at:e.state.endedAt||e.event.startsAt,place:r.place,kills:Number.isFinite(r.kills)?r.kills:null,marks:paid?.amount||0,bonusMarks:r.bonusMarks||0,pickaxe:r.pickaxeAwarded||null,complete:!!e.state.standingsComplete}];
+  }).sort((a,b)=>b.at-a.at);
+  const known=results.filter(r=>r.kills!==null);
+  return {identity,at:this.now(),results,stats:{events:results.length,wins:results.filter(r=>r.place===1).length,podiums:results.filter(r=>r.place<=3).length,top10:results.filter(r=>r.place<=10).length,best:results.length?Math.min(...results.map(r=>r.place)):null,average:results.length?results.reduce((n,r)=>n+r.place,0)/results.length:null,marks:results.reduce((n,r)=>n+r.marks,0),bonusMarks:results.reduce((n,r)=>n+r.bonusMarks,0),kills:known.reduce((n,r)=>n+r.kills,0),killsRecorded:known.length}};
+ }
  manage(body,audit){
   if(body.revision!==this.catalog.revision)throw Object.assign(Error('The schedule changed in another session. Refresh before saving.'),{status:409});
   const existing=body.eventId?this.event(body.eventId):null,before=existing?.event||null;
