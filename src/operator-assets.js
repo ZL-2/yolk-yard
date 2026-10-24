@@ -4,7 +4,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Original, editable Blender assets. Geometry, maps and materials are shared;
 // makeHumanoid creates only the skeleton and pose state for each player.
-export const OPERATOR_ASSET_IDS=Object.freeze(['wren','rank-25','rank-10','rank-5','rank-1','voss','rook','nyx','pulse']);
+export const OPERATOR_ASSET_IDS=Object.freeze(['wren','rank-25','rank-10','rank-5','rank-1','voss','rook','nyx','pulse','morrow']);
 const assets=new Map(),pending=new Map();
 const swap=name=>name.replace(/(shoulder|arm|forearm|hand|thigh|shin|foot|toe|finger)([LR])/,(_,part,side)=>part+(side==='L'?'R':'L'));
 export function operatorAsset(profile){if(profile.infectedType||profile.infectedSkin||profile.henchman)return null;const id=profile.outfit?.replace(/^outfit-/,'');return assets.get(OPERATOR_ASSET_IDS.includes(id)?id:'scout');}

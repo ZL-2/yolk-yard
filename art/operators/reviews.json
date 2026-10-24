@@ -116,5 +116,17 @@
       "ground contact and distance topology"
     ],
     "notes": "Sculpted face and swept white hair locks, cropped teal jacket, articulated fingerless gloves, tool harness and cyan wrist terminal. Corrected sleeves, connected glove wrists and upper trouser fit; final UV refinement preserves tested geometry/rig. Hidden views inferred."
+  },
+  {
+    "id": "morrow",
+    "name": "Morrow",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "eec9b230103cc9736e4c05ba4e50734c711c4a89fa12e3f9e0faed7974cc6196",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Ivory owl mask, olive hood, asymmetric leaf armor, diagonal poncho and long leaf sashes. Corrected hood, shin, boot and glove projection boundaries; final texture-only refinement preserves tested geometry and rig. Hidden views inferred."
   }
 ]
