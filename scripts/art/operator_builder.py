@@ -114,12 +114,12 @@ class Builder:
    t=max(0,min(1,(vertex[1]-top)/(bottom-top)));hold=t*t*(3-2*t)*.85
    return {bone:1-hold,'root':hold}
   return self.mesh('Tailored cape',v,f,bone,'fabric',weights=drape,side_blend=False)
- def fingers(self,side,palm,ends):
+ def fingers(self,side,palm,ends,size=1):
   x,y,d=palm
-  self.sphere(side+' articulated palm',x,y,d,13,21,8,'hand'+side,'leather')
+  self.sphere(side+' articulated palm',x,y,d,13*size,21*size,8*size,'hand'+side,'leather')
   for i,(ex,ey) in enumerate(ends):
    sx=x+(i-1.5)*6 if i<4 else x+(18 if side=='L' else -18);sy=y+10 if i<4 else y-2
-   rows=[(sy,sx,3.4,4,d),(sy+(ey-sy)*.42,sx+(ex-sx)*.45,3.8,4,d-2),(ey,ex,2.7,3,d-8)]
+   rows=[(sy,sx,3.4*size,4*size,d),(sy+(ey-sy)*.42,sx+(ex-sx)*.45,3.8*size,4*size,d-2),(ey,ex,2.7*size,3*size,d-8)]
    self.loft(side+' finger '+str(i),rows,'finger'+side+str(i),'leather',sides=10,steps=2)
    self.joints['finger'+side+str(i)]=(sx,sy,d)
  def armature(self):

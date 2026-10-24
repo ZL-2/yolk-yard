@@ -80,5 +80,17 @@
       "ground contact and distance topology"
     ],
     "notes": "Layered gold armor, integral crown with rear peaks, tufted ivory mantle and split cloak. Original artwork retained; hidden views inferred."
+  },
+  {
+    "id": "rook",
+    "name": "Marshal Rook",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "c53a0294efb5d3fb00fb2f84a517f568d3f867d44cbc2facfd7228e8f1012117",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Rounded dive helmet and amber visor, raised anchor, marine armor, twin pressure tanks and ribbed hoses. Refined ankle weighting and hip equipment. Hidden views inferred."
   }
 ]

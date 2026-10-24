@@ -104,7 +104,8 @@ function cylinder(parent, x, y, z, radius, height, color, segments = 16) {
 // Compatibility export; all callers now construct the shared human rig.
 export function makeEgg(profile, team = -1, withWeapon = true) {
   const group=makeHumanoid({...profile,teamColor:team>=0?(team===0?'#3d8ce8':'#d94949'):null});
-  if(shopItem(profile.backbling)){const badgeOnly=group.userData.asset?.startsWith('rank-')&&profile.backbling==='backbling-'+group.userData.asset;const back=makeShopBack(profile.backbling,profile.royaleRank,badgeOnly);back.position.set(0,-.09,badgeOnly?0:.18);group.userData.human.bones.chest.add(back);group.userData.back=back;}
+  const integratedBack=['voss','rook'].includes(group.userData.asset)&&profile.backbling==='backbling-'+group.userData.asset;
+  if(shopItem(profile.backbling)&&!integratedBack){const badgeOnly=group.userData.asset?.startsWith('rank-')&&profile.backbling==='backbling-'+group.userData.asset;const back=makeShopBack(profile.backbling,profile.royaleRank,badgeOnly);back.position.set(0,-.09,badgeOnly?0:.18);group.userData.human.bones.chest.add(back);group.userData.back=back;}
   if(withWeapon){
     const held=new THREE.Group(),blaster=makeBlaster(profile.weapon,profile.wrap),arms=makeArms(profile.weapon,profile,false);
     held.position.set(VIEWMODEL.x,EYE+VIEWMODEL.y,VIEWMODEL.z);held.scale.setScalar(VIEWMODEL.scale);
