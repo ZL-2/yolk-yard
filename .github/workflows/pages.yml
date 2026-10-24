@@ -387,7 +387,8 @@ jobs:
             if home_update: out.write('focused=true\n')
           print('Home screen layout and existing lobby controls:',home_update)
           field214_allowed={'src/tactical-map.css', 'tests/field214.test.js', 'src/royale-ranking.js', 'src/competitive-career.css', 'src/main.js', 'server/realtime/parties.js', 'src/lobby-comms.js', 'tests/royale-prestige.test.js', 'src/releases.js', 'src/compete-ui.js', 'src/view.js', 'scripts/field214-browser-check.mjs', 'src/data.js', 'src/combat-hud-policy.js', '.github/workflows/pages.yml', 'server/realtime/owner.js', 'src/royale-ui.js', 'docs/UPDATE_214.md', 'src/competitive-career.js', 'src/career-ui.js', 'src/royale-rewards-ui.js', 'src/tactical-map.js', 'server/realtime/owner-store.js', 'package-lock.json', 'server/realtime/tournament.js', 'package.json'}
-          field214_update={'src/tactical-map.js','src/combat-hud-policy.js','src/competitive-career.js','server/realtime/owner.js','tests/field214.test.js'}<=files<=field214_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.22.0'
+          field214_files=set(subprocess.check_output(['git','diff','--name-only','21b9301c83e192177abd0068be504cad40e9c2ab','HEAD'],text=True).splitlines())
+          field214_update={'src/tactical-map.js','src/combat-hud-policy.js','src/competitive-career.js','server/realtime/owner.js','tests/field214.test.js'}<=field214_files<=field214_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.22.0'
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('field214_update='+str(field214_update).lower()+'\n')
             if field214_update: out.write('focused=true\n')
