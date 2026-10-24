@@ -104,7 +104,7 @@ function cylinder(parent, x, y, z, radius, height, color, segments = 16) {
 // Compatibility export; all callers now construct the shared human rig.
 export function makeEgg(profile, team = -1, withWeapon = true) {
   const group=makeHumanoid({...profile,teamColor:team>=0?(team===0?'#3d8ce8':'#d94949'):null});
-  if(shopItem(profile.backbling)){const back=makeShopBack(profile.backbling,profile.royaleRank);back.position.set(0,-.09,.18);group.userData.human.bones.chest.add(back);group.userData.back=back;}
+  if(shopItem(profile.backbling)){const badgeOnly=group.userData.asset?.startsWith('rank-')&&profile.backbling==='backbling-'+group.userData.asset;const back=makeShopBack(profile.backbling,profile.royaleRank,badgeOnly);back.position.set(0,-.09,badgeOnly?0:.18);group.userData.human.bones.chest.add(back);group.userData.back=back;}
   if(withWeapon){
     const held=new THREE.Group(),blaster=makeBlaster(profile.weapon,profile.wrap),arms=makeArms(profile.weapon,profile,false);
     held.position.set(VIEWMODEL.x,EYE+VIEWMODEL.y,VIEWMODEL.z);held.scale.setScalar(VIEWMODEL.scale);
@@ -307,14 +307,16 @@ export class View {
     });
     group.traverse((o) => {
       if (o.userData.ownedMaterial) {
+       for(const material of Array.isArray(o.material)?o.material:[o.material]){
         if (
-          o.material.map &&
-          !o.material.map.userData.shared &&
-          o.material.map !== this.scopeTarget.texture &&
-          o.material.map !== this.reticleTexture
+          material.map &&
+          !material.map.userData.shared &&
+          material.map !== this.scopeTarget.texture &&
+          material.map !== this.reticleTexture
         )
-          o.material.map.dispose();
-        o.material.dispose();
+          material.map.dispose();
+        material.dispose();
+       }
       }
     });
     group.clear();

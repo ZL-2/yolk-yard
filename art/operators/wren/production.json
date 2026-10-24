@@ -1,0 +1,12 @@
+{
+  "name": "Wren",
+  "source": "Wren-editable.blend from approved review",
+  "sourceTriangles": 64774,
+  "lodTriangles": 15544,
+  "files": {
+    "wren.glb": 4280488,
+    "wren-lod.glb": 823908
+  },
+  "reference": "public/shop/wren.webp",
+  "unseenSurfaces": "Inferred in the approved construction sheet"
+}

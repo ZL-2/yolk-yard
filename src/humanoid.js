@@ -10,6 +10,7 @@ import {surfaceUV,surfaceAtlasMaterial} from './model-surfaces.js';
 import {strideProfile,strideFoot,pelvisTurn} from './operator-motion.js';
 import {equipPose} from './equip.js';
 import {animateCharacterMotion} from './character-motion.js';
+import {operatorAsset,loadOperatorLod} from './operator-assets.js';
 
 // One anatomical bind pose and skeleton contract for every cosmetic. Distances
 // are metres. Rigid gear and clothing are cosmetic; physics never reads this mesh.
@@ -173,8 +174,13 @@ function template(profile){
 export function makeHumanoid(profile={}){
  const root=new T.Group();root.name='Ravelfront operator';const bones={},list=[];
  for(const [name,parent,xyz]of defs){const b=new T.Bone();b.name=name;const rest=V(...xyz).sub(parent?points[parent]:V());b.position.copy(rest);b.userData.rest=rest.clone();bones[name]=b;list.push(b);if(parent)bones[parent].add(b);}
- const mesh=new T.SkinnedMesh(template(profile),surfaceAtlasMaterial());mesh.name='Skinned operator';mesh.add(bones.root);mesh.bind(new T.Skeleton(list));mesh.boundingSphere=new T.Sphere(new T.Vector3(0,.9,0),2);mesh.frustumCulled=true;mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);root.userData.artRevision=166;
+ const asset=operatorAsset(profile);
+ if(asset)for(const [name,parent]of defs){if(!asset.joints[name])throw Error(`Missing ${asset.id} joint ${name}`);const b=bones[name];b.position.copy(asset.joints[name]).sub(parent?asset.joints[parent]:V());b.userData.rest.copy(b.position);}
+ const geometry=asset?asset.geometry:template(profile);
+ if(asset&&!geometry.userData.remapped){const skin=geometry.attributes.skinIndex;for(let i=0;i<skin.array.length;i++)skin.array[i]=ids[asset.names[skin.array[i]]];geometry.userData.remapped=true;}
+ const mesh=new T.SkinnedMesh(geometry,asset?asset.materials:surfaceAtlasMaterial());mesh.name=asset?`${asset.id} · authored Blender model`:'Skinned operator';mesh.add(bones.root);mesh.updateMatrixWorld(true);mesh.bind(new T.Skeleton(list));mesh.boundingSphere=new T.Sphere(new T.Vector3(0,.9,0),2);mesh.frustumCulled=true;mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);root.userData.artRevision=asset?215:166;
  root.userData.human={mesh,bones,clock:0,phase:0,speed:0,previous:null,grounded:true,land:0,air:0,death:0,lastYaw:null,pose:'idle',nextUpdate:0};root.userData.cracks=[];
+ if(asset){const h=root.userData.human;h.asset=asset;h.soleHeight=asset.joints.footL.y;h.motionRootOffset=bones.hips.userData.rest.y-.93;h.motionLegLength=bones.shinL.userData.rest.length()+bones.footL.userData.rest.length()-.02;root.userData.asset=asset.id;loadOperatorLod(asset.id);}
  return root;
 }
 // Analytic two-bone IK. Targets are in character coordinates. Elbow/knee poles
@@ -189,7 +195,8 @@ function solveChain(h,upper,lower,end,target,pole,blend=1){
  aim(a,b.userData.rest,elbow.clone().sub(start));aim(b,c.userData.rest,start.clone().addScaledVector(dir,len).sub(elbow));
 }
 export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0,map=null}={}){
- const h=model.userData.human;if(!h)return;h.clock+=dt;
+ const h=model.userData.human;if(!h)return;const soleY=h.soleHeight??.09;h.clock+=dt;
+ if(h.asset){const a=!menu&&distance>36&&h.asset.lod?h.asset.lod:h.asset;if(!a.geometry.userData.remapped){const skin=a.geometry.attributes.skinIndex;for(let i=0;i<skin.array.length;i++)skin.array[i]=ids[a.names[skin.array[i]]];a.geometry.userData.remapped=true;}h.mesh.geometry=a.geometry;}
  // 60 Hz nearby, 20 Hz at distance, 10 Hz far away. Animation clocks continue.
  const interval=distance>90?.1:distance>40?.05:0;if(h.clock<h.nextUpdate){h.skipped=(h.skipped||0)+dt;return;}dt=Math.min(.12,dt+(h.skipped||0));h.skipped=0;h.nextUpdate=h.clock+interval;
  // Layer from the bind pose each frame. Adding yaw onto last frame's residual
@@ -254,12 +261,12 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const directionalSpeed=Math.hypot(h.forward,h.side)||1,f=h.forward/directionalSpeed,s=h.side/directionalSpeed,legs=[];
  const walking=grounded&&!airborne&&!dead&&!emote&&!p.sliding&&!p.downed&&!p.reviving&&!p.vehicleId&&!p.mantle&&!p.traversal;
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R',phase=h.phase+(sideSign<0?Math.PI:0),pose=strideFoot(h.phase,sideSign,patrol?{...gait,distance:patrol.cycleDistance,stance:.58,lift:.085,moving:1}:gait),{contact:stance,lift,roll}=pose;
-  let foot=V(sideSign*.112+s*pose.stride,.09+lift,-f*pose.stride);
+  let foot=V(sideSign*.112+s*pose.stride,soleY+lift,-f*pose.stride);
   if(patrol){
    const travelZ=-pose.stride,heading=(p.yaw||Math.PI)-Math.PI;
    // Counter the root turn so the planted boot keeps following the straight road.
    foot=V(Math.cos(heading)*sideSign*.112-Math.sin(heading)*travelZ,
-    .09+lift,Math.sin(heading)*sideSign*.112+Math.cos(heading)*travelZ);
+    soleY+lift,Math.sin(heading)*sideSign*.112+Math.cos(heading)*travelZ);
   }
   if(!grounded&&!airborne)foot=V(sideSign*.14,.17+(sideSign>0?.10:0),.10);
   if(airborne)foot=V(sideSign*(p.flight==='glide'?.18:.29),p.flight==='glide'?.14:.18+Math.sin(time*2.3+sideSign)*.018,p.flight==='glide'?.10:.34+sideSign*.035);
@@ -295,14 +302,14 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   const minimum=Math.min(...ankles.map(v=>v.y));
   const walking=motion.gait==='walk'&&speed>.3&&!p.crouching;
   const strideScale=walking?.7:1;
-  for(const foot of ankles){foot.x=b.hips.position.x+(foot.x-b.hips.position.x)*strideScale;foot.z=b.hips.position.z+(foot.z-b.hips.position.z)*strideScale;foot.y=.09+Math.max(0,foot.y-minimum)*(walking?.7:1);}
-  let height=b.hips.position.y+T.MathUtils.clamp(.09-minimum,-.10,.10);
+  for(const foot of ankles){foot.x=b.hips.position.x+(foot.x-b.hips.position.x)*strideScale;foot.z=b.hips.position.z+(foot.z-b.hips.position.z)*strideScale;foot.y=soleY+Math.max(0,foot.y-minimum)*(walking?.7:1);}
+  let height=b.hips.position.y+T.MathUtils.clamp(soleY-minimum,-.10,.10);
   if(walking){height=.89+(h.motionRootOffset||0);for(let i=0;i<2;i++){const foot=ankles[i],dx=foot.x-(i?.115:-.115)-b.hips.position.x,dz=foot.z-b.hips.position.z,reach=h.motionLegLength||.785;height=Math.min(height,foot.y+.03+Math.sqrt(Math.max(.1,reach**2-dx*dx-dz*dz)));}}
   h.contactHeight??=height;h.contactHeight+=(height-h.contactHeight)*(1-Math.exp(-dt*22));
   b.hips.position.y=h.contactHeight;
   for(let i=0;i<2;i++){
    const S=i?'R':'L',foot=ankles[i];
-   let contact=foot.y<.12&&speed>.3&&!h['release'+S];
+   let contact=foot.y<soleY+.03&&speed>.3&&!h['release'+S];
    if(menu){const heading=(p.yaw||Math.PI)-Math.PI,x=foot.x,z=foot.z;foot.x=Math.cos(heading)*x-Math.sin(heading)*z;foot.z=Math.sin(heading)*x+Math.cos(heading)*z;}
    const originalFoot=foot.clone(),yaw=model.rotation.y,cs=Math.cos(yaw),sn=Math.sin(yaw),old=h['plant'+S];
    if(contact&&old){if(menu)old.z-=(p.lobbyPatrol?.speed||speed)*dt;const dx=old.x-model.position.x,dz=old.z-model.position.z,x=cs*dx-sn*dz,z=sn*dx+cs*dz;if(Math.hypot(x-foot.x,z-foot.z)<.16){foot.x=x;foot.z=z;}else contact=false;}
@@ -323,13 +330,13 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
    b['foot'+S].quaternion.copy(b['foot'+S].parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(footQ));
    // Flatten the support sole, preserving heading. Ankle contact alone let
    // rotated source boots skate through the road.
-   if(foot.y<.18){const localQ=h.mesh.getWorldQuaternion(new T.Quaternion()).invert().multiply(footQ),yaw=new T.Euler().setFromQuaternion(localQ,'YXZ').y;
+   if(foot.y<soleY+.09){const localQ=h.mesh.getWorldQuaternion(new T.Quaternion()).invert().multiply(footQ),yaw=new T.Euler().setFromQuaternion(localQ,'YXZ').y;
     const flat=h.mesh.getWorldQuaternion(new T.Quaternion()).multiply(new T.Quaternion().setFromAxisAngle(V(0,1,0),yaw));
-    flat.slerp(footQ,T.MathUtils.smoothstep(foot.y,.12,.18));
+    flat.slerp(footQ,T.MathUtils.smoothstep(foot.y,soleY+.03,soleY+.09));
     b['foot'+S].quaternion.copy(b['foot'+S].parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(flat));}
   }
  }else if(motion){h.plantL=h.plantR=h.releaseL=h.releaseR=h.lastMotionFootL=h.lastMotionFootR=null;h.releasedL=h.releasedR=false;h.contactHeight=undefined;}
- if(motion?.id==='crawl'){h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert(),minimum=Math.min(...['L','R'].map(S=>b['foot'+S].getWorldPosition(V()).applyMatrix4(inverse).y));b.hips.position.y+=Math.max(0,.09-minimum);}
+ if(motion?.id==='crawl'){h.mesh.updateWorldMatrix(true,true);const inverse=h.mesh.matrixWorld.clone().invert(),minimum=Math.min(...['L','R'].map(S=>b['foot'+S].getWorldPosition(V()).applyMatrix4(inverse).y));b.hips.position.y+=Math.max(0,soleY-minimum);}
  const held=model.userData.held,arms=model.userData.arms,draw=model.userData.draw;
  if(held&&arms){held.updateWorldMatrix(true,false);h.mesh.updateWorldMatrix(true,false);}
  for(const sideSign of [-1,1]){const S=sideSign<0?'L':'R';let target;

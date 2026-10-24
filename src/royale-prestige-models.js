@@ -43,12 +43,13 @@ export function prestigeOutfit(i,c,h){
 }
 
 const digits={'#':['01010','11111','01010','11111','01010'],'0':['111','101','101','101','111'],'1':['010','110','010','010','111'],'2':['111','001','111','100','111'],'3':['111','001','111','001','111'],'4':['101','101','111','001','001'],'5':['111','100','111','001','111'],'6':['111','100','111','101','111'],'7':['111','001','010','010','010'],'8':['111','101','111','101','111'],'9':['111','101','111','001','111']};
-export function prestigeGear(i,slot,g,{box,tube,part,blade},rank=i.rank){
+export function prestigeGear(i,slot,g,{box,tube,part,blade},rank=i.rank,{badgeOnly=false}={}){
  const glow=[],a=i.accent,d=i.color,m=i.metal,solar=i.rank===5,apex=i.rank===1,rift=i.rank===10;
  const light=(geo,x=0,y=0,z=0)=>{geo.translate(x,y,z);glow.push(geo);};
  const gem=(x,y,z,r)=>{part(g,new T.OctahedronGeometry(r*1.25),m,x,y,z,'metal');light(new T.OctahedronGeometry(r),x,y,z+.02);};
  const ring=(x,y,z,r,t=.012)=>part(g,new T.TorusGeometry(r,t,5,32),m,x,y,z,'metal');
  if(slot==='backbling'){
+  if(!badgeOnly){
   // Pleated double-sided cape, armored yoke, luminous insignia and live rank.
   const pos=[],uv=[],idx=[],nx=16,ny=12,length=apex?1.03:rift?.96:.89,width=solar?.64:.56;
   for(let j=0;j<=ny;j++)for(let k=0;k<=nx;k++){const u=k/nx,v=j/ny;pos.push((u-.5)*width*(.8+.35*v),.13-v*length-(j===ny?(rift?Math.abs(u-.5)*.1:Math.cos(u*Math.PI*4)*.025):0),.10+.16*v+Math.cos(u*Math.PI*8)*.014*v);uv.push(u,v);if(j<ny&&k<nx){const n=j*(nx+1)+k;idx.push(n,n+nx+1,n+1,n+1,n+nx+1,n+nx+2);}}
@@ -58,6 +59,7 @@ export function prestigeGear(i,slot,g,{box,tube,part,blade},rank=i.rank){
   if(rift)for(const s of [-1,1]){const fin=blade(g,m,[[s*.06,.17],[s*.18,.31],[s*.30,.18],[s*.25,-.04],[s*.18,.12]],.03);fin.position.z=.1;}
   else if(solar)for(let k=0;k<10;k++){const t=k*Math.PI/5;tube(g,m,[Math.sin(t)*.082,.09+Math.cos(t)*.082,.14],[Math.sin(t)*.125,.09+Math.cos(t)*.125,.14],.008);}
   else for(const s of [-1,1])for(let k=0;k<(apex?4:2);k++){const fin=blade(g,apex?'#e5edf0':m,[[s*(.1+k*.04),.14],[s*(.17+k*.05),.29+k*.025],[s*(.24+k*.035),.24],[s*(.16+k*.03),.06]],.025);fin.position.z=.09;}
+  }
   const label='#'+(Number.isInteger(rank)&&rank>0&&rank<=25?rank:i.rank),pixels=.026,total=[...label].reduce((n,c)=>n+digits[c][0].length+1,0)-1;let offset=-total*pixels/2;
   for(const char of label){const rows=digits[char];rows.forEach((row,y)=>[...row].forEach((v,x)=>{if(v==='1')box(g,apex?d:a,offset+x*pixels,-.26-y*pixels,.19+y*.005,pixels*.85,pixels*.85,.008,'paint');}));offset+=(rows[0].length+1)*pixels;}
   for(const s of [-1,1]){tube(g,m,[s*.11,-.48,.218],[0,-.59,.239],.008,'cloth');tube(g,m,[0,-.59,.239],[s*.15,-.72,.255],.006,'cloth');}

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "wren",
+    "name": "Wren",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "448e925b27a2dc085f53f85403451a4f04ac2b1051fbbc4fddc7f29a5d234701",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Preserves the approved Wren review mesh."
+  },
+  {
+    "id": "rank-25",
+    "name": "Tempest Sentinel",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "2771c348cbc32cc093e0e32267a4b86127b1b38f030ae393de84ddf25db7f5b7",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint skin weights",
+      "idle, walk, run, crouch, aim, glide",
+      "ground contact",
+      "distance topology"
+    ],
+    "notes": "Refined torso depth, side fabric mapping, cape clearance and trim. Hidden surfaces remain interpretations of the construction reference."
+  }
+]
