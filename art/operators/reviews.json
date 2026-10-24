@@ -92,5 +92,17 @@
       "ground contact and distance topology"
     ],
     "notes": "Rounded dive helmet and amber visor, raised anchor, marine armor, twin pressure tanks and ribbed hoses. Refined ankle weighting and hip equipment. Hidden views inferred."
+  },
+  {
+    "id": "nyx",
+    "name": "Lieutenant Nyx",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "b1dfc02722f5d4f7b581ff4ab3c76a3317b727af979f918790ce120460fd56fe",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Pointed open hood, violet mask strokes, layered armor and split coat. Corrected sleeve fit, coat silhouette and projection seam; final UV-only refinement preserves tested geometry and rig. Hidden views inferred."
   }
 ]

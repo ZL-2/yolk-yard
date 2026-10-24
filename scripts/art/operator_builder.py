@@ -37,8 +37,11 @@ class Builder:
   width,height=self.image.size
   for p in m.polygons:
    p.use_smooth=smooth
+   # Keep each polygon in one projection island. Choosing per vertex could
+   # interpolate through the gray gap between front/back reference figures.
+   front=sum(vertices[m.loops[li].vertex_index][2] for li in p.loop_indices)/len(p.loop_indices)<=0
    for li in p.loop_indices:
-    idx=m.loops[li].vertex_index;x,y,d=vertices[idx];front=d<=0;px=x if front else self.bx-(x-self.cx)
+    idx=m.loops[li].vertex_index;x,y,d=vertices[idx];px=x if front else self.bx-(x-self.cx)
     # Blending towards the side photograph removes the stretched tangent seam.
     t=max(0,min(1,(abs(p.normal.x)-.42)/.48)) if side_blend else 0
     ref.data[li].uv=(px/width,1-y/height);side.data[li].uv=((self.sx+d*self.side_direction)/width,1-y/height);blend.data[li].value=t;surf.data[li].color=(0,rough,metal,1)
