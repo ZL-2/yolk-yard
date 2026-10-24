@@ -104,5 +104,17 @@
       "ground contact and distance topology"
     ],
     "notes": "Pointed open hood, violet mask strokes, layered armor and split coat. Corrected sleeve fit, coat silhouette and projection seam; final UV-only refinement preserves tested geometry and rig. Hidden views inferred."
+  },
+  {
+    "id": "pulse",
+    "name": "Pulse",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "791101cdb5ee18f0880d1fec3673e4ca3ee6f846ad0b29502fa49f34a2fb7741",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Sculpted face and swept white hair locks, cropped teal jacket, articulated fingerless gloves, tool harness and cyan wrist terminal. Corrected sleeves, connected glove wrists and upper trouser fit; final UV refinement preserves tested geometry/rig. Hidden views inferred."
   }
 ]
