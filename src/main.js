@@ -48,6 +48,10 @@ import {inventoryDropTarget} from './inventory-drag.js';
 import {gateBuildFire} from './field-refinement.js';
 import {watchersFor,spectatorMessage,spectatorTargets,canSpectate} from './spectator-status.js';
 import {recordSeasonEvent,masteryRewards} from './season-progress.js';
+import {competitiveCareerMarkup} from './competitive-career.js';
+import './competitive-career.css';
+import {bindTacticalMap} from './tactical-map.js';
+import './tactical-map.css';
 import {careerMarkup} from './career-ui.js';
 import {recordCareerReceipt} from './career.js';
 import {lobbyNavigation} from './lobby-ui.js';
@@ -55,6 +59,7 @@ import {leaderboardMarkup} from './leaderboard-ui.js';
 import {installLeaderboardScrollbars} from './leaderboard-scroll.js';
 import './menu-hub.css';
 import {crosshairRadius} from './combat.js';
+import {combatReticle} from './combat-hud-policy.js';
 import './referrals.css';
 import {showReferrals,ReferralRewards} from './referrals.js';
 import {showPerspectiveBriefing} from './perspective-briefing.js';
@@ -348,6 +353,12 @@ function titleBar() {
   return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
 let socialActivityKey='';
+let competitiveCareer=null,competitiveError='',competitivePending=false,competitiveAt=0,competitiveScroll=false;
+async function refreshCompetitiveCareer(force=false){
+ if(!party?.ready||competitivePending||!force&&competitiveCareer?.identity===party.id&&performance.now()-competitiveAt<10000)return;
+ const identity=party.id;competitivePending=true;
+ try{const record=await party.request('competitive-career');if(party.id!==identity)return;competitiveCareer=record;competitiveError='';competitiveAt=performance.now();}catch(error){competitiveError=error.message;}finally{competitivePending=false;const section=$('#competitive-career');if(section){section.outerHTML=competitiveCareerMarkup(competitiveCareer,!!party?.ready,competitiveError);if(competitiveScroll)$('#competitive-career')?.scrollIntoView({block:'start'});}competitiveScroll=false;}
+}
 function syncSocialActivity(me){if(!party?.ready)return;const activity=screen==='game'&&state?.phase==='playing'?(me?.spectating||me?.health<=0?'spectating':'in-match'):'lobby',mode=activity!=='lobby'?(state?.options.training?'training':state?.options.mode):null,key=activity+':'+mode+':'+party.id;if(key===socialActivityKey)return;socialActivityKey=key;party.request('presence',{activity,mode,visible:!document.hidden&&document.hasFocus()}).catch(()=>{socialActivityKey='';});}
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();if(screen==='menu')renderMenu();}});
 function currentLeaderboardMode(){leaderboardSelection=syncRankingSelection(leaderboardSelection,party?.party?.selection?.mode);return leaderboardSelection.mode;}
@@ -362,7 +373,7 @@ async function refreshLeaderboards(force=false){
 }
 setInterval(()=>{void refreshLeaderboards();},15000);
 const lobbyNews=new LobbyNews();
-let lobbyFooterObserver;
+let lobbyFooterObserver,mapPanel;
 function renderMenu(force=false) {
  lobbyFooterObserver?.disconnect();
  const root=$('#menu'),model=menuModel();
@@ -372,8 +383,8 @@ function renderMenu(force=false) {
  }
  root.dataset.section=menuSection;
  if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);lobbyNews.mount(root.querySelector('.lobby-news'));view.lobbyLabels=[...root.querySelectorAll('[data-lobby-player]')];installLeaderboardScrollbars();const footer=root.querySelector('.yard-footer');if(footer){lobbyFooterObserver=new ResizeObserver(()=>document.documentElement.style.setProperty('--lobby-footer-height',Math.ceil(footer.getBoundingClientRect().height)+16+'px'));lobbyFooterObserver.observe(footer);}void refreshLeaderboards();return;}
- root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':menuSection==='compete'?'Compete':'Career'}" tabindex="-1">${menuSection==='compete'?competeMarkup(model,competeState):menuSection==='career'?careerMarkup({stats,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
- if(menuSection==='career')$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};
+ root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':menuSection==='compete'?'Compete':'Career'}" tabindex="-1">${menuSection==='compete'?competeMarkup(model,competeState):menuSection==='career'?careerMarkup({stats,competitive:competitiveCareer,competitiveError,online:!!party?.ready,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
+ if(menuSection==='career'){$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};void refreshCompetitiveCareer();}
  else if(menuSection==='compete')bindCompete(root.querySelector('.compete-page'),competeState,refreshCompete,id=>{void partyRequest('tournament-join',{eventId:id});});
  else {
   eggShop??=new EggShop({wallet:eggWallet,view,rankRewards,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
@@ -411,6 +422,7 @@ function errorToast(message,title='Connection or service error'){rememberProblem
 function modal(title, body, type = "generic") {
   if(needsPlayerName(profile.name)&&type!=='name-required'){requiredNamePrompt();return;}
   if(type==="error")sound.cue("ui-error");
+  mapPanel?.destroy();mapPanel=null;
   bindingEditor = null;
   dialogType = type;
   dialog.dataset.kind=type;
@@ -921,6 +933,7 @@ function mouseCapturePrompt() {
 }
 document.addEventListener('pointerlockerror',()=>{capturePendingUntil=0;mouseCapturePrompt();});
 async function resume(capture = true) {
+  mapPanel?.destroy();mapPanel=null;
   dialog.close();
   dialogType = "";
   paused = false;
@@ -1291,11 +1304,11 @@ function hud() {
     p.health > 0 &&
     !paused &&
     p.reloadEnd <= state.time;
-  $("#crosshair").style.display =
-    p.health > 0 && !p.downed && (armed||grappling||state.royale&&p.flight==='ground') && !paused && !(aiming&&['scope','prism'].includes(gun(p).optic)) ? "block" : "none";
+  const reticle=combatReticle(state,p,view,paused);
+  $("#crosshair").style.display = reticle.crosshair ? "block" : "none";
   // Convert the host's current angular shot spread to a screen-space radius.
   $('#crosshair').classList.toggle('cover-blocked',!!view.coverBlocked);
-  $('#crosshair').classList.toggle('weapon-lowered',!!(p.tacticalSprint||p.sprintRecovery>0||p.traversal));
+  $('#crosshair').classList.toggle('weapon-lowered',!p.vehicleId&&!!(p.tacticalSprint||p.sprintRecovery>0||p.traversal));
   const spread = (!sim||sim.remote?predicted?.shotSpread:null)??p.shotSpread??gun(p).spread;
   const radius=crosshairRadius(spread,$('#world').clientHeight,view.camera.projectionMatrix.elements[5]);
   $("#crosshair").style.setProperty("--crosshair-gap", `${Math.max(0,radius)}px`);
@@ -1309,9 +1322,8 @@ function hud() {
   marker.hidden = !settings.hitMarkers || p.health <= 0 || paused || performance.now() >= combatConfirmation.until;
   marker.dataset.kind=combatConfirmation.kind;marker.setAttribute('aria-label',CONFIRM_LABEL[combatConfirmation.kind]);
   hitLabel.hidden=marker.hidden;hitLabel.textContent=CONFIRM_LABEL[combatConfirmation.kind];hitLabel.dataset.kind=combatConfirmation.kind;
-  const scoped =
-    aiming && (gun(p).optic === "scope" || gun(p).optic === "prism");
-  $("#scope").style.display = scoped && view.aimBlend>.8 ? "block" : "none";
+  const scoped = reticle.scope;
+  $("#scope").style.display = scoped ? "block" : "none";
   $("#scope").dataset.reticle=gun(p).ads?.reticle||"mil-dot";
   $("#scope").dataset.overlay=gun(p).ads?.overlay||"precision";
   hudText($("#scope-label"), scoped
@@ -1415,14 +1427,14 @@ function initializeParty(){
   'tournament-rewards':m=>{void eggWallet.syncTournamentRewards(m.record).then(()=>{if(screen==='menu')renderMenu();});},
   'royale-rank':m=>rankRewards.receive(m.record),
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
-  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
+  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){if(menuSection==='career')void refreshCompetitiveCareer(true);void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   'public-join':event=>publicJoinNotice.receive(event,party?.id),
   'lobby-chat':m=>lobbyComms.receive(m.message),
   'lobby-chat-cleared':m=>lobbyComms.clear(m.channel),
   'owner-controls':m=>ownerRuntime.set(m.controls),
-  'owner-grants':m=>{void eggWallet.syncOwnerGrants(m.record).then(r=>{if(r.amount){toast(r.amount.toLocaleString()+' Marks received from the owner.');if(screen==='menu')renderMenu();}}).catch(()=>toast('Your owner grant is saved online. Reconnect when browser storage is available.'));},
+  'owner-grants':m=>{void eggWallet.syncOwnerGrants(m.record).then(r=>{lobbyComms.setGrants(m.record.notices||[]);if(r.amount&&screen==='menu')renderMenu();}).catch(()=>toast('Your owner grant is saved online. Reconnect when browser storage is available.'));},
   'owner-session-ended':m=>{if(net||screen==='game')leave(false,false);errorToast(m.message);},
   'feature-updates':m=>lobbyComms.setUpdates(m.updates),
   'social-changed':scheduleSocialRefresh,
@@ -1432,7 +1444,7 @@ function initializeParty(){
   cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing'||activeLaunch&&m.launchId===activeLaunch;activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);errorToast(m.message);if(screen==='menu')renderMenu();}
  });
 }
-function royaleMap(){if(!state?.royale)return;modal(state.boxfight?state.boxfight.arena:'Ravel Coast',royaleUI.mapHTML(),'royale-map');royaleUI.drawMap($('#royale-fullmap'),state,state.players.find(p=>p.id===localId),true);}
+function royaleMap(){if(!state?.royale)return;const map=getMap(state.royale.practice?'sunnybreak':state.options.map);modal(map.name+' · MAP',royaleUI.mapHTML(),'royale-map');mapPanel=bindTacticalMap(dialog,{size:map.size,view:royaleUI.mapViewport,onView:v=>{royaleUI.mapViewport=v;},player:()=>state.players.find(p=>p.id===localId),onMarker:p=>sendMarker('map',p),draw:()=>royaleUI.drawMap($('#royale-fullmap'),state,state.players.find(p=>p.id===localId),true)});}
 function royaleInventory(){if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);royaleUI.inventoryKey='';modal('INVENTORY',royaleUI.inventoryHTML(p),'royale-inventory');royaleUI.updateInventory(p);}
 function inventoryAction(action,index,from){
  const p=state?.players.find(p=>p.id===localId);if(!state?.royale||!p||p.health<=0)return;
@@ -1494,6 +1506,8 @@ const actions = {
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
  'start-training':()=>{try{ownerRuntime.admission('training');}catch(error){return errorToast(error.message);}if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
  'career':()=>selectMenuSection('career'),
+ 'competitive-career':()=>{selectMenuSection('career');competitiveScroll=competitivePending;$('#competitive-career')?.scrollIntoView({block:'start'});},
+ 'competitive-refresh':()=>{void refreshCompetitiveCareer(true);},
  'compete':()=>{competeState.selected='';selectMenuSection('compete');},
  'compete-event':b=>{competeState.selected=b.dataset.eventId;competeState.tab='details';selectMenuSection('compete');},
  'find-public':()=>lobbyOptionsMenu(),
@@ -1880,9 +1894,6 @@ document.addEventListener('click',e=>{
  const slot=e.target.closest('[data-royale-slot]'),swap=e.target.closest('[data-royale-swap]');
  if(slot)inventoryAction('slot',Number(slot.dataset.royaleSlot));
  if(swap)inventoryAction('swap',Number(swap.dataset.royaleSwap));
- if(e.target.id==='royale-fullmap'){
-  const rect=e.target.getBoundingClientRect(),size=getMap(state.royale.practice?'sunnybreak':state.options.map).size;sendMarker('map',{x:(e.clientX-rect.left)/rect.width*size*2-size,z:(e.clientY-rect.top)/rect.height*size*2-size});
- }
  if(e.target.closest('[data-build-control="repair"]')){if(sim)sim.playerAction(localId,'build-repair');else net?.send({type:'player-action',action:'build-repair'});}
  if(e.target.closest('[data-build-control="edit"]')){const p=state?.players.find(p=>p.id===localId);if(p)buildUI.beginEdit(state,localBuildPose(p),view.buildMap);}
  const emote=e.target.closest('[data-emote]');if(emote)playEmote(emote.dataset.emote);

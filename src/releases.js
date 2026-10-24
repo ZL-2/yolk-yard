@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'214',title:'Tactical map and competitive records',changes:[
+  'A larger tactical map adds 1–6× zoom, drag-to-pan, keyboard controls, player centering and accurate waypoints. It displays current island geometry, helipad, districts, storm circles and objectives.',
+  'Career now includes saved tournament placements, eliminations, earnings and repeat-winner bonuses, with a shortcut from Compete. Marks awards remain in a notification until acknowledged, even after reconnecting.',
+  'Box Fights hides opponents’ overhead names; Zone Wars keeps them. Passenger crosshairs stay visible through scope transitions in both perspectives. Victory Score now gives 1,000 per win and 10 per elimination, preserving your totals. Version 6.22.0 / protocol 82.'
+ ]},
  {number:'213',title:'A cleaner home screen',changes:[
   'Rebuilt the lobby around consistent slate panels, restrained gold highlights, aligned columns and clearer typography. Play stays on the left, your operator stays in the center, and party and rankings stay on the right.',
   'The header now focuses on navigation, Marks, Social and Settings. Crew referrals and feature requests sit beneath your party. Chat and voice share the bottom bar; secondary tools are grouped under Help & More.',

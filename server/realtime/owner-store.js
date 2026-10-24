@@ -23,6 +23,7 @@ export class OwnerStore{
    if(this.db.prepare('PRAGMA quick_check').get().quick_check!=='ok')throw Error('Owner history needs recovery. Existing files were preserved.');
    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;
     CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS grant_reads(id TEXT PRIMARY KEY,player TEXT NOT NULL,at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS visits(id TEXT PRIMARY KEY,client TEXT NOT NULL,visitor TEXT NOT NULL,started INTEGER NOT NULL,seen INTEGER NOT NULL,ended INTEGER,mode TEXT NOT NULL,visible INTEGER NOT NULL DEFAULT 1,activeMs INTEGER NOT NULL DEFAULT 0,reason TEXT NOT NULL DEFAULT '');
     CREATE INDEX IF NOT EXISTS visits_started ON visits(started); CREATE INDEX IF NOT EXISTS visits_client ON visits(client,seen); CREATE INDEX IF NOT EXISTS visits_visitor ON visits(visitor,started);
     CREATE TABLE IF NOT EXISTS segments(id TEXT PRIMARY KEY,visit TEXT NOT NULL,mode TEXT NOT NULL,started INTEGER NOT NULL,ended INTEGER NOT NULL,activeMs INTEGER NOT NULL DEFAULT 0);

@@ -39,7 +39,8 @@ export class OwnerService {
   if(this.controls.modes[mode]?.[access]===false)throw Error('This mode is temporarily closed to '+access+' matchmaking.');
  }
  assertChat(id){this.assertPlayer(id);const mute=this.sanction(id,'mute');if(mute)throw Error('Lobby chat is muted for this browser identity. '+mute.reason);if(!this.controls.chatEnabled)throw Error('Lobby chat is temporarily paused.');}
- grantSummary(id){return {id,marks:this.db.get('SELECT coalesce(sum(amount),0) n FROM grants WHERE player=?',id).n};}
+ grantSummary(id){return {id,marks:this.db.get('SELECT coalesce(sum(amount),0) n FROM grants WHERE player=?',id).n,notices:this.db.all('SELECT g.id,g.at,g.amount FROM grants g LEFT JOIN grant_reads r ON r.id=g.id WHERE g.player=? AND r.id IS NULL ORDER BY g.at,g.id LIMIT 100',id).map(g=>({...g,kind:'marks-grant',request:'Marks award',body:g.amount.toLocaleString('en-US')+' Marks were added to your balance.'}))};}
+ acknowledgeGrants(id,ids){if(!Array.isArray(ids)||ids.length>100||ids.some(x=>typeof x!=='string'||x.length>200))throw Error('Invalid grant acknowledgement');this.db.transaction(()=>{for(const grant of ids)this.db.run('INSERT OR IGNORE INTO grant_reads SELECT id,player,? FROM grants WHERE id=? AND player=?',this.now(),grant,id);});return this.grantSummary(id).notices;}
  onIdentity(user){this.assertPlayer(user.id);if(!this.db.db)return;if(user.sessions.size===1)this.systemEvent('player-connected',user.profile.name+' connected',user.id);this.relay.parties.send(user,{type:'owner-controls',controls:this.publicControls()});this.relay.parties.send(user,{type:'owner-grants',record:this.grantSummary(user.id)});}
  liveRooms(){
   const relay=this.relay;if(!relay)return [];

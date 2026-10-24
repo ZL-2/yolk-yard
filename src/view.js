@@ -983,7 +983,7 @@ export class View {
         if(p.inventory&&poseDue)this.royaleView.animateActor(model,p,this.clock,poseDt);
         if(model.userData.nameplate){
           const name=model.userData.nameplate;name.position.y=bodyHeight(p)+.3;
-          name.visible=p.id!==local?.id&&p.health>0&&!p.spectating&&(!!p.boss||!!state.zonewars||!state.royale||teammates(state.options,p,local));
+          name.visible=nameplateVisible(state,p,local);
           // Constant readable text size throughout the district, including
           // behind walls and while aiming. No extra DOM or per-frame textures.
           if(state.zonewars){const h=56*Math.tan(this.camera.fov*Math.PI/360)/Math.max(1,this.canvas.clientHeight);name.scale.set(h*512/96,h,1);}
@@ -1183,3 +1183,4 @@ export class View {
   }
 }
 import {teammates,teamStyle} from './teams.js';
+import {nameplateVisible} from './combat-hud-policy.js';

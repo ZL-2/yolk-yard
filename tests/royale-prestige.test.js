@@ -15,9 +15,9 @@ const account=(socialId,wins,kills)=>({socialId,publicName:socialId,publicPartic
 function fixture(){const identities=new Map(),sent=[],updates=[],users=new Map(),parties={store:{identities,save(){}},users,send:(u,m)=>{if(u)sent.push([u.id,m]);},sync(){}};const relay={parties,peers:new Map(),send:(p,m)=>updates.push([p.id,m])},service=new ProgressionService(relay,{path:null});relay.progression=service;
  const add=(id,wins=0,kills=0)=>{identities.set(id,{profile:{name:id,pickaxe:''}});users.set(id,{id,profile:identities.get(id).profile});service.accounts.set(id,account(id,wins,kills));service.rankRewards.invalidate();};return {service,relay,identities,sent,updates,add};}
 
-test('Victory Score values wins consistently and rewards kills with diminishing returns',()=>{
- assert.equal(royaleRating({wins:1,kills:25}),1500);assert.equal(royaleRating({wins:0,kills:100}),1000);assert.equal(royaleRating({wins:5,kills:100}),6000);
- assert.ok(royaleRating({kills:25})-royaleRating({kills:0})>royaleRating({kills:50})-royaleRating({kills:25}));
+test('Victory Score preserves wins and gives every kill ten points without diminishing returns',()=>{
+ assert.equal(royaleRating({wins:1,kills:25}),1250);assert.equal(royaleRating({wins:0,kills:100}),1000);assert.equal(royaleRating({wins:5,kills:100}),6000);
+ assert.equal(royaleRating({wins:30,kills:500})-royaleRating({wins:30,kills:400}),1000);
  assert.equal(royaleRating({wins:NaN,kills:-10}),0);assert.equal(royaleRating({wins:Infinity,kills:Infinity}),0);
  for(const [rank,count]of [[1,4],[2,3],[5,3],[6,2],[10,2],[11,1],[25,1],[26,0],[0,0]])assert.equal(eligibleRankPickaxes(rank,100).length,count);
  assert.deepEqual(eligibleRankPickaxes(1,0),[]);
