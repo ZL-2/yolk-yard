@@ -4,12 +4,12 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Original, editable Blender assets. Geometry, maps and materials are shared;
 // makeHumanoid creates only the skeleton and pose state for each player.
-export const OPERATOR_ASSET_IDS=Object.freeze(['wren','rank-25']);
+export const OPERATOR_ASSET_IDS=Object.freeze(['wren','rank-25','rank-10','rank-5']);
 const assets=new Map(),pending=new Map();
 const swap=name=>name.replace(/(shoulder|arm|forearm|hand|thigh|shin|foot|toe|finger)([LR])/,(_,part,side)=>part+(side==='L'?'R':'L'));
-export function operatorAsset(profile){return !profile.infectedType&&!profile.henchman?assets.get(profile.outfit?.replace(/^outfit-/,'')):null;}
+export function operatorAsset(profile){if(profile.infectedType||profile.infectedSkin||profile.henchman)return null;const id=profile.outfit?.replace(/^outfit-/,'');return assets.get(OPERATOR_ASSET_IDS.includes(id)?id:'scout');}
 async function decode(id,suffix=''){
- const url=new URL(`models/operators/${id}${suffix}.glb`,document.baseURI).href;
+ const source=new URL(`models/operators/${id}${suffix}.glb`,document.baseURI);source.searchParams.set('v','215');const url=source.href;
  const gltf=await new GLTFLoader().loadAsync(url);gltf.scene.updateMatrixWorld(true);
  const inputs=[];gltf.scene.traverse(o=>{if(o.isSkinnedMesh)inputs.push(o);});
  if(!inputs.length)throw Error(`No skinned geometry in ${id}${suffix}`);

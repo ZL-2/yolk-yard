@@ -57,7 +57,7 @@ for loop in cape.data.loops:
  for uv in cape.data.uv_layers:uv.data[loop.index].uv=(px/b.image.size[0],1-yy/b.image.size[1])
 for top,bottom in [(710,722),(740,752)]:
  for offset in [-1,1]:
-  band=b.cape([(y,410+(y-650)/95*55,89+(y-650)/95*6+offset) for y in [top,bottom]])
+  band=b.cape([(y,410+(y-650)/95*55,89+(y-650)/95*6+offset) for y in [top,bottom]],drape_range=(175,810))
   band.name='Sewn silver cape stripe'
   for loop in band.data.loops:
    v=band.data.vertices[loop.vertex_index].co;t=(v.x/b.scale+244)/488

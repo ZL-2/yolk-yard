@@ -8,11 +8,13 @@ a conventional UV atlas; these are interpreted hidden surfaces, not scans.
 import bpy, math, json
 from pathlib import Path
 from mathutils import Vector
+from mathutils.geometry import tessellate_polygon
 
 ROOT=Path(__file__).resolve().parents[2]
 class Builder:
- def __init__(self, id, name, center, back, side, floor, scale, joints):
+ def __init__(self, id, name, center, back, side, floor, scale, joints, side_direction=1):
   self.id,self.name,self.cx,self.bx,self.sx,self.floor,self.scale=id,name,center,back,side,floor,scale
+  self.side_direction=side_direction
   self.directory=ROOT/'art/operators'/id;self.directory.mkdir(parents=True,exist_ok=True)
   self.out=ROOT/'public/models/operators';self.out.mkdir(parents=True,exist_ok=True)
   bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
@@ -39,7 +41,7 @@ class Builder:
     idx=m.loops[li].vertex_index;x,y,d=vertices[idx];front=d<=0;px=x if front else self.bx-(x-self.cx)
     # Blending towards the side photograph removes the stretched tangent seam.
     t=max(0,min(1,(abs(p.normal.x)-.42)/.48)) if side_blend else 0
-    ref.data[li].uv=(px/width,1-y/height);side.data[li].uv=((self.sx+d)/width,1-y/height);blend.data[li].value=t;surf.data[li].color=(0,rough,metal,1)
+    ref.data[li].uv=(px/width,1-y/height);side.data[li].uv=((self.sx+d*self.side_direction)/width,1-y/height);blend.data[li].value=t;surf.data[li].color=(0,rough,metal,1)
   if weights:
    for i,v in enumerate(vertices):
     for group,w in weights(v).items():
@@ -87,21 +89,31 @@ class Builder:
   for j in range(rings):
    for i in range(segments):a=j*segments+i;b=j*segments+(i+1)%segments;f.append((a,a+segments,b+segments,b))
   return self.mesh(name,v,f,bone,surface)
+ def silhouette(self,name,points,depth,bone,thickness=5,surface='metal'):
+  poly=[Vector((x,y,0)) for x,y in points];lookup={(p.x,p.y):i for i,p in enumerate(poly)};n=len(poly)
+  v=[(x,y,depth) for x,y in points]+[(x,y,depth+thickness) for x,y in points];f=[]
+  for tri in tessellate_polygon([poly]):
+   indices=tuple(p if isinstance(p,int) else lookup[(p.x,p.y)] for p in tri);f.append(indices);f.append(tuple(n+i for i in reversed(indices)))
+  for i in range(n):j=(i+1)%n;f.append((i,j,j+n,i+n))
+  return self.mesh(name,v,f,bone,surface,smooth=False,side_blend=False)
  def chain(self,a,b,start,end):
   def weight(v):
    t=max(0,min(1,(v[1]-start)/(end-start)));t=max(0,min(1,(t-.65)/.35))*.48
    return {a:1-t,b:t}
   return weight
- def cape(self,rows,bone='chest'):
-  v=[];f=[];columns=32
+ def cape(self,rows,bone='chest',columns=32,drape_range=None):
+  v=[];f=[];top,bottom=drape_range or (rows[0][0],rows[-1][0])
   for row,(y,width,depth) in enumerate(rows):
    for i in range(columns+1):
-    t=i/columns;x=self.cx+(t-.5)*width;d=depth+math.cos(t*math.pi*12)*3.5
+    t=i/columns;x=self.cx+(t-.5)*width;d=depth+math.cos(t*math.pi*12)*(2+(y-top)/(bottom-top)*8)
     # Side ridges keep a heavy fabric cape from reading as a flat card.
     v.append((x,y+(math.sin(t*math.pi*8)*3 if row==len(rows)-1 else 0),d))
   for j in range(len(rows)-1):
    for i in range(columns):a=j*(columns+1)+i;f.append((a,a+1,a+columns+2,a+columns+1))
-  return self.mesh('Tailored cape',v,f,bone,'fabric',side_blend=False)
+  def drape(vertex):
+   t=max(0,min(1,(vertex[1]-top)/(bottom-top)));hold=t*t*(3-2*t)*.85
+   return {bone:1-hold,'root':hold}
+  return self.mesh('Tailored cape',v,f,bone,'fabric',weights=drape,side_blend=False)
  def fingers(self,side,palm,ends):
   x,y,d=palm
   self.sphere(side+' articulated palm',x,y,d,13,21,8,'hand'+side,'leather')

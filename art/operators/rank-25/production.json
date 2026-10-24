@@ -1,10 +1,10 @@
 {
   "name": "Tempest Sentinel",
   "triangles": 21882,
-  "lodTriangles": 6125,
+  "lodTriangles": 6126,
   "bones": 32,
   "materials": 1,
-  "glbBytes": 2183068,
+  "glbBytes": 2194588,
   "status": "visual-review-required",
   "source": "Original cover and generated construction sheet; hidden surfaces inferred"
 }
