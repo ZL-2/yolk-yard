@@ -1,27 +1,51 @@
-# Ravelfront production character roster
+# Ravelfront production character roster — release 215
 
-Scope authorized 24 October 2026: six Item Shop characters (Commandant Voss,
-Marshal Rook, Lieutenant Nyx, Pulse, Wren, Morrow), four Victory Score characters
-(Tempest Sentinel, Rift Revenant, Solar Imperator, Apex Sovereign), and one new
-free default character. Retire all other playable outfit entries, including
-alternate styles. Preserve unrelated equipment and player progression.
+The playable roster contains six Item Shop characters, four Victory Score rewards,
+and the free Frontier Scout default: 11 outfits. Other playable outfits and
+alternate variants are retired. Saved ownership is archived; Marks, equipment,
+receipts and progression are preserved. An alternate purchase retains its
+signature outfit. Ranked unlock rules are unchanged.
 
-Work proceeds one character at a time. Compare the actual exported mesh with
-the original cover, inspect front/side/back, and exercise the game animation
-rig before proceeding. Generated construction views are references, never
-presented as renders of completed models. Unseen surfaces are interpretations.
+## Reviewed assets
 
-## Recovery
+| Character | Asset | Near triangles | Distance triangles |
+| --- | --- | ---: | ---: |
+| Wren | `wren` | 64,774 | 15,544 |
+| Tempest Sentinel | `rank-25` | 21,882 | 6,126 |
+| Rift Revenant | `rank-10` | 23,130 | 6,475 |
+| Solar Imperator | `rank-5` | 26,926 | 7,526 |
+| Apex Sovereign | `rank-1` | 26,382 | 7,377 |
+| Commandant Voss | `voss` | 23,850 | 5,957 |
+| Marshal Rook | `rook` | 34,880 | 9,766 |
+| Lieutenant Nyx | `nyx` | 19,408 | 5,434 |
+| Pulse | `pulse` | 31,236 | 8,746 |
+| Morrow | `morrow` | 21,958 | 6,147 |
+| Frontier Scout | `scout` | 41,854 | 11,688 |
 
-The approved Wren review and editable Blender source were recovered from the
-23 October review package. That package also contained the four ranked cover
-targets; it did not contain completed replacement models for those characters.
-The current Wren source and GLBs preserve that approved geometry and textures.
-Runtime packaging compresses textures and supplies a reduced distance mesh.
+Each character has a texture-packed editable Blender source, game GLB, reduced
+distance GLB and actual mesh renders. `reviews.json` records export SHA-256 and
+review evidence. Original covers remain the design targets; unseen surfaces are
+interpretations. Scout's portrait is rendered from the final model. Generated
+construction sheets are references, not renders of completed models.
 
-## Build
+The approved Wren mesh and source were recovered from the October 23 review
+package. Geometry and textures are preserved; runtime packaging compresses maps
+and adds a distance mesh. The four ranked replacements and remaining Shop
+characters were built and reviewed sequentially, followed by Scout.
 
-Blender 4.3 Python module, Python 3.11, NumPy 1.26. Production files retain
-packed textures in editable `.blend` sources. Exported GLBs use the shared
-32-joint game rig. Actual animation, hitboxes and matchmaking are independent
-of the cosmetic mesh.
+## Build and inspect
+
+Authoring uses Blender 4.3's Python module, Python 3.11 and NumPy 1.26.
+`scripts/art/build-<name>.py` rebuilds each packed source, near/distance GLBs and
+front, side, back and three-quarter renders. `prepare-wren.py` packages the
+approved Wren source. The common builder is `scripts/art/operator_builder.py`.
+
+All assets use the 32-joint game rig, with one material each except Wren's two.
+Geometry, textures and materials are shared between instances. The runtime uses
+the reduced mesh at distance and retains the existing gameplay hitboxes.
+
+Open `operators.html` for the actual game-mesh viewer: character selector, six
+animated poses, rotation, wireframe and downloadable GLBs. Per-character checks:
+`node scripts/operator-browser-check.mjs <id>`. Full lobby/Locker/local-match check:
+`node scripts/roster-browser-check.mjs`. Browser evidence is written to
+`test-results/roster215` and retained by the release workflow.

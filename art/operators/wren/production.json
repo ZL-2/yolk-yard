@@ -8,5 +8,8 @@
     "wren-lod.glb": 823908
   },
   "reference": "public/shop/wren.webp",
-  "unseenSurfaces": "Inferred in the approved construction sheet"
+  "unseenSurfaces": "Inferred in the approved construction sheet",
+  "status": "visually-reviewed",
+  "assetSha256": "448e925b27a2dc085f53f85403451a4f04ac2b1051fbbc4fddc7f29a5d234701",
+  "reviewRecord": "../reviews.json"
 }

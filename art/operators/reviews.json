@@ -128,5 +128,17 @@
       "ground contact and distance topology"
     ],
     "notes": "Ivory owl mask, olive hood, asymmetric leaf armor, diagonal poncho and long leaf sashes. Corrected hood, shin, boot and glove projection boundaries; final texture-only refinement preserves tested geometry and rig. Hidden views inferred."
+  },
+  {
+    "id": "scout",
+    "name": "Frontier Scout",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "0ecd27c73c65a537fb461ffbd3cb549fee3324cc0be04ad50e0fb5b1a8231ddb",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "New free default: sculpted face and cropped curls, petrol field jacket, compass badge, leather utility strap, cargo trousers and boots. Portrait is rendered from this actual model. Final sleeve UV refinement preserves tested geometry and rig."
   }
 ]

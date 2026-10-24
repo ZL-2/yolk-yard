@@ -1,26 +1,22 @@
-# Roster 215 — work in progress
+# Roster 215 — completed character production
 
-Authorized final roster: six base Shop outfits, four Victory Score outfits, and
-the new free Frontier Scout (11). Retire all 24 legacy and six alternate outfits.
-Keep equipment, Marks, receipts and archived ownership. Do not publish partial work.
+Authorized roster: six Shop outfits, four Victory Score rewards, and the free
+Frontier Scout (11). Retire 24 legacy outfits and six alternate variants. Keep
+Marks, equipment, receipts, progression and archived outfit ownership.
 
-Sequential order: Wren, Tempest, Rift, Solar, Apex, Voss, Rook, Nyx, Pulse, Morrow,
-Scout. Wren approved source is recovered. Tempest and Rift passed mesh views and
-six real game poses. Solar and Apex passed their final reviews. Voss is also reviewed. Rook passed the final view and pose checks. Nyx is reviewed after sleeve and UV corrections. Pulse is reviewed after arm and hip refinements. Morrow is reviewed after cloth, mask and texture refinements. Scout remains. Existing generic bodies do not count.
+Completed in order: Wren, Tempest Sentinel, Rift Revenant, Solar Imperator, Apex
+Sovereign, Commandant Voss, Marshal Rook, Lieutenant Nyx, Pulse, Morrow, Frontier
+Scout. Each actual mesh received front/side/back/three-quarter inspection and
+six-pose browser review before proceeding. Review records include final hashes.
+Scout's cover is rendered from the final mesh. Original other covers are retained.
 
-Runtime: `/tmp/ravel-blender-env/bin/python` (bpy 4.3.0 / NumPy 1.26.4).
-Build with `scripts/art/build-<name>.py`. Actual renders and packed editable sources
-are under `art/operators/<id>`, game assets under `public/models/operators`.
-Browser: `BROWSER_EXECUTABLE=/tmp/chromium node scripts/operator-browser-check.mjs <id>`.
-Screenshots and evidence in `test-results/roster215/<id>`. Reference images are
-construction guides, not evidence of a completed 3D model. Hidden views inferred.
+All 11 are registered in the runtime, with distance meshes and shared materials.
+New players start as Scout; every wallet receives Scout without changing balances.
+Retired/invalid equipped outfits fall back to Scout. Alternate owners retain their
+signature character. Ranking rewards remain earned and server-checked.
 
-The previous temporary checkout disappeared; restored this branch into the current
-workspace and rebuilt Tempest, Rift and Solar from the saved/reconstructed scripts.
-All original generated references and approved Wren package remain available.
-Save each next character checkpoint to the work branch. Main remains 214.
-
-Remaining integration: the remaining Scout asset, 11-ID manifest, review hashes; full lobby,
-Locker and local-match smoke; bounded CI tests, version/release 215 bump; PR/merge
-and verify GitHub Pages and Render. Preserve owner-edited tournament schedule.
-Never restart/redeploy during an active tournament; check health/event pre-merge.
+Focused unit checks: 65 passing. Production build passes. Final lobby/Locker/local
+match review and release CI follow before publication. Release 215 / 6.23.0 /
+protocol 83. Publish the full batch through the work branch and PR, then verify
+Pages and Render against the merged commit. Preserve the owner's event schedule;
+check the live event before merging and do not deploy during an active tournament.

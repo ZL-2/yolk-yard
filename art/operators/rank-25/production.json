@@ -5,6 +5,8 @@
   "bones": 32,
   "materials": 1,
   "glbBytes": 2194588,
-  "status": "visual-review-required",
-  "source": "Original cover and generated construction sheet; hidden surfaces inferred"
+  "status": "visually-reviewed",
+  "source": "Original cover and generated construction sheet; hidden surfaces inferred",
+  "assetSha256": "96d20e90e68d3e52d7faf52cf1a4074d6b34d69354df27fda3bc2ca6200938bb",
+  "reviewRecord": "../reviews.json"
 }

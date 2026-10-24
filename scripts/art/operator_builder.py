@@ -12,15 +12,17 @@ from mathutils.geometry import tessellate_polygon
 
 ROOT=Path(__file__).resolve().parents[2]
 class Builder:
- def __init__(self, id, name, center, back, side, floor, scale, joints, side_direction=1):
+ def __init__(self, id, name, center, back, side, floor, scale, joints, side_direction=1, reference=True):
   self.id,self.name,self.cx,self.bx,self.sx,self.floor,self.scale=id,name,center,back,side,floor,scale
   self.side_direction=side_direction
+  self.reference=reference
   self.directory=ROOT/'art/operators'/id;self.directory.mkdir(parents=True,exist_ok=True)
   self.out=ROOT/'public/models/operators';self.out.mkdir(parents=True,exist_ok=True)
   bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
   self.scene=bpy.context.scene;self.scene.render.engine='CYCLES';self.scene.cycles.samples=1;self.scene.render.threads_mode='FIXED';self.scene.render.threads=4
   self.scene.view_settings.view_transform='Standard';self.scene.world.color=(.18,.18,.18)
-  self.image=bpy.data.images.load(str(self.directory/'turnaround.png'));self.image.pack()
+  self.image=bpy.data.images.load(str(self.directory/'turnaround.png')) if reference else bpy.data.images.new('Procedural authoring canvas',width=1536,height=1024)
+  self.image.pack()
   self.parts=[];self.joints=joints;self.material=bpy.data.materials.new(name+' / reference projection');self.material.use_nodes=True
   n=self.material.node_tree.nodes;l=self.material.node_tree.links;bs=n.get('Principled BSDF');bs.inputs['Roughness'].default_value=.75
   a=n.new('ShaderNodeTexImage');a.image=self.image;u=n.new('ShaderNodeUVMap');u.uv_map='Reference';l.new(u.outputs[0],a.inputs['Vector'])
@@ -163,7 +165,7 @@ class Builder:
    light=bpy.data.lights.new(name,'AREA');light.energy=power;light.shape='DISK';light.size=size;o=bpy.data.objects.new(name,light);self.scene.collection.objects.link(o);o.location=pos;o.rotation_euler=(Vector((0,0,1))-o.location).to_track_quat('-Z','Y').to_euler()
   self.scene.render.film_transparent=False;self.scene.world.color=(.12,.16,.19)
   cam.location=(0,-5,.95);cam.rotation_euler=(Vector((0,0,.95))-cam.location).to_track_quat('-Z','Y').to_euler()
-  body['reference']='Original cover + generated orthographic construction views';body['hidden_surfaces']='Interpreted from construction reference';rig['production_roster']=215
+  body['reference']='Original cover + generated orthographic construction views' if self.reference else 'Original Blender sculpt and procedural materials';body['hidden_surfaces']='Interpreted from construction reference' if self.reference else 'Authored directly in three dimensions';rig['production_roster']=215
   bpy.ops.wm.save_as_mainfile(filepath=str(self.directory/(self.id+'.blend')),compress=True)
   def export(suffix='',materials='EXPORT'):
    bpy.ops.export_scene.gltf(filepath=str(self.out/(self.id+suffix+'.glb')),export_format='GLB',use_selection=True,export_skins=True,export_animations=False,export_yup=True,export_image_format='JPEG',export_jpeg_quality=91,export_materials=materials,export_attributes=False)
@@ -171,5 +173,5 @@ class Builder:
   for name,pos in [('front',(0,-5,.95)),('side',(5,0,.95)),('back',(0,5,.95)),('three-quarter',(2.8,-5,1.05))]:
    cam.location=pos;cam.rotation_euler=(Vector((0,0,.95))-cam.location).to_track_quat('-Z','Y').to_euler();self.scene.render.filepath=str(self.directory/(name+'.png'));bpy.ops.render.render(write_still=True)
   bpy.context.view_layer.objects.active=body;mod=body.modifiers.new('Distance topology','DECIMATE');mod.ratio=.28;bpy.ops.object.modifier_apply(modifier=mod.name);export('-lod','NONE')
-  report={'name':self.name,'triangles':triangles,'lodTriangles':sum(len(p.vertices)-2 for p in body.data.polygons),'bones':len(rig.data.bones),'materials':len(body.data.materials),'glbBytes':(self.out/(self.id+'.glb')).stat().st_size,'status':'visual-review-required','source':'Original cover and generated construction sheet; hidden surfaces inferred'}
+  report={'name':self.name,'triangles':triangles,'lodTriangles':sum(len(p.vertices)-2 for p in body.data.polygons),'bones':len(rig.data.bones),'materials':len(body.data.materials),'glbBytes':(self.out/(self.id+'.glb')).stat().st_size,'status':'visual-review-required','source':'Original cover and generated construction sheet; hidden surfaces inferred' if self.reference else 'Original Blender sculpt and procedural materials; no external character mesh'}
   (self.directory/'production.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report),flush=True)

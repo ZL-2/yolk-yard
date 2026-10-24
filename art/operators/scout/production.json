@@ -1,0 +1,12 @@
+{
+  "name": "Frontier Scout",
+  "triangles": 41854,
+  "lodTriangles": 11688,
+  "bones": 32,
+  "materials": 1,
+  "glbBytes": 3278548,
+  "status": "visually-reviewed",
+  "source": "Original sculpt with generated construction refinement; cover portrait rendered from the final game model",
+  "assetSha256": "0ecd27c73c65a537fb461ffbd3cb549fee3324cc0be04ad50e0fb5b1a8231ddb",
+  "reviewRecord": "../reviews.json"
+}
