@@ -68,5 +68,17 @@
       "distance topology"
     ],
     "notes": "Separate ivory feathers, open suspended crown, gold hardware and navy/ivory cape. Corrected projection borders and boot mapping. Hidden surfaces inferred."
+  },
+  {
+    "id": "voss",
+    "name": "Commandant Voss",
+    "status": "ready-for-roster-integration",
+    "assetSha256": "ba51199440edfdf47e6c2ce9051993dba13712a1f11c66cdde3b7bd70406716b",
+    "checks": [
+      "front, side, back and three-quarter actual mesh inspection",
+      "32-joint weights and six game poses with actual weapon",
+      "ground contact and distance topology"
+    ],
+    "notes": "Layered gold armor, integral crown with rear peaks, tufted ivory mantle and split cloak. Original artwork retained; hidden views inferred."
   }
 ]

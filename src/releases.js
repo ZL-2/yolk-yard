@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'215',title:'Eleven operators, rebuilt for the frontier',changes:[
+  'The six Shop characters and all four Victory Score characters now use authored, textured Blender models based on their original artwork, with game animation rigs and lighter distance meshes. Inspect every character in the roster viewer.',
+  'Meet Frontier Scout, the new free default operator included for everyone. New players start as Scout; retired or invalid outfits fall back to Scout. The selectable roster contains exactly eleven characters.',
+  'Retired outfits and alternate styles leave selection. Marks, equipment, receipts and archived outfit ownership are preserved; alternate-style owners retain their base character. Ranked and tournament rewards remain exclusive. Combat dimensions are unchanged. Version 6.23.0 / protocol 83.'
+ ]},
  {number:'214',title:'Tactical map and competitive records',changes:[
   'A larger tactical map adds 1–6× zoom, drag-to-pan, keyboard controls, player centering and accurate waypoints. It displays current island geometry, helipad, districts, storm circles and objectives.',
   'Career now includes saved tournament placements, eliminations, earnings and repeat-winner bonuses, with a shortcut from Compete. Marks awards remain in a notification until acknowledged, even after reconnecting.',
