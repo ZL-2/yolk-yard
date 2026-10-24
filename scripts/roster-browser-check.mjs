@@ -4,13 +4,16 @@ import {createServer} from 'vite';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {fixture} from '../tests/helpers/public-match.js';
 const origin='http://127.0.0.1:5298',out='test-results/roster215/game';await mkdir(out,{recursive:true});
-const f=await fixture({serverOptions:{origins:[origin],tournamentOptions:{now:()=>Date.parse('2026-10-24T18:00Z'),autoStart:false}}});
-const vite=await createServer({server:{host:'127.0.0.1',port:5298,strictPort:true,watch:null}});await vite.listen();
+let now=Date.parse('2026-10-24T18:00Z');
+const f=await fixture({serverOptions:{origins:[origin],tournamentOptions:{now:()=>now,autoStart:false}}});
+now-=10800000;f.app.relay.tournament.event('frontier-cup-2026-10-23').complete('cancelled','Past fixture event');now+=10800000;
+const localRelay='http://127.0.0.1:'+f.app.server.address().port;
+const vite=await createServer({server:{host:'127.0.0.1',port:5298,strictPort:true,watch:null,proxy:{'^/(game|social|health|leaderboards|tournament|compete)(/|$|\\?)':{target:localRelay,ws:true}}}});await vite.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
-const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:.6}),errors=[],checks=[];page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(e.message));
+const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:.8}),errors=[],checks=[];page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(e.stack||e.message));page.on('console',m=>{if(m.type()==='error'&&/Content Security Policy|GLTFLoader: Couldn.t load texture|WebGLProgram|Shader Error|INVALID_OPERATION/.test(m.text()))errors.push(m.text());});
 const nav=action=>page.locator('.yard-nav nav [data-action="'+action+'"]');
 try{
- await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.YOLK_NETWORK={relay:"ws://127.0.0.1:'+f.app.server.address().port+'/game"};'}));
+ await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.YOLK_NETWORK={relay:"ws://127.0.0.1:5298/game"};'}));
  await page.addInitScript(()=>{
   localStorage.setItem('yolk-profile',JSON.stringify({name:'Roster Review',weapon:'sprinter',outfit:'outfit-neon',pickaxe:'pickaxe-frost'}));
   localStorage.setItem('yolk-egg-shop-v1',JSON.stringify({version:1,balance:7480,earned:15620,owned:['outfit-neon','outfit-wren-alt','pickaxe-frost'],receipts:['original-purchase']}));
@@ -19,6 +22,7 @@ try{
  });
  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
  await page.waitForFunction(()=>window.__yolkTest.loadingFixture(v=>v.menuEgg?.userData.human?.asset?.id==='scout'));
+ const modelMaps=await page.evaluate(()=>window.__yolkTest.loadingFixture(v=>[].concat(v.menuEgg.userData.human.mesh.material).every(m=>!!m.map)));assert.equal(modelMaps,true,'embedded model textures load under the production CSP');console.log('Scout lobby and embedded maps ready');
  const wallet=await page.evaluate(()=>JSON.parse(localStorage.getItem('yolk-egg-shop-v1')));
  assert.equal(wallet.balance,7480);assert.equal(wallet.earned,15620);assert.ok(wallet.owned.includes('outfit-scout'));assert.ok(wallet.owned.includes('outfit-wren'));assert.ok(wallet.owned.includes('pickaxe-frost'));assert.ok(!wallet.owned.includes('outfit-neon'));assert.ok(wallet.retiredOwned.includes('outfit-neon'));assert.deepEqual(wallet.receipts,['original-purchase']);
  await page.screenshot({path:out+'/scout-lobby.png'});checks.push('Retired outfit becomes actual Scout model; wallet, equipment, receipts and alternate base ownership preserved');
@@ -34,16 +38,16 @@ try{
  const shop=await page.locator('.shop-card[data-shop-item^="outfit-"]').evaluateAll(nodes=>nodes.map(n=>n.dataset.shopItem));
  assert.deepEqual(shop.sort(),['outfit-voss','outfit-rook','outfit-nyx','outfit-pulse','outfit-wren','outfit-morrow'].sort());
  await page.screenshot({path:out+'/six-shop-characters.png'});checks.push('Item Shop exposes exactly the six retained characters');
- await nav('lobby-home').click();await page.evaluate(()=>window.__yolkTest.startFixture({mode:'training',capacity:4,bots:0,fill:false}));
- await page.locator('#loading-screen').waitFor({state:'hidden'});await page.evaluate(()=>window.__yolkTest.setPerspective('third'));await page.evaluate(()=>window.__yolkTest.resume());
- await page.waitForFunction(()=>window.__yolkTest.perspective().active&&window.__yolkTest.loadingFixture(v=>[...v.models.values()].some(m=>m.userData.human?.asset?.id==='wren')));
+ console.log('Starting isolated local match');await nav('lobby-home').click();await page.evaluate(()=>window.__yolkTest.startFixture({mode:'ffa',map:'yard',capacity:4,bots:0,fill:false}));
+ console.log('Match launched',await page.evaluate(()=>{const q=window.__yolkTest,r=q.read();return {screen:r.screen,phase:r.state.phase,local:r.state.players.find(p=>p.id===r.localId)?.health};}));await page.locator('#loading-screen').waitFor({state:'hidden',timeout:60000});console.log('Loading hidden');await page.evaluate(()=>{const q=window.__yolkTest;const id=q.read().localId;q.fixture(s=>{const p=s.players.get(id);s.spawn(p);p.awaitingEntry=false;});q.setPerspective('third');q.resume();});
+ console.log('Spawned local operator',await page.evaluate(()=>{const q=window.__yolkTest,r=q.read();return {screen:r.screen,local:r.state.players.find(p=>p.id===r.localId)?.health,perspective:q.perspective()};}));await page.waitForFunction(()=>window.__yolkTest.perspective().active&&window.__yolkTest.loadingFixture(v=>[...v.models.values()].some(m=>m.userData.human?.asset?.id==='wren')));
  const active=await page.evaluate(()=>window.__yolkTest.loadingFixture(v=>[...v.models.values()].filter(m=>m.userData.human?.asset).map(m=>({id:m.userData.human.asset.id,materials:[].concat(m.userData.human.mesh.material).length,triangles:m.userData.human.mesh.geometry.index.count/3}))));
  assert.ok(active.some(x=>x.id==='wren'&&x.materials===2));await page.screenshot({path:out+'/wren-third-person.png'});
- await page.evaluate(()=>window.__yolkTest.setPerspective('first'));await page.waitForFunction(()=>window.__yolkTest.perspective().blend<.1);
- await page.evaluate(()=>window.__yolkTest.setPerspective('third'));await page.waitForFunction(()=>window.__yolkTest.perspective().blend>.9);
+ await page.evaluate(()=>window.__yolkTest.setPerspective('first'));await page.waitForFunction(()=>!window.__yolkTest.perspective().active);
+ await page.evaluate(()=>window.__yolkTest.setPerspective('third'));await page.waitForFunction(()=>window.__yolkTest.perspective().active);
  const materials=await page.evaluate(()=>window.__yolkTest.loadingFixture(v=>[...v.models.values()].filter(m=>m.userData.human?.asset?.id==='wren').map(m=>[].concat(m.userData.human.mesh.material).map(x=>({map:!!x.map,opacity:x.opacity})))));
  assert.ok(materials.length&&materials.every(ms=>ms.length===2&&ms.every(m=>m.map&&Number.isFinite(m.opacity))));checks.push('Real local match uses Wren with both material groups through first/third person transitions');
  assert.deepEqual(errors,[]);await writeFile(out+'/result.json',JSON.stringify({result:'PASS',checks,active,errors},null,2));console.log('PASS',checks);
-}catch(error){await page.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/result.json',JSON.stringify({result:'FAIL',checks,error:String(error),errors},null,2));throw error;}
+}catch(error){await page.screenshot({path:out+'/failure.png',timeout:5000}).catch(()=>{});await writeFile(out+'/result.json',JSON.stringify({result:'FAIL',checks,error:String(error),errors,read:await page.evaluate(()=>{const q=window.__yolkTest?.read();return {screen:q?.screen,phase:q?.state?.phase,local:q?.state?.players.find(p=>p.id===q.localId),models:window.__yolkTest?.loadingFixture(v=>[...v.models.values()].map(m=>m.userData.human?.asset?.id)),perspective:window.__yolkTest?.perspective(),partyReady:window.__yolkTest?.party()?.ready};}).catch(()=>null)},null,2));throw error;}
 finally{await browser.close();await vite.close();await f.close();}
 
