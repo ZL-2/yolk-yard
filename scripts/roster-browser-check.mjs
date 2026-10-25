@@ -4,12 +4,13 @@ import {createServer} from 'vite';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {fixture} from '../tests/helpers/public-match.js';
 const origin='http://127.0.0.1:5298',out='test-results/roster216/game';await mkdir(out,{recursive:true});
-let now=Date.parse('2026-10-24T18:00Z');
-const f=await fixture({serverOptions:{origins:[origin],tournamentOptions:{now:()=>now,autoStart:false}}});
+let now=Date.parse('2026-10-24T18:00Z');const clockStarted=performance.now(),serverNow=()=>now+performance.now()-clockStarted;
+const f=await fixture({serverOptions:{origins:[origin],tournamentOptions:{now:serverNow,autoStart:false}}});
 now-=10800000;f.app.relay.tournament.event('frontier-cup-2026-10-23').complete('cancelled','Past fixture event');now+=10800000;
+const tournamentTick=setInterval(()=>f.app.relay.tournament.tick(),250);
 f.app.relay.iconVoting.now=()=>now;await f.app.relay.iconVoting.mutate('fixture',{action:'nominate',first:'Review',last:'Operator'});
 const localRelay='http://127.0.0.1:'+f.app.server.address().port;
-const vite=await createServer({server:{host:'127.0.0.1',port:5298,strictPort:true,watch:null,proxy:{'^/(game|social|health|leaderboards|tournament|compete|icon-voting)(/|$|\\?)':{target:localRelay,ws:true}}}});await vite.listen();
+const vite=await createServer({server:{host:'127.0.0.1',port:5298,strictPort:true,watch:null,proxy:{'^/(game|social|health|leaderboards|tournament|icon-voting)(/|$|\\?)':{target:localRelay,ws:true}}}});await vite.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:.8}),errors=[],checks=[];page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(e.stack||e.message));page.on('console',m=>{if(m.type()==='error'&&/Content Security Policy|GLTFLoader: Couldn.t load texture|WebGLProgram|Shader Error|INVALID_OPERATION/.test(m.text()))errors.push(m.text());});
 const nav=action=>page.locator('.yard-nav nav [data-action="'+action+'"]');
@@ -30,7 +31,8 @@ try{
  await page.screenshot({path:out+'/scout-lobby.png'});checks.push('Retired outfit becomes actual Scout model; wallet, equipment, receipts and alternate base ownership preserved');
  await page.evaluate(()=>{window.__qaDateNow=Date.now;Date.now=()=>Date.UTC(2035,3,2);});
  await nav('compete').click();await page.locator('[data-compete-clock]').waitFor();
- assert.match(await page.locator('[data-compete-clock]').innerText(),/Oct 24, 2026.*EDT/);
+ assert.match(await page.locator('[data-compete-clock]').innerText(),/Oct 24, 2026.*EDT/);assert.doesNotMatch(await page.locator('[data-compete-clock]').innerText(),/Reconnecting/);
+ await page.waitForFunction(()=>[...document.querySelectorAll('.compete-page img')].every(i=>i.complete&&i.naturalWidth>0));
  assert.equal(await page.locator('[data-compete-day="2026-10-24"].today').count(),1);
  await page.locator('[data-compete-move="1"]').click();await page.locator('[data-compete-today]').click();
  assert.equal(await page.locator('[data-compete-day="2026-10-24"].today').count(),1);
@@ -58,5 +60,5 @@ try{
  assert.ok(materials.length&&materials.every(ms=>ms.length===2&&ms.every(m=>m.map&&Number.isFinite(m.opacity))));checks.push('Real local match uses Wren with both material groups through first/third person transitions');
  assert.deepEqual(errors,[]);await writeFile(out+'/result.json',JSON.stringify({result:'PASS',checks,active,errors},null,2));console.log('PASS',checks);
 }catch(error){await page.screenshot({path:out+'/failure.png',timeout:5000}).catch(()=>{});await writeFile(out+'/result.json',JSON.stringify({result:'FAIL',checks,error:String(error),errors,read:await page.evaluate(()=>{const q=window.__yolkTest?.read();return {screen:q?.screen,phase:q?.state?.phase,local:q?.state?.players.find(p=>p.id===q.localId),models:window.__yolkTest?.loadingFixture(v=>[...v.models.values()].map(m=>m.userData.human?.asset?.id)),perspective:window.__yolkTest?.perspective(),partyReady:window.__yolkTest?.party()?.ready};}).catch(()=>null)},null,2));throw error;}
-finally{await browser.close();await vite.close();await f.close();}
+finally{clearInterval(tournamentTick);await browser.close();await vite.close();await f.close();}
 

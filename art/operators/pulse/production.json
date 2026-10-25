@@ -186,6 +186,7 @@
       0.051076631993055344
     ]
   },
-  "status": "requires-game-pose-review",
-  "notes": "UV-preserving anatomy and joint-weight refinement. Hidden surfaces are artistic interpretations; collision unchanged."
+  "status": "reviewed-in-game",
+  "notes": "UV-preserving anatomy and joint-weight refinement. Hidden surfaces are artistic interpretations; collision unchanged.",
+  "reviewRevision": 216
 }

@@ -77,6 +77,7 @@ for S in ['L','R']:
  for i in range(5):
   n='finger'+S+str(i);new[n]=new['hand'+S]+(new[n]-new['hand'+S])*handScale
 for o in meshes:
+ ankleHardware=set()
  if id=='rook':
   parent=list(range(len(o.data.vertices)))
   def find(i):
@@ -87,6 +88,10 @@ for o in meshes:
    if a!=b:parent[a]=b
   parts={}
   for v in o.data.vertices:parts.setdefault(find(v.index),[]).append(v.index)
+  for ids in parts.values():
+   vs=[o.data.vertices[i] for i in ids]
+   if .13<min(v.co.z for v in vs) and max(v.co.z for v in vs)<.235 and len(ids)>100:
+    ankleHardware.update(ids)
   for S in ['L','R']:
    name='arm'+S
    for ids in parts.values():
@@ -118,6 +123,7 @@ for o in meshes:
    for S in ['L','R']:
     w=sum(w for n,w in groups if n in ['shin'+S,'foot'+S]);center=old['foot'+S]
     q.x+=(p.x-center.x)*.55*volume*w;q.y+=(p.y-center.y)*.22*volume*w
+  if v.index in ankleHardware:q.x+=math.copysign(.04,p.x);q.y-=.01
   # Sculpt soft cheek/jaw volume and shorten the projecting nose on exposed faces.
   headWeight=sum(w for n,w in groups if n=='head')
   if id in ['wren','pulse','scout'] and headWeight>.9 and p.y<-.025:
