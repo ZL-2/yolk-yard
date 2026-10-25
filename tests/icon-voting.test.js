@@ -35,3 +35,15 @@ test('owner voting endpoint rejects unauthorized access',async()=>{
  let status;const res={writeHead(s){status=s;},end(){}};
  await owner.handle(req,res,{origins:['https://game.test'],relay:{}});assert.equal(status,401);
 });
+
+test('authenticated social voting uses session identity and rejects owner actions',async()=>{
+ const {PartyService}=await import('../server/realtime/parties.js');
+ const v=new IconVoting({path:null,now:()=>ICON_CLOSES_AT-10000});
+ const service={parties:new Map(),store:{available(){}},relay:{iconVoting:v},limit(){}};
+ const command=body=>PartyService.prototype.command.call(service,{id:'authenticated-player'},{type:'icon-voting',body,id:'spoofed-player'});
+ const nominated=await command({action:'nominate',first:'Joe',last:'Fox'});
+ const id=nominated.candidates[0].id;
+ await command({action:'vote',candidate:id});
+ assert.equal((await command()).vote,id);assert.equal(v.summary('spoofed-player').vote,null);
+ await assert.rejects(command({action:'delete',id}),/Unknown voting action/);
+});

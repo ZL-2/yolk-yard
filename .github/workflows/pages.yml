@@ -411,7 +411,7 @@ jobs:
 
 
           icon_files=set(subprocess.check_output(['git','diff','--name-only','bf0d9f24776c735d41db4ee72a9df56cc8d5f5ac','HEAD'],text=True).splitlines())
-          icon_update=bool(icon_files) and icon_files <= {'server/realtime/parties.js', 'src/icon-voting-rules.js', 'src/owner-console.js', '.github/workflows/pages.yml', 'src/icon-voting.css', 'src/main.js', 'server/realtime/icon-voting.js', 'src/owner-icon-voting.js', 'scripts/icon-voting-browser-check.mjs', 'src/icon-voting-ui.js', 'tests/icon-voting.test.js', 'server/realtime/index.js', 'server/realtime/owner.js', 'docs/ICON_SERIES_VOTING.md', 'src/lobby-ui.js'}
+          icon_update=bool(icon_files) and icon_files <= {'server/realtime/parties.js', 'src/icon-voting-rules.js', 'src/owner-console.js', '.github/workflows/pages.yml', 'src/icon-voting.css', 'src/party-client.js', 'src/main.js', 'server/realtime/icon-voting.js', 'src/owner-icon-voting.js', 'scripts/icon-voting-browser-check.mjs', 'src/icon-voting-ui.js', 'tests/icon-voting.test.js', 'server/realtime/index.js', 'server/realtime/owner.js', 'docs/ICON_SERIES_VOTING.md', 'src/lobby-ui.js'}
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('icon_voting_update='+str(icon_update).lower()+'\n')
             if icon_update: out.write('focused=true\n')
@@ -1304,7 +1304,21 @@ jobs:
         run: node scripts/owner-live-check.mjs
       - name: Matching website/relay build, private PvP, paused Zombies and live lobby
         if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true'
-        run: node scripts/release-live-check.mjs
+        run: |
+          if [ "${{ needs.scope.outputs.icon_voting_update }}" = "true" ]; then
+            node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          const sha=process.env.GITHUB_SHA;
+          for(let i=0;i<60;i++){
+            const [front,health]=await Promise.all([fetch('https://zl-2.github.io/yolk-yard/version.json?t='+Date.now()).then(r=>r.json()),fetch('https://yolk-yard-relay.onrender.com/health').then(r=>r.json())]);
+            if(front.build===sha&&health.build===sha&&health.socialAvailable){console.log('PASS exact website and healthy relay build',sha);process.exit(0);}
+            await new Promise(r=>setTimeout(r,5000));
+          }
+          assert.fail('Website and relay did not reach the published commit');
+          JS
+          else
+            node scripts/release-live-check.mjs
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
