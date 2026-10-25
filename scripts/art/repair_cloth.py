@@ -52,7 +52,9 @@ def repair_cloth(body,finish,leg_uv,sleeve_uv,glove_uv,operator=None):
    if rgb is not None:
     color=np.mean([rgb[max(0,min(H-1,int(coords[i].y*H))),max(0,min(W-1,int(coords[i].x*W))),:3] for i in p.loop_indices],axis=0)
     if color[2]-color[0]>.025 and color[2]-color[1]>.01 and color[0]<color[2]*.55:navy_faces.add(p.index)
-    gray=min(color)>.03 and color[2]>color[0]*.95 and color[0]>color[2]*.52 and center.z>.65
+    # The atlas background is blue-gray as well as neutral. Extend navy across
+    # the outer strip; warm gold and ivory remain on their original UVs.
+    gray=True # Gold/ivory are protected per texel in the bake shader below.
    for (a,x),(b,y) in zip(rows[key],rows[key][1:]):
     if a<=center.z<=b:
      edge_width=x+(y-x)*(center.z-a)/(b-a)
@@ -61,9 +63,22 @@ def repair_cloth(body,finish,leg_uv,sleeve_uv,glove_uv,operator=None):
     candidates.append((body.data.vertices[body.data.loops[i].vertex_index].co.copy(),coords[i],key))
    if edge_width and abs(center.x)>.78*edge_width and gray:border.append((p,center,key,edge_width))
   for p,center,key,edge_width in border:
-   if operator in ['rank-5','rank-1']:
+   if operator=='rank-1':
+    # This cape's dense edge strips have a different UV island scale from its
+    # broad center panels. A shared navy sample avoids repeating whole panels
+    # across those narrow strips, while the mesh supplies the cloth shading.
+    local=[f for f in faces if f[2]==key and f[0].index in navy_faces and abs(f[1].x)<.2 and .65<f[1].z<1.3]
+    if not local:continue
+    uvs=[sum((coords[i] for i in f[0].loop_indices),Vector((0,0)))/len(f[0].loop_indices) for f in local]
+    uv=min(uvs,key=lambda u:float(np.sum((rgb[max(0,min(H-1,int(u.y*H))),max(0,min(W-1,int(u.x*W))),:3]-np.array([.07,.11,.19]))**2)))
+    for i in p.loop_indices:
+     v=body.data.vertices[body.data.loops[i].vertex_index]
+     t=max(0,min(1,(abs(v.co.x)/edge_width-.76)/.08))
+     weights[i]=t*t*(3-2*t);samples[i]=uv
+    continue
+   if operator=='rank-5':
     x=center.x-(1 if center.x>0 else -1)*edge_width*.20
-    local=[f for f in faces if f[2]==key and len(f[0].loop_indices)==len(p.loop_indices) and (operator!='rank-1' or f[0].index in navy_faces)]
+    local=[f for f in faces if f[2]==key and len(f[0].loop_indices)==len(p.loop_indices)]
     if not local:continue
     target=min(local,key=lambda f:abs(f[1].z-center.z)*8+abs(f[1].x-x))[0]
     for i,j in zip(p.loop_indices,target.loop_indices):weights[i]=1;samples[i]=coords[j]
@@ -98,6 +113,18 @@ def repair_cloth(body,finish,leg_uv,sleeve_uv,glove_uv,operator=None):
  sample_uv=nodes.new('ShaderNodeUVMap');sample_uv.uv_map='ClothColor';links.new(sample_uv.outputs[0],sample.inputs['Vector'])
  factor=nodes.new('ShaderNodeVertexColor');factor.layer_name='ClothBlend'
  mix=nodes.new('ShaderNodeMixRGB');links.new(factor.outputs['Color'],mix.inputs[0]);links.new(texture.outputs['Color'],mix.inputs[1]);links.new(sample.outputs['Color'],mix.inputs[2])
+ trim_nodes=[]
+ if operator=='rank-1':
+  # Gold crosses the cape's large quads. A polygon-average mask would erase
+  # pieces of its hem; protect the warm embroidery at the actual texels.
+  channels=nodes.new('ShaderNodeSeparateRGB');links.new(texture.outputs['Color'],channels.inputs[0])
+  warmth=nodes.new('ShaderNodeMath');warmth.operation='SUBTRACT';links.new(channels.outputs['R'],warmth.inputs[0]);links.new(channels.outputs['B'],warmth.inputs[1])
+  preserve=nodes.new('ShaderNodeMapRange');preserve.interpolation_type='SMOOTHSTEP';preserve.clamp=True
+  preserve.inputs['From Min'].default_value=.015;preserve.inputs['From Max'].default_value=.045
+  preserve.inputs['To Min'].default_value=1;preserve.inputs['To Max'].default_value=0
+  links.new(warmth.outputs[0],preserve.inputs['Value'])
+  strength=nodes.new('ShaderNodeMath');strength.operation='MULTIPLY';links.new(factor.outputs['Color'],strength.inputs[0]);links.new(preserve.outputs['Result'],strength.inputs[1]);links.new(strength.outputs[0],mix.inputs[0])
+  trim_nodes=[channels,warmth,preserve,strength]
  emit=nodes.new('ShaderNodeEmission');links.new(mix.outputs[0],emit.inputs['Color'])
  output=next(n for n in nodes if n.type=='OUTPUT_MATERIAL');bs=next(n for n in nodes if n.type=='BSDF_PRINCIPLED');links.new(emit.outputs[0],output.inputs['Surface'])
  atlas=bpy.data.images.new('Continuous garment albedo 216',width=original.size[0],height=original.size[1],alpha=False);atlas.colorspace_settings.name='sRGB'
@@ -107,6 +134,6 @@ def repair_cloth(body,finish,leg_uv,sleeve_uv,glove_uv,operator=None):
  scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=1;scene.render.bake.margin=8
  bpy.ops.object.bake(type='EMIT');atlas.pack();links.new(bs.outputs[0],output.inputs['Surface'])
  texture.image=atlas
- for node in [base_uv,sample,sample_uv,factor,mix,emit,target]:nodes.remove(node)
+ for node in [base_uv,sample,sample_uv,factor,mix,emit,target]+trim_nodes:nodes.remove(node)
  body.data.uv_layers.remove(body.data.uv_layers['ClothColor']);body.data.color_attributes.remove(body.data.color_attributes['ClothBlend'])
  if original.users==0:bpy.data.images.remove(original)

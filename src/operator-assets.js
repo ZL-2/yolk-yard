@@ -24,7 +24,7 @@ async function decode(id,suffix=''){
   g.deleteAttribute('color');g.deleteAttribute('tangent');g.clearGroups();
   // Each Blender mesh has one material; joining retains face/body material groups.
   if(Array.isArray(input.material))throw Error(`Unexpected material layout in ${id}`);
-  const m=input.material;m.envMap=modelEnvironment();m.envMapIntensity=.72;m.side=T.DoubleSide;m.userData.shared=true;
+  const m=input.material;m.vertexColors=false;m.envMap=modelEnvironment();m.envMapIntensity=.72;m.side=T.DoubleSide;m.userData.shared=true;
   for(const value of Object.values(m))if(value?.isTexture){value.userData.shared=true;value.anisotropy=4;}
   materials.push(m);parts.push(g);
  }

@@ -62,15 +62,16 @@
     "id": "rank-1",
     "name": "Apex Sovereign",
     "status": "ready-for-roster-integration",
-    "assetSha256": "187ca91224a8a57ce1b0e51d0781f3c49c043f0a35ecd5da0f768854fcd525f7",
+    "assetSha256": "83d9c033a284451aa790ed708e57af95ea97672fdbc4d5c60b98418b57210d73",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim with actual weapon, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Separate ivory feathers, open suspended crown, gold hardware and navy/ivory cape. Corrected projection borders and boot mapping. Hidden surfaces inferred."
+    "notes": "Broader armored body, balanced helmet and shorter hands. Feathered ivory armor, floating crown and two-sided cape retain their identity. Continuous navy edge cloth preserves the gold embroidery and hem with a per-texel material mask. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "voss",

@@ -234,6 +234,10 @@ if id=='pulse':
     t=max(0,min(1,(ne-.025-v.co.z)/.08));t=t*t*(3-2*t)
     o.vertex_groups['neck'].add([v.index],1-t,'REPLACE');o.vertex_groups['chest'].add([v.index],t,'REPLACE')
 
+if id=='scout':
+ from scout_face import scout_face
+ meshes.append(scout_face(body))
+
 # Armature rest and geometry receive the same map. Bind matrices are regenerated
 # by the exporter; no runtime mesh scaling or per-player geometry copies.
 bpy.context.view_layer.objects.active=rig;bpy.ops.object.mode_set(mode='EDIT')
