@@ -570,11 +570,12 @@ export function weaponPortrait(renderer, id) {
 
 // Ground pickups do not need moving magazines/bolts. Merge once, reuse one draw call per gun.
 const groundModels=new Map();
-export function makeGroundBlaster(id){
- if(!groundModels.has(id)){
-  const model=makeBlaster(id),parts=[];model.updateMatrixWorld(true);
+export function makeGroundBlaster(id,wrap=''){
+ const key=id+':'+wrap;
+ if(!groundModels.has(key)){
+  const model=makeBlaster(id,wrap),parts=[];model.updateMatrixWorld(true);
   model.traverse(o=>{if(!o.isMesh||!o.visible||o===model.userData.reloadToken)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrixWorld);surfaceUV(g,o.material.userData.surfaceKind||(o.material.transparent||o===model.userData.lens?'glass':'paint'));const c=o.material.color,colors=new Float32Array(g.attributes.position.count*3);for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));parts.push(g);});
-  const g=mergeGeometries(parts);g.userData.shared=true;g.computeBoundingSphere();parts.forEach(p=>p.dispose());disposeBlaster(model);groundModels.set(id,g);
+  const g=mergeGeometries(parts);g.userData.shared=true;g.computeBoundingSphere();parts.forEach(p=>p.dispose());disposeBlaster(model);groundModels.set(key,g);
  }
- const mesh=new THREE.Mesh(groundModels.get(id),surfaceAtlasMaterial());mesh.userData.artRevision=ART_REVISION;mesh.userData.weaponId=id;mesh.name=weapon(id).name;return mesh;
+ const mesh=new THREE.Mesh(groundModels.get(key),surfaceAtlasMaterial());mesh.userData.artRevision=ART_REVISION;mesh.userData.weaponId=id;mesh.name=weapon(id).name;return mesh;
 }

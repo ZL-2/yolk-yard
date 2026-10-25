@@ -15,7 +15,7 @@ export class RemotePoses {
    if(this.samples.length>8)this.samples.shift();if(Number.isFinite(arrival))this.arrival=arrival;
   }
  }
- targetTime(time){return Math.min(this.samples.at(-1)?.time??time,Math.max(this.samples[0]?.time??time,time-this.delay));}
+ targetTime(time){const latest=this.samples.at(-1)?.time;return Math.min(latest===undefined?time:latest+(this.samples.length>1?.075:0),Math.max(this.samples[0]?.time??time,time-this.delay));}
  players(state,local,time){
   const target=this.targetTime(time);
   let a=this.samples[0],b=a;
@@ -38,6 +38,9 @@ export class RemotePoses {
    pose.lean=(previous.lean||0)+((next.lean||0)-(previous.lean||0))*f;
    const angle=Math.atan2(Math.sin(next.yaw-previous.yaw),Math.cos(next.yaw-previous.yaw));
    pose.yaw=previous.yaw+angle*f;
+   // Bridge one missing packet using known velocity. Bound the prediction and
+   // never detach passengers or interpolate through a traversal/teleport.
+   if(target>b.time&&!p.vehicleId&&!p.zVehicle&&!p.mantle&&!p.traversal){const age=Math.min(.075,target-b.time),speed=Math.hypot(next.vx||0,next.vy||0,next.vz||0),dt=Math.min(age,.75/Math.max(1,speed));pose.x+=(next.vx||0)*dt;pose.y+=(next.grounded?0:next.vy||0)*dt;pose.z+=(next.vz||0)*dt;}
    return pose;
   });
  }

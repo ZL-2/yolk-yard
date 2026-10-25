@@ -186,20 +186,24 @@ export function makeHumanoid(profile={}){
 }
 // Analytic two-bone IK. Targets are in character coordinates. Elbow/knee poles
 // remain on the anatomical side; fixed limb lengths prevent stretching.
+// Pose evaluation is synchronous. Reuse scratch math across chains; no pose
+// retains these objects, so this also bounds garbage collection during combat.
+const ik={inverse:new T.Matrix4(),start:V(),dir:V(),normal:V(),elbow:V(),dest:V(),rest:V(),parentQ:new T.Quaternion(),modelQ:new T.Quaternion(),q:new T.Quaternion()};
 function solveChain(h,upper,lower,end,target,pole,blend=1){
  const a=h.bones[upper],b=h.bones[lower],c=h.bones[end];h.mesh.updateWorldMatrix(true,false);
- const inverse=h.mesh.matrixWorld.clone().invert(),start=a.getWorldPosition(V()).applyMatrix4(inverse),L1=b.userData.rest.length(),L2=c.userData.rest.length();
- const dir=target.clone().sub(start),len=T.MathUtils.clamp(dir.length(),.02,L1+L2-.002);dir.normalize();
- const normal=pole.clone().sub(start).addScaledVector(dir,-pole.clone().sub(start).dot(dir)).normalize();
- const along=(L1*L1-L2*L2+len*len)/(2*len),height=Math.sqrt(Math.max(0,L1*L1-along*along)),elbow=start.clone().addScaledVector(dir,along).addScaledVector(normal,height);
- function aim(bone,rest,dest){const parentQ=bone.parent.getWorldQuaternion(new T.Quaternion()),modelQ=h.mesh.getWorldQuaternion(new T.Quaternion());const local=dest.applyQuaternion(modelQ).applyQuaternion(parentQ.invert()).normalize();const q=new T.Quaternion().setFromUnitVectors(rest.clone().normalize(),local);bone.quaternion.slerp(q,blend);bone.updateWorldMatrix(true,false);}
- aim(a,b.userData.rest,elbow.clone().sub(start));aim(b,c.userData.rest,start.clone().addScaledVector(dir,len).sub(elbow));
+ const inverse=ik.inverse.copy(h.mesh.matrixWorld).invert(),start=a.getWorldPosition(ik.start).applyMatrix4(inverse),L1=b.userData.rest.length(),L2=c.userData.rest.length();
+ const dir=ik.dir.copy(target).sub(start),len=T.MathUtils.clamp(dir.length(),.02,L1+L2-.002);dir.normalize();
+ const normal=ik.normal.copy(pole).sub(start);normal.addScaledVector(dir,-normal.dot(dir)).normalize();
+ const along=(L1*L1-L2*L2+len*len)/(2*len),height=Math.sqrt(Math.max(0,L1*L1-along*along)),elbow=ik.elbow.copy(start).addScaledVector(dir,along).addScaledVector(normal,height);
+ h.mesh.getWorldQuaternion(ik.modelQ);
+ const aim=(bone,rest,dest)=>{bone.parent.getWorldQuaternion(ik.parentQ);dest.applyQuaternion(ik.modelQ).applyQuaternion(ik.parentQ.invert()).normalize();ik.q.setFromUnitVectors(ik.rest.copy(rest).normalize(),dest);bone.quaternion.slerp(ik.q,blend);};
+ aim(a,b.userData.rest,ik.dest.copy(elbow).sub(start));aim(b,c.userData.rest,ik.dest.copy(start).addScaledVector(dir,len).sub(elbow));
 }
-export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0,map=null}={}){
+export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0,scheduled=false,map=null}={}){
  const h=model.userData.human;if(!h)return;const soleY=h.soleHeight??.09;h.clock+=dt;
  if(h.asset){const a=!menu&&distance>36&&h.asset.lod?h.asset.lod:h.asset;if(!a.geometry.userData.remapped){const skin=a.geometry.attributes.skinIndex;for(let i=0;i<skin.array.length;i++)skin.array[i]=ids[a.names[skin.array[i]]];a.geometry.userData.remapped=true;}h.mesh.geometry=a.geometry;}
  // 60 Hz nearby, 20 Hz at distance, 10 Hz far away. Animation clocks continue.
- const interval=distance>90?.1:distance>40?.05:0;if(h.clock<h.nextUpdate){h.skipped=(h.skipped||0)+dt;return;}dt=Math.min(.12,dt+(h.skipped||0));h.skipped=0;h.nextUpdate=h.clock+interval;
+ const interval=scheduled?0:distance>90?.1:distance>40?.05:0;if(h.clock<h.nextUpdate){h.skipped=(h.skipped||0)+dt;return;}dt=Math.min(.12,dt+(h.skipped||0));h.skipped=0;h.nextUpdate=h.clock+interval;
  // Layer from the bind pose each frame. Adding yaw onto last frame's residual
  // quaternion accumulated a permanent sideways twist (especially at low FPS).
  const b=h.bones;for(const bone of Object.values(b)){bone.position.copy(bone.userData.rest);bone.quaternion.identity();}

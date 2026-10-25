@@ -1,0 +1,279 @@
+{
+  "tag": "confirm-before",
+  "root": "/tmp/ravel-performance216",
+  "fixtureRefreshActivity": false,
+  "phase": "playing",
+  "activeHumans": 11,
+  "humans": 11,
+  "spectators": 3,
+  "elapsedMs": 12013.928434,
+  "simulatedSeconds": 12.033333333333612,
+  "memory": {
+    "rss": 434765824,
+    "heapTotal": 328241152,
+    "heapUsed": 234710248,
+    "external": 16134387,
+    "arrayBuffers": 8922208
+  },
+  "serverCpuMsPerSecond": 547.6824700718872,
+  "wireBytesPerSecond": 462312.5591693532,
+  "eventLoopMs": {
+    "p50": 5.165055,
+    "p95": 14.786559,
+    "p99": 36.700159,
+    "max": 294.387711
+  },
+  "timing": {
+    "stepMaxMs": 273,
+    "gapMaxMs": 293,
+    "phases": {
+      "battle": {
+        "stepMaxMs": 273,
+        "gapMaxMs": 293,
+        "broadcastMaxMs": 129,
+        "stepCpuAtMaxMs": 275.9,
+        "broadcastCpuAtMaxMs": 128.8
+      }
+    },
+    "departureMs": 14,
+    "cpuQuota": {
+      "available": true,
+      "version": 2,
+      "scope": "current group",
+      "quotaCores": 8,
+      "periodUs": 100000,
+      "observedMs": 16503,
+      "periods": 165,
+      "throttledPeriods": 0,
+      "throttledMs": 0
+    }
+  },
+  "shots": 652,
+  "errors": [],
+  "clients": [
+    {
+      "id": "player-d8808cdb-95f1-4a2a-86d1-33df958e28a2",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 48.76951399999962,
+        "p95": 86.38407099999858,
+        "p99": 207.67471399999886,
+        "max": 333.21528599999965
+      },
+      "bytes": 1104333,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-67589bd0-48ee-40a2-bf22-91a014d11f8c",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 49.26474000000053,
+        "p95": 88.35269700000026,
+        "p99": 200.7849070000011,
+        "max": 344.6173339999996
+      },
+      "bytes": 1111990,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-652104e5-af29-4271-bfd8-05fdedb54978",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 48.50524000000041,
+        "p95": 91.16763700000047,
+        "p99": 211.15162599999894,
+        "max": 363.0892160000003
+      },
+      "bytes": 1111938,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-53c5a548-9e05-403f-9226-596f7e19afe7",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 48.78465599999981,
+        "p95": 97.83401400000002,
+        "p99": 199.0105939999994,
+        "max": 345.74201600000015
+      },
+      "bytes": 1112441,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-471eb1c3-24df-40c4-95b4-27c2fcadb897",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 47.911033999998835,
+        "p95": 91.3578120000002,
+        "p99": 249.9726900000005,
+        "max": 353.97470599999997
+      },
+      "bytes": 1106635,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-aebdd829-483d-4101-9a71-4f1b4997acf7",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 48.19135300000016,
+        "p95": 97.4592990000001,
+        "p99": 252.21840300000076,
+        "max": 369.6902829999999
+      },
+      "bytes": 1117162,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-49574fed-e261-409b-9b6b-18323b592910",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 48.76168599999983,
+        "p95": 97.62408800000048,
+        "p99": 248.2430919999988,
+        "max": 372.63281800000004
+      },
+      "bytes": 1115112,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-3b2ca58d-8fda-4369-a847-f3e6695792dc",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 49.19290199999887,
+        "p95": 101.1946429999989,
+        "p99": 234.91796799999975,
+        "max": 375.37474199999997
+      },
+      "bytes": 1115192,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-d4a0ea2b-5faf-4e5f-b0d0-a8550a86b9cf",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 47.06568100000004,
+        "p95": 101.51983400000063,
+        "p99": 251.02294599999914,
+        "max": 402.7994660000004
+      },
+      "bytes": 1102048,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-0ccd25f2-090a-4e17-b628-219049568df0",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 47.82473000000027,
+        "p95": 104.06739300000118,
+        "p99": 240.54452000000128,
+        "max": 383.90790299999935
+      },
+      "bytes": 1112049,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-1edcd1d3-6122-4cdb-9e83-f30d540d92cc",
+      "spectator": false,
+      "frames": 229,
+      "gaps": {
+        "count": 228,
+        "p50": 47.90774799999781,
+        "p95": 99.98326900000029,
+        "p99": 234.40906899999936,
+        "max": 413.3576320000002
+      },
+      "bytes": 1111667,
+      "reset": false,
+      "time": 13.950000000000273,
+      "ack": 757
+    },
+    {
+      "id": "player-1214563d-a7d0-493a-a18b-d46dc00e39d8",
+      "spectator": true,
+      "frames": 116,
+      "gaps": {
+        "count": 115,
+        "p50": 99.27354100000048,
+        "p95": 160.02483500000017,
+        "p99": 401.1456959999996,
+        "max": 402.68679900000006
+      },
+      "bytes": 759982,
+      "reset": false,
+      "time": 13.90000000000027,
+      "ack": 0
+    },
+    {
+      "id": "player-8446cb66-a44d-4452-949e-8bc893790588",
+      "spectator": true,
+      "frames": 117,
+      "gaps": {
+        "count": 116,
+        "p50": 97.72569000000112,
+        "p95": 178.0778160000009,
+        "p99": 406.78438800000004,
+        "max": 431.6828970000006
+      },
+      "bytes": 761184,
+      "reset": false,
+      "time": 13.90000000000027,
+      "ack": 0
+    },
+    {
+      "id": "player-081f5623-b01c-41d9-afa0-4f090e9f5ffc",
+      "spectator": true,
+      "frames": 117,
+      "gaps": {
+        "count": 116,
+        "p50": 97.09570499999973,
+        "p95": 167.28561000000082,
+        "p99": 400.8217289999993,
+        "max": 421.4566850000001
+      },
+      "bytes": 761184,
+      "reset": false,
+      "time": 13.90000000000027,
+      "ack": 0
+    }
+  ]
+}

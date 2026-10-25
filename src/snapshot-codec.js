@@ -25,7 +25,7 @@ function snapshotLayout(layout){if(!normalizedLayouts.has(layout))normalizedLayo
 // A broadcast batch owns its memo, so mutable simulation objects are never
 // cached across ticks. Recipient groups share player/world clones and diffs.
 export class SnapshotBatch {
- constructor(){this.values=new WeakMap();this.indexed=new WeakMap();this.normalized=new WeakMap();this.worlds=new WeakMap();this.retained=new WeakMap();this.payloads=new WeakMap();}
+ constructor(){this.values=new Map();this.indexed=new Map();this.normalized=new Map();this.worlds=new Map();this.retained=new Map();this.payloads=new Map();this.patches=new Map();}
  clone(source){
   if(source===null)return null;
   if(typeof source==='number')return Number.isFinite(source)?source:null;
@@ -65,7 +65,7 @@ export class SnapshotBatch {
   return value;
  }
  retain(state,previous){
-  let pairs=this.retained.get(state);if(!pairs){pairs=new WeakMap();this.retained.set(state,pairs);}
+  let pairs=this.retained.get(state);if(!pairs){pairs=new Map();this.retained.set(state,pairs);}
   if(pairs.has(previous.royale))return pairs.get(previous.royale);
   const next={...state,royale:{...state.royale}};
   for(const key of ['loot','chests','builds','worldDamage'])if(!Object.hasOwn(next.royale,key)&&previous.royale[key])next.royale[key]=previous.royale[key];
@@ -115,24 +115,30 @@ function equalJson(a,b){
  for(const key of keys)if(!Object.hasOwn(b,key)||!equalJson(a[key],b[key]))return false;
  return true;
 }
-// Shared recipient states also share their object-pair diff. Weak keys keep old
-// frames collectable; each connection still owns its sequence and baseline.
-const patches=new WeakMap();
-function sharedPatch(previous,next){
+// Share object-pair diffs only within the current broadcast. Releasing one
+// bounded memo avoids maintaining weak-key caches across spent frames. Each
+// connection still owns its independent baseline.
+function sharedPatch(previous,next,patches){
  if(previous&&next&&typeof previous==='object'&&typeof next==='object'){
   let cache=patches.get(next);if(cache?.has(previous))return cache.get(previous);
-  const result=patch(previous,next);if(!cache){cache=new WeakMap();patches.set(next,cache);}cache.set(previous,result);return result;
+  const result=patch(previous,next,patches);if(!cache){cache=new Map();patches.set(next,cache);}cache.set(previous,result);return result;
  }
- return patch(previous,next);
+ return patch(previous,next,patches);
 }
-function patch(previous,next){
+function patch(previous,next,patches){
  if(Object.is(previous,next))return undefined;
  if(!previous||!next||typeof previous!=='object'||typeof next!=='object')return [next];
  if(Array.isArray(previous)||Array.isArray(next))return equalJson(previous,next)?undefined:[next];
- const changes=Object.create(null);
- for(const key of Object.keys(previous))if(!Object.hasOwn(next,key))changes[key]=[];
- for(const key of Object.keys(next)){const change=sharedPatch(previous[key],next[key]);if(change!==undefined)changes[key]=change;}
- return Object.keys(changes).length?changes:undefined;
+ // Most fields are unchanged scalars. Avoid a recursive call and a fresh
+ // empty patch for each of them, including every remote pose recipient.
+ let changes;
+ for(const key of Object.keys(previous))if(!Object.hasOwn(next,key))(changes??=Object.create(null))[key]=[];
+ for(const key of Object.keys(next)){
+  const before=previous[key],after=next[key];if(Object.is(before,after))continue;
+  const change=before&&after&&typeof before==='object'&&typeof after==='object'?sharedPatch(before,after,patches):[after];
+  if(change!==undefined)(changes??=Object.create(null))[key]=change;
+ }
+ return changes;
 }
 function apply(previous,changes){
  if(Array.isArray(changes))return changes[0];
@@ -156,7 +162,7 @@ export class SnapshotEncoder {
   const omitWorld=[];
   for(const key of ['loot','chests','builds','worldDamage'])if(next.state?.royale&&!Object.hasOwn(next.state.royale,key)&&this.previous?.state?.royale?.[key])omitWorld.push(key);
   if(omitWorld.length){if(batch)next.state=batch.retain(next.state,this.previous.state);else{next.state={...next.state,royale:{...next.state.royale}};for(const key of omitWorld)next.state.royale[key]=this.previous.state.royale[key];}}
-  const frame=this.previous?{base:this.seq,seq:this.seq+1,patch:patch(this.previous,next)||{}}:{base:0,seq:1,full:next};
+  const frame=this.previous?{base:this.seq,seq:this.seq+1,patch:patch(this.previous,next,batch?.patches||new Map())||{}}:{base:0,seq:1,full:next};
   if(omitWorld.length)frame.omitWorld=omitWorld;
   this.previous=next;this.seq=frame.seq;return {type:'snapshot-v1',frame};
  }

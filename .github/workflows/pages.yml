@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      performance217_update: ${{ steps.scope.outputs.performance217_update }}
       anatomy216_update: ${{ steps.scope.outputs.anatomy216_update }}
       icon_voting_update: ${{ steps.scope.outputs.icon_voting_update }}
       roster215_update: ${{ steps.scope.outputs.roster215_update }}
@@ -419,6 +420,14 @@ jobs:
 
 
 
+          perf217_files=set(subprocess.check_output(['git','diff','--name-only','2c16f3b21909290cdd20934730be8ef88660cb89','HEAD'],text=True).splitlines())
+          perf217_allowed={'src/physics.js','src/snapshot-interest.js', 'server/realtime/authority.js', 'src/damage-numbers.js', 'scripts/tournament-load-profile.mjs', 'package.json', 'package-lock.json', 'src/build-snapshot.js', 'src/view.js', 'server/realtime/snapshot-work.js', 'src/building.js', 'src/royale.js', 'src/weapons.js', 'docs/UPDATE_217.md', 'src/remote-poses.js', 'tests/performance217.test.js', 'tests/combat-overhaul.test.js', 'tests/authority-performance.test.js', 'src/releases.js', 'src/data.js', 'src/operator-assets.js', 'scripts/performance-browser-check.mjs', 'src/frontier-world.js', 'src/snapshot-codec.js', 'src/humanoid.js', '.github/workflows/pages.yml', 'scripts/performance-live-check.mjs', 'scripts/tournament-realtime-profile.mjs'}
+          perf217_update={'server/realtime/snapshot-work.js','src/damage-numbers.js','tests/performance217.test.js'}<=perf217_files and all(f in perf217_allowed or f.startswith('docs/performance217/') for f in perf217_files) and json.loads(Path('package.json').read_text()).get('version')=='6.25.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('performance217_update='+str(perf217_update).lower()+'\n')
+            if perf217_update: out.write('focused=true\n')
+          print('Crowded combat, snapshot scheduling, bounded feedback and render budgets:',perf217_update)
+
           icon_files=set(subprocess.check_output(['git','diff','--name-only','bf0d9f24776c735d41db4ee72a9df56cc8d5f5ac','HEAD'],text=True).splitlines())
           icon_update=bool(icon_files) and icon_files <= {'server/realtime/parties.js', 'src/icon-voting-rules.js', 'src/owner-console.js', '.github/workflows/pages.yml', 'src/icon-voting.css', 'src/party-client.js', 'src/main.js', 'server/realtime/icon-voting.js', 'src/owner-icon-voting.js', 'scripts/icon-voting-browser-check.mjs', 'src/icon-voting-ui.js', 'tests/icon-voting.test.js', 'server/realtime/index.js', 'server/realtime/owner.js', 'docs/ICON_SERIES_VOTING.md', 'src/lobby-ui.js'}
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
@@ -438,6 +447,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Combat performance, interpolation, builds, spectators and unchanged match rules
+        if: needs.scope.outputs.performance217_update == 'true'
+        run: |
+          node --test --test-concurrency=2 tests/performance217.test.js tests/snapshot-codec.test.js tests/update-204.test.js tests/streaming-performance.test.js tests/guest-responsiveness.test.js tests/update-200.test.js tests/authority-performance.test.js tests/tournament.test.js tests/compete.test.js tests/anatomy-retarget.test.js tests/character-motion.test.js tests/building.test.js tests/building-overhaul.test.js tests/built-world-gameplay.test.js tests/arms.test.js tests/hitbox.test.js tests/relay-compact.test.js tests/realtime-resume.test.js tests/combat-overhaul.test.js tests/release-history.test.js
+          node scripts/tournament-realtime-profile.mjs . 11 ci
       - name: Icon voting persistence, deadlines and owner authorization
         if: needs.scope.outputs.icon_voting_update == 'true'
         run: node --test tests/icon-voting.test.js
@@ -758,7 +772,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true'
+        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true'
       - name: Icon voting modal and owner forms
         if: needs.scope.outputs.icon_voting_update == 'true'
         run: |
@@ -766,7 +780,7 @@ jobs:
           ln -sf "$(node --input-type=module -e "import {chromium} from 'playwright'; console.log(chromium.executablePath())")" /tmp/chromium
           node scripts/icon-voting-browser-check.mjs
       - name: Install the headless desktop runtime with a missing-library fallback
-        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true'
+        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true' || needs.scope.outputs.performance217_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           # Ubuntu runners already carry the Chromium libraries. Avoid a full
@@ -779,6 +793,15 @@ jobs:
           node scripts/compete-browser-check.mjs
           node scripts/tournament-browser-check.mjs
           node scripts/camera-gameplay-browser.mjs
+      - name: Actual crowded models, distant weapons and pooled hit feedback in Chromium
+        if: needs.scope.outputs.performance217_update == 'true'
+        run: node scripts/performance-browser-check.mjs . ci
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.performance217_update == 'true'
+        with:
+          name: performance217-browser
+          path: test-results/performance217
+          retention-days: 14
       - name: Revised operator anatomy and server-time calendar in Chromium
         if: needs.scope.outputs.anatomy216_update == 'true'
         env:
@@ -1319,7 +1342,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true'
+        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true'
       - name: Install the focused headless desktop runtime
         if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true'
         run: |
@@ -1334,7 +1357,9 @@ jobs:
       - name: Matching website/relay build, private PvP, paused Zombies and live lobby
         if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true'
         run: |
-          if [ "${{ needs.scope.outputs.anatomy216_update }}" = "true" ]; then
+          if [ "${{ needs.scope.outputs.performance217_update }}" = "true" ]; then
+            node scripts/performance-live-check.mjs
+          elif [ "${{ needs.scope.outputs.anatomy216_update }}" = "true" ]; then
             node scripts/anatomy-live-check.mjs
           elif [ "${{ needs.scope.outputs.icon_voting_update }}" = "true" ]; then
             node --input-type=module - <<'JS'

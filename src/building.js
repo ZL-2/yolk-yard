@@ -2,7 +2,7 @@ import {environmentCollision} from './environment-collision.js';
 import {sightRay,reachablePoint,thirdPersonActive} from './perspective.js';
 import {SHIELD_BARREL} from './field-refinement.js';
 import {worldDoorBox,cacheDoorCollisions,updateDoorCollisions} from './world-rules.js';
-import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,candidates,playerBoxOverlap,canOccupy,pruneBuildPhases} from './physics.js';
+import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,removeCollisionBoxes,candidates,playerBoxOverlap,canOccupy,pruneBuildPhases} from './physics.js';
 import {bodyHeight,eyeHeight,canFight} from './stance.js';
 import {groundAt} from './terrain.js';
 import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,isBreakable,propAt,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
@@ -31,8 +31,9 @@ const touching=(a,b)=>a.minX<=b.maxX+.2&&a.maxX>=b.minX-.2&&a.minY<=b.maxY+.2&&a
 export const blocksBuilding=b=>b.buildBlocking===true||b.buildBlocking!==false&&!b.decorative&&!['tree','rock','vehicle'].includes(b.kind)&&!['rock','car'].includes(b.harvestType)&&!(b.kind==='prop'&&b.w*b.d*b.h<3);
 function supportSamples(b){return [[b.x,b.z],[b.x-b.w/2+.04,b.z-b.d/2+.04],[b.x+b.w/2-.04,b.z-b.d/2+.04],[b.x-b.w/2+.04,b.z+b.d/2-.04],[b.x+b.w/2-.04,b.z+b.d/2-.04]];}
 function anchored(p,map){
- const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,5)];
- return bs.some(b=>supportSamples(b).some(([x,z])=>Math.abs(b.y-groundAt(map,x,z))<.32))||near.some(b=>!b.buildId&&blocksBuilding(b)&&bs.some(a=>Math.abs(a.y-(b.y+b.h))<.24&&Math.abs(a.x-b.x)<(a.w+b.w)/2&&Math.abs(a.z-b.z)<(a.d+b.d)/2));
+ const bs=pieceBoxes(p);
+ if(bs.some(b=>supportSamples(b).some(([x,z])=>Math.abs(b.y-groundAt(map,x,z))<.32)))return true;
+ return candidates(map,p,null,0,5).some(b=>!b.buildId&&blocksBuilding(b)&&bs.some(a=>Math.abs(a.y-(b.y+b.h))<.24&&Math.abs(a.x-b.x)<(a.w+b.w)/2&&Math.abs(a.z-b.z)<(a.d+b.d)/2));
 }
 export function validPlacement(p,map,builds,players=[],builder=null){
  if(![p.x,p.y,p.z,p.rotation].every(Number.isFinite)||p.y<0)return 'Invalid coordinates';
@@ -133,11 +134,17 @@ export function collapse(sim){
  while(changed){changed=false;for(const b of sim.builds)if(!supported.has(b.id)&&sim.builds.some(a=>supported.has(a.id)&&touching(cache.get(a.id),cache.get(b.id)))){supported.add(b.id);changed=true;}}
  if(supported.size!==sim.builds.length){sim.builds=sim.builds.filter(b=>supported.has(b.id));sim.buildVersion++;rebuildMap(sim);}
 }
+const authoredObjectIds=new WeakMap();
+function ownsWorldObject(sim,id){
+ let ids=authoredObjectIds.get(sim.worldBoxes);
+ if(!ids){ids=new Set(sim.worldBoxes.map(b=>b.objectId));authoredObjectIds.set(sim.worldBoxes,ids);}
+ return ids.has(id);
+}
 export function damageObject(sim,box,amount,harvester=null){
  if(!isBreakable(box)||!Number.isFinite(amount)||amount<=0)return;
  const built=box.buildId?sim.builds.find(b=>b.id===box.buildId):null;
  if(box.buildId&&!built)return; // Stale references can never become environmental resources.
- if(!built&&!sim.worldBoxes.some(b=>b.objectId===box.objectId))return;
+ if(!built&&!ownsWorldObject(sim,box.objectId))return;
  const definition=harvestDefinition(box,sim.map),material=built?.material||definition.material,max=built?.maxHealth||box.health||definition.health;
  const object=built||(sim.worldDamage[box.objectId]??={health:max,maxHealth:max,destroyed:false,resourceBudget:definition.resources,resourcePaid:0});
  if(object.destroyed||object.health<=0)return;
@@ -151,7 +158,10 @@ export function damageObject(sim,box,amount,harvester=null){
   harvester.materials[material]=(harvester.materials[material]||0)+earned;
   if(earned){harvester.lastHarvest={material,amount:earned,time:sim.time};sim.emit('harvest',{player:harvester.id,material,amount:earned,x:box.x,y:box.y+1,z:box.z});}
  }
- if(object.health<=0){object.destroyed=true;if(built)sim.builds=sim.builds.filter(b=>b!==built);sim.emit('royale-fx',{kind:'break',x:box.x,y:box.y,z:box.z});rebuildMap(sim);collapse(sim);
+ if(object.health<=0){object.destroyed=true;if(built)sim.builds=sim.builds.filter(b=>b!==built);sim.emit('royale-fx',{kind:'break',x:box.x,y:box.y,z:box.z});
+  if(built)rebuildMap(sim);
+  else {const removed=sim.map.boxes.filter(b=>!b.buildId&&b.objectId===box.objectId);removeCollisionBoxes(sim.map,removed);if(removed.some(b=>b.doorId))cacheDoorCollisions(sim.map);sim.lootSupportDirty=true;sim.navigationRevision=(sim.navigationRevision||0)+1;}
+  collapse(sim);
   if(!built&&box.harvestType==='shieldBarrel'){
    for(const p of sim.players.values())if(canFight(p)&&p.flight==='ground'&&Math.hypot(p.x-box.x,p.y-box.y,p.z-box.z)<=SHIELD_BARREL.radius){
     const from={x:box.x,y:box.y+.7,z:box.z},dx=p.x-from.x,dy=p.y+.9-from.y,dz=p.z-from.z,len=Math.hypot(dx,dy,dz)||1;
