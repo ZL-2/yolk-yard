@@ -1,0 +1,329 @@
+{
+  "tag": "after-final",
+  "models": [
+    {
+      "id": "render-1",
+      "distance": 11.130588483993108,
+      "lod": false,
+      "triangles": 26202,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-2",
+      "distance": 14.962954253756175,
+      "lod": false,
+      "triangles": 27450,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-3",
+      "distance": 17.801404438976157,
+      "lod": false,
+      "triangles": 31246,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-4",
+      "distance": 45.03209966235197,
+      "lod": true,
+      "triangles": 8588,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-5",
+      "distance": 65.21418557338579,
+      "lod": true,
+      "triangles": 7167,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-6",
+      "distance": 85.1639008030985,
+      "lod": true,
+      "triangles": 10975,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-7",
+      "distance": 105.01376100302284,
+      "lod": true,
+      "triangles": 6643,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-8",
+      "distance": 125.111510261846,
+      "lod": true,
+      "triangles": 9892,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-9",
+      "distance": 145.09614054136657,
+      "lod": true,
+      "triangles": 7357,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-10",
+      "distance": 165.0087573433604,
+      "lod": true,
+      "triangles": 13445,
+      "pose": "locomotion"
+    }
+  ],
+  "actorDraws": {
+    "frame": 33,
+    "calls": 79,
+    "triangles": 228831,
+    "points": 0,
+    "lines": 0
+  },
+  "fullDraws": {
+    "frame": 35,
+    "calls": 512,
+    "triangles": 1139969,
+    "points": 0,
+    "lines": 0
+  },
+  "hitFeedback": {
+    "enqueueMs": 1.5999999977648258,
+    "calls": 1,
+    "textures": 96,
+    "numbers": {
+      "numbers": 40,
+      "glyphs": 228,
+      "draws": 1,
+      "capacity": 64
+    },
+    "totals": [
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": false
+      },
+      {
+        "amount": 90,
+        "shield": 30,
+        "critical": true
+      }
+    ],
+    "stress": {
+      "numbers": 64,
+      "glyphs": 128,
+      "draws": 1,
+      "capacity": 64
+    },
+    "reusedMesh": true,
+    "expired": {
+      "numbers": 0,
+      "glyphs": 0,
+      "draws": 0,
+      "capacity": 64
+    }
+  },
+  "viewCpuMs": {
+    "p50": 2.899999998509884,
+    "p95": 8.300000000745058,
+    "p99": 14.5,
+    "max": 17.700000002980232
+  },
+  "posesPerFrame": {
+    "min": 3,
+    "max": 7,
+    "average": 4.666666666666667
+  },
+  "gpu": {
+    "renderer": "WebKit WebGL"
+  }
+}

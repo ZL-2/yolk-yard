@@ -1,4 +1,10 @@
 export const RELEASE_NOTES = [
+ {number:'217',title:'Smoother combat and tournament delivery',changes:[
+  'Server snapshots run in short batches so movement input and the 60 Hz match simulation can run between recipients. Unchanged buildings and doors reuse immutable snapshots, with temporary comparison caches bounded to each broadcast; private HUD data stays with its owner or spectator target.',
+  'Distant operators now use their authored lighter models, with staggered animation updates and batched distant weapons. Nearby operators keep full detail, and combat hitboxes are unchanged.',
+  'Damage numbers share one glyph atlas and one draw call while retaining shield, health, critical-hit and pellet aggregation feedback. Character posing and asset loading allocate less temporary memory.',
+  'Remote movement can bridge a missing packet for up to 75 milliseconds, with bounded displacement and safeguards for teleports, elimination, passengers and traversal. Tournament entry, spectators, results and rewards retain their existing rules. Version 6.25.0 / protocol 85.'
+ ]},
  {number:'216',title:'Character anatomy and tournament time',changes:[
   'All eleven operators receive individual body proportions, shorter necks, fuller limbs and hands, and exposed-face refinements. Flexible clothing underlayers keep joints covered while bending. Gameplay hitboxes remain unchanged.',
   'Animations now adapt captured limb directions to each operator’s actual skeleton. The roster viewer adds sprinting, strafing, backpedaling, jumping, falling, sliding, crawling, reviving, reloading, melee and emote previews.',

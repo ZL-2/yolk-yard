@@ -1,0 +1,111 @@
+{
+  "tag": "before-final",
+  "models": [
+    {
+      "id": "render-1",
+      "distance": 11.130588483993108,
+      "lod": false,
+      "triangles": 26202,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-2",
+      "distance": 14.962954253756175,
+      "lod": false,
+      "triangles": 27450,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-3",
+      "distance": 17.801404438976157,
+      "lod": false,
+      "triangles": 31246,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-4",
+      "distance": 45.03209966235197,
+      "lod": false,
+      "triangles": 30702,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-5",
+      "distance": 65.21418557338579,
+      "lod": false,
+      "triangles": 28170,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-6",
+      "distance": 85.1639008030985,
+      "lod": false,
+      "triangles": 39200,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-7",
+      "distance": 105.01376100302284,
+      "lod": false,
+      "triangles": 23728,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-8",
+      "distance": 125.111510261846,
+      "lod": false,
+      "triangles": 35336,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-9",
+      "distance": 145.09614054136657,
+      "lod": false,
+      "triangles": 26278,
+      "pose": "locomotion"
+    },
+    {
+      "id": "render-10",
+      "distance": 165.0087573433604,
+      "lod": false,
+      "triangles": 46174,
+      "pose": "locomotion"
+    }
+  ],
+  "actorDraws": {
+    "frame": 33,
+    "calls": 212,
+    "triangles": 394366,
+    "points": 0,
+    "lines": 0
+  },
+  "fullDraws": {
+    "frame": 35,
+    "calls": 564,
+    "triangles": 1287680,
+    "points": 0,
+    "lines": 0
+  },
+  "hitFeedback": {
+    "enqueueMs": 33.69999999925494,
+    "calls": 40,
+    "textures": 135,
+    "numbers": {
+      "numbers": 40
+    }
+  },
+  "viewCpuMs": {
+    "p50": 3.899999998509884,
+    "p95": 8.400000002235174,
+    "p99": 14.199999999254942,
+    "max": 15.699999999254942
+  },
+  "posesPerFrame": {
+    "min": 4,
+    "max": 7,
+    "average": 5.5
+  },
+  "gpu": {
+    "renderer": "WebKit WebGL"
+  }
+}

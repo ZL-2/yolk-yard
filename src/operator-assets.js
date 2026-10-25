@@ -29,7 +29,7 @@ async function decode(id,suffix=''){
   materials.push(m);parts.push(g);
  }
  const geometry=mergeGeometries(parts,true);if(!geometry)throw Error(`Cannot merge ${id}`);
- parts.forEach(g=>g.dispose());geometry.computeBoundingSphere();geometry.userData.shared=true;
+ parts.forEach(g=>g.dispose());for(const input of inputs)input.geometry.dispose();geometry.computeBoundingSphere();geometry.userData.shared=true;
  return {geometry,materials,joints,names,id};
 }
 export function loadOperatorAsset(id){
@@ -38,8 +38,9 @@ export function loadOperatorAsset(id){
  const task=decode(id).then(asset=>{assets.set(id,asset);return asset;}).catch(error=>{pending.delete(id);throw error;});pending.set(id,task);return task;
 }
 export async function preloadOperatorAssets(){
- // Three concurrent requests bound decoding and texture-upload pressure.
+ // Decode both detail levels under the loading screen, with three concurrent
+ // assets. First contact with a distant operator must not trigger GLB decoding.
  const queue=[...OPERATOR_ASSET_IDS];
- await Promise.all(Array.from({length:Math.min(3,queue.length)},async()=>{while(queue.length)await loadOperatorAsset(queue.shift());}));
+ await Promise.all(Array.from({length:Math.min(3,queue.length)},async()=>{while(queue.length){const id=queue.shift();await loadOperatorAsset(id);await loadOperatorLod(id);}}));
 }
-export function loadOperatorLod(id){const asset=assets.get(id);if(!asset||asset.lodRequest)return;asset.lodRequest=decode(id,'-lod').then(lod=>{lod.materials.forEach(m=>m.dispose());lod.materials=asset.materials;asset.lod=lod;}).catch(()=>{});}
+export function loadOperatorLod(id){const asset=assets.get(id);if(!asset)return;if(asset.lodRequest)return asset.lodRequest;return asset.lodRequest=decode(id,'-lod').then(lod=>{const textures=new Set();for(const m of lod.materials){for(const value of Object.values(m))if(value?.isTexture&&value!==m.envMap)textures.add(value);m.dispose();}for(const texture of textures){texture.dispose();texture.source?.data?.close?.();}lod.materials=asset.materials;asset.lod=lod;}).catch(()=>{});}

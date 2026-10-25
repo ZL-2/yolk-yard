@@ -1,6 +1,7 @@
 import {bindCrownStore,attachCrown} from '../../src/crowns.js';
 import {settleZombiesPlayer} from './zombies-service.js';
 import {timingPhase,roomTiming,recordTiming,startTiming,finishTiming} from './timing.js';
+import {SnapshotWork} from './snapshot-work.js';
 import {SnapshotInterest} from '../../src/snapshot-interest.js';
 import {randomInt,randomUUID} from 'node:crypto';
 import {Simulation} from '../../src/simulation.js';
@@ -21,7 +22,7 @@ const address=new RegExp('^yolk-yard-v'+VERSION+'-([A-Z2-9]{8})$');
 // The relay owns simulation and persistent room lifetime. Browsers submit bounded
 // input/interaction intent only; even the room leader cannot submit game state.
 export class MatchAuthority{
- constructor(relay){this.relay=relay;this.rooms=new Map();this.capacity=new MatchCapacity(this);this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),16);this.timer.unref?.();}
+ constructor(relay){this.snapshotWork=new SnapshotWork({onSlice:(room,wallMs,cpuMs)=>recordTiming(room,timingPhase(room.sim),'broadcastMaxMs',wallMs,cpuMs)});this.relay=relay;this.rooms=new Map();this.capacity=new MatchCapacity(this);this.last=performance.now();this.accumulator=0;this.timer=setInterval(()=>this.tick(),16);this.timer.unref?.();}
  roomFor(peer){return this.rooms.get(peer.authorityRoom);}
  connection(peer,connected){const room=this.roomFor(peer),p=room?.sim.players.get(peer.authorityId);if(p){p.connected=connected;if(p.activity)p.activity.last=room.sim.time;room.sim.advanceWarmupClock();}}
  send(peer,message,serialized){if(peer&&this.relay.peers.has(peer.id))this.relay.send(peer,message,serialized);}
@@ -109,8 +110,10 @@ export class MatchAuthority{
   if(m.type==='kick'&&m.id!==id){const target=room.members.get(m.id);if(target){room.kicked.add(target.progressId);this.send(target,{type:'authority-notice',event:'kicked'});this.disconnect(target);}}
  }
  publish(room){const s=room.sim,p=room.hostPeer;const humans=[...s.players.values()].filter(p=>!p.bot&&!p.lateSpectator&&p.connected!==false);p.listedAt=Date.now();p.listing={code:room.code,version:VERSION,host:room.tournament?'Frontier Cup':room.recurring?'Recurring Frontier Royale':s.players.get(room.owner)?.name||'Operator',map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize,players:humans.length,capacity:Math.min(MAX_HUMANS,s.options.capacity),contestantCapacity:s.options.capacity,public:room.visibility==='public',recurring:!!room.recurring,phase:isWarmup(s.stage)?'lobby':s.phase};}
- broadcast(room){
-  const broadcastStarted=startTiming();roomTiming(room);room.timing.cpuQuota=this.relay.cpuQuota?.snapshot();
+ broadcast(room){this.snapshotWork.enqueue(room,()=>this.broadcastSteps(room));}
+ flushBroadcast(room,budget=Infinity){this.snapshotWork.flush(room,budget);}
+ *broadcastSteps(room){
+  roomTiming(room);room.timing.cpuQuota=this.relay.cpuQuota?.snapshot();
   if(!room.members.size){this.publish(room);return;}
   // Avoid cloning sleeping world collections only to discard them below.
   const sim=room.sim,worldKey=sim.options.mode==='royale'?`${sim.matchId}:${sim.map.id}:${sim.round}`:null;
@@ -122,9 +125,13 @@ export class MatchAuthority{
   }
   const state=sim.snapshot({includeLoot,includeBuilds});if(room.tournament)state.tournament={id:room.eventId||this.relay.tournament.id};state.visibility=room.visibility;state.chatEnabled=room.chat.enabled;state.chatMuted=[...room.chat.muted];state.network={hostId:room.owner,members:this.members(room),chatSequence:room.chat.sequence,authority:'server',timing:room.timing};
   const groups=new Map(),batch=new SnapshotBatch();
+  // The detached state belongs to this broadcast. Socket input and simulation
+  // can run between recipients; a newer request coalesces behind this one.
+  yield;
   for(const [id,peer]of room.members){
    // Do not encode dependent deltas faster than a socket can deliver them.
-   if(!peer.ws||peer.ws.bufferedAmount>65536||peer.pendingBytes>0||peer.historyBytes>65536)continue;
+   if(room.key&&this.rooms.get(room.key)!==room||room.sim!==sim||state.round!==sim.round||state.matchId!==sim.matchId||state.options.map!==sim.map.id)return;
+   if(room.members.get(id)!==peer||!peer.ws||peer.ws.bufferedAmount>65536||peer.pendingBytes>0||peer.historyBytes>65536)continue;
    let encoder=room.encoders.get(id);const p=state.players.find(p=>p.id===id);if(!p)continue;
    // Spectators interpolate a 10 Hz feed; live competitors retain the full 20 Hz
    // snapshots and 60 Hz authority. Slow viewers cannot consume match CPU.
@@ -147,11 +154,11 @@ export class MatchAuthority{
    room.eventCursors.set(id,state.events.at(-1)?.id||room.eventCursors.get(id)||0);
    room.interest??=new SnapshotInterest();const presentation={...outgoing,players:room.interest.players(outgoing,p)};
    const message=encoder.encode({type:'authority-state',state:presentation},batch);this.send(peer,{type:'authority-frame',frame:message.frame},batch.serialize(message.frame));
+   yield;
   }
   if(!room.publishedAt||room.age-room.publishedAt>=2){this.publish(room);room.publishedAt=room.age;}
   if(room.zombies){for(const [id,peer]of room.members){const p=sim.players.get(id);if(sim.phase==='results'||p?.zExtracted)settleZombiesPlayer(this.relay,room,p,peer);}if(sim.zAccountDirty){this.relay.progression.dirty=true;sim.zAccountDirty=false;void this.relay.progression.save();}}
   else if(!room.tournament&&room.age-room.progressAt>=.5){room.progressAt=room.age;this.relay.progression.frame(room.hostPeer,rewardFrame(state,room.owner,room.sim.inputs.get(room.owner)||{}));}
-  const broadcastCost=finishTiming(broadcastStarted);recordTiming(room,timingPhase(room.sim),'broadcastMaxMs',broadcastCost.wallMs,broadcastCost.cpuMs);
  }
  restartPublicRoom(room){
   this.capacity.rematch(room.key);room.sim.phase='results';room.sim.startRound();delete room.restartAt;room.encoders.clear();room.eventCursors.clear();this.publish(room);
@@ -196,5 +203,5 @@ export class MatchAuthority{
   // Yield between catch-up slices while retaining earned simulation time.
   if(this.accumulator+1e-8>=1/60&&this.rooms.size){this.catchup=setImmediate(()=>{this.catchup=null;this.tick();});this.catchup.unref?.();}
  }
- close(){clearInterval(this.timer);clearImmediate(this.catchup);this.rooms.clear();}
+ close(){this.snapshotWork.close();clearInterval(this.timer);clearImmediate(this.catchup);this.rooms.clear();}
 }

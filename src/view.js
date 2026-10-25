@@ -1,3 +1,4 @@
+import {DamageNumbers} from './damage-numbers.js';
 import {CombatParticles,visibleShot} from './combat-particles.js';
 import {ShaderPreparation} from './shader-preparation.js';
 import {buildZoneDistrict,updateZoneDistrict} from './zone-wars-view.js';
@@ -40,6 +41,7 @@ import { getMap } from "./maps.js";
 import { gun, weapon, TEAM_COLORS, mode, clamp, NO_EYEWEAR } from "./data.js";
 import { EYE, VIEWMODEL, direction, wallDistance, worldHit, rayEgg } from "./physics.js";
 import {weaponPortrait} from "./weapons.js";
+import {makeGroundBlaster} from './weapons.js';
 import {makeBlaster,setResonance} from "./zombies-weapons.js";
 import { buildArena } from "./arenas.js";
 const palette = {
@@ -200,7 +202,7 @@ export class View {
     this.effects = new THREE.Group();
     this.scene.add(this.effects);
     this.eliminations=new EliminationEffects(this.effects);
-    this.combatParticles=new CombatParticles(this.effects);
+    this.combatParticles=new CombatParticles(this.effects);this.damageNumbers=new DamageNumbers(this.effects);
     this.models = new Map();
     this.projectiles = new Map();
     this.renderPool=new RenderPool();
@@ -612,20 +614,7 @@ export class View {
   event(e, localId,state=null) {
     this.royaleView.event(e);
     if (["hit","vehicle-hit"].includes(e.type) && e.player === localId && Number.isFinite(e.x)) {
-      const key=e.shotId!=null?e.player+':'+e.shotId+':'+e.target:null;
-      const previous=key&&this.fx.find(f=>f.damageText&&f.shotKey===key&&f.life>0);
-      const total=(previous?.amount||0)+e.amount,critical=!!(e.precision||previous?.critical),shield=(previous?.shield||0)+(e.shield?e.amount:0),health=total-shield;
-      const runs=[];if(health>0)runs.push({text:String(Math.max(1,Math.round(health)))+(critical?'!':''),color:critical?'#ffcf52':'#ffffff'});if(shield>0)runs.push({text:(health>0?'  ':'')+'◆'+Math.max(1,Math.round(shield))+(critical?'!':''),color:'#79d9ff'});
-      const next=label('', '#ffffff',true,critical,runs);
-      next.material.sizeAttenuation=false;next.material.needsUpdate=true;
-      if(previous){
-        previous.mesh.material.map?.dispose();previous.mesh.material.dispose();previous.mesh.material=next.material;
-        previous.amount=total;previous.shield=shield;previous.critical=critical;previous.life=previous.max=.9;
-      }else{
-        const height=88/Math.max(1,this.canvas.clientHeight)/this.camera.projectionMatrix.elements[5];
-        next.scale.set(height*512/96,height,1);next.position.set(e.x,e.y,e.z);this.effects.add(next);
-        this.fx.push({mesh:next,life:.9,max:.9,damageText:true,critical,drift:0,shotKey:key,amount:total,shield});
-      }
+      this.damageNumbers.hit(e);
     }
 
     if(e.type==='z-cue'&&e.cue==='throw'){if(e.player===localId)this.localThrowStart=this.clock;const actor=this.models.get(e.player);if(actor)actor.userData.throwStart=this.clock;}
@@ -706,7 +695,7 @@ export class View {
   }
   update(state, local, predicted, dt, playing, aim, profile) {
     this.isRoyale=!!state?.royale;this.localPlayer=local;this.thirdPersonEnabled=false;this.coverBlocked=false;this.renderLocalActor=null;
-    if(!playing&&this.eliminations.active.length)this.eliminations.clear();
+    if(!playing){if(this.eliminations.active.length)this.eliminations.clear();if(this.damageNumbers.rows.length)this.damageNumbers.clear();}
     // Reduce GPU work when rendering itself delays input and socket processing.
     const updateStarted=performance.now();
     const resized=this.renderBudget.sample(updateStarted,{quality:this.settings.quality,limit:this.settings.fpsLimit,active:!document.hidden});
@@ -921,10 +910,15 @@ export class View {
           this.models.set(p.id, model);
           model.position.set(p.x, p.y, p.z);
         }
-        const distance=this.camera.position.distanceTo(model.position),poseInterval=distance>120?.1:distance>60?.05:0;
+        const distance=Math.hypot(this.camera.position.x-p.x,this.camera.position.y-p.y,this.camera.position.z-p.z)/Math.max(1,local?.aim?gun(local).magnification||1:1),poseInterval=p.id===local?.id?0:distance>90?.1:distance>40?.05:0;
         const poseDue=this.clock>=(model.userData.poseAt||0)||model.userData.poseSlot!==p.slot||p.health<=0;
         const poseDt=poseDue?Math.min(.15,this.clock-(model.userData.poseClock??this.clock-dt)):dt;
-        if(poseDue){model.userData.poseAt=this.clock+poseInterval;model.userData.poseClock=this.clock;model.userData.poseSlot=p.slot;}
+        if(poseDue){
+          // Stable phases spread distant skeleton work across frames instead of
+          // waking every actor together every third/sixth frame.
+          const phase=model.userData.posePhase??=(Array.from(String(p.id)).reduce((n,c)=>(n*31+c.charCodeAt(0))>>>0,0)%997)/997;
+          model.userData.poseAt=poseInterval?(Math.floor(this.clock/poseInterval-phase)+1+phase)*poseInterval:this.clock;model.userData.poseClock=this.clock;model.userData.poseSlot=p.slot;
+        }
         const draw=equipPose(p,state.time);
         if(model.userData.arms?.userData.id!==gun(p).id){
           this.clearOutgoing(model.userData);
@@ -936,19 +930,24 @@ export class View {
           const held=new THREE.Group(),blaster=makeBlaster(gun(p).id,p.wrap),arms=makeArms(gun(p).id,p,false);
           held.scale.setScalar(VIEWMODEL.scale);arms.visible=false;held.add(blaster,arms);model.add(held);
           Object.assign(model.userData,{held,blaster,arms,armRecoil:0});
-          model.userData.shopTool=null;
+          model.userData.shopTool=null;model.userData.weaponLod=null;
         }
         this.lowerOutgoing(model.userData,draw,p.health>0);
         const harvesting=!!p.inventory?.[p.slot]?.pickaxe;
         if(harvesting&&!model.userData.shopTool){const tool=shopItem(p.pickaxe)?makeShopPickaxe(p.pickaxe):this.royaleView.itemModel({id:'pickaxe',pickaxe:true},false);tool.scale.setScalar(.5);tool.position.set(-.05,-.12,-.2);model.userData.held.add(tool);model.userData.shopTool=tool;}
         if(model.userData.shopTool)model.userData.shopTool.visible=harvesting;
-        model.userData.blaster.visible=!harvesting;if(p.zombieKit)setResonance(model.userData.blaster,gun(p).tier,gun(p).grade,gun(p).attachments);
+        // Distant weapons share the same baked surface/shape in one draw. The
+        // articulated model still supplies hand and muzzle transforms.
+        const weaponLod=distance>40&&!local?.aim&&!p.zombieKit&&!harvesting;
+        if(weaponLod&&!model.userData.weaponLod){const lod=makeGroundBlaster(gun(p).id,p.wrap);lod.castShadow=lod.receiveShadow=true;model.userData.held.add(lod);model.userData.weaponLod=lod;}
+        if(model.userData.weaponLod)model.userData.weaponLod.visible=weaponLod;
+        model.userData.blaster.visible=!harvesting&&!weaponLod;if(p.zombieKit)setResonance(model.userData.blaster,gun(p).tier,gun(p).grade,gun(p).attachments);
         model.userData.draw=draw;
         model.userData.drawProfile=itemDrawProfile(p.inventory?.[p.slot]||{id:gun(p).id,weapon:true});
         const deathAge=p.health<=0?state.time-(p.eliminatedAt??p.respawnAt-3):0;
         model.visible=p.health>0||deathAge<(state.royale ? .16 : 1.3);
         if (model.userData.arms&&poseDue) {
-          const recoil = model.userData.armRecoil = Math.max(0, (model.userData.armRecoil || 0) - dt * 7);
+          const recoil = model.userData.armRecoil = Math.max(0, (model.userData.armRecoil || 0) - poseDt * 7);
           const hands = updateArms(model.userData.arms, draw.active?-1:reloadProgress(p, state.time), model.userData.blaster, recoil,draw.progress,null,!!p.reloadEmpty);
           if(harvesting&&model.userData.shopTool)animatePickaxe(model.userData.shopTool,model.userData.arms,p.pickaxe,state.time-(p.swingAt??-100));
           const throwT=(this.clock-(model.userData.throwStart??-Infinity))/.78;
@@ -993,7 +992,7 @@ export class View {
         }
         if(p.boss||p.henchman)updateBossAlert(model,p,state.time,bodyHeight(p),distance);
         updateCelebration(model,p,state.time,g=>this.disposeGroup(g));
-        if(poseDue)animateHumanoid(model,{...p,...(state.phase==='results'?{vx:0,vz:0,moving:false}:{}),throwProgress:(this.clock-(model.userData.throwStart??-100))/.78,shotRecoil:model.userData.armRecoil||0},poseDt,state.phase==='results'&&!p.emote?this.clock:state.time,{distance:0,map:this.buildMap});
+        if(poseDue)animateHumanoid(model,{...p,...(state.phase==='results'?{vx:0,vz:0,moving:false}:{}),throwProgress:(this.clock-(model.userData.throwStart??-100))/.78,shotRecoil:model.userData.armRecoil||0},poseDt,state.phase==='results'&&!p.emote?this.clock:state.time,{distance,scheduled:true,map:this.buildMap});
         if(p.id===local?.id&&this.thirdPersonEnabled)this.fadeLocalActor(model,Math.max(0,Math.min(1,(this.thirdPersonDistance-.35)/.5)));
         else if(model.userData.cameraFade!==undefined)this.fadeLocalActor(model,1);
 
@@ -1092,6 +1091,7 @@ export class View {
     const effectDt=this.cinematic?.slowMotion&&!this.settings.reducedMotion?dt*.35:dt;
     this.eliminations.update(effectDt);
     this.combatParticles.update(effectDt);
+    this.damageNumbers.update(dt,this.canvas.clientWidth,this.canvas.clientHeight);
     for (let i = this.fx.length - 1; i >= 0; i--) {
       const f = this.fx[i];
       if (f.fresh) {
@@ -1112,14 +1112,6 @@ export class View {
         this.fx.splice(i, 1);
       } else if (f.smoke) {
         f.mesh.scale.multiplyScalar(1+dt*1.8);f.mesh.position.y+=dt*.3;f.mesh.material.opacity=.4*f.life/f.max;
-      } else if (f.damageText) {
-        const age = f.max - f.life;
-        const pop = (f.critical ? 1.18 : 1) * (1 + 0.4 * Math.sin(Math.min(1, age / 0.18) * Math.PI));
-        const height = 88 / Math.max(1, this.canvas.clientHeight) / this.camera.projectionMatrix.elements[5];
-        f.mesh.scale.set(height * 512 / 96 * pop, height * pop, 1);
-        f.mesh.position.y += dt * (0.85 - age * 0.45);
-        f.mesh.position.x += dt * f.drift;
-        f.mesh.material.opacity = Math.min(1, f.life / 0.3);
       } else if(f.trace){
         const travel=Math.min(f.length,(1-f.life/f.max)*f.length),length=Math.min(.85,f.length-travel);
         f.mesh.position.copy(f.origin).addScaledVector(f.dir,travel+length/2);f.mesh.scale.y=Math.max(.01,length);f.mesh.material.opacity=.5*Math.min(1,f.life/.02);

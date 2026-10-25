@@ -1,0 +1,13 @@
+{
+  "source": "Render metrics API",
+  "service": "srv-daqlu2vavr4c738sbe40",
+  "from": "2026-10-23T16:05:00Z",
+  "to": "2026-10-23T16:25:00Z",
+  "resolutionSeconds": 60,
+  "cpuLimitCores": 0.5,
+  "cpuPeakCores": 0.5,
+  "cpuPeakAt": "2026-10-23T16:13:00Z",
+  "memoryPeakBytes": 316731400,
+  "memoryLimitBytes": 536870900,
+  "note": "One-minute metrics establish CPU saturation, not the exact cause of subsecond stalls."
+}

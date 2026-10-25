@@ -5,7 +5,10 @@ const POSE=['x','y','z','yaw','pitch','vx','vy','vz','grounded','moving','crouch
 // Prediction state is only consumed by its owner (or the watched player).
 // Sending it for every nearby opponent made human firefights quadratic in
 // fields traversed and flooded the uplink with continually changing internals.
-const PRIVATE=new Set(['inputQueue','ack','combatState','weaponCooldowns','pendingFireUntil','lastFirePress','lastJumpPress','jumpLatch','jumpHeld','jumpBuffer','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','slideUphill','slideStartX','slideStartZ','mobilityJumpWindow','sprintRest','sprintRecovery','vehicleLock','vehicleExitSince','phasedBuilds','mantleCooldown','nextShot','fireLatch','shotgunReadyAt','burstWeapon','burstLeft','burstTime','viewBlend','viewBoom','cameraEye','shotSpread','firstShot','recoilPitch','recoilYaw']);
+const PRIVATE=new Set(['inputQueue','ack','combatState','weaponCooldowns','pendingFireUntil','lastFirePress','lastJumpPress','jumpLatch','jumpHeld','jumpBuffer','crouchLatch','slideVX','slideVZ','slideAge','slideCooldown','slideUphill','slideStartX','slideStartZ','mobilityJumpWindow','sprintRest','sprintRecovery','vehicleLock','vehicleExitSince','phasedBuilds','mantleCooldown','nextShot','fireLatch','shotgunReadyAt','burstWeapon','burstLeft','burstTime','viewBlend','viewBoom','cameraEye','shotSpread','firstShot','recoilPitch','recoilYaw',
+ // These feed the owner's HUD/reconciliation, never an opponent's model. The
+ // watched player keeps the full row, including inventory and reward details.
+ 'ammo','reserve','bank','materials','field','fieldOrders','tutorial','training','chestId','chestProgress','cacheProgress','vaultProgress','swapUid','swapProgress','fall','redeploy','forceGlider','launchVelocity','lastHarvest','flightLatch','aimBreakUntil','traversalLock','afkRemaining','afkRemoved','recap','spawnRequested','stamina','exhausted','poppers']);
 const PRECISION={x:1000,y:1000,z:1000,vx:1000,vy:1000,vz:1000,yaw:10000,pitch:10000,lean:1000,sprintBlend:1000};
 export function remotePlayerRow(p){const row={};for(const key of Object.keys(p)){if(PRIVATE.has(key))continue;const value=p[key],scale=PRECISION[key];row[key]=scale&&Number.isFinite(value)?Math.round(value*scale)/scale:value;}return row;}
 export class SnapshotInterest {
