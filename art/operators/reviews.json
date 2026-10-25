@@ -3,15 +3,16 @@
     "id": "wren",
     "name": "Wren",
     "status": "ready-for-roster-integration",
-    "assetSha256": "448e925b27a2dc085f53f85403451a4f04ac2b1051fbbc4fddc7f29a5d234701",
+    "assetSha256": "0cb97059e627eb6c216015d802085d5df290d4e313fb590681ae317b61ba1c7a",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face mesh inspection",
+      "32-joint skin weights and shared material budget",
+      "19 actual game movement/action poses",
+      "knee and shoulder continuity during bends",
+      "ground contact and distance topology"
     ],
-    "notes": "Preserves the approved Wren review mesh."
+    "notes": "Fuller head, torso and hips; shorter hands; continuous fabric underlayers and corrected finger UVs. Source clips retarget to this authored skeleton. Hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "rank-25",

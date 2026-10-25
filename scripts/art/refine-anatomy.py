@@ -52,6 +52,10 @@ def warp(p):
  z=p.z
  return Vector((p.x*interp(z,xmap,True),p.y*interp(z,[(0,.96),(ankle,1.02),(hip,depth),(chest,depth),(neck,1.05),(head,hw*.94)],True),interp(z,zmap)))
 new={n:warp(p) for n,p in old.items()}
+# Place ankle pivots inside the foot, rather than at the top of a tall boot.
+# The mesh stays fixed in its rest pose; this changes only the roll center.
+if id!='wren':
+ for S in ['L','R']:new['foot'+S].z=.11 if id in ['rook','voss','rank-1','rank-5'] else .10
 # A continuous deform field keeps adjacent clothing sections aligned. Extra
 # radial mass is local to the limb; stance width and armor do not balloon.
 chains={}
@@ -62,6 +66,9 @@ for S in ['L','R']:
   n='finger'+S+str(i);new[n]=new['hand'+S]+(new[n]-new['hand'+S])*handScale
 for o in meshes:
  names={g.index:g.name for g in o.vertex_groups}
+ if id=='pulse':
+  source=o.data.attributes.new('SourcePosition','FLOAT_VECTOR','POINT')
+  for v in o.data.vertices:source.data[v.index].vector=v.co
  for v in o.data.vertices:
   p=v.co.copy();q=warp(p);groups=[(names[g.group],g.weight) for g in v.groups if g.weight>.001]
   for n,w in groups:
@@ -86,6 +93,8 @@ for o in meshes:
    q.x+=math.copysign(.006,p.x)*jaw*min(1,abs(p.x)/.035)
    q.y-=.005*face*math.exp(-((abs(p.x)-.04)/.023)**2)
    q.y+=.007*face*math.exp(-(p.x/.018)**2)*math.exp(-((z+.012)/.034)**2)
+  if id=='pulse' and sum(w for n,w in groups if n=='neck')>.9:
+   t=max(0,min(1,(968-p.z/(1.78/950)-133)/78));q.y+=.016*(1-t)**2;q.z-=.005*(1-t)**2
   v.co=q
  o.data.update()
  # Blend the bend region on both sides of an elbow/knee. The previous chain
@@ -109,11 +118,18 @@ texture=next(n.image for n in material.node_tree.nodes if n.type=='TEX_IMAGE' an
 import numpy as np
 pixels=np.empty(len(texture.pixels),dtype=np.float32);texture.pixels.foreach_get(pixels)
 W,H=texture.size;pixels=pixels.reshape(H,W,4)
+surface=next((n.image for n in material.node_tree.nodes if n.type=='TEX_IMAGE' and n.image.colorspace_settings.name=='Non-Color'),None)
+finish=None
+if surface:
+ finish=np.empty(len(surface.pixels),dtype=np.float32);surface.pixels.foreach_get(finish);SW,SH=surface.size;finish=finish.reshape(SH,SW,4)
 uv=body.data.uv_layers.active;uvName=uv.name;best=(1e9,(.5,.5));skin=(1e9,(.5,.5));sleeve=(1e9,(.5,.5))
 for poly in body.data.polygons:
  if poly.index%3:continue
  p=body.data.vertices[poly.vertices[0]];names=[body.vertex_groups[g.group].name for g in p.groups if g.weight>.5]
  U=uv.data[poly.loop_indices[0]].uv;rgb=pixels[min(H-1,int(U.y*H)),min(W-1,int(U.x*W)),:3]
+ if finish is not None:
+  physical=finish[min(SH-1,int(U.y*SH)),min(SW-1,int(U.x*SW)),:3]
+  if physical[2]>.15 or physical[1]<.55:continue
  if any(n.startswith(('thigh','shin')) for n in names):
   score=float(np.sum((rgb-np.array([.20,.22,.23]))**2))
   if score<best[0]:best=(score,tuple(U))
@@ -138,8 +154,9 @@ if id=='wren':
 del pixels
 bridges=[]
 for S in ['L','R']:
- for a,b,rx,ry,rz in [('thigh','shin',.078,.077,.14),('arm','forearm',.045,.043,.075),('chest','arm',.060,.057,.070)]:
-  upper=a if a=='chest' else a+S;lower=b+S;center=new[lower]
+ for a,b,rx,ry,rz in [('thigh','shin',.067,.063,.13),('arm','forearm',.045,.043,.075),('chest','arm',.060,.057,.070)]:
+  upper=a if a=='chest' else a+S;lower=b+S;center=new[lower].copy()
+  if a=='chest':center.z-=.035
   bpy.ops.mesh.primitive_uv_sphere_add(segments=24,ring_count=16,location=center)
   o=bpy.context.object;o.name=id+' flexible '+lower+' underlayer';o.scale=(rx*limb,ry*depth,rz)
   bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
@@ -156,6 +173,15 @@ for o in [body]+bridges:o.select_set(True)
 bpy.context.view_layer.objects.active=body;bpy.ops.object.join()
 for layer in list(body.data.uv_layers):
  if layer.name!=uvName:body.data.uv_layers.remove(layer)
+
+if id=='pulse':
+ from operator_face import pulse_face
+ meshes.append(pulse_face(body,old['head'],ROOT))
+ for o in meshes:
+  for v in o.data.vertices:
+   if any(o.vertex_groups[g.group].name=='neck' and g.weight>.9 for g in v.groups):
+    t=max(0,min(1,(ne-.025-v.co.z)/.08));t=t*t*(3-2*t)
+    o.vertex_groups['neck'].add([v.index],1-t,'REPLACE');o.vertex_groups['chest'].add([v.index],t,'REPLACE')
 
 # Armature rest and geometry receive the same map. Bind matrices are regenerated
 # by the exporter; no runtime mesh scaling or per-player geometry copies.
@@ -180,7 +206,7 @@ def export(lod=False):
  bpy.ops.export_scene.gltf(filepath=str(ROOT/'public/models/operators'/(id+('-lod' if lod else '')+'.glb')),export_format='GLB',use_selection=True,export_skins=True,export_animations=False,export_yup=True,export_image_format='JPEG',export_jpeg_quality=93,export_materials='NONE' if lod else 'EXPORT',export_attributes=False)
 export()
 cam=scene.camera
-for name,pos in [('front',(0,-5,1)),('side',(5,0,1)),('back',(0,5,1)),('three-quarter',(2.4,-5,1.05)),('face',(.7,-3,1.65))]:
+for name,pos in [('face',(.7,-3,1.65)),('three-quarter',(2.4,-5,1.05)),('front',(0,-5,1)),('side',(5,0,1)),('back',(0,5,1))]:
  cam.location=pos;target=Vector((0,0,1.62 if name=='face' else .95));cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.type='ORTHO';cam.data.ortho_scale=.62 if name=='face' else 2.12;scene.render.filepath=str(out/(name+'.png'));bpy.ops.render.render(write_still=True)
 triangles=sum(len(p.vertices)-2 for o in meshes for p in o.data.polygons)
 for o in meshes:

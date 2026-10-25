@@ -21,3 +21,10 @@ test('New York calendar handles DST and tournament cutoffs without device timezo
  assert.throws(()=>parseTournamentTime('2026-11-01T01:30'),/twice/);assert.throws(()=>parseTournamentTime('2026-03-08T02:30'),/does not exist/);
  const e=TOURNAMENTS[1];for(const [at,phase]of [[e.lockAt-1,'scheduled'],[e.lockAt,'preparing'],[e.opensAt,'entry'],[e.startsAt,'starting']])assert.equal(tournamentPhase(at,null,e),phase);
 });
+
+test('month navigation follows the New York month near UTC midnight',()=>{
+ const s={...createCompeteState(),view:'month',cursor:Date.parse('2026-10-31T23:30:00-04:00')},root={};
+ bindCompete(root,s,()=>{},()=>{});root.onclick({target:{closest:()=>({dataset:{competeMove:'1'}})}});
+ assert.match(tournamentLocalTime(s.cursor),/^2026-11-/);
+ root.onclick({target:{closest:()=>({dataset:{competeMove:'-1'}})}});assert.match(tournamentLocalTime(s.cursor),/^2026-10-/);
+});

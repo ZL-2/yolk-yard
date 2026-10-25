@@ -1,3 +1,6 @@
+import {updateArms} from './arms.js';
+import {VIEWMODEL} from './physics.js';
+import {eyeHeight} from './stance.js';
 import * as T from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {animateHumanoid} from './humanoid.js';
@@ -39,7 +42,7 @@ function poseModel(dt){
  if(pose==='backward')p.vz=2.4;
  if(pose==='crouch')p.crouching=true;
  if(['aim','reload'].includes(pose)){p.aim=true;p.weapon='sprinter';p.inventory=[{id:'sprinter',weapon:true}];}
- if(pose==='reload'){p.reloadEnd=elapsed+1;p.reloadDuration=2;}
+ if(pose==='reload'){p.reloadEnd=elapsed+2-(elapsed%2);p.reloadDuration=2;}
  if(pose==='melee'){p.swingAt=elapsed-.25;p.inventory=[{id:'pickaxe',pickaxe:true}];}
  if(['jump','fall'].includes(pose)){p.grounded=false;p.vy=pose==='jump'?4:-4;}
  if(pose==='slide'){p.sliding=true;p.slideAge=.25;}
@@ -47,6 +50,7 @@ function poseModel(dt){
  if(pose==='revive')p.reviving='teammate';
  if(['salute','shuffle','cheer'].includes(pose))p.emote={id:pose,start:0};
  if(pose==='glide'){p.flight='glide';p.grounded=false;}
+ if(model.userData.held.visible){const hands=updateArms(model.userData.arms,pose==='reload'?(elapsed%2)/2:-1,model.userData.blaster);model.userData.held.rotation.set(...hands.rotation);model.userData.held.position.set(VIEWMODEL.x,eyeHeight(p)+VIEWMODEL.y-hands.dip,VIEWMODEL.z);}
  animateWrenStudy(model,p,dt,elapsed);
 }
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;elapsed+=dt;
