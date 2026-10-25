@@ -50,6 +50,9 @@ if not local.exists():
  local.write_bytes(subprocess.check_output(['git','show',BASE+':art/operators/'+id+'/'+id+'.blend'],cwd=ROOT))
 bpy.ops.wm.open_mainfile(filepath=str(local))
 rig=next(o for o in bpy.data.objects if o.type=='ARMATURE');meshes=[o for o in bpy.data.objects if o.type=='MESH']
+if id in ['nyx','morrow']:
+ from repair_hood import repair_hood
+ for mesh in meshes:repair_hood(mesh,id)
 old={b.name:b.head_local.copy() for b in rig.data.bones}
 heights,widths,depth,limb,handScale=PROFILES[id]
 hp,ch,ne,he=heights;wh,ww,wc,ws,hw=widths

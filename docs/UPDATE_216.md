@@ -6,7 +6,7 @@ Release 6.24.0 / protocol 84 follows the eleven-operator rollout. It addresses t
 
 Each of the eleven editable Blender sources receives an individual, UV-preserving anatomy pass from the immutable release-215 source commit. Hip, ribcage, shoulder, neck and head proportions differ by character. Rook and Voss retain heavier builds; the other characters retain their own silhouettes. Exposed faces receive cheek/jaw volume and nose-profile adjustments. Hands are shorter and fuller, with relaxed finger curvature. Flexible garment underlayers and continuous knee/elbow weights cover separated construction panels during bends. Existing garment atlases remain packed; both near and distance meshes are regenerated. Pulse also receives a dedicated face/neck atlas with isolated UVs, removing projected facial features from her hair and neck.
 
-Gray studio-background projection on limb sides is replaced by smoothly blended garment color, baked into the body atlas. Front/back detail, armor, skin and cape artwork remain intact. Joint underlayers sample each outfit’s own sleeve and trouser colors.
+Gray studio-background projection on limb sides is replaced by smoothly blended garment color, baked into the body atlas. Front/back detail, armor, skin and cape artwork remain intact. Joint underlayers sample each outfit’s own sleeve and trouser colors. Nyx and Morrow’s hood crowns meet their lower shells without overlapping rims; Rook’s ankle fittings are seated against the boots.
 
 Imported materials share the same reflection environment as the game's other equipment. This restores metal response without changing painted colors or adding per-player texture copies.
 

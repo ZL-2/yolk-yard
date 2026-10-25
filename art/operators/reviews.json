@@ -9,7 +9,7 @@
       "32-joint skin weights and material budget",
       "19 actual game movement/action poses",
       "ground contact, weapon grip and distance topology",
-      "final texture refinement in idle, run and aim"
+      "final mesh and material refinements in idle, run and aim"
     ],
     "notes": "Fuller head, torso and hips; shorter hands; continuous fabric underlayers and corrected finger UVs. Source clips retarget to the authored skeleton; hitboxes unchanged.",
     "revision": 216
@@ -80,7 +80,7 @@
       "32-joint skin weights and material budget",
       "19 actual game movement/action poses",
       "ground contact, weapon grip and distance topology",
-      "final texture refinement in idle, run and aim"
+      "final mesh and material refinements in idle, run and aim"
     ],
     "notes": "Broader torso and hips, stronger limbs and shorter hands. Clean continuous side fabric, dark glove fingers, layered gold armor and split cape. Source clips retarget to the authored skeleton; hitboxes unchanged.",
     "revision": 216
@@ -95,7 +95,7 @@
       "32-joint skin weights and material budget",
       "19 actual game movement/action poses",
       "ground contact, weapon grip and distance topology",
-      "final texture refinement in idle, run and aim"
+      "final mesh and material refinements in idle, run and aim"
     ],
     "notes": "Broad torso and hips, enlarged dive helmet, fuller boot shafts and dark glove fingers. Shoulder armor blends with the chest; ankle fittings sit against the boots. Continuous navy side fabric and matching joint underlayers. Source clips retarget to the authored skeleton; hitboxes unchanged.",
     "revision": 216
@@ -104,13 +104,16 @@
     "id": "nyx",
     "name": "Lieutenant Nyx",
     "status": "ready-for-roster-integration",
-    "assetSha256": "b1dfc02722f5d4f7b581ff4ab3c76a3317b727af979f918790ce120460fd56fe",
+    "assetSha256": "8e8c1fc0714748782fb1646d09512e3a7c3b0dc007a74d578b47b45ba87f77e3",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Pointed open hood, violet mask strokes, layered armor and split coat. Corrected sleeve fit, coat silhouette and projection seam; final UV-only refinement preserves tested geometry and rig. Hidden views inferred."
+    "notes": "Balanced head, ribcage and hip proportions with a narrow waist; fuller limbs and shorter hands. Joined hood crown, graphite mask and split coat retain their distinct silhouette. Dark side fabric and continuous elbow/knee underlayers. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "pulse",
@@ -122,7 +125,7 @@
       "32-joint skin weights and material budget",
       "19 actual game movement/action poses",
       "ground contact, weapon grip and distance topology",
-      "final texture refinement in idle, run and aim"
+      "final mesh and material refinements in idle, run and aim"
     ],
     "notes": "Fuller head and jaw, wider torso and hips, shorter hands, dedicated facial atlas and continuous neck/clavicle surface. Clean teal sleeves and dark trouser side fabric. Source clips retarget to the authored skeleton; hitboxes unchanged.",
     "revision": 216
@@ -131,13 +134,16 @@
     "id": "morrow",
     "name": "Morrow",
     "status": "ready-for-roster-integration",
-    "assetSha256": "eec9b230103cc9736e4c05ba4e50734c711c4a89fa12e3f9e0faed7974cc6196",
+    "assetSha256": "7afd1045ebb9177213b77a417f0b503c5800b7b6c617cbc840debaa93e08bb58",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Ivory owl mask, olive hood, asymmetric leaf armor, diagonal poncho and long leaf sashes. Corrected hood, shin, boot and glove projection boundaries; final texture-only refinement preserves tested geometry and rig. Hidden views inferred."
+    "notes": "Fuller torso, hips and limbs, shorter hands and a balanced owl-mask silhouette. Hood crown joins the open shell without overlap; olive sleeves, leather layers and leaf sashes retain their distinct shapes. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "scout",
