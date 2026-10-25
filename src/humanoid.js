@@ -1,3 +1,4 @@
+import {createAnatomyRetarget,retargetAnatomy} from './anatomy-retarget.js';
 import {leanAmount,LEAN} from './stance.js';
 import {emotePose} from './emotes.js';
 import {groundAt} from './terrain.js';
@@ -178,9 +179,9 @@ export function makeHumanoid(profile={}){
  if(asset)for(const [name,parent]of defs){if(!asset.joints[name])throw Error(`Missing ${asset.id} joint ${name}`);const b=bones[name];b.position.copy(asset.joints[name]).sub(parent?asset.joints[parent]:V());b.userData.rest.copy(b.position);}
  const geometry=asset?asset.geometry:template(profile);
  if(asset&&!geometry.userData.remapped){const skin=geometry.attributes.skinIndex;for(let i=0;i<skin.array.length;i++)skin.array[i]=ids[asset.names[skin.array[i]]];geometry.userData.remapped=true;}
- const mesh=new T.SkinnedMesh(geometry,asset?asset.materials:surfaceAtlasMaterial());mesh.name=asset?`${asset.id} · authored Blender model`:'Skinned operator';mesh.add(bones.root);mesh.updateMatrixWorld(true);mesh.bind(new T.Skeleton(list));mesh.boundingSphere=new T.Sphere(new T.Vector3(0,.9,0),2);mesh.frustumCulled=true;mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);root.userData.artRevision=asset?215:166;
+ const mesh=new T.SkinnedMesh(geometry,asset?asset.materials:surfaceAtlasMaterial());mesh.name=asset?`${asset.id} · authored Blender model`:'Skinned operator';mesh.add(bones.root);mesh.updateMatrixWorld(true);mesh.bind(new T.Skeleton(list));mesh.boundingSphere=new T.Sphere(new T.Vector3(0,.9,0),2);mesh.frustumCulled=true;mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);root.userData.artRevision=asset?216:166;
  root.userData.human={mesh,bones,clock:0,phase:0,speed:0,previous:null,grounded:true,land:0,air:0,death:0,lastYaw:null,pose:'idle',nextUpdate:0};root.userData.cracks=[];
- if(asset){const h=root.userData.human;h.asset=asset;h.soleHeight=asset.joints.footL.y;h.motionRootOffset=bones.hips.userData.rest.y-.93;h.motionLegLength=bones.shinL.userData.rest.length()+bones.footL.userData.rest.length()-.02;root.userData.asset=asset.id;loadOperatorLod(asset.id);}
+ if(asset){const h=root.userData.human;h.asset=asset;h.retarget=createAnatomyRetarget(defs,points,asset.joints);h.soleHeight=asset.joints.footL.y;h.motionRootOffset=bones.hips.userData.rest.y-.93;h.motionLegLength=bones.shinL.userData.rest.length()+bones.footL.userData.rest.length()-.02;root.userData.asset=asset.id;loadOperatorLod(asset.id);}
  return root;
 }
 // Analytic two-bone IK. Targets are in character coordinates. Elbow/knee poles
@@ -230,6 +231,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
  const blend=1-Math.exp(-dt*14);for(const [key,on]of [['crouch',p.crouching&&!p.sliding],['compact',p.lowCrouch],['slide',p.sliding],['down',p.downed],['revive',p.reviving]])h[key]=(h[key]||0)+(Number(!!on)-(h[key]||0))*blend;
  h.forward=(h.forward||0)+(forward-(h.forward||0))*blend;h.side=(h.side||0)+(side-(h.side||0))*blend;
  const motion=animateCharacterMotion(h,p,dt,time,{menu});
+ if(motion&&h.retarget)retargetAnatomy(h.retarget,b);
  const acceleration=T.MathUtils.clamp((forward-h.forward)*.017,-.045,.045);
  const lower=Math.max(h.crouch*.53+h.compact*.29,h.slide*.87,h.down*.65,h.revive*.53);
  if(!motion){
@@ -304,7 +306,7 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   const strideScale=walking?.7:1;
   for(const foot of ankles){foot.x=b.hips.position.x+(foot.x-b.hips.position.x)*strideScale;foot.z=b.hips.position.z+(foot.z-b.hips.position.z)*strideScale;foot.y=soleY+Math.max(0,foot.y-minimum)*(walking?.7:1);}
   let height=b.hips.position.y+T.MathUtils.clamp(soleY-minimum,-.10,.10);
-  if(walking){height=.89+(h.motionRootOffset||0);for(let i=0;i<2;i++){const foot=ankles[i],dx=foot.x-(i?.115:-.115)-b.hips.position.x,dz=foot.z-b.hips.position.z,reach=h.motionLegLength||.785;height=Math.min(height,foot.y+.03+Math.sqrt(Math.max(.1,reach**2-dx*dx-dz*dz)));}}
+  if(walking){height=.89+(h.motionRootOffset||0);for(let i=0;i<2;i++){const foot=ankles[i],dx=foot.x-b['thigh'+(i?'R':'L')].userData.rest.x-b.hips.position.x,dz=foot.z-b.hips.position.z,reach=h.motionLegLength||.785;height=Math.min(height,foot.y+.03+Math.sqrt(Math.max(.1,reach**2-dx*dx-dz*dz)));}}
   h.contactHeight??=height;h.contactHeight+=(height-h.contactHeight)*(1-Math.exp(-dt*22));
   b.hips.position.y=h.contactHeight;
   for(let i=0;i<2;i++){
@@ -369,6 +371,9 @@ export function animateHumanoid(model,p={},dt=1/60,time=0,{menu=false,distance=0
   hand.quaternion.copy(hand.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(handQ));hand.rotateX(-.12);
 
  }
+ // Gentle resting curl; a firmer grip when holding equipment. These cosmetic
+ // finger rotations do not move the weapon, aim direction or hit geometry.
+ if(h.asset)for(const S of ['L','R'])for(let i=0;i<5;i++){const grip=held?.visible&&!motion?.freeHands?1:.25;b['finger'+S+i].rotation.x=i===4?-.15*grip:-.48*grip;}
  if(model.userData.utility){h.mesh.updateWorldMatrix(true,false);const position=b.handR.getWorldPosition(V());model.worldToLocal(position);model.userData.utility.position.copy(position);model.userData.utility.rotation.set(p.use?-.35:0,0,0);}
  model.userData.animationState=h.pose;
 }

@@ -1,6 +1,8 @@
+import {tournamentClock} from './tournament-clock.js';
 import {tournamentEvents,visibleTournament,eventTime,eventDate,placementReward} from './tournament.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function tournamentCard(event,online=false,now=event?.serverNow||Date.now()){
+export function tournamentCard(event,online=false,now=tournamentClock.now()??event?.serverNow){
+ if(!Number.isFinite(now))return '';
  const e=visibleTournament(tournamentEvents(event),now);if(!e)return '';
  const phase=e.phase,entry=phase==='entry',live=phase==='running',done=['finished','cancelled'].includes(phase),seconds=Math.max(0,Math.ceil(((entry?e.startsAt:e.opensAt)-now)/1000));
  const timer=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;

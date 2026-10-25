@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'216',title:'Character anatomy and tournament time',changes:[
+  'All eleven operators receive individual body proportions, shorter necks, fuller limbs and hands, and exposed-face refinements. Flexible clothing underlayers keep joints covered while bending. Gameplay hitboxes remain unchanged.',
+  'Animations now adapt captured limb directions to each operator’s actual skeleton. The roster viewer adds sprinting, strafing, backpedaling, jumping, falling, sliding, crawling, reviving, reloading, melee and emote previews.',
+  'Compete uses synchronized server time for Today, calendars and lobby countdowns, with New York daylight saving and a visible date and time. A wrong device clock cannot move the schedule; the server continues to control entry and rewards. Version 6.24.0 / protocol 84.'
+ ]},
  {number:'215',title:'Eleven operators, rebuilt for the frontier',changes:[
   'The six Shop characters and all four Victory Score characters now use authored, textured Blender models based on their original artwork, with game animation rigs and lighter distance meshes. Inspect every character in the roster viewer.',
   'Meet Frontier Scout, the new free default operator included for everyone. New players start as Scout; retired or invalid outfits fall back to Scout. The selectable roster contains exactly eleven characters.',
