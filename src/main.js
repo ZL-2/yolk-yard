@@ -1,3 +1,4 @@
+import {requireIconVote} from './icon-voting-ui.js';
 import {updateTournamentCard} from './tournament-ui.js';
 import {preloadOperatorAssets} from './operator-assets.js';
 import {competeMarkup,createCompeteState,bindCompete} from './compete-ui.js';
@@ -1395,6 +1396,7 @@ function receiveInvite(invite){
  tray.append(node);while(tray.children.length>3)tray.firstChild.remove();setTimeout(()=>node.remove(),Math.max(0,invite.expires-Date.now()));sound.cue('queue-found');
 }
 async function queueParty(custom=false,code=null){
+ if(!await requireIconVote())return;
  if(state){toast('Return to the lobby before finding another match.');return;}
  const selected=custom?getOptions():matchOptions(party?.party?.selection);
  if(!selected)return;
@@ -1505,7 +1507,7 @@ const actions = {
  'z-journal':openZombiesJournal,
  'quick-rematch':()=>{if(net?.officialPublic)return toast('The next public round starts automatically.');if(sim&&(!sim.remote||state?.zombies)&&state?.phase==='results'&&(!net||net.isHost)){launchRound();}},
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
- 'start-training':()=>{try{ownerRuntime.admission('training');}catch(error){return errorToast(error.message);}if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
+ 'start-training':async()=>{if(!await requireIconVote())return;try{ownerRuntime.admission('training');}catch(error){return errorToast(error.message);}if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
  'career':()=>selectMenuSection('career'),
  'competitive-career':()=>{selectMenuSection('career');competitiveScroll=competitivePending;$('#competitive-career')?.scrollIntoView({block:'start'});},
  'competitive-refresh':()=>{void refreshCompetitiveCareer(true);},
@@ -1522,7 +1524,7 @@ const actions = {
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
  'duo-fill':()=>partyRequest('select',{...party.party.selection,teamFill:true,duoFill:true}),
  'duo-no-fill':()=>partyRequest('select',{...party.party.selection,teamFill:false,duoFill:false}),
- 'party-ready':()=>partyRequest('ready',{value:!party.party.members.find(m=>m.id===party.id)?.ready}),
+ 'party-ready':async()=>{if(await requireIconVote())return partyRequest('ready',{value:!party.party.members.find(m=>m.id===party.id)?.ready});},
  'party-cancel':()=>partyRequest('cancel'),
  'party-leave':()=>partyRequest('leave'),
  'party-privacy':()=>partyRequest('privacy',{value:party.party.privacy==='open'?'invite':'open'}),
