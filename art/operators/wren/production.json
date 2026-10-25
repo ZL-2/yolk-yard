@@ -187,6 +187,6 @@
     ]
   },
   "status": "reviewed-in-game",
-  "notes": "UV-preserving anatomy and joint-weight refinement. Hidden surfaces are artistic interpretations; collision unchanged.",
+  "notes": "Individual anatomy, garment material and joint-weight refinement. Hidden surfaces are artistic interpretations; collision unchanged.",
   "reviewRevision": 216
 }

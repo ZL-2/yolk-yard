@@ -263,6 +263,9 @@ export()
 cam=scene.camera
 for name,pos in [('face',(.7,-3,1.65)),('three-quarter',(2.4,-5,1.05)),('front',(0,-5,1)),('side',(5,0,1)),('back',(0,5,1))]:
  cam.location=pos;target=Vector((0,0,1.62 if name=='face' else .95));cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.type='ORTHO';cam.data.ortho_scale=.62 if name=='face' else 2.12;scene.render.filepath=str(out/(name+'.png'));bpy.ops.render.render(write_still=True)
+if id=='scout':
+ from scout_face import render_scout_portrait
+ render_scout_portrait(scene,out,ROOT)
 triangles=sum(len(p.vertices)-2 for o in meshes for p in o.data.polygons)
 for o in meshes:
  bpy.context.view_layer.objects.active=o;mod=o.modifiers.new('Distance topology','DECIMATE');mod.ratio=.24 if id=='wren' else .28;bpy.ops.object.modifier_apply(modifier=mod.name)

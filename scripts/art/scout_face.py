@@ -53,3 +53,13 @@ def scout_face(body):
  for o in [body,head]:
   while len(o.data.color_attributes):o.data.color_attributes.remove(o.data.color_attributes[-1])
  return head
+
+def render_scout_portrait(scene,directory,root):
+ from PIL import Image
+ cam=scene.camera;cam.location=(2.1,-5,1.05)
+ cam.rotation_euler=(Vector((0,0,.95))-cam.location).to_track_quat('-Z','Y').to_euler()
+ cam.data.type='ORTHO';cam.data.ortho_scale=2.12
+ scene.render.film_transparent=True;scene.render.filepath=str(directory/'cover.png')
+ bpy.ops.render.render(write_still=True)
+ Image.open(directory/'cover.png').save(root/'public/shop/scout.webp',format='WEBP',lossless=True,method=6)
+ scene.render.film_transparent=False

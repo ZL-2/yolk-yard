@@ -152,12 +152,15 @@
     "id": "scout",
     "name": "Frontier Scout",
     "status": "ready-for-roster-integration",
-    "assetSha256": "0ecd27c73c65a537fb461ffbd3cb549fee3324cc0be04ad50e0fb5b1a8231ddb",
+    "assetSha256": "ce83de065050be98009ebcd4dc3ed1f3e2c0c34a7145cdc244ce2aa2b03757f7",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "New free default: sculpted face and cropped curls, petrol field jacket, compass badge, leather utility strap, cargo trousers and boots. Portrait is rendered from this actual model. Final sleeve UV refinement preserves tested geometry and rig."
+    "notes": "Fuller human proportions, shorter neck and hands, cleaned ear/neck skin UVs and a nonmetallic head material. Removed baked construction vertex colors that darkened the game model. The free field jacket, short curls and utility equipment retain their identity. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   }
 ]
