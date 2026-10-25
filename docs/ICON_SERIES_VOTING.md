@@ -26,3 +26,5 @@ and assets will need a separate review before that character is published.
 Validation: rules/service tests cover boundary, duplicates, concurrency, vote
 replacement and restart. Browser check covers required modal, Escape handling,
 cast/unlock, shortcut and vote changes. Production Vite build passes.
+
+Owner controls → Icon Series allows renaming and deleting nominations with audited, authenticated requests. Renames retain votes and use the same three-letter and duplicate checks. Deletion clears associated votes; affected players must choose again while voting remains open. Stale edits are rejected. Owner moderation remains available after closing.
