@@ -51,8 +51,8 @@ def repair_cloth(body,finish,leg_uv,sleeve_uv,glove_uv,operator=None):
    gray=True
    if rgb is not None:
     color=np.mean([rgb[max(0,min(H-1,int(coords[i].y*H))),max(0,min(W-1,int(coords[i].x*W))),:3] for i in p.loop_indices],axis=0)
-    if color[2]-color[0]>.025 and color[2]-color[1]>.01:navy_faces.add(p.index)
-    gray=min(color)>.03 and max(color)-min(color)<.04 and center.z>.65
+    if color[2]-color[0]>.025 and color[2]-color[1]>.01 and color[0]<color[2]*.55:navy_faces.add(p.index)
+    gray=min(color)>.03 and color[2]>color[0]*.95 and color[0]>color[2]*.52 and center.z>.65
    for (a,x),(b,y) in zip(rows[key],rows[key][1:]):
     if a<=center.z<=b:
      edge_width=x+(y-x)*(center.z-a)/(b-a)

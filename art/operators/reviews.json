@@ -47,15 +47,16 @@
     "id": "rank-5",
     "name": "Solar Imperator",
     "status": "ready-for-roster-integration",
-    "assetSha256": "e62bb776bad2805502b0bd93d5daed9d4509368653f5d599de6c8e881348936a",
+    "assetSha256": "05fc547d89e62160624f073a4bf659e7f1092ca5f5b8707ac366bf5eeb74c7bf",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim with real weapon, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Layered gold helmet, sculpted sunray armor, stellar reactor, embroidered cape on both sides, corrected glove silhouettes. Hidden surfaces are interpreted from construction reference."
+    "notes": "Broader armored torso and hips, stronger limbs, balanced helmet and shorter hands. Gold ray armor and embroidered cape retain their identity; cape edges use continuous cloth with the sun crest and trim preserved. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "rank-1",
