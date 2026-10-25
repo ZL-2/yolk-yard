@@ -27,7 +27,7 @@ export async function fixture({recovery=false,serverOptions={}}={}){
  const base=`ws://127.0.0.1:${app.server.address().port}`,users=[],games=[];
  globalThis.window={YOLK_NETWORK:{relay:base+'/game'}};
  globalThis.WebSocket=class extends WebSocket{constructor(url){super(url,{origin:'https://zl-2.github.io'});}};
- async function user(name){
+ async function user(name,{voted=true}={}){
   const user={profile:safeProfile({name}),launches:[],pending:new Map(),serial:0};
   const ws=user.ws=new globalThis.WebSocket(base+'/social');users.push(user);
   ws.on('error',()=>{});
@@ -46,7 +46,16 @@ export async function fixture({recovery=false,serverOptions={}}={}){
    const request=++user.serial,timer=setTimeout(()=>{user.pending.delete(request);reject(Error('No social reply: '+type));},8000);
    user.pending.set(request,{resolve,reject,timer});ws.send(JSON.stringify({type,...data,request}));
   });
-  await until(()=>user.party,'Social connected');return user;
+  await until(()=>user.party,'Social connected');
+  // Game fixtures represent an admitted player. Complete the current lobby
+  // prerequisite against this isolated server, with an opt-out for gate tests.
+  const voting=app.relay.iconVoting;
+  if(voted&&voting&&!voting.summary(user.id).closed){
+   let candidate=voting.summary(user.id).candidates[0];
+   if(!candidate)candidate=(await voting.mutate('fixture',{action:'nominate',first:'Fixture',last:'Operator'})).candidates[0];
+   await user.ask('icon-voting',{body:{action:'vote',candidate:candidate.id}});
+  }
+  return user;
  }
  async function game(user){
   await until(()=>user.launches.length,'Match reservation dispatched');

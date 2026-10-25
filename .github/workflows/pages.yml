@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       anatomy216_update: ${{ steps.scope.outputs.anatomy216_update }}
+      icon_voting_update: ${{ steps.scope.outputs.icon_voting_update }}
       roster215_update: ${{ steps.scope.outputs.roster215_update }}
       field214_update: ${{ steps.scope.outputs.field214_update }}
       lobby_home_update: ${{ steps.scope.outputs.lobby_home_update }}
@@ -404,8 +405,8 @@ jobs:
             out.write('roster215_update='+str(roster215_update).lower()+'\n')
             if roster215_update: out.write('focused=true\n')
           print('Eleven authored operators, free default and saved wardrobe migration:',roster215_update)
-          anatomy216_allowed={'package.json','package-lock.json','src/data.js','src/releases.js','.github/workflows/pages.yml','src/anatomy-retarget.js','src/humanoid.js','src/operator-assets.js','src/wren-study.js','src/compete-ui.js','src/tournament-ui.js','src/tournament.js','src/tournament-clock.js','src/main.js','tests/anatomy-retarget.test.js','tests/tournament-clock.test.js','scripts/operator-browser-check.mjs','scripts/roster-browser-check.mjs','docs/UPDATE_216.md'}
-          anatomy216_files=set(subprocess.check_output(['git','diff','--name-only','bf0d9f24776c735d41db4ee72a9df56cc8d5f5ac','HEAD'],text=True).splitlines())
+          anatomy216_allowed={'tests/helpers/public-match.js','package.json','package-lock.json','src/data.js','src/releases.js','.github/workflows/pages.yml','src/anatomy-retarget.js','src/humanoid.js','src/operator-assets.js','src/wren-study.js','src/compete-ui.js','src/tournament-ui.js','src/tournament.js','src/tournament-clock.js','src/main.js','tests/anatomy-retarget.test.js','tests/tournament-clock.test.js','scripts/operator-browser-check.mjs','scripts/roster-browser-check.mjs','docs/UPDATE_216.md'}
+          anatomy216_files=set(subprocess.check_output(['git','diff','--name-only','1a8c19c6429369bc29dfc43d8997c5f9dcd06760','HEAD'],text=True).splitlines())
           anatomy216_update={'src/anatomy-retarget.js','src/tournament-clock.js'}<=anatomy216_files and all(f in anatomy216_allowed or f.startswith(('art/operators/','public/models/operators/','scripts/art/')) for f in anatomy216_files) and json.loads(Path('package.json').read_text()).get('version')=='6.24.0'
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('anatomy216_update='+str(anatomy216_update).lower()+'\n')
@@ -418,6 +419,11 @@ jobs:
 
 
 
+          icon_files=set(subprocess.check_output(['git','diff','--name-only','bf0d9f24776c735d41db4ee72a9df56cc8d5f5ac','HEAD'],text=True).splitlines())
+          icon_update=bool(icon_files) and icon_files <= {'server/realtime/parties.js', 'src/icon-voting-rules.js', 'src/owner-console.js', '.github/workflows/pages.yml', 'src/icon-voting.css', 'src/party-client.js', 'src/main.js', 'server/realtime/icon-voting.js', 'src/owner-icon-voting.js', 'scripts/icon-voting-browser-check.mjs', 'src/icon-voting-ui.js', 'tests/icon-voting.test.js', 'server/realtime/index.js', 'server/realtime/owner.js', 'docs/ICON_SERIES_VOTING.md', 'src/lobby-ui.js'}
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('icon_voting_update='+str(icon_update).lower()+'\n')
+            if icon_update: out.write('focused=true\n')
           PY
   build:
     needs: scope
@@ -432,6 +438,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Icon voting persistence, deadlines and owner authorization
+        if: needs.scope.outputs.icon_voting_update == 'true'
+        run: node --test tests/icon-voting.test.js
       - name: Tournament lifecycle, spectators, rewards, camera and transport regressions
         if: needs.scope.outputs.tournament_update == 'true'
         run: |
@@ -440,7 +449,7 @@ jobs:
           node --expose-gc scripts/tournament-performance.mjs
       - name: Anatomy retargeting, tournament clock and collision invariants
         if: needs.scope.outputs.anatomy216_update == 'true'
-        run: node --test --test-concurrency=2 tests/anatomy-retarget.test.js tests/tournament-clock.test.js tests/compete.test.js tests/tournament.test.js tests/tournament-owner.test.js tests/operator-roster.test.js tests/character-motion.test.js tests/hitbox.test.js tests/release-history.test.js
+        run: node --test --test-concurrency=2 tests/anatomy-retarget.test.js tests/icon-voting.test.js tests/tournament-clock.test.js tests/compete.test.js tests/tournament.test.js tests/tournament-owner.test.js tests/operator-roster.test.js tests/character-motion.test.js tests/hitbox.test.js tests/release-history.test.js
       - name: Eleven model assets, ownership migration, equipment, animation and camera
         if: needs.scope.outputs.roster215_update == 'true'
         run: node --test --test-concurrency=2 tests/operator-roster.test.js tests/egg-shop.test.js tests/shop-overhaul.test.js tests/character-motion.test.js tests/arms.test.js tests/hitbox.test.js tests/prestige-sets.test.js tests/royale-prestige.test.js tests/perspective.test.js tests/release-history.test.js
@@ -750,6 +759,12 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true'
+      - name: Icon voting modal and owner forms
+        if: needs.scope.outputs.icon_voting_update == 'true'
+        run: |
+          mkdir -p /tmp
+          ln -sf "$(node --input-type=module -e "import {chromium} from 'playwright'; console.log(chromium.executablePath())")" /tmp/chromium
+          node scripts/icon-voting-browser-check.mjs
       - name: Install the headless desktop runtime with a missing-library fallback
         if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true'
         run: |
@@ -1314,7 +1329,21 @@ jobs:
         run: node scripts/owner-live-check.mjs
       - name: Matching website/relay build, private PvP, paused Zombies and live lobby
         if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true'
-        run: node scripts/release-live-check.mjs
+        run: |
+          if [ "${{ needs.scope.outputs.icon_voting_update }}" = "true" ]; then
+            node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          const sha=process.env.GITHUB_SHA;
+          for(let i=0;i<60;i++){
+            const [front,health]=await Promise.all([fetch('https://zl-2.github.io/yolk-yard/version.json?t='+Date.now()).then(r=>r.json()),fetch('https://yolk-yard-relay.onrender.com/health').then(r=>r.json())]);
+            if(front.build===sha&&health.build===sha&&health.socialAvailable){console.log('PASS exact website and healthy relay build',sha);process.exit(0);}
+            await new Promise(r=>setTimeout(r,5000));
+          }
+          assert.fail('Website and relay did not reach the published commit');
+          JS
+          else
+            node scripts/release-live-check.mjs
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

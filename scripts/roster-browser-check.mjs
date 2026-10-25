@@ -7,8 +7,9 @@ const origin='http://127.0.0.1:5298',out='test-results/roster216/game';await mkd
 let now=Date.parse('2026-10-24T18:00Z');
 const f=await fixture({serverOptions:{origins:[origin],tournamentOptions:{now:()=>now,autoStart:false}}});
 now-=10800000;f.app.relay.tournament.event('frontier-cup-2026-10-23').complete('cancelled','Past fixture event');now+=10800000;
+f.app.relay.iconVoting.now=()=>now;await f.app.relay.iconVoting.mutate('fixture',{action:'nominate',first:'Review',last:'Operator'});
 const localRelay='http://127.0.0.1:'+f.app.server.address().port;
-const vite=await createServer({server:{host:'127.0.0.1',port:5298,strictPort:true,watch:null,proxy:{'^/(game|social|health|leaderboards|tournament|compete)(/|$|\\?)':{target:localRelay,ws:true}}}});await vite.listen();
+const vite=await createServer({server:{host:'127.0.0.1',port:5298,strictPort:true,watch:null,proxy:{'^/(game|social|health|leaderboards|tournament|compete|icon-voting)(/|$|\\?)':{target:localRelay,ws:true}}}});await vite.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:.8}),errors=[],checks=[];page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(e.stack||e.message));page.on('console',m=>{if(m.type()==='error'&&/Content Security Policy|GLTFLoader: Couldn.t load texture|WebGLProgram|Shader Error|INVALID_OPERATION/.test(m.text()))errors.push(m.text());});
 const nav=action=>page.locator('.yard-nav nav [data-action="'+action+'"]');
@@ -21,6 +22,7 @@ try{
   localStorage.setItem('ravelfront-stormspike-kestrel-199-dismissed','yes');
  });
  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
+ await page.locator('.icon-voting[open] [data-candidate]').first().click();await page.locator('.icon-voting[open] [data-cast]').click();await page.locator('.icon-voting[open]').waitFor({state:'hidden'});checks.push('Newer Icon voting gate completes against the isolated local fixture');
  await page.waitForFunction(()=>window.__yolkTest.loadingFixture(v=>v.menuEgg?.userData.human?.asset?.id==='scout'));
  const modelMaps=await page.evaluate(()=>window.__yolkTest.loadingFixture(v=>[].concat(v.menuEgg.userData.human.mesh.material).every(m=>!!m.map)));assert.equal(modelMaps,true,'embedded model textures load under the production CSP');console.log('Scout lobby and embedded maps ready');
  const wallet=await page.evaluate(()=>JSON.parse(localStorage.getItem('yolk-egg-shop-v1')));

@@ -86,13 +86,16 @@
     "id": "rook",
     "name": "Marshal Rook",
     "status": "ready-for-roster-integration",
-    "assetSha256": "c53a0294efb5d3fb00fb2f84a517f568d3f867d44cbc2facfd7228e8f1012117",
+    "assetSha256": "bacbd32f6f329534f90cee127bab208234d71553949a04b1e1dfe7fd19e5ea0e",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "pauldron rotation and boot volume in motion",
+      "ground contact, weapon grip and distance topology"
     ],
-    "notes": "Rounded dive helmet and amber visor, raised anchor, marine armor, twin pressure tanks and ribbed hoses. Refined ankle weighting and hip equipment. Hidden views inferred."
+    "notes": "Broad torso and hips, enlarged dive helmet, fuller boot shafts and dark glove fingers. Shoulder armor blends with the chest to avoid lifting into wings. Hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "nyx",
@@ -110,13 +113,16 @@
     "id": "pulse",
     "name": "Pulse",
     "status": "ready-for-roster-integration",
-    "assetSha256": "791101cdb5ee18f0880d1fec3673e4ca3ee6f846ad0b29502fa49f34a2fb7741",
+    "assetSha256": "c62697e16e12e48d1f5072c677affac827d9ff8f16d92b45a5590005a19915a7",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face mesh inspection",
+      "32-joint skin weights and two-material budget",
+      "19 actual game movement/action poses",
+      "final face/neck topology in idle, aim and reload",
+      "ground contact, weapon grip and distance topology"
     ],
-    "notes": "Sculpted face and swept white hair locks, cropped teal jacket, articulated fingerless gloves, tool harness and cyan wrist terminal. Corrected sleeves, connected glove wrists and upper trouser fit; final UV refinement preserves tested geometry/rig. Hidden views inferred."
+    "notes": "Fuller head and jaw, wider torso and hips, shorter hands, dedicated facial atlas and continuous neck/clavicle surface. Source clips retarget to this authored skeleton. Hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "morrow",

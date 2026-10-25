@@ -1,3 +1,4 @@
+import {iconOwnerView,submitIconOwner} from './owner-icon-voting.js';
 import {ownerFetch} from './owner-request.js';
 import {tournamentOwnerView,tournamentOwnerClick,submitTournamentForm} from './owner-tournaments.js';
 import './owner-console.css';
@@ -10,6 +11,7 @@ const rowAction=(label,attr,value)=>`<button type="button" class="oc-row-button"
 export class OwnerConsole{
  constructor({modal,screen,dialog,wallet,onWalletChange,onMapEditor,onCampaign,identity=()=>null}){
   Object.assign(this,{modal,screen,dialog,wallet,onWalletChange,onMapEditor,onCampaign,identity,token:null,expires:0,progress:0,last:0,taps:0,lastTap:0,tab:'overview',range:'30',mode:'',q:'',offset:0,statusFilter:'',kind:'',historyType:'',auto:false,serial:0});
+  tabs.icons=['Icon Series','Edit or delete community voting options.'];
   tabs.campaign=['Campaign lab','An original single-player mission. Available only from this control room.'];
   tabs.compete=['Compete schedule','Create, edit, duplicate, cancel and remove tournaments. Server-saved dates, rewards and results.'];
   dialog.addEventListener('click',e=>{const b=e.target.closest('[data-oc-cup]');if(b&&!b.disabled){e.preventDefault();try{tournamentOwnerClick(this,b);}catch(error){this.fail(error);}}});
@@ -17,6 +19,7 @@ export class OwnerConsole{
   dialog.addEventListener('submit',e=>{if(e.target.id.startsWith('oc-')){e.preventDefault();void this.submit(e.target);}});
   dialog.addEventListener('click',e=>{const b=e.target.closest('[data-oc-nav],[data-oc-refresh],[data-oc-lock],[data-oc-page],[data-oc-player],[data-oc-command],[data-oc-dismiss],[data-oc-export],[data-oc-history],[data-oc-ticket],[data-oc-ticket-action],[data-oc-room],[data-oc-backup],[data-oc-history-export],[data-oc-merge],[data-oc-map],[data-oc-event]');if(b&&!b.disabled){e.preventDefault();void this.click(b);}});
   dialog.addEventListener('change',e=>{if(e.target.name==='range'){const custom=dialog.querySelector('[data-oc-custom]');if(custom)custom.hidden=e.target.value!=='custom';}if(e.target.name==='action'){const form=e.target.closest('form');form.querySelector('[data-oc-duration]').hidden=!['ban','mute'].includes(e.target.value);form.querySelector('[data-oc-amount]').hidden=e.target.value!=='grant';}if(e.target.id==='oc-auto'){this.auto=e.target.checked;this.schedule();}if(e.target.id==='oc-import-file')void this.previewImport(e.target.files?.[0]);});
+  dialog.addEventListener('click',e=>{const b=e.target.closest('[data-icon-delete]');if(b&&!b.disabled){e.preventDefault();b.disabled=true;void submitIconOwner(this,b.closest('form'),'delete').catch(error=>this.fail(error)).finally(()=>{b.disabled=false;});}});
   dialog.addEventListener('close',()=>{clearTimeout(this.timer);this.serial++;this.pending=null;});
   document.addEventListener('keydown',e=>this.key(e));document.addEventListener('click',e=>{if(this.screen()!=='menu'||dialog.open||!e.target.closest('.yard-logo,[data-owner-trigger]'))return;const now=Date.now();this.taps=now-this.lastTap<1200?this.taps+1:1;this.lastTap=now;if(this.taps===7){this.taps=0;e.preventDefault();e.stopImmediatePropagation();this.open();}});
  }
@@ -46,6 +49,7 @@ export class OwnerConsole{
    if(this.tab==='economy')extra=await this.post('/history',{...f,type:this.historyType==='grants'?'grants':'results'});
    if(this.tab==='audit')extra=await this.post('/history',{...f,type:'audit'});
    if(this.tab==='worlds')extra=await this.post('/maps',{action:'list'});
+   if(this.tab==='icons')extra=await this.post('/icon-voting',{action:'list'});
    if(this.tab==='compete')extra=await this.post('/tournaments');
    if(serial!==this.serial)return;this.extra=extra;this.pending=null;this.player=null;this.ticket=null;const content=this.dialog.querySelector('#oc-content');if(!content)return;content.innerHTML=this.view();content.setAttribute('aria-busy','false');this.schedule();
   }catch(error){if(serial===this.serial)this.fail(error);}
@@ -57,6 +61,7 @@ export class OwnerConsole{
  autoControl(){return `<label class="oc-check"><input type="checkbox" id="oc-auto" ${this.auto?'checked':''}>Live refresh · 15s</label>`;}
  retention(){const s=this.data.storage;return `<div class="oc-notice ${s.available&&s.persistent?'':'warn'}">${s.available?s.persistent?'<strong>Permanent history is active.</strong> Records survive server restarts and releases. No age or count limit.':'<strong>History is stored, but this environment is not on a verified persistent disk.</strong> Production must use its mounted data disk.':'<strong>Storage needs attention.</strong> '+esc(s.error)} ${this.data.analytics.legacy?num(this.data.analytics.legacy.sessions)+' surviving legacy sessions migrated.':''}</div>`;}
  view(){return this[this.tab+'View']();}
+ iconsView(){return iconOwnerView(this);}
  competeView(){return tournamentOwnerView(this);}
  campaignView(){return `<section class="oc-campaign-card"><span class="oc-eyebrow">PRIVATE / FIRST PLAYABLE MISSION</span><h3>OPERATION<br>BLACKGLASS</h3><p>A night raid on a coastal relay station. Infiltrate the compound, recover a civilian evacuation manifest, and stop its transmission before extraction.</p><div class="oc-actions"><button class="oc-primary" data-oc-campaign>Open Blackglass →</button></div><small>Solo story mission · Desktop mouse & keyboard · Checkpoint saves<br>Independent weapons, characters, presentation, and local simulation.</small></section><div class="oc-notice">This is a playable campaign preview. It does not appear in the public mode picker, queues, invitations, or rankings. Zombies remains paused with its existing project preserved.</div>`;}
  async openCampaign(){try{await this.post('/summary',{});if(this.screen()==='menu')await this.onCampaign?.();}catch(e){this.fail(e);}}
@@ -95,6 +100,7 @@ export class OwnerConsole{
   else if(b.hasAttribute('data-oc-map'))await this.openMapEditor();
  }catch(e){this.fail(e);}finally{if(b.isConnected)b.disabled=false;}}
  async submit(form){const f=new FormData(form),button=form.querySelector('button[type="submit"]')||form.querySelector('button');if(button)button.disabled=true;try{
+  if(form.id.startsWith('oc-icon-')){await submitIconOwner(this,form);return;}
   if(form.id==='oc-tournament-form'){submitTournamentForm(this,form);return;}
   if(form.id==='oc-filter-form'){for(const key of ['range','mode','q','from','to','kind'])if(f.has(key))this[key]=String(f.get(key));if(f.has('status'))this.statusFilter=String(f.get('status'));if(this.range==='custom'&&this.from&&this.to&&this.from>this.to)throw Error('The end date must be after the start date.');this.offset=0;await this.refresh();}
   else if(form.id==='oc-player-form'){const action=f.get('action'),name=this.player.name;this.confirm({action,player:this.player.id,...(action==='grant'?{amount:Number(f.get('amount'))}:{}),...(['ban','mute'].includes(action)?{hours:Number(f.get('hours'))}:{})},({ban:'Suspend',mute:'Mute',unban:'Release suspension for',unmute:'Unmute',kick:'Disconnect',note:'Add a note for',grant:'Grant Marks to'}[action])+' '+name,action==='grant'?num(f.get('amount'))+' Marks will be added to this identity’s server grant ledger.':action==='note'?'This private note will be permanently recorded in the audit trail.':['ban','mute'].includes(action)?'Applies for '+(Number(f.get('hours'))?num(f.get('hours'))+' hours':'until revoked')+'. '+(action==='ban'?'Active sessions will be disconnected.':'Lobby chat messages will be blocked.'):'The action applies to this browser identity and is recorded permanently.',String(f.get('reason')));}
