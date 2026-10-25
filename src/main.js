@@ -1,3 +1,4 @@
+import {tournamentClock} from './tournament-clock.js';
 import {requireIconVote} from './icon-voting-ui.js';
 import {updateTournamentCard} from './tournament-ui.js';
 import {preloadOperatorAssets} from './operator-assets.js';
@@ -219,7 +220,7 @@ const eggWallet=new EggWallet({getItem:key=>localStorage.getItem(key),setItem:(k
 let progressMatch='';
 let crownStatus=read('ravelfront-crown-status',{season:1,wins:0,owned:false,unlocked:false}),crownStatusKey='';
 let menuSection=['locker','shop','compete','career'].includes(location.hash.slice(1))?location.hash.slice(1):'play',careerMode='all';
-const competeState=createCompeteState();let tournamentReceivedAt=0;
+const competeState=createCompeteState();let competeClockMinute=null;
 let privateMatchDrafts={},leaderboardSelection={playMode:null,mode:'royale'},leaderboardDataMode='',leaderboards=null,leaderboardTab='rating',leaderboardError='',leaderboardPending=false,leaderboardFetchedAt=0,leaderboardOffset=0,leaderboardPageBoards=null;
 const menuShopStates={};
 let pendingRankLoadout=Object.fromEntries(PRESTIGE_SLOTS.filter(slot=>rankItem(profile[slot])).map(slot=>[slot,profile[slot]]));
@@ -365,7 +366,7 @@ function syncSocialActivity(me){if(!party?.ready)return;const activity=screen===
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();if(screen==='menu')renderMenu();}});
 function currentLeaderboardMode(){leaderboardSelection=syncRankingSelection(leaderboardSelection,party?.party?.selection?.mode);return leaderboardSelection.mode;}
 function trainingBoard(){const p={rank:1,name:profile.name,kills:stats.training?.kills||0,wins:stats.training?.wins||0,you:true};return {mode:'training',...Object.fromEntries(['kills','wins'].map(k=>[k,{total:1,offset:0,rows:[p],self:p,hasMore:false}]))};}
-function menuModel(){const selected=currentLeaderboardMode();if(leaderboardDataMode!==selected){leaderboardTab=rankingMetrics(selected)[0];leaderboards=selected==='training'?trainingBoard():null;leaderboardPageBoards=leaderboards;leaderboardDataMode=selected;leaderboardFetchedAt=0;leaderboardOffset=0;}return {leaderboardMode:selected,profile,party:party?.party,id:party?.id,online:!!party?.ready,tournament:party?.tournament,balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
+function menuModel(){const selected=currentLeaderboardMode();if(leaderboardDataMode!==selected){leaderboardTab=rankingMetrics(selected)[0];leaderboards=selected==='training'?trainingBoard():null;leaderboardPageBoards=leaderboards;leaderboardDataMode=selected;leaderboardFetchedAt=0;leaderboardOffset=0;}return {leaderboardMode:selected,profile,party:party?.party,id:party?.id,online:!!party?.ready,tournament:party?.tournament,now:tournamentClock.now(),balance:eggWallet.value.balance,publicMatch:party?.publicMatch,publicMatchElapsed:party?.publicMatchAt?performance.now()-party.publicMatchAt:Infinity,leaderboards,leaderboardTab,leaderboardError};}
 function renderLeaderboard(focus=false){for(const box of document.querySelectorAll('#menu .frontier-leaderboard,#dialog .frontier-leaderboard')){const expanded=box.closest('#dialog')!=null,scroll=box.querySelector('.frontier-board-ranks')?.scrollTop||0;box.innerHTML=leaderboardMarkup({...menuModel(),leaderboards:expanded?leaderboardPageBoards:leaderboards,expanded,leaderboardPending});box.querySelector('.frontier-board-ranks').scrollTop=scroll;if(focus&&expanded===!!(dialog.open&&dialogType==='leaderboards'))box.querySelector('[aria-selected=true]')?.focus({preventScroll:true});}installLeaderboardScrollbars();}
 async function refreshLeaderboards(force=false){
  if(screen!=='menu'||menuSection!=='play'&&dialogType!=='leaderboards'||!party?.ready||leaderboardPending||!force&&leaderboards&&performance.now()-leaderboardFetchedAt<15000)return;
@@ -406,7 +407,8 @@ function selectMenuSection(section,push=true){
 }
 window.addEventListener('popstate',()=>{if(screen==='menu')selectMenuSection(location.hash.slice(1)||'play',false);});
 function refreshCompete(search=false,reset=false){if(screen!=='menu'||menuSection!=='compete')return;const hub=$('#menu .hub-page'),scroll=reset?0:hub?.scrollTop||0,table=hub?.querySelector('.tournament-standings')?.scrollTop||0,focused=hub?.contains(document.activeElement)?document.activeElement:null,focusKey=focused?JSON.stringify(focused.dataset):null,pos=focused?.selectionStart;renderMenu(true);const next=$('#menu .hub-page');next.scrollTop=scroll;const list=next.querySelector('.tournament-standings');if(list)list.scrollTop=table;if(search){const input=next.querySelector('[data-compete-search]');input?.focus({preventScroll:true});input?.setSelectionRange(pos,pos);}else if(focusKey){[...next.querySelectorAll('button,input')].find(n=>JSON.stringify(n.dataset)===focusKey)?.focus({preventScroll:true});}}
-setInterval(()=>{if(screen!=='menu'||menuSection!=='play')return;const e=party?.tournament;if(e)updateTournamentCard(document,e,!!party?.ready,e.serverNow+Math.max(0,performance.now()-tournamentReceivedAt));},1000);
+setInterval(()=>{if(screen!=='menu')return;const now=tournamentClock.now(),e=party?.tournament;if(e&&menuSection==='play')updateTournamentCard(document,e,!!party?.ready&&tournamentClock.fresh,now);const minute=Math.floor(now/60000)+':'+tournamentClock.fresh;if(menuSection==='compete'&&minute!==competeClockMinute){competeClockMinute=minute;refreshCompete();}},1000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)tournamentClock.invalidate();});
 
 function profileMenu(){
   modal('Player details',`<label for="player-name">YOUR NAME</label><input class="field" id="player-name" aria-describedby="name-safety" maxlength="128" value="${esc(profile.name)}" autocomplete="off"><p id="name-safety" role="alert"></p><button class="primary" data-action="save-profile-name">SAVE NAME</button>`,'profile');
@@ -1426,7 +1428,7 @@ function initializeParty(){
  if(needsPlayerName(profile.name))return;
  if(party){party.updateProfile(profile);return;}
  party=new PartyClient({...profile,...pendingRankLoadout},{
-  tournament:event=>{const changed=ownerRuntime.tournament?.locked!==event.locked||ownerRuntime.tournament?.phase!==event.phase;tournamentReceivedAt=performance.now();ownerRuntime.tournament=event;if(changed&&screen==='menu')renderMenu();updateTournamentCard(document,event,!!party?.ready);refreshCompete();},
+  tournament:event=>{const changed=ownerRuntime.tournament?.locked!==event.locked||ownerRuntime.tournament?.phase!==event.phase;tournamentClock.sync(event.serverNow);ownerRuntime.tournament=event;if(changed&&screen==='menu')renderMenu();updateTournamentCard(document,event,!!party?.ready&&tournamentClock.fresh,tournamentClock.now());refreshCompete();},
   'tournament-rewards':m=>{void eggWallet.syncTournamentRewards(m.record).then(()=>{if(screen==='menu')renderMenu();});},
   'royale-rank':m=>rankRewards.receive(m.record),
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},

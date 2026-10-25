@@ -1,3 +1,4 @@
+import {modelEnvironment} from './model-surfaces.js';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
@@ -9,7 +10,7 @@ const assets=new Map(),pending=new Map();
 const swap=name=>name.replace(/(shoulder|arm|forearm|hand|thigh|shin|foot|toe|finger)([LR])/,(_,part,side)=>part+(side==='L'?'R':'L'));
 export function operatorAsset(profile){if(profile.infectedType||profile.infectedSkin||profile.henchman)return null;const id=profile.outfit?.replace(/^outfit-/,'');return assets.get(OPERATOR_ASSET_IDS.includes(id)?id:'scout');}
 async function decode(id,suffix=''){
- const source=new URL(`models/operators/${id}${suffix}.glb`,document.baseURI);source.searchParams.set('v','215');const url=source.href;
+ const source=new URL(`models/operators/${id}${suffix}.glb`,document.baseURI);source.searchParams.set('v','216');const url=source.href;
  const gltf=await new GLTFLoader().loadAsync(url);gltf.scene.updateMatrixWorld(true);
  const inputs=[];gltf.scene.traverse(o=>{if(o.isSkinnedMesh)inputs.push(o);});
  if(!inputs.length)throw Error(`No skinned geometry in ${id}${suffix}`);
@@ -23,7 +24,7 @@ async function decode(id,suffix=''){
   g.deleteAttribute('color');g.deleteAttribute('tangent');g.clearGroups();
   // Each Blender mesh has one material; joining retains face/body material groups.
   if(Array.isArray(input.material))throw Error(`Unexpected material layout in ${id}`);
-  const m=input.material;m.side=T.DoubleSide;m.userData.shared=true;
+  const m=input.material;m.vertexColors=false;m.envMap=modelEnvironment();m.envMapIntensity=.72;m.side=T.DoubleSide;m.userData.shared=true;
   for(const value of Object.values(m))if(value?.isTexture){value.userData.shared=true;value.anisotropy=4;}
   materials.push(m);parts.push(g);
  }

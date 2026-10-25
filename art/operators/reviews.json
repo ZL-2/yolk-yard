@@ -3,142 +3,164 @@
     "id": "wren",
     "name": "Wren",
     "status": "ready-for-roster-integration",
-    "assetSha256": "448e925b27a2dc085f53f85403451a4f04ac2b1051fbbc4fddc7f29a5d234701",
+    "assetSha256": "0cb97059e627eb6c216015d802085d5df290d4e313fb590681ae317b61ba1c7a",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Preserves the approved Wren review mesh."
+    "notes": "Fuller head, torso and hips; shorter hands; continuous fabric underlayers and corrected finger UVs. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "rank-25",
     "name": "Tempest Sentinel",
     "status": "ready-for-roster-integration",
-    "assetSha256": "96d20e90e68d3e52d7faf52cf1a4074d6b34d69354df27fda3bc2ca6200938bb",
+    "assetSha256": "d31badd72c557ef6f7eba31636e89c81c0eacba7adab7c0d90d3a1458a0ce53f",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim with real weapon, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology"
     ],
-    "notes": "Refined torso, clean side fabric, silver cape trim and lower cape weighting. Hidden surfaces are interpreted from construction reference."
+    "notes": "Fuller athletic torso, hips and limbs, enlarged helmet and shorter hands. Layered silver shoulder armor, cyan reactor and dark cape retain their distinct shapes; side fabric stays consistent through motion. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "rank-10",
     "name": "Rift Revenant",
     "status": "ready-for-roster-integration",
-    "assetSha256": "1d0b5835deb132c90fce472e775549e3ca3bf64d55adc65991a834dbbda80599",
+    "assetSha256": "d2f666b4a7150a1da8d45442d54569ac479200a86c0a532fbc1177e15da52f34",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim with real weapon, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Open hood, shaped mask, crescent shoulder armor, tabard and traced torn cape. Hidden surfaces are interpreted from construction reference."
+    "notes": "Fuller torso and limbs, balanced helmet and shorter hands. Joined hood crown and continuous violet cape borders with preserved silver trim. Crescent armor and tabard retain their distinct silhouette. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "rank-5",
     "name": "Solar Imperator",
     "status": "ready-for-roster-integration",
-    "assetSha256": "e62bb776bad2805502b0bd93d5daed9d4509368653f5d599de6c8e881348936a",
+    "assetSha256": "05fc547d89e62160624f073a4bf659e7f1092ca5f5b8707ac366bf5eeb74c7bf",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim with real weapon, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Layered gold helmet, sculpted sunray armor, stellar reactor, embroidered cape on both sides, corrected glove silhouettes. Hidden surfaces are interpreted from construction reference."
+    "notes": "Broader armored torso and hips, stronger limbs, balanced helmet and shorter hands. Gold ray armor and embroidered cape retain their identity; cape edges use continuous cloth with the sun crest and trim preserved. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "rank-1",
     "name": "Apex Sovereign",
     "status": "ready-for-roster-integration",
-    "assetSha256": "187ca91224a8a57ce1b0e51d0781f3c49c043f0a35ecd5da0f768854fcd525f7",
+    "assetSha256": "83d9c033a284451aa790ed708e57af95ea97672fdbc4d5c60b98418b57210d73",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim with actual weapon, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Separate ivory feathers, open suspended crown, gold hardware and navy/ivory cape. Corrected projection borders and boot mapping. Hidden surfaces inferred."
+    "notes": "Broader armored body, balanced helmet and shorter hands. Feathered ivory armor, floating crown and two-sided cape retain their identity. Continuous navy edge cloth preserves the gold embroidery and hem with a per-texel material mask. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "voss",
     "name": "Commandant Voss",
     "status": "ready-for-roster-integration",
-    "assetSha256": "ba51199440edfdf47e6c2ce9051993dba13712a1f11c66cdde3b7bd70406716b",
+    "assetSha256": "d498dbc5cdc7ca32964827c5890721535d1c84dbfaaab47d30a37d663784f72f",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Layered gold armor, integral crown with rear peaks, tufted ivory mantle and split cloak. Original artwork retained; hidden views inferred."
+    "notes": "Broader torso and hips, stronger limbs and shorter hands. Clean continuous side fabric, dark glove fingers, layered gold armor and split cape. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "rook",
     "name": "Marshal Rook",
     "status": "ready-for-roster-integration",
-    "assetSha256": "c53a0294efb5d3fb00fb2f84a517f568d3f867d44cbc2facfd7228e8f1012117",
+    "assetSha256": "984e6721e9570f998d37dd0742c8dbf5468abfd5cb97c3be220a1cd7651e7f9b",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Rounded dive helmet and amber visor, raised anchor, marine armor, twin pressure tanks and ribbed hoses. Refined ankle weighting and hip equipment. Hidden views inferred."
+    "notes": "Broad torso and hips, enlarged dive helmet, fuller boot shafts and dark glove fingers. Shoulder armor blends with the chest; ankle fittings sit against the boots. Continuous navy side fabric and matching joint underlayers. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "nyx",
     "name": "Lieutenant Nyx",
     "status": "ready-for-roster-integration",
-    "assetSha256": "b1dfc02722f5d4f7b581ff4ab3c76a3317b727af979f918790ce120460fd56fe",
+    "assetSha256": "8e8c1fc0714748782fb1646d09512e3a7c3b0dc007a74d578b47b45ba87f77e3",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Pointed open hood, violet mask strokes, layered armor and split coat. Corrected sleeve fit, coat silhouette and projection seam; final UV-only refinement preserves tested geometry and rig. Hidden views inferred."
+    "notes": "Balanced head, ribcage and hip proportions with a narrow waist; fuller limbs and shorter hands. Joined hood crown, graphite mask and split coat retain their distinct silhouette. Dark side fabric and continuous elbow/knee underlayers. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "pulse",
     "name": "Pulse",
     "status": "ready-for-roster-integration",
-    "assetSha256": "791101cdb5ee18f0880d1fec3673e4ca3ee6f846ad0b29502fa49f34a2fb7741",
+    "assetSha256": "25ab72d1a607775e8be19a60332d7f5cc664f91fb8aa7499cac2ed29698742ac",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Sculpted face and swept white hair locks, cropped teal jacket, articulated fingerless gloves, tool harness and cyan wrist terminal. Corrected sleeves, connected glove wrists and upper trouser fit; final UV refinement preserves tested geometry/rig. Hidden views inferred."
+    "notes": "Fuller head and jaw, wider torso and hips, shorter hands, dedicated facial atlas and continuous neck/clavicle surface. Clean teal sleeves and dark trouser side fabric. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "morrow",
     "name": "Morrow",
     "status": "ready-for-roster-integration",
-    "assetSha256": "eec9b230103cc9736e4c05ba4e50734c711c4a89fa12e3f9e0faed7974cc6196",
+    "assetSha256": "7afd1045ebb9177213b77a417f0b503c5800b7b6c617cbc840debaa93e08bb58",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Ivory owl mask, olive hood, asymmetric leaf armor, diagonal poncho and long leaf sashes. Corrected hood, shin, boot and glove projection boundaries; final texture-only refinement preserves tested geometry and rig. Hidden views inferred."
+    "notes": "Fuller torso, hips and limbs, shorter hands and a balanced owl-mask silhouette. Hood crown joins the open shell without overlap; olive sleeves, leather layers and leaf sashes retain their distinct shapes. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "scout",
     "name": "Frontier Scout",
     "status": "ready-for-roster-integration",
-    "assetSha256": "0ecd27c73c65a537fb461ffbd3cb549fee3324cc0be04ad50e0fb5b1a8231ddb",
+    "assetSha256": "ce83de065050be98009ebcd4dc3ed1f3e2c0c34a7145cdc244ce2aa2b03757f7",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint weights and six game poses with actual weapon",
-      "ground contact and distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "New free default: sculpted face and cropped curls, petrol field jacket, compass badge, leather utility strap, cargo trousers and boots. Portrait is rendered from this actual model. Final sleeve UV refinement preserves tested geometry and rig."
+    "notes": "Fuller human proportions, shorter neck and hands, cleaned ear/neck skin UVs and a nonmetallic head material. Removed baked construction vertex colors that darkened the game model. The free field jacket, short curls and utility equipment retain their identity. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   }
 ]
