@@ -18,29 +18,30 @@
     "id": "rank-25",
     "name": "Tempest Sentinel",
     "status": "ready-for-roster-integration",
-    "assetSha256": "96d20e90e68d3e52d7faf52cf1a4074d6b34d69354df27fda3bc2ca6200938bb",
+    "assetSha256": "d31badd72c557ef6f7eba31636e89c81c0eacba7adab7c0d90d3a1458a0ce53f",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim with real weapon, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology"
     ],
-    "notes": "Refined torso, clean side fabric, silver cape trim and lower cape weighting. Hidden surfaces are interpreted from construction reference."
+    "notes": "Fuller athletic torso, hips and limbs, enlarged helmet and shorter hands. Layered silver shoulder armor, cyan reactor and dark cape retain their distinct shapes; side fabric stays consistent through motion. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "rank-10",
     "name": "Rift Revenant",
     "status": "ready-for-roster-integration",
-    "assetSha256": "1d0b5835deb132c90fce472e775549e3ca3bf64d55adc65991a834dbbda80599",
+    "assetSha256": "d2f666b4a7150a1da8d45442d54569ac479200a86c0a532fbc1177e15da52f34",
     "checks": [
-      "front, side, back and three-quarter actual mesh inspection",
-      "32-joint skin weights",
-      "idle, walk, run, crouch, aim with real weapon, glide",
-      "ground contact",
-      "distance topology"
+      "front, side, back, three-quarter and face/helmet mesh inspection",
+      "32-joint skin weights and material budget",
+      "19 actual game movement/action poses",
+      "ground contact, weapon grip and distance topology",
+      "final mesh and material refinements in idle, run and aim"
     ],
-    "notes": "Open hood, shaped mask, crescent shoulder armor, tabard and traced torn cape. Hidden surfaces are interpreted from construction reference."
+    "notes": "Fuller torso and limbs, balanced helmet and shorter hands. Joined hood crown and continuous violet cape borders with preserved silver trim. Crescent armor and tabard retain their distinct silhouette. Source clips retarget to the authored skeleton; hitboxes unchanged.",
+    "revision": 216
   },
   {
     "id": "rank-5",

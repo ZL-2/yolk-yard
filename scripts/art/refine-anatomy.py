@@ -1,7 +1,7 @@
 """UV-preserving anatomy pass over the editable 215 sculpts.
 Run one operator at a time, inspect its game poses, then continue. Source files
 are recovered from the immutable 215 commit; re-running cannot compound scale.
-Geometry and rig only: gameplay collision/hit detection do not read these files.
+Cosmetic meshes, materials and rigs only: gameplay collision/hit detection do not read these files.
 """
 import bpy,sys,json,math,subprocess,tempfile
 from pathlib import Path
@@ -50,7 +50,7 @@ if not local.exists():
  local.write_bytes(subprocess.check_output(['git','show',BASE+':art/operators/'+id+'/'+id+'.blend'],cwd=ROOT))
 bpy.ops.wm.open_mainfile(filepath=str(local))
 rig=next(o for o in bpy.data.objects if o.type=='ARMATURE');meshes=[o for o in bpy.data.objects if o.type=='MESH']
-if id in ['nyx','morrow']:
+if id in ['nyx','morrow','rank-10']:
  from repair_hood import repair_hood
  for mesh in meshes:repair_hood(mesh,id)
 old={b.name:b.head_local.copy() for b in rig.data.bones}
@@ -223,7 +223,7 @@ for layer in list(body.data.uv_layers):
 
 if id not in ['wren','scout']:
  from repair_cloth import repair_cloth
- repair_cloth(body,finish,best[1],sleeve[1],glove[1])
+ repair_cloth(body,finish,best[1],sleeve[1],glove[1],id)
 
 if id=='pulse':
  from operator_face import pulse_face
@@ -247,7 +247,7 @@ for o in meshes:
  bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.mesh.normals_make_consistent(inside=False);bpy.ops.object.mode_set(mode='OBJECT')
 scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=16;scene.render.threads_mode='FIXED';scene.render.threads=4
 scene.render.resolution_x=720;scene.render.resolution_y=960;scene.render.resolution_percentage=100
-# Existing authored material maps remain packed and UVs untouched.
+# Material maps stay packed and use the final authored UVs.
 out=ROOT/'art/operators'/id;out.mkdir(exist_ok=True)
 bpy.ops.object.select_all(action='DESELECT')
 for o in [rig]+meshes:o.select_set(True)

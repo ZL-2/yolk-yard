@@ -13,13 +13,13 @@ def repair_hood(body, operator):
  parts={}
  for v in body.data.vertices:parts.setdefault(find(v.index),[]).append(v)
  head=[vs for vs in parts.values() if all(all(body.vertex_groups[g.group].name=='head' for g in v.groups if g.weight>.001) for v in vs)]
- crown=next(vs for vs in head if len(vs)==400)
- hood=next(vs for vs in head if len(vs)==287)
+ crown_count,hood_count,angle=(520,259,2.45) if operator=='rank-10' else (400,287,2.25 if operator=='morrow' else 2.2)
+ crown=max((vs for vs in head if len(vs)==crown_count),key=lambda vs:max(v.co.z for v in vs))
+ hood=next(vs for vs in head if len(vs)==hood_count)
  bottom=min(v.co.z for v in crown);top=max(v.co.z for v in crown)
  join=max(v.co.z for v in hood)
  rim=[v for v in crown if abs(v.co.z-bottom)<1e-5]
  upper=[v for v in hood if abs(v.co.z-join)<1e-5]
- angle=2.25 if operator=='morrow' else 2.2
  rx=max(abs(v.co.x) for v in upper)
  radius=(max(v.co.y for v in upper)-min(v.co.y for v in upper))/(1-math.cos(angle))
  cy=max(v.co.y for v in upper)-radius
