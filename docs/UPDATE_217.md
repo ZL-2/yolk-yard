@@ -1,6 +1,6 @@
 # Update 217 — smoother combat and tournament delivery
 
-Version 6.25.0 / protocol 85. Baseline: deployed Update 216, commit `2c16f3b21909290cdd20934730be8ef88660cb89`.
+Version 6.25.0 / protocol 85. The development identifier is 217; the in-game Quality Update number is assigned sequentially from published history and may differ. Baseline: deployed Update 216, commit `2c16f3b21909290cdd20934730be8ef88660cb89`.
 
 ## What changed
 
