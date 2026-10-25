@@ -781,6 +781,9 @@ jobs:
           node scripts/camera-gameplay-browser.mjs
       - name: Revised operator anatomy and server-time calendar in Chromium
         if: needs.scope.outputs.anatomy216_update == 'true'
+        env:
+          # Keep every pose and assertion; reduce software-rendered screenshot cost.
+          REVIEW_DPR: '0.5'
         run: |
           node scripts/operator-browser-check.mjs wren
           node scripts/operator-browser-check.mjs pulse

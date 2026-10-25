@@ -12,7 +12,7 @@ f.app.relay.iconVoting.now=()=>now;await f.app.relay.iconVoting.mutate('fixture'
 const localRelay='http://127.0.0.1:'+f.app.server.address().port;
 const vite=await createServer({server:{host:'127.0.0.1',port:5298,strictPort:true,watch:null,proxy:{'^/(game|social|health|leaderboards|tournament|icon-voting)(/|$|\\?)':{target:localRelay,ws:true}}}});await vite.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
-const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:.8}),errors=[],checks=[];page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(e.stack||e.message));page.on('console',m=>{if(m.type()==='error'&&/Content Security Policy|GLTFLoader: Couldn.t load texture|WebGLProgram|Shader Error|INVALID_OPERATION/.test(m.text()))errors.push(m.text());});
+const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:Number(process.env.REVIEW_DPR)||.8}),errors=[],checks=[];page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(e.stack||e.message));page.on('console',m=>{if(m.type()==='error'&&/Content Security Policy|GLTFLoader: Couldn.t load texture|WebGLProgram|Shader Error|INVALID_OPERATION/.test(m.text()))errors.push(m.text());});
 const nav=action=>page.locator('.yard-nav nav [data-action="'+action+'"]');
 try{
  await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.YOLK_NETWORK={relay:"ws://127.0.0.1:5298/game"};'}));
