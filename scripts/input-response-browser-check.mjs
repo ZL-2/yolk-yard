@@ -28,13 +28,15 @@ try{
  const sim=event.room.sim,p=[...sim.players.values()].find(p=>p.name==='Response Reviewer');sim.tickActivity=()=>{};sim.queueEnds=sim.time+10000;
  p.inventory[1]={id:'sprinter',weapon:true,rarity:1,ammo:30,count:1};p.inventory[2]={id:'scatter',weapon:true,rarity:1,ammo:8,count:1};sim.syncInventory(p);authority.broadcast(event.room);
  await page.waitForFunction(()=>window.__yolkTest.read().state.players.find(p=>p.id===window.__yolkTest.read().localId)?.inventory?.[2]?.id==='scatter');
- await page.evaluate(()=>window.__yolkTest.resume());await page.keyboard.press('1');await page.waitForFunction(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).slot===1;});
+ await page.evaluate(()=>window.__yolkTest.resume());await page.keyboard.press('1');await page.waitForFunction(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).slot===1&&window.__yolkTest.loadingFixture(v=>!v.mapCompile&&v.localWeapon==='sprinter');});
+ // Arm observation before dispatch: feedback intentionally expires if the
+ // server stays silent, so a slow browser driver must not miss its first frame.
+ const observe=async(predicate,action,arg=null)=>{const [seen]=await Promise.all([page.waitForFunction(predicate,arg,{timeout:15000}),action()]);return seen.jsonValue();};
  // Hold application of decoded authority states while keeping real networking,
  // input transmission, frame scheduling and rendering alive.
  await page.waitForFunction(()=>{const r=window.__yolkTest.read();if(r.input.slot!==1||r.state.players.find(p=>p.id===r.localId).slot!==1)return false;window.__yolkTest.connectionFixture(n=>{n.savedState=n.callbacks.onState;n.callbacks.onState=s=>{n.pendingState=s;};});return true;});
  console.log('Holding state updates; checking switch before acknowledgement');
- await page.keyboard.press('2');await page.waitForFunction(()=>window.__yolkTest.loadingFixture(v=>v.localWeapon==='scatter'),null,{timeout:15000});
- const beforeAck=await page.evaluate(()=>{const r=window.__yolkTest.read();return {authoritativeSlot:r.state.players.find(p=>p.id===r.localId).slot,requested:r.input.slot,model:window.__yolkTest.loadingFixture(v=>v.localWeapon)};});
+ const beforeAck=await observe(()=>{const r=window.__yolkTest.read(),model=window.__yolkTest.loadingFixture(v=>v.localWeapon);return model==='scatter'&&{authoritativeSlot:r.state.players.find(p=>p.id===r.localId).slot,requested:r.input.slot,model};},()=>page.keyboard.press('2'));
  assert.equal(beforeAck.authoritativeSlot,1);assert.equal(beforeAck.requested,2);assert.equal(beforeAck.model,'scatter');
  console.log('Local switch confirmed before network acknowledgement');
  const position=await page.evaluate(()=>{const p=window.__yolkTest.read().predicted;return {x:p.x,z:p.z};});await page.keyboard.down('w');await page.waitForTimeout(180);await page.keyboard.up('w');
@@ -50,17 +52,16 @@ try{
  const release=()=>page.evaluate(()=>window.__yolkTest.connectionFixture(n=>{n.callbacks.onState=n.savedState;if(n.pendingState)n.savedState(n.pendingState);}));
  p.inventory[1].ammo=10;p.bank.medium=100;sim.syncInventory(p);authority.broadcast(event.room);
  await page.waitForFunction(()=>{const r=window.__yolkTest.read(),p=r.state.players.find(p=>p.id===r.localId);return p.ammo[1]===10&&p.slot===1&&p.equipUntil<=r.state.time;});
- await hold();await page.keyboard.press('r');
- await page.waitForFunction(()=>window.__yolkTest.loadingFixture(v=>v.localPlayer?.reloadEnd>v.lastStateTime));
+ await hold();await observe(()=>window.__yolkTest.loadingFixture(v=>v.localPlayer?.reloadEnd>window.__yolkTest.read().state.time),()=>page.keyboard.press('r'));
  assert.equal(await page.evaluate(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).reloadEnd;}),0);
  await release();await until(()=>p.reloadEnd===0,'Reload completed');
  await page.keyboard.press('p');await page.waitForFunction(()=>{const r=window.__yolkTest.read(),p=r.state.players.find(p=>p.id===r.localId);return p.slot===0&&p.equipUntil<=r.state.time;});
  await hold();const oldSwing=await page.evaluate(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).swingAt??-100;});
- await page.mouse.down();await page.waitForFunction(old=>window.__yolkTest.loadingFixture(v=>v.localPlayer?.swingAt>old),oldSwing);await page.mouse.up();await release();
+ await observe(old=>window.__yolkTest.loadingFixture(v=>v.localPlayer?.swingAt>old),()=>page.mouse.down(),oldSwing);await page.mouse.up();await release();
  p.inventory[3]={id:'bandage',count:2};p.health=50;sim.syncInventory(p);authority.broadcast(event.room);
  await page.waitForFunction(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).inventory[3]?.id==='bandage';});
  await page.keyboard.press('3');await page.waitForFunction(()=>{const r=window.__yolkTest.read(),p=r.state.players.find(p=>p.id===r.localId);return p.slot===3&&p.equipUntil<=r.state.time;});
- await hold();await page.mouse.down();await page.waitForFunction(()=>window.__yolkTest.loadingFixture(v=>v.localPlayer?.use?.id==='bandage'));await page.mouse.up();
+ await hold();await observe(()=>window.__yolkTest.loadingFixture(v=>v.localPlayer?.use?.id==='bandage'),()=>page.mouse.down());await page.mouse.up();
  assert.equal(await page.evaluate(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).inventory[3].count;}),2);await release();
  await page.keyboard.press('1');await page.waitForFunction(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).slot===1;});
  console.log('PASS reload, pickaxe and item-use presentation before acknowledgements');
@@ -70,7 +71,7 @@ try{
  sim.dropLoot(p,{id:'needle',weapon:true,rarity:1,ammo:5,count:1});const item=sim.loot.at(-1);authority.broadcast(event.room);
  await page.waitForFunction(uid=>window.__yolkTest.read().state.royale.loot.some(i=>i.uid===uid),item.uid);
  await page.evaluate(()=>window.__yolkTest.connectionFixture(n=>{n.callbacks.onState=s=>{n.pendingState=s;};}));
- await page.keyboard.press('f');await page.waitForFunction(()=>document.querySelector('#royale-prompt')?.textContent.includes('Picking up'),null,{timeout:10000});
+ await observe(()=>document.querySelector('#royale-prompt')?.textContent.includes('Picking up'),()=>page.keyboard.press('f'));
  assert.equal(await page.evaluate(()=>window.__yolkTest.read().state.players.find(p=>p.id===window.__yolkTest.read().localId).inventory.some(i=>i?.id==='needle')),false);
  await until(()=>p.inventory.some(i=>i?.id==='needle'),'Authority accepted exactly one pickup');
  await page.evaluate(()=>window.__yolkTest.connectionFixture(n=>{n.callbacks.onState=n.savedState;if(n.pendingState)n.savedState(n.pendingState);}));
@@ -80,5 +81,5 @@ try{
  // keep software GPU cost out of this input-isolation fixture.
  await page.screenshot({path:out+'/confirmed-inventory.png'});assert.deepEqual(errors,[]);
  await writeFile(out+'/browser.json',JSON.stringify({passed:true,beforeAck,checks:['real-cup-authority','weapon-before-ack','movement-before-ack','rapid-switch-cache','pending-pickup-feedback','single-authoritative-pickup','reload-before-ack','pickaxe-before-ack','use-before-ack'],errors},null,2));console.log('PASS real Cup inputs, immediate weapon/movement, cached switching and confirmed pickups');
-}catch(error){await page.screenshot({path:out+'/failure.png'}).catch(()=>{});console.error('Response test failure',await page.evaluate(()=>({screen:window.__yolkTest?.read().screen,paused:window.__yolkTest?.read().paused,dialog:document.querySelector('#dialog')?.innerText,prompt:document.querySelector('#royale-prompt')?.innerText,report:window.__yolkTest?.read().connection})).catch(()=>null),errors);throw error;}
+}catch(error){await page.screenshot({path:out+'/failure.png'}).catch(()=>{});console.error('Response test failure',await page.evaluate(()=>{const r=window.__yolkTest?.read();return {screen:r?.screen,paused:r?.paused,input:r?.input,predicted:r?.predicted,player:r?.state?.players.find(p=>p.id===r.localId),view:window.__yolkTest?.loadingFixture(v=>({localWeapon:v.localWeapon,localPlayer:v.localPlayer,map:v.mapId,building:!!v.mapBuild,compiling:!!v.mapCompile})),dialogOpen:document.querySelector('#dialog')?.open,dialog:document.querySelector('#dialog')?.innerText,prompt:document.querySelector('#royale-prompt')?.innerText,report:r?.connection};}).catch(()=>null),errors);throw error;}
 finally{await browser.close();await vite.close();await f.close();}

@@ -1187,12 +1187,12 @@ export class View {
     this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
     // A departed match must never block rendering the lobby. Rewarm on reentry.
     if(!playing)this.cancelMapPreparation();
-    const renderStarted=performance.now();this.gpuTimer.begin();
     if(playing&&this.needsMapCompile&&!this.mapBuild){
       this.needsMapCompile=false;
       this.mapPreparation.start(()=>this.renderer.compileAsync(this.scene,this.camera));
     }
     if(this.mapCompile)return;
+    const renderStarted=performance.now();this.gpuTimer.begin();
     // Update the shadow once for all views, including the scope, at a bounded
     // cadence. Near actors keep smooth shadows without duplicate scope passes.
     const shadowKey=`${playing}:${this.mapId}:${state?.round}`;
