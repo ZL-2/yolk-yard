@@ -60,6 +60,8 @@ test('repeated public transfers preserve identity, health, inventory and team, i
   // Restart the first player's frame loop: it will only simulate after election.
   first.clock=setInterval(()=>{if(first.net.isHost){first.sim.tick(.05);first.net.broadcast(first.sim.snapshot());}},50);
   await until(()=>first.net.lastCheckpoint?.simulation?.time>0,'Recovered player checkpoint');
+  // Separate owner/address sockets may deliver the alias close first.
+  const receive=second.net.peer.message.bind(second.net.peer);second.net.peer.message=m=>m.type==='host-demoted'?setTimeout(()=>receive(m),200):receive(m);
   await transfer(second,first);
   assert.equal(f.app.relay.publicHost.roomFor(f.app.relay.peers.get(first.net.peer.id)).host.id,'host');
   const before=second.states;await until(()=>second.states>before,'Former replacement receives new authority frames');
@@ -101,4 +103,11 @@ test('warmup cannot drop a recovering host when its departure countdown expires'
  const sim=new RoyaleSimulation(publicRoyaleOptions());sim.addPlayer('host',{name:'Recovering Player'});sim.addPlayer('successor',{name:'Active Player'});sim.startRound();sim.players.get('host').connected=false;sim.beginHostRecovery(HOST_RECOVERY_MS);sim.queueEnds=sim.time-1;
  sim.advanceWarmupClock(60);assert.equal(sim.beginBattle('timer'),false);assert.ok(sim.players.has('host'));assert.equal(sim.stage,'spawn-island');
  sim.admitPlayer('host',{name:'Recovering Player'});assert.equal(sim.recoveringHumans(),false);
+});
+
+test('demotion restores the last published roster if private channel closure arrived first',async()=>{
+ const {Network}=await import('../src/network.js');const net=new Network({getCheckpoint:()=>({matchId:'round'})});
+ net.isHost=true;net.id='host';net.members=[{id:'host',peerId:'address',order:1}];net.snapshot={players:[{id:'host',name:'Captain'}],network:{members:[...net.members,{id:'guest',peerId:'guest-peer',order:2}]}};
+ net.beginMigration=()=>{net.migrating=true;};net.hostDemoted({hostId:'host',matchId:'round',candidates:['guest'],recovering:{id:'host'}});
+ assert.equal(net.isHost,false);assert.equal(net.migrating,true);assert.equal(net.members.find(m=>m.id==='guest').peerId,'guest-peer');
 });

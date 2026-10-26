@@ -68,10 +68,10 @@ export class RelayPeer extends Events {
   ws.addEventListener('error',()=>{});
   ws.addEventListener('close',event=>{
    if(this.destroyed||ws!==this.socket)return;
-   const reasons=['Host unresponsive for 10 seconds','No active player available to host','Server stopping','Server restarting','Connection too slow','Rate limit','Command sequence','Invalid relay message','Expired resume','Register first','Public host stopped advancing','Public host transferred','Reconnect grace expired','Invalid public host state','Invalid frame'];
+   const reasons=['Host duties transferred','Host unresponsive for 10 seconds','No active player available to host','Server stopping','Server restarting','Connection too slow','Rate limit','Command sequence','Invalid relay message','Expired resume','Register first','Public host stopped advancing','Public host transferred','Reconnect grace expired','Invalid public host state','Invalid frame'];
    this.emit('transport-close',{code:Number.isInteger(event.code)?event.code:0,reason:reasons.includes(event.reason)?event.reason:'unspecified'});
    clearInterval(this.heartbeat);
-   const fatal=event.code===1008||['Expired resume','Command sequence','Invalid frame','Invalid relay message'].includes(event.reason);
+   const fatal=event.reason==='Host duties transferred'||event.code===1008||['Expired resume','Command sequence','Invalid frame','Invalid relay message'].includes(event.reason);
    if(!fatal&&((this.protocol===2&&this.resume)||!this.openedOnce)&&this.retry(!this.openedOnce))return;
    this.failConnection();
   });

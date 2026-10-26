@@ -545,6 +545,8 @@ export class Network {
   hostDemoted(message){
     if(this.closed||!this.isHost)return;
     this.lastCheckpoint=this.migrationData();
+    // Closed channels can arrive before demotion on the separate alias socket.
+    if(Array.isArray(this.snapshot?.network?.members))this.members=this.snapshot.network.members;
     this.joinProfile=safeProfile(this.snapshot?.players.find(p=>p.id===this.id));
     this.isHost=false;this.publicLeaseAuthorized=false;
     const alias=this.aliasPeer;this.aliasPeer=null;
@@ -643,8 +645,9 @@ export class Network {
     alias.on('open',()=>{if(this.closed)return;if(recovering&&this.migrating){this.publicLeaseAuthorized=true;this.promote();}this.publishRoom();});for(const type of ['reward','afk','afk-enforce','rank-cosmetic'])alias.on(type,event=>this.callbacks.onProgress?.(type,event));
     alias.on('host-transfer',m=>this.hostTransfer(m));
     alias.on('connection',conn=>this.accept(conn));
-    alias.on('transport-close',event=>{this.disconnectReason=event.reason;this.lastTransportClose=`WebSocket close ${event.code}: ${event.reason}.`;connectionReport.set('service','Interrupted',this.lastTransportClose);});
-    const lost=()=>{if(this.aliasPeer!==alias)return;alias.destroy();if(this.closed)return;if(this.disconnectReason===HOST_TIMEOUT_REASON||this.disconnectReason===MATCH_ENDED_REASON||this.officialPublic&&this.isHost){this.isHost=false;this.publicLeaseAuthorized=false;this.callbacks.onError?.(this.disconnectReason===HOST_TIMEOUT_REASON?HOST_TIMEOUT_MESSAGE:'The host connection ended. Return to the lobby to rejoin.');return;}this.later(()=>this.isHost?this.claimRoomAddress():recovering&&this.recoverPublicHost(),recovering?800:2500);};
+    let released=false;
+    alias.on('transport-close',event=>{released=event.reason==='Host duties transferred';this.disconnectReason=event.reason;this.lastTransportClose=`WebSocket close ${event.code}: ${event.reason}.`;connectionReport.set('service','Interrupted',this.lastTransportClose);});
+    const lost=()=>{if(this.aliasPeer!==alias)return;alias.destroy();if(this.closed||released)return;if(this.disconnectReason===HOST_TIMEOUT_REASON||this.disconnectReason===MATCH_ENDED_REASON||this.officialPublic&&this.isHost){this.isHost=false;this.publicLeaseAuthorized=false;this.callbacks.onError?.(this.disconnectReason===HOST_TIMEOUT_REASON?HOST_TIMEOUT_MESSAGE:'The host connection ended. Return to the lobby to rejoin.');return;}this.later(()=>this.isHost?this.claimRoomAddress():recovering&&this.recoverPublicHost(),recovering?800:2500);};
     alias.on('error',lost);
     alias.on('disconnected',()=>{if(!alias.destroyed&&!this.closed){if(relayURL())lost();else alias.reconnect();}});
   }
