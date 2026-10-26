@@ -245,13 +245,20 @@ export class RoyaleSimulation extends Simulation {
   if(!this.dropLoot(p,{...item,droppedBy:p.id,pickupAfter:this.time+1.5}))return false;if(p.use?.slot===index)this.cancelUse(p,'drop');p.inventory[index]=null;if(index===p.slot){p.reloadEnd=0;p.burstLeft=0;}this.syncInventory(p);
   this.emit('royale-cue',{player:p.id,cue:'item-drop',x:p.x,y:p.y,z:p.z});
  }
+ recordFairPlayTransfer(p,item,amount){
+  if(!this.fairPlayTransfer||!item.droppedBy||item.droppedBy===p.id)return;
+  const donor=this.players.get(item.droppedBy),droppedAt=(item.pickupAfter||0)-(item.resource||item.ammoType?2:1.5);
+  if(!donor||donor.bot||donor.health<=0||donor.downed||donor.eliminated||donor.connected===false||donor.flight!=='ground'||this.time-droppedAt>15||this.time-droppedAt<0||!this.accessible(p,donor,10))return;
+  if(amount<(item.resource||item.ammoType?10:1))return;
+  this.fairPlayTransfer({time:this.time,from:donor.id,to:p.id,drop:item.uid,item:item.id,amount});
+ }
  takeLoot(p,item,{stackOnly=false}={}){
   if(item?.droppedBy===p.id&&item.pickupAfter>this.time)return false;
   if(!item||!vaultOpen(this,item.vaultId)||itemById(this,'loot',item.uid)!==item||!this.accessible(p,item)||!canFight(p)||p.flight!=='ground')return false;
   if(stackOnly&&!canAutoStack(p,item))return false;
-  if(item.resource){const add=Math.min(item.count,999-p.materials[item.resource]);if(add<=0)return false;p.materials[item.resource]+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;return true;}
+  if(item.resource){const add=Math.min(item.count,999-p.materials[item.resource]);if(add<=0)return false;p.materials[item.resource]+=add;this.recordFairPlayTransfer(p,item,add);item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;return true;}
   if(item.crown)return takeCrown(this,p,item);
-  if(item.ammoType){const add=Math.min(item.count,AMMO_CAPS[item.ammoType]-p.bank[item.ammoType]);if(add<=0)return false;p.bank[item.ammoType]+=add;item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'ammo-pickup'});return true;}
+  if(item.ammoType){const add=Math.min(item.count,AMMO_CAPS[item.ammoType]-p.bank[item.ammoType]);if(add<=0)return false;p.bank[item.ammoType]+=add;this.recordFairPlayTransfer(p,item,add);item.count-=add;if(!item.count)this.removeLoot(item);else this.lootVersion++;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'ammo-pickup'});return true;}
   const selected=p.inventory[p.slot];let merged=0,slot=-1;const maximum=item.weapon?1:ITEMS[item.id]?.stack||1;
   if(!item.weapon)for(let i=1;i<=5&&item.count>0;i++){const entry=p.inventory[i];if(entry?.id!==item.id)continue;const add=Math.min(item.count,Math.max(0,maximum-entry.count));entry.count+=add;item.count-=add;merged+=add;}
   while(!stackOnly&&item.count>0){
@@ -262,7 +269,7 @@ export class RoyaleSimulation extends Simulation {
    if(!p.inventory[p.slot] || p.inventory.filter(i=>i&&!i.pickaxe).length===1)p.slot=slot;
    }else break;
   }
-  if(!merged)return false;if(!item.count)this.removeLoot(item);else this.lootVersion++;
+  if(!merged)return false;this.recordFairPlayTransfer(p,item,merged);if(!item.count)this.removeLoot(item);else this.lootVersion++;
   if(p.inventory[p.slot]!==selected){this.cancelUse(p,'swap');p.reloadEnd=0;beginEquip(p,this.time,true);}if(p.bot&&p.brain)p.brain.decision=0;this.syncInventory(p);this.emit('royale-cue',{player:p.id,cue:'pickup-'+(item.rarity||0),item:item.id,slot:p.slot});return true;
  }
  openChest(p,chest){

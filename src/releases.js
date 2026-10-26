@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'221',title:'Automatic Cup fair play and readable restrictions',changes:[
+  'Server-run Cups automatically monitor sustained cooperation between opponents. Multiple independent gameplay signals are required; nearby players, ordinary third parties, legitimate teammates and reports alone do not trigger removals.',
+  'Detected teamers are removed from the current Cup, excluded from its rewards, suspended from all game modes for one hour and prohibited from the next scheduled Cup. Restrictions persist across reconnects and remain visible with their end time and Cup details.',
+  'Owner Access includes a Fair play evidence history and penalty reversal. Cup leaderboard scrolling supports trackpads, mouse wheels, a draggable thumb and keyboard without resetting during updates. Version 6.28.0 / protocol 87.'
+ ]},
  {number:'220',title:'Stay in the match after host transfer',changes:[
   'An unresponsive host still transfers match duties to an active player. The previous host gets up to 30 seconds to reconnect as a player, preserving their identity, equipment, health, team and reward tracking.',
   'Expired recovery removes only the disconnected player. Repeated handoffs and authenticated reconnects retain the same match without duplicate players. Version 6.27.0 / protocol 87.'

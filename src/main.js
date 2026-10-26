@@ -133,6 +133,7 @@ import './lobby-home.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';
+import {FairPlayRuntime} from './fair-play.js';
 import {OwnerRuntime} from './owner-runtime.js';
 import { CONTROLS, migratePerspectiveBindings, normalizeBindings, bindingDown, bindingLabel, wheelIntent, helicopterActions } from "./keybinds.js";
 import { RELEASES, RELEASE } from "./releases.js";
@@ -312,6 +313,7 @@ const rankRewards=new RoyaleRewards({getView:()=>view,getProfile:()=>profile,con
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerRuntime=new OwnerRuntime();
+const fairPlay=new FairPlayRuntime({poll:()=>party?.ready?party.request('fair-play-status'):null,onRemoval:()=>{if(net||screen==='game')leave(false,false);modal('Removed for teaming','<p>You have been removed from the match. All game modes are suspended for one hour, and you cannot enter the next scheduled Cup.</p><p>Your restriction and remaining time stay visible in the lobby. Use Report a problem if you believe this was a mistake.</p><button data-action="close">RETURN TO LOBBY</button>','fair-play');}});ownerRuntime.fairPlay=fairPlay;
 const ownerConsole=new OwnerConsole({identity:()=>party?.id,onMapEditor:openOwnerMapEditor,onCampaign:openOwnerCampaign,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 startAnonymousVisits(()=>screen==='game'?(state?.options?.training?'training':state?.options?.mode||options.mode||'royale'):screen==='lobby'?'lobby':screen==='editor'?'editor':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
@@ -756,6 +758,7 @@ function callbacks() {
   };
 }
 function beginSim() {
+  fairPlay.admission();
   chat.reset();
   sim = options.mode==='zonewars'?new ZoneWarsSimulation(options):options.mode==='boxfight'?new BoxFightSimulation(options):options.mode==='zombies'?new ZombiesSimulation(options):options.mode==='royale'?new RoyaleSimulation(options):new Simulation(options);
   sim.addPlayer("host", profile);
@@ -823,6 +826,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   }
 }
 async function joinRoom(publicCode, quiet=false, ticket=null) {
+  try{fairPlay.admission();}catch(error){return errorToast(error.message);}
   if(!ticket&&party?.ready){await queueParty(false,cleanCode(publicCode||$("#join-code")?.value));return;}
   if (checkingConnection) { toast('Wait for the connection check to finish.'); return; }
   if (busy) return;
@@ -897,10 +901,11 @@ function renderLobby() {
   const scrollTop = $("#lobby .lobby-panel")?.scrollTop || 0;
   lobbyRenderKey = key;
   $("#lobby").innerHTML =
-    `${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility === "public" ? "PUBLIC" : "PRIVATE"} ROOM</div><h2 style="margin-top:8px">${o.mode==='royale'?'Next stop: Ravel Coast.':'SQUAD ASSEMBLED.'}</h2>${o.mode==='royale'?`<p class="royale-queue" id="royale-queue">${queueText}</p>`:''}<div class="room-code">${formatCode(net?.code || "--------")}</div><div class="split-actions"><button class="plain" data-action="copy-code">Copy code</button><button class="plain" data-action="copy-link">Copy invite link</button></div><div class="lobby-meta"><strong>${getMap(o.map).name}</strong><span>·</span><span>${mode(o.mode).name}</span></div><div class="roster">${roster.map((p) => `<div class="roster-row"><b><span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>${esc(p.name)}${p.id === localId ? " (you)" : ""}</b><span>${p.bot ? "BOT" : weapon(p.weapon).name}</span>${net?.isHost && p.id !== localId && !p.bot ? `<button data-kick="${esc(p.id)}">Remove</button>` : ""}</div>`).join("")}</div><p class="hint" style="margin-bottom:18px">${net?.isHost ? `${o.bots} bots will fill available spots. The next player takes over if the host disconnects.` : "Waiting for the host to start. You can choose your loadout while you wait."}</p><p class="hint">${ruleSummary(o)}</p>${net?.isHost ? '<button class="secondary" data-action="match-settings">EDIT MATCH SETTINGS</button>' : ""}${visibilityButton()}<button class="plain" data-action="chat-controls">Player controls & quick chat</button><div class="room-bottom">${net?.isHost ? '<button class="primary" data-action="start-match">START MATCH</button>' : '<button class="primary" data-action="loadout">Choose loadout</button>'}<button class="plain" data-action="leave">Leave</button></div></section>`;
+    `${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility === "public" ? "PUBLIC" : "PRIVATE"} ROOM</div><h2 style="margin-top:8px">${o.mode==='royale'?'Next stop: Ravel Coast.':'SQUAD ASSEMBLED.'}</h2>${o.mode==='royale'?`<p class="royale-queue" id="royale-queue">${queueText}</p>`:''}<div class="room-code">${formatCode(net?.code || "--------")}</div><div class="split-actions"><button class="plain" data-action="copy-code">Copy code</button><button class="plain" data-action="copy-link">Copy invite link</button></div><div class="lobby-meta"><strong>${getMap(o.map).name}</strong><span>·</span><span>${mode(o.mode).name}</span></div><div class="roster">${roster.map((p) => `<div class="roster-row"><b><span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>${esc(p.name)}${p.id === localId ? " (you)" : ""}</b><span>${p.bot ? "BOT" : weapon(p.weapon).name}</span>${net?.isHost && p.id !== localId && !p.bot ? `<button data-kick="${esc(p.id)}">Remove</button>` : ""}</div>`).join("")}</div><p class="hint" style="margin-bottom:18px">${net?.isHost ? `${o.bots} bots will fill available spots. The next player takes over if the host disconnects.` : "Waiting for the host to start. You can choose your loadout while you wait."}</p><p class="hint">${ruleSummary(o)}</p>${net?.isHost ? '<button class="secondary" data-action="match-settings">EDIT MATCH SETTINGS</button>' : ""}${visibilityButton()}<button class="plain" data-action="chat-controls">Player controls & quick chat</button><button class="plain" data-action="report-teaming">Report teaming</button><div class="room-bottom">${net?.isHost ? '<button class="primary" data-action="start-match">START MATCH</button>' : '<button class="primary" data-action="loadout">Choose loadout</button>'}<button class="plain" data-action="leave">Leave</button></div></section>`;
   $("#lobby .lobby-panel").scrollTop = scrollTop;
 }
 function launchRound(){
+  fairPlay.admission();
   if(sim?.remote){sim.startRound();return true;}
   buildControls.buildMode=false;buildUI.cancel();
   if(sim.startRound()===false){toast('Invite another operator or add a bot before launching.');return false;}
@@ -1356,6 +1361,7 @@ async function partyRequest(type,data={}){
 }
 let tournamentJoining=false;
 async function joinTournament(eventId,spectate=false){
+ try{fairPlay.admission(eventId);}catch(error){return errorToast(error.message);}
  if(state)return toast('Return to the lobby to join the tournament.');
  if(tournamentJoining)return;
  tournamentJoining=true;
@@ -1425,6 +1431,7 @@ async function queuePublicRoyale(spectate=false){
  if(await partyRequest('queue',{publicRoyale:true,spectate})){dialog.close();dialogType='';renderMenu();}
 }
 async function launchParty(launch){
+ try{fairPlay.admission();}catch(error){await partyRequest('failed',{id:launch.id,reason:error.message});return errorToast(error.message);}
  campaign?.close({returnToOwner:false});
  if(activeLaunch===launch.id)return;activeLaunch=launch.id;
  if(net||state)leave(false,false);
@@ -1446,12 +1453,13 @@ function initializeParty(){
   'tournament-rewards':m=>{void eggWallet.syncTournamentRewards(m.record).then(()=>{if(screen==='menu')renderMenu();});},
   'royale-rank':m=>rankRewards.receive(m.record),
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
-  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){if(menuSection==='career')void refreshCompetitiveCareer(true);void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
+  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void fairPlay.refresh();if(menuSection==='career')void refreshCompetitiveCareer(true);void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   'public-join':event=>publicJoinNotice.receive(event,party?.id),
   'lobby-chat':m=>lobbyComms.receive(m.message),
   'lobby-chat-cleared':m=>lobbyComms.clear(m.channel),
+  'fair-play':m=>fairPlay.set(m.status),
   'owner-controls':m=>ownerRuntime.set(m.controls),
   'owner-grants':m=>{void eggWallet.syncOwnerGrants(m.record).then(r=>{lobbyComms.setGrants(m.record.notices||[]);if(r.amount&&screen==='menu')renderMenu();}).catch(()=>toast('Your owner grant is saved online. Reconnect when browser storage is available.'));},
   'owner-session-ended':m=>{if(net||screen==='game')leave(false,false);errorToast(m.message);},
@@ -1483,6 +1491,10 @@ const actions = {
  'watch-winner':()=>{dialog.close();dialogType='';resultAt=0;paused=false;},
  'report-problem':reportProblemMenu,
  'report-connection':()=>{rememberProblem('Match connection interrupted',document.querySelector('#match-connection span')?.textContent||'Connection interrupted');reportProblemMenu();},
+ 'report-teaming':async()=>{
+  if(!party?.ready)return errorToast('Connect to report teaming.');
+  try{const roster=await party.request('teaming-roster');modal('Report teaming',`<p>Select the players cooperating against the rules and describe what you saw. Reports cannot cause an automatic ban; live enforcement uses server gameplay evidence.</p><form id="teaming-report-form"><div class="teaming-report-players">${roster.map(p=>`<label><input name="player" type="checkbox" value="${esc(p.id)}">${esc(p.name)}</label>`).join('')}</div><textarea class="field" name="notes" rows="4" minlength="15" maxlength="1000" required placeholder="What did these players do together?"></textarea><button type="submit">SEND REPORT</button><p role="status"></p></form>`,'teaming-report');$('#teaming-report-form').onsubmit=async e=>{e.preventDefault();const form=e.target,values=new FormData(form),button=form.querySelector('button'),status=form.querySelector('[role=status]');button.disabled=true;try{await party.request('teaming-report',{players:values.getAll('player'),notes:values.get('notes')});status.textContent='Report saved. Automatic fair-play checks continue during the match.';}catch(error){status.textContent=error.message;button.disabled=false;}};}catch(error){errorToast(error.message);}
+ },
  'feature-request':()=>{modal('Request a feature',`<p>Tell us what you would like to see in Ravelfront. Your request goes to the administrator’s private inbox.</p><form id="feature-request-form"><label for="feature-request-text">YOUR IDEA</label><textarea id="feature-request-text" class="field" rows="5" minlength="5" maxlength="1000" required placeholder="What would make the frontier better?"></textarea><button class="primary" type="submit">SEND REQUEST</button></form><p id="feature-request-status" role="status"></p>`,'feature-request');$('#feature-request-text').focus();$('#feature-request-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button'),status=$('#feature-request-status');button.disabled=true;status.textContent='Sending…';try{await party.request('feature-request',{text:$('#feature-request-text').value});if(form.isConnected){form.hidden=true;status.textContent='Request sent. Thank you for helping shape the frontier.';}}catch(error){if(form.isConnected){status.textContent=error.message;button.disabled=false;}}};},
  'owner-inbox':()=>{ownerConsole.inboxShowCleared=false;void ownerConsole.inbox();},
  'end-spectate':()=>{matchEndUI.watch();paused=false;},
@@ -1514,7 +1526,7 @@ const actions = {
  'copy-friend-code':()=>copy(party.code),
  'social-retry-identity':()=>{party.retryIdentity();closeDialog();},
  'social-new-identity':()=>modal('Create New Friend Code?',`<p>This creates a separate identity with an empty friend list. It does not restore your old friendships. Your previous browser credential will be kept for recovery.</p><div class="actions"><button class="primary" data-action="social-confirm-new-identity">CREATE NEW CODE</button><button data-action="social">GO BACK</button></div>`,'social-new-identity'),
- 'social-confirm-new-identity':()=>{party.newIdentity();closeDialog();},
+ 'social-confirm-new-identity':()=>{try{fairPlay.admission();}catch(error){return errorToast(error.message);}party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
  referrals:()=>showReferrals({party}),
  'midseason-briefing':()=>showMidseasonBriefing({force:true}),
@@ -1942,7 +1954,7 @@ dialog.addEventListener('pointercancel',finishInventoryDrag);
 dialog.addEventListener('click',e=>{if(performance.now()<suppressInventoryClickUntil){e.preventDefault();e.stopImmediatePropagation();}},{capture:true});
 dialog.addEventListener('keydown',e=>{if(e.key==='Escape'&&inventoryDrag){e.preventDefault();e.stopPropagation();finishInventoryDrag();}});
 dialog.addEventListener('keydown',e=>{if(dialogType!=='royale-inventory')return;const slot=e.target.closest('[data-royale-slot]');if(slot&&e.altKey&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const from=Number(slot.dataset.royaleSlot),to=1+((from-1+(e.key==='ArrowRight'?1:4))%5);inventoryAction('swap',to,from);dialog.querySelector(`[data-royale-slot="${to}"]`)?.focus();}});
-document.addEventListener('wheel',e=>{const ranks=e.target.closest?.('.frontier-board-ranks');if(ranks&&ranks.scrollHeight>ranks.clientHeight){e.preventDefault();ranks.scrollTop+=e.deltaY*(e.deltaMode===1?18:e.deltaMode===2?ranks.clientHeight:1);return;}if(scoreHeld&&screen==='game'&&!dialog.open){e.preventDefault();$('#scoreboard').scrollTop+=e.deltaY;return;}if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
+document.addEventListener('wheel',e=>{const ranks=e.target.closest?.('.frontier-board-ranks,.tournament-standings');if(ranks&&ranks.scrollHeight>ranks.clientHeight){e.preventDefault();ranks.scrollTop+=e.deltaY*(e.deltaMode===1?18:e.deltaMode===2?ranks.clientHeight:1);return;}if(scoreHeld&&screen==='game'&&!dialog.open){e.preventDefault();$('#scoreboard').scrollTop+=e.deltaY;return;}if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
 document.addEventListener("contextmenu", (e) => {
   if (screen === "game" || (dialog.open&&dialogType==='settings'&&!e.target.matches('input,textarea'))) e.preventDefault();
 });

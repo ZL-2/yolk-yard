@@ -1,4 +1,5 @@
 import {IconVoting} from './icon-voting.js';
+import {FairPlayService} from './fair-play.js';
 import {TournamentService} from './tournament.js';
 import {releaseActivity} from './release-activity.js';
 import {DeploymentStatus} from './deployment.js';
@@ -29,6 +30,7 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
   const owner=new OwnerService({code:ownerCode??process.env.YOLK_OWNER_CODE,dbPath:ownerPath!==undefined?ownerPath:host==='127.0.0.1'?null:undefined});await owner.ready;await relay.progression.ready;await relay.parties.store.ready;owner.attach(relay);
   if(publicRoyale)relay.authority.ensurePublicRoyale();
   relay.recovery=new RelayRecovery(relay,{path:recoveryPath});relay.recovery.restore();
+  relay.fairPlay=new FairPlayService(relay,{now:()=>owner.now()});
   relay.tournament=new TournamentService(relay,tournamentOptions);
   const iconVoting=relay.iconVoting=new IconVoting();
   const server=createServer((req,res)=>{

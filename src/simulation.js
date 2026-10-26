@@ -73,6 +73,7 @@ export class Simulation {
     if(activity&&actor?.activity&&!actor.bot&&meaningfulActivity(actor.activity,'action',activity.signature+':'+Math.round(actor.x/3)+','+Math.round(actor.z/3),this.time)&&activity.contribution)actor.activity.contributions++;
     if(type==='hit'&&data.player&&this.players.get(data.player)?.activity){this.players.get(data.player).activity.damage+=Math.max(0,Math.min(100,data.amount||0));meaningfulActivity(this.players.get(data.player).activity,'damage',data.target,this.time);}
     const e = { id: ++this.eventId, time: this.time, type, ...data };
+    this.fairPlayObserver?.(e);
     this.events.push(e);
     if (this.events.length > 120) this.events.shift();
     recordFieldEvent(this,type,e);

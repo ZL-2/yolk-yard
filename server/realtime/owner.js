@@ -35,13 +35,13 @@ export class OwnerService {
  sanction(id,kind){if(!id||!this.db.db)return null;return this.db.get('SELECT * FROM sanctions WHERE player=? AND kind=? AND revoked IS NULL AND (expires IS NULL OR expires>?) ORDER BY created DESC LIMIT 1',id,kind,this.now());}
  assertPlayer(id){const ban=this.sanction(id,'ban');if(ban)throw Error('This browser identity is suspended'+(ban.expires?' until '+new Date(ban.expires).toISOString():'')+'. '+ban.reason);}
  assertAdmission(id,mode,access='public'){
-  this.assertPlayer(id);this.db.assert();if(this.controls.maintenance)throw Error(this.controls.maintenanceMessage);
+  this.assertPlayer(id);this.db.assert();this.relay?.fairPlay?.assertPlay(id);if(this.controls.maintenance)throw Error(this.controls.maintenanceMessage);
   if(this.controls.modes[mode]?.[access]===false)throw Error('This mode is temporarily closed to '+access+' matchmaking.');
  }
  assertChat(id){this.assertPlayer(id);const mute=this.sanction(id,'mute');if(mute)throw Error('Lobby chat is muted for this browser identity. '+mute.reason);if(!this.controls.chatEnabled)throw Error('Lobby chat is temporarily paused.');}
  grantSummary(id){return {id,marks:this.db.get('SELECT coalesce(sum(amount),0) n FROM grants WHERE player=?',id).n,notices:this.db.all('SELECT g.id,g.at,g.amount FROM grants g LEFT JOIN grant_reads r ON r.id=g.id WHERE g.player=? AND r.id IS NULL ORDER BY g.at,g.id LIMIT 100',id).map(g=>({...g,kind:'marks-grant',request:'Marks award',body:g.amount.toLocaleString('en-US')+' Marks were added to your balance.'}))};}
  acknowledgeGrants(id,ids){if(!Array.isArray(ids)||ids.length>100||ids.some(x=>typeof x!=='string'||x.length>200))throw Error('Invalid grant acknowledgement');this.db.transaction(()=>{for(const grant of ids)this.db.run('INSERT OR IGNORE INTO grant_reads SELECT id,player,? FROM grants WHERE id=? AND player=?',this.now(),grant,id);});return this.grantSummary(id).notices;}
- onIdentity(user){this.assertPlayer(user.id);if(!this.db.db)return;if(user.sessions.size===1)this.systemEvent('player-connected',user.profile.name+' connected',user.id);this.relay.parties.send(user,{type:'owner-controls',controls:this.publicControls()});this.relay.parties.send(user,{type:'owner-grants',record:this.grantSummary(user.id)});}
+ onIdentity(user){this.assertPlayer(user.id);if(!this.db.db)return;this.relay.fairPlay?.sync(user.id);if(user.sessions.size===1)this.systemEvent('player-connected',user.profile.name+' connected',user.id);this.relay.parties.send(user,{type:'owner-controls',controls:this.publicControls()});this.relay.parties.send(user,{type:'owner-grants',record:this.grantSummary(user.id)});}
  liveRooms(){
   const relay=this.relay;if(!relay)return [];
   return [...relay.peers.values()].filter(p=>p.listing&&(p.ws||p.virtualRoom)&&this.now()-p.listedAt<20000).map(p=>{
@@ -82,9 +82,10 @@ export class OwnerService {
  }
  async action(req,body){
   this.db.assert();if(!/^[a-f0-9-]{36}$/.test(body.requestId||''))throw Error('A unique action identifier is required');
-  const fingerprint=createHash('sha256').update(JSON.stringify([body.action,body.player,body.room,body.amount,body.hours,body.reason,body.revision,body.controls,...(body.action?.startsWith('tournament-')?[body.eventId,body.event]:[])])).digest('hex');
+  const fingerprint=createHash('sha256').update(JSON.stringify([body.action,body.player,body.room,body.amount,body.hours,body.reason,body.revision,body.controls,...(body.action?.startsWith('tournament-')?[body.eventId,body.event]:[]),...(body.action?.startsWith('teaming-')?[body.caseId,body.players]:[])])).digest('hex');
   const old=this.db.get('SELECT data FROM events WHERE id=?','action:'+body.requestId);if(old){const saved=JSON.parse(old.data);if(saved.fingerprint!==fingerprint)throw Object.assign(Error('Action identifier already used for different values'),{status:409});return saved.result;}
   const reason=reasonOf(body),r=this.relay;let result={ok:true};
+  if(body.action?.startsWith('teaming-'))return r.fairPlay.manage(body,(result,data)=>{this.audit(req,body,body.action,reason,body.caseId,data);this.db.event('action',reason,body.caseId,{action:body.action,result,fingerprint,actor:this.actor(req,body)},'action:'+body.requestId);});
   if(body.action?.startsWith('tournament-'))return r.tournament.manage(body,(result,before,after)=>{this.audit(req,body,body.action,reason,after.id,{before,after});this.db.event('action',reason,after.id,{action:body.action,result,fingerprint,actor:this.actor(req,body)},'action:'+body.requestId);});
   if(body.action==='settings'){
    if(body.revision!==this.controls.revision)throw Object.assign(Error('Controls changed in another session. Refresh before saving.'),{status:409});
@@ -150,6 +151,7 @@ export class OwnerService {
     json(res,200,data,origin);return;
    }
    if(route==='/owner/summary'){json(res,200,this.summary(body),origin);return;}
+   if(route==='/owner/fair-play'&&req.method==='POST'){json(res,200,relay.fairPlay.overview(),origin);return;}
    if(route==='/owner/tournaments'&&req.method==='POST'){json(res,200,relay.tournament.overview(),origin);return;}
    if(route==='/owner/players'){json(res,200,this.players(body),origin);return;}
    if(route==='/owner/history'){json(res,200,this.db.history(body.type,body),origin);return;}

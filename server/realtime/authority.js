@@ -189,6 +189,7 @@ export class MatchAuthority{
   const elapsed=Math.max(0,(now-this.last)/1000);this.last=now;this.accumulator=Math.min(.75,this.accumulator+elapsed);let steps=0;
   for(const room of this.rooms.values()){
    if(room.zombies){if(!room.members.size&&Date.now()-room.created>90000){this.rooms.delete(room.key);this.capacity.releaseRoom(room.key);this.relay.remove(room.hostPeer);continue;}if(room.autoStart&&room.sim.phase==='lobby'&&room.startedWaitingAt!=null&&room.age-room.startedWaitingAt>=12&&[...room.sim.players.values()].some(p=>p.connected!==false))room.sim.startRound();}
+   this.relay.fairPlay?.observe(room);
    this.resetEmptyPublicRound(room);
    if(room.recurring&&room.sim.phase==='results'){room.restartAt??=room.age+PUBLIC_ROYALE.restartSeconds;if(room.age>=room.restartAt)this.restartPublicRoom(room);}
    recordTiming(room,timingPhase(room.sim),'gapMaxMs',elapsed*1000);

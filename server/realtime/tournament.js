@@ -20,7 +20,7 @@ class TournamentEvent{
  standings(){
   const sim=this.room?.sim,teamCup=tournamentTeamSize(this.event)>1;
   const aliveTeams=sim?livingTeams(sim.options,sim.players.values()):new Set();
-  return [...this.roster.values()].filter(e=>sim?.players.get(e.player)?.contestant).map(e=>{const p=sim.players.get(e.player);return {identity:e.identity,name:e.name,team:p.team,place:p.place||null,kills:p.kills||0,alive:!p.eliminated&&p.health>0,teamAlive:teamCup&&aliveTeams.has(p.team),connected:p.connected!==false};}).sort((a,b)=>Number(b.alive||b.teamAlive)-Number(a.alive||a.teamAlive)||(a.place||Infinity)-(b.place||Infinity)||(teamCup?a.team-b.team:0)||b.kills-a.kills||a.name.localeCompare(b.name));
+  return [...this.roster.values()].filter(e=>sim?.players.get(e.player)?.contestant&&!this.relay.fairPlay?.disqualified(e.identity,this.id)).map(e=>{const p=sim.players.get(e.player);return {identity:e.identity,name:e.name,team:p.team,place:p.place||null,kills:p.kills||0,alive:!p.eliminated&&p.health>0,teamAlive:teamCup&&aliveTeams.has(p.team),connected:p.connected!==false};}).sort((a,b)=>Number(b.alive||b.teamAlive)-Number(a.alive||a.teamAlive)||(a.place||Infinity)-(b.place||Infinity)||(teamCup?a.team-b.team:0)||b.kills-a.kills||a.name.localeCompare(b.name));
  }
  summary(){const room=this.room,players=room?[...room.sim.players.values()]:[],phase=this.phase;return {...this.event,name:tournamentName(this.event),phase,serverNow:this.now(),locked:this.locked,players:players.filter(p=>p.contestant&&!p.bot&&p.connected!==false).length,alive:room?.sim.alive||0,spectatorCapacity:this.event.spectators,spectators:players.filter(p=>p.lateSpectator&&p.connected!==false).length,joinable:phase==='entry',spectatable:phase==='running',message:this.state.message||'',endedAt:this.state.endedAt||null,startedAt:this.state.startedAt||null,standingsComplete:!!this.state.standingsComplete,results:this.state.results||[],standings:phase==='running'?this.standings():[]};}
  publish(){this.onPublish();}
@@ -47,7 +47,7 @@ class TournamentEvent{
  }
  queue(u,{spectate=false}={}){
   this.tick();const EVENT=this.event,phase=this.phase,p=this.relay.parties,size=tournamentTeamSize(EVENT);
-  this.relay.owner.assertAdmission(u.id,'royale','public');
+  this.relay.owner.assertAdmission(u.id,'royale','public');this.relay.fairPlay?.assertCup(u.id,this.id);
   if(u.inMatch)throw Error('Return to the lobby before joining the tournament.');
   if(phase!=='entry'&&phase!=='running')throw Error(phase==='scheduled'||phase==='preparing'?`Tournament entry opens at ${eventTime(EVENT.opensAt)} New York time.`:'The tournament is over. Normal matchmaking is open.');
   const existing=this.roster.get(u.id),old=existing&&this.room.sim.players.get(existing.player);
@@ -66,7 +66,7 @@ class TournamentEvent{
    for(const member of members){
     if(!member||!p.connected(member)||member.inMatch)throw Error('Every party member must be online and in the lobby before entering.');
     if(this.entryTeams.has(member.id))throw Error('A party member already has a tournament team. They must rejoin their original entry.');
-    this.relay.owner.assertAdmission(member.id,'royale','public');
+    this.relay.owner.assertAdmission(member.id,'royale','public');this.relay.fairPlay?.assertCup(member.id,this.id);
    }
    group={id:randomUUID(),members:members.map(m=>m.id)};
   }
@@ -87,6 +87,7 @@ class TournamentEvent{
  }
  claim(t,peer){
   if(!t?.tournament||!this.room||!['entry','running'].includes(this.phase))return false;
+  try{this.relay.fairPlay?.assertCup(t.member,this.id);}catch{return false;}
   if(!t.spectator&&!t.reconnect&&this.phase!=='entry')return false;
   const entry=this.roster.get(t.member),old=entry&&this.room.sim.players.get(entry.player);
   if(old?.connected&&this.room.members.get(old.id)!==peer)return false;
@@ -104,7 +105,7 @@ class TournamentEvent{
  complete(phase,message='',results=[]){
   if(['finished','cancelled'].includes(this.state.phase))return;
   const EVENT=this.event,entitled=this.db.meta('tournament-entitlements',{});
-  const awarded=results.map(r=>{const bonusMarks=r.place===1&&EVENT.pickaxe&&entitled[r.identity]?.includes(EVENT.pickaxe)?EVENT.duplicateReward||0:0;return {...r,marks:(EVENT.prizes[r.place-1]||0)+bonusMarks,bonusMarks,pickaxeAwarded:r.place===1&&!bonusMarks?EVENT.pickaxe:null};});
+  const awarded=results.filter(r=>!this.relay.fairPlay?.disqualified(r.identity,this.id)).map(r=>{const bonusMarks=r.place===1&&EVENT.pickaxe&&entitled[r.identity]?.includes(EVENT.pickaxe)?EVENT.duplicateReward||0:0;return {...r,marks:(EVENT.prizes[r.place-1]||0)+bonusMarks,bonusMarks,pickaxeAwarded:r.place===1&&!bonusMarks?EVENT.pickaxe:null};});
   const next={phase,message,results:awarded,endedAt:this.now(),startedAt:this.state.startedAt||null,standingsComplete:true};
   this.db.transaction(()=>{
    for(const result of awarded){const amount=result.marks;
@@ -138,7 +139,7 @@ class TournamentEvent{
     // Rank complete teams as a unit; every member receives the team's place.
     // Simultaneous team eliminations use last survival, total eliminations, then identity.
     const teamCup=tournamentTeamSize(EVENT)>1,groups=new Map();
-    for(const e of entries){const key=teamCup?(e.p?.team??e.result.team):e.identity;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(e);}
+    for(const e of entries.filter(e=>!this.relay.fairPlay?.disqualified(e.identity,this.id))){const key=teamCup?(e.p?.team??e.result.team):e.identity;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(e);}
     const rank=members=>({place:Math.min(...members.map(e=>e.p?.place||e.result.place)),survival:Math.max(...members.map(e=>e.p?.eliminatedAt??Infinity)),kills:members.reduce((n,e)=>n+(e.p?.kills||e.result?.kills||0),0),identity:members.map(e=>e.identity).sort()[0]});
     const teams=[...groups.values()].map(members=>({members,...rank(members)})).sort((a,b)=>a.place-b.place||b.survival-a.survival||b.kills-a.kills||a.identity.localeCompare(b.identity));
     const results=teams.flatMap((team,i)=>team.members.sort((a,b)=>a.identity.localeCompare(b.identity)).map(e=>({identity:e.identity,name:e.name,team:e.p?.team??e.result?.team,place:i+1,kills:e.p?.kills||e.result?.kills||0,marks:EVENT.prizes[i]||0})));

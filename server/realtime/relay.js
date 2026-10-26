@@ -140,6 +140,7 @@ export class RealtimeRelay {
       if(peer.hostRecovery&&m.target!==peer.hostRecovery.address&&!peer.hostRecovery.targets.includes(m.target)&&other?.hostReady?.address!==peer.hostRecovery.address&&m.target!==(this.peers.get(peer.hostRecovery.address)?.hostOwner||this.peers.get(peer.hostRecovery.address)?.publicHostOwner)){this.send(peer,{type:'error',channel:m.channel,error:'peer-unavailable'});return;}
       if(!other||other===peer||other.links.size>=MAX_HUMANS+MAX_SPECTATORS){this.send(peer,{type:'error',channel:m.channel,error:'peer-unavailable'});return;}
       const identity=this.progression.accounts.get(peer.progressId)?.socialId,publicRoom=this.publicHost.roomFor(peer);
+      this.fairPlay?.assertPlay(identity);
       if(other.listing){if(publicRoom?.members.has(peer.id)&&publicRoom===this.publicHost.roomByAddress(other.id))this.owner?.assertPlayer(identity);else this.owner?.assertAdmission(identity,other.listing.mode,other.listing.public===false?'private':'public');}
       if(peer.links.has(m.channel)||other.links.has(m.channel))throw Error('Duplicate channel');
       peer.links.set(m.channel,other);other.links.set(m.channel,peer);
