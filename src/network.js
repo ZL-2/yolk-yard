@@ -13,7 +13,7 @@ import { FILTER_VERSION, moderateText, safeName, safeSystemText, SAFETY_MESSAGES
 import { matchOptions } from './match-options.js';
 import {visibleMarkers} from './team-markers.js';
 import {isTeamRoyale} from './teams.js';
-import {HOST_TIMEOUT_REASON,HOST_TIMEOUT_MESSAGE,MATCH_ENDED_REASON} from './host-timeout.js';
+import {HOST_RECOVERY_MS,HOST_TIMEOUT_REASON,HOST_TIMEOUT_MESSAGE,MATCH_ENDED_REASON} from './host-timeout.js';
 import { HostHeartbeat } from './host-heartbeat.js';
 const PREFIX = `yolk-yard-v${VERSION}-`;
 const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -49,7 +49,7 @@ export class Network {
   constructor(callbacks = {}) {
     this.callbacks = callbacks;
     this.visibility = "public";
-    this.hostId="host";this.members=[];this.memberOrder=0;this.migrating=false;this.failedHosts=new Set();this.reconnectingMembers=new Map();
+    this.hostId="host";this.members=[];this.memberOrder=0;this.migrating=false;this.failedHosts=new Set();this.recoveringHosts=new Map();this.reconnectingMembers=new Map();
     this.maxConnections=15;
     this.peer = null;
     this.connections = new Map();
@@ -81,6 +81,7 @@ export class Network {
     });
     for(const type of ['reward','afk','afk-enforce','rank-cosmetic'])this.peer.on(type,event=>this.callbacks.onProgress?.(type,event));
     this.peer.on('host-transfer',m=>this.hostTransfer(m));
+    this.peer.on('host-demoted',m=>this.hostDemoted(m));
     this.peer.on('deployment',status=>this.callbacks.onDeployment?.(status));
     this.peer.on('authority-state',s=>{
       if(s?.version!==VERSION||!Array.isArray(s.players))return;this.serverAuthority=true;this.snapshot=s;this.visibility=s.visibility;this.chatEnabled=s.chatEnabled;this.chatMuted=s.chatMuted||[];this.hostId=s.network.hostId;this.members=s.network.members;const wasHost=this.isHost;this.isHost=this.id===this.hostId;this.lastState=performance.now();this.hostHeartbeat.contact(this.lastState);
@@ -214,6 +215,8 @@ export class Network {
         this.timers.delete(timeout);
         this.connections.set(conn.peer, conn);
         if(!this.members.some(m=>m.id===conn.peer))this.members.push({id:conn.peer,peerId:conn.peer,order:++this.memberOrder,spectator:!!msg.admission?.friendSpectator||!this.officialPublic&&!!msg.admission?.spectator||!!this.snapshot?.players.find(p=>p.id===conn.peer)?.friendSpectator});
+        const member=this.members.find(m=>m.id===conn.peer);if(member&&msg.recoveryPeerId)member.peerId=msg.recoveryPeerId;
+        this.recoveringHosts.delete(conn.peer);this.failedHosts.delete(conn.peer);
         this.syncRoster();
         conn.send({
           type: "welcome",
@@ -469,6 +472,7 @@ export class Network {
     this.publishRoom();
   }
   publishRoom() {
+    if(!this.isHost)return;
     if(this.serverAuthority)return;
     const s = this.snapshot;
     // A newly elected host may have a checkpoint before its first visible frame.
@@ -481,6 +485,7 @@ export class Network {
     else directory.publish(this.visibility==='public'?listing:null);
   }
   broadcast(state) {
+    if(!this.isHost)return;
     if(this.serverAuthority)return;
     this.snapshot = state;
     if (!this.lastPublish || performance.now() - this.lastPublish > 2000 || this.lastPublishedStage!==(state.boxfight?.stage||state.royale?.stage) || this.lastPublishedPhase!==state.phase) { this.lastPublish = performance.now();this.lastPublishedStage=state.boxfight?.stage||state.royale?.stage;this.lastPublishedPhase=state.phase;this.publishRoom(); }
@@ -537,10 +542,23 @@ export class Network {
     if(this.isHost){if(this.nameTaken(profile.name,this.id)){this.callbacks.onNameRequired?.();return;}this.callbacks.onProfile?.(this.id,this.joinProfile);this.callbacks.onNameAccepted?.();}
     else this.send(this.nameJoining?{type:'hello',version:VERSION,profile:this.joinProfile,ticket:this.ticket}:{type:'profile',profile:this.joinProfile});
   }
+  hostDemoted(message){
+    if(this.closed||!this.isHost)return;
+    this.lastCheckpoint=this.migrationData();
+    this.joinProfile=safeProfile(this.snapshot?.players.find(p=>p.id===this.id));
+    this.isHost=false;this.publicLeaseAuthorized=false;
+    const alias=this.aliasPeer;this.aliasPeer=null;
+    const connections=[...this.connections.values()];this.connections.clear();
+    for(const conn of connections)conn.close();alias?.destroy();
+    this.callbacks.onDemoted?.();
+    this.callbacks.onStatus?.('Host transferred. Reconnecting you to the same match…');
+    this.hostTransfer(message);
+  }
   hostTransfer(message){
     if(this.closed||this.isHost||message.matchId!==this.lastCheckpoint?.simulation?.matchId||!Array.isArray(message.candidates))return;
     this.failedHosts.add(message.hostId);
-    if(!this.officialPublic)this.members=this.members.filter(m=>message.candidates.includes(m.id));
+    if(message.recovering)this.recoveringHosts.set(message.hostId,Date.now()+HOST_RECOVERY_MS);
+    if(!this.officialPublic)this.members=this.members.filter(m=>message.candidates.includes(m.id)||this.recoveringHosts.has(m.id));
     if(!this.migrating)this.beginMigration();
   }
   beginMigration(){
@@ -567,7 +585,7 @@ export class Network {
   connectMigration(next,publicRecovery=false){
     const attempt=this.peer.connect(next.peerId,{reliable:true,serialization:'binary'});
     let welcomed=false,failed=false;this.hostConnection=attempt;
-    const retry=()=>{if(failed||welcomed||this.closed||!this.migrating||this.hostConnection!==attempt)return;failed=true;clearTimeout(timer);this.timers.delete(timer);attempt.close();if(publicRecovery){if(this.lastCheckpoint?.simulation)this.claimRoomAddress(true);else this.later(()=>this.recoverPublicHost(),800);}else{this.failedHosts.add(next.id);this.electHost();}};
+    const retry=()=>{if(failed||welcomed||this.closed||!this.migrating||this.hostConnection!==attempt)return;failed=true;clearTimeout(timer);this.timers.delete(timer);attempt.close();if(this.recoveringHosts.has(this.id)){this.later(()=>this.connectMigration(next,publicRecovery),800);return;}if(publicRecovery){if(this.lastCheckpoint?.simulation)this.claimRoomAddress(true);else this.later(()=>this.recoverPublicHost(),800);}else{this.failedHosts.add(next.id);this.electHost();}};
     const timer=this.later(retry,5000);
     attempt.on('open',()=>attempt.send({type:'hello',version:VERSION,profile:this.joinProfile||safeProfile(this.snapshot?.players.find(p=>p.id===this.id))}));
     attempt.on('data',msg=>{
@@ -575,7 +593,7 @@ export class Network {
       if(msg.type==='welcome'&&msg.version===VERSION){
         if(msg.checkpoint)this.lastCheckpoint=msg.checkpoint;
         welcomed=true;clearTimeout(timer);this.timers.delete(timer);this.migrating=false;this.hostId=msg.hostId;this.members=msg.members;this.lastState=performance.now();
-        this.failedHosts.delete(this.hostId);
+        this.failedHosts.delete(this.hostId);this.failedHosts.delete(this.id);this.recoveringHosts.delete(this.id);
         this.hostHeartbeat=new HostHeartbeat(this.lastState);
         this.publicReady();
         this.callbacks.onStatus?.('New host connected. Match continues.');
@@ -602,18 +620,19 @@ export class Network {
   promote(){
     if(this.officialPublic&&!this.publicLeaseAuthorized)return;
     this.isHost=true;this.migrating=false;this.hostId=this.id;
-    this.members=this.members.filter(m=>!this.failedHosts.has(m.id));
+    this.members=this.members.filter(m=>!this.failedHosts.has(m.id)||this.recoveringHosts.has(m.id));
     this.memberOrder=Math.max(0,...this.members.map(m=>m.order));
     const checkpoint=this.lastCheckpoint;
     this.chatRoom.sequence=Math.max(checkpoint.chat?.sequence||0,this.snapshot?.network?.chatSequence||0);this.chatRoom.enabled=this.chatEnabled=checkpoint.chat?.enabled!==false;
     this.chatMuted=checkpoint.chat?.muted||[];this.chatRoom.muted=new Set(this.chatMuted);this.chatRoom.members=new Map(checkpoint.chat?.members||[]);this.chatRoom.reports=new Set(checkpoint.chat?.reports||[]);this.kicked=new Set(checkpoint.kicked||[]);
     this.maxConnections=(['royale','zonewars'].includes(checkpoint.simulation.options.mode)?Math.min(checkpoint.simulation.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
-    this.callbacks.onHost?.(checkpoint.simulation,[...this.failedHosts]);
-    this.callbacks.onHostRecovery?.(10000);
+    this.callbacks.onHost?.(checkpoint.simulation,[...this.failedHosts].filter(id=>!this.recoveringHosts.has(id)));
+    for(const [id,expires] of this.recoveringHosts){this.callbacks.onSuspendPlayer?.(id);this.later(()=>{if(!this.isHost||this.recoveringHosts.get(id)!==expires)return;if(!this.connections.has(id)){this.members=this.members.filter(m=>m.id!==id);this.callbacks.onLeave?.(id);this.syncRoster();}this.recoveringHosts.delete(id);},HOST_RECOVERY_MS);}
+    this.callbacks.onHostRecovery?.(this.recoveringHosts.size?HOST_RECOVERY_MS:10000);
     this.snapshot=this.callbacks.getChatState?.()||this.snapshot;
     this.lastPublish=0;this.lastCheckpointSent=0;this.claimRoomAddress();
     this.callbacks.onStatus?.('You are now the host. The match continues.');
-    this.later(()=>{for(const member of [...this.members])if(member.id!==this.id&&!this.connections.has(member.id)){this.members=this.members.filter(m=>m.id!==member.id);this.callbacks.onLeave?.(member.id);}},10000);
+    this.later(()=>{if(!this.isHost)return;for(const member of [...this.members])if(member.id!==this.id&&!this.connections.has(member.id)&&!this.recoveringHosts.has(member.id)){this.members=this.members.filter(m=>m.id!==member.id);this.callbacks.onLeave?.(member.id);}},10000);
   }
   claimRoomAddress(recovering=false){
     if(this.closed||!this.isHost&&!(recovering&&this.officialPublic&&this.migrating))return;

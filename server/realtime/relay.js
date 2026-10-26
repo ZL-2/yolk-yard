@@ -1,3 +1,4 @@
+import {HOST_RECOVERY_MS,HOST_TIMEOUT_REASON} from '../../src/host-timeout.js';
 import {isPublicCode} from '../../src/public-royale.js';
 import {acceptFrame} from './rate-budget.js';
 import {HostWatchdog} from './host-watchdog.js';
@@ -29,6 +30,7 @@ export class RealtimeRelay {
           if(m.type!=='register')throw Error('Register first');
           if(m.resume){
             peer=this.peers.get(m.id);
+            if(peer?.token!==m.resume)peer=[...this.peers.values()].find(p=>p.previousHostAddress===m.id&&p.token===m.resume);
             if(!peer||peer.virtualRoom||peer.token!==m.resume||!Number.isSafeInteger(m.cursor)||m.cursor<peer.acked||m.cursor>peer.seq||peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)throw Error('Expired resume');
             const old=peer.ws;peer.ws=null;old?.close(1000,'Resumed elsewhere');
             this.ack(peer,m.cursor);peer.ws=ws;
@@ -44,6 +46,7 @@ export class RealtimeRelay {
             if(this.peers.size>=1000)throw Error('Server full');
             peer={id,token:randomUUID(),ws,links:new Map(),pending:[],pendingBytes:0,seq:0,acked:0,clientSeq:0,history:[],historyBytes:0,lastSeen:Date.now(),rateAt:Date.now(),frames:0,bytes:0};
             if(m.hostProof){const owner=this.peers.get(m.hostProof.id);if(!owner||owner.token!==m.hostProof.token||!owner.ws)throw Error('Invalid host proof');peer.hostOwner=owner.id;}
+            const provenOwner=this.peers.get(m.hostProof?.id||m.publicHostProof?.id);if(provenOwner?.hostRecovery)provenOwner.hostRecovery.activeHost=true;
             this.peers.set(id,peer);this.sessions.add(peer);if(this.publicHost.roomByAddress(id)&&this.publicHost.enabled)this.publicHost.registered(peer,m);void this.progression.register(peer,m.progressToken);
             // The elected alias shares its proven live member's progression identity,
             // including browsers that cannot persist a local storage credential.
@@ -112,6 +115,7 @@ export class RealtimeRelay {
       this.send(peer,{type:'rooms',request:m.request,rooms});return;
     }
     if(m.type==='publish'){
+      if(peer.hostRecovery)return; // Consume stale host commands without poisoning replay.
       this.tournament?.assertNormal(peer.id);
       if(this.authority.rooms.has(peer.id))return;
       if(!address.test(peer.id))throw Error('Not a room');
@@ -133,12 +137,13 @@ export class RealtimeRelay {
       this.tournament?.assertNormal(m.target);
       if(typeof m.channel!=='string'||!/^[-a-z0-9]{36}$/.test(m.channel)||peer.links.size>=MAX_HUMANS+MAX_SPECTATORS)throw Error('Invalid channel');
       const other=this.peers.get(m.target);
+      if(peer.hostRecovery&&m.target!==peer.hostRecovery.address&&!peer.hostRecovery.targets.includes(m.target)&&other?.hostReady?.address!==peer.hostRecovery.address&&m.target!==(this.peers.get(peer.hostRecovery.address)?.hostOwner||this.peers.get(peer.hostRecovery.address)?.publicHostOwner)){this.send(peer,{type:'error',channel:m.channel,error:'peer-unavailable'});return;}
       if(!other||other===peer||other.links.size>=MAX_HUMANS+MAX_SPECTATORS){this.send(peer,{type:'error',channel:m.channel,error:'peer-unavailable'});return;}
       const identity=this.progression.accounts.get(peer.progressId)?.socialId,publicRoom=this.publicHost.roomFor(peer);
       if(other.listing){if(publicRoom?.members.has(peer.id)&&publicRoom===this.publicHost.roomByAddress(other.id))this.owner?.assertPlayer(identity);else this.owner?.assertAdmission(identity,other.listing.mode,other.listing.public===false?'private':'public');}
       if(peer.links.has(m.channel)||other.links.has(m.channel))throw Error('Duplicate channel');
       peer.links.set(m.channel,other);other.links.set(m.channel,peer);
-      if(!this.authority.connect(peer,other,m.channel))this.send(other,{type:'incoming',channel:m.channel,peer:peer.id});return;
+      if(!this.authority.connect(peer,other,m.channel))this.send(other,{type:'incoming',channel:m.channel,peer:peer.hostRecovery?.playerId||peer.id});return;
     }
     if(m.type==='batch'){
       if(!Array.isArray(m.messages)||m.messages.length>128)throw Error('Invalid batch');
@@ -146,6 +151,7 @@ export class RealtimeRelay {
         if(!entry||!['accept','data','close'].includes(entry.type)||typeof entry.channel!=='string')throw Error('Invalid entry');
         const other=peer.links.get(entry.channel);
         if(!other){this.send(peer,{type:'closed',channel:entry.channel});continue;}
+        if(peer.hostRecovery&&!peer.hostRecovery.activeHost&&entry.type==='data'&&['state','snapshot-v1','welcome','host-left'].includes(entry.data?.type))continue;
         if(entry.type==='data'&&this.authority.data(peer,other,entry))continue;
         if(entry.type==='data'&&entry.data?.type==='input')this.progression.input(peer,entry.data.input||entry.data);
         if(entry.type==='data'&&entry.data?.type==='hello'){
@@ -156,17 +162,41 @@ export class RealtimeRelay {
           if(this.publicHost.enabled&&(this.publicHost.isTarget(other)||this.publicHost.members.has(other.id))){admission??=this.publicHost.members.get(peer.id)?.admission;admission=this.publicHost.admission(peer,admission,other);if(!admission){this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'Join the public match from Play, or wait for host transfer.'}});continue;}}
           if(entry.data.ticket&&!admission){this.send(peer,{type:'data',channel:entry.channel,data:{type:'reject',reason:'Your party reservation expired. Return to the lobby and try again.'}});continue;}
           // Never forward a self-reported party or team claim.
-          entry.data={...entry.data,admission};delete entry.data.ticket;
+          entry.data={...entry.data,admission,recoveryPeerId:peer.hostRecovery?peer.id:undefined};delete entry.data.ticket;
         }
         // A validated ticket can restore the social identity before the new
         // browser's progression credential has been bound by joined.
         if(entry.type==='data'&&['hello','profile'].includes(entry.data?.type)&&entry.data.profile)entry.data={...entry.data,profile:this.progression.rankRewards.sanitizePeer(entry.data.profile,peer,entry.data.type==='hello'?entry.data.admission?.memberId:undefined)};
+        if(entry.type==='data'&&entry.data?.type==='welcome'&&other.hostRecovery&&entry.data.id===other.hostRecovery.playerId)other.hostRecovery.expires=0;
         if(entry.type==='data')this.hostWatchdog?.observe(peer,entry.data);
         this.send(other,{type:entry.type==='accept'?'opened':entry.type==='close'?'closed':'data',channel:entry.channel,...(entry.type==='data'?{data:entry.data}:{})});
         if(entry.type==='close'){peer.links.delete(entry.channel);other.links.delete(entry.channel);}
       }return;
     }
     throw Error('Unknown command');
+  }
+  demoteHost(host,owner,watch,active){
+    const peer=owner||host,oldId=peer.id,room=this.publicHost.roomByAddress(watch.address);
+    // Revoke the lease before closing links. Preserve membership and progression.
+    if(room){room.host=null;room.pending=null;}
+    if(peer===host){
+      this.peers.delete(oldId);peer.previousHostAddress=oldId;peer.id=`player-${randomUUID()}`;this.peers.set(peer.id,peer);
+      const member=room?.members.get(oldId);
+      if(member){room.members.delete(oldId);member.peer=peer.id;room.members.set(peer.id,member);}
+      for(const ticket of this.parties.tickets.values())if(ticket.peer===oldId)ticket.peer=peer.id;
+      for(const user of this.parties.users.values())if(user.matchPeer===oldId)user.matchPeer=peer.id;
+    }
+    peer.listing=null;delete peer.hostOwner;delete peer.publicHostOwner;peer.hostReady=null;
+    const member=room?.members.get(peer.id);if(member)member.ready=false;
+    peer.hostRecovery={playerId:watch.hostId,address:watch.address,matchId:watch.matchId,targets:active.map(p=>p.id),expires:Date.now()+HOST_RECOVERY_MS};
+    const recovering={id:watch.hostId,peerId:peer.id,expires:peer.hostRecovery.expires};
+    this.send(peer,{type:'host-demoted',id:peer.id,hostId:watch.hostId,matchId:watch.matchId,candidates:active.map(p=>p.hostRecovery?.playerId||p.id),recovering});
+    for(const source of new Set([host,peer])){
+      for(const [channel,other] of source.links){other.links.delete(channel);this.send(other,{type:'closed',channel});}
+      source.links.clear();
+    }
+    if(host!==peer)this.remove(host,1000,'Host duties transferred');
+    return recovering;
   }
   remove(peer,code=1000,reason='Session ended'){
     if(this.peers.get(peer.id)!==peer)return;
@@ -177,6 +207,7 @@ export class RealtimeRelay {
     peer.links.clear();peer.history=[];peer.pending=[];
   }
   sweep(){this.progression.sweep();this.publicHost.sweep();this.hostWatchdog.sweep();for(const peer of this.peers.values()){
+    if(peer.hostRecovery?.expires&&Date.now()>peer.hostRecovery.expires){this.remove(peer,1008,HOST_TIMEOUT_REASON);continue;}
     if(peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)this.remove(peer,1001,'Reconnect grace expired');
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}

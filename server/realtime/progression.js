@@ -57,7 +57,7 @@ export class ProgressionService{
   if(s.phase!=='results'&&now-m.last<.35&&!scoreChanged)return;
   const recovered=now-m.last>5,dt=Math.min(1.5,Math.max(0,now-m.last));m.last=now;m.state=s;
   if(recovered)for(const p of m.players.values())p.activity.last=now;
-  const seen=new Set(),connected=new Map([...this.relay.peers.values()].filter(p=>p.ws).map(p=>[p.id,p]));
+  const seen=new Set(),connected=new Map([...this.relay.peers.values()].filter(p=>p.ws).map(p=>[p.hostRecovery?.address===room?p.hostRecovery.playerId:p.id,p]));
   for(const raw of s.players){if(typeof raw.id!=='string'||seen.has(raw.id)||raw.lateSpectator||raw.friendSpectator||raw.contestant===false)continue;seen.add(raw.id);
    const isHost=raw.id===s.hostId,remote=isHost?peer:connected.get(raw.id),bot=raw.bot===true&&/^(?:box-bot-\d+|bot-(?:\d+|fill-\d+x*))$/.test(raw.id);
    if(!bot&&!remote)continue;

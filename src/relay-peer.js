@@ -109,6 +109,7 @@ export class RelayPeer extends Events {
   if(m.type==='deployment'){this.emit('deployment',m.deployment);return;}
   if(m.type==='authority-frame'){this.authorityDecoder??=new SnapshotDecoder();const message=this.authorityDecoder.decode(m.frame);if(message){this.authorityReset=false;this.emit('authority-state',message.state);}else if(!this.authorityReset){this.authorityReset=true;this.control({type:'authority-command',command:{type:'snapshot-reset'}});}return;}
   if(['authority-ready','authority-owner','authority-notice','authority-error'].includes(m.type)){this.emit(m.type,m);return;}
+  if(m.type==='host-demoted'){this.id=m.id;this.emit(m.type,m);return;}
   if(['reward','afk','afk-enforce','rank-cosmetic','host-transfer'].includes(m.type)){this.emit(m.type,m);return;}
   if(m.type==='command-ack'){const sent=this.sentTimes.get(m.seq);if(sent!==undefined)this.relayLatency=performance.now()-sent;for(const seq of this.unacked.keys())if(seq<=m.seq){this.unacked.delete(seq);this.sentTimes.delete(seq);this.unackedBytes=Math.max(0,(this.unackedBytes||0)-(this.wireCommands?.get(seq)?.bytes||0));this.wireCommands?.delete(seq);}this.drainControls();this.finishRecovery();this.flush();return;}
   if(m.type==='alive'){this.resumeConfirmed=true;this.finishRecovery();return;}

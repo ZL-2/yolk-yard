@@ -1,4 +1,8 @@
 export const RELEASE_NOTES = [
+ {number:'220',title:'Stay in the match after host transfer',changes:[
+  'An unresponsive host still transfers match duties to an active player. The previous host gets up to 30 seconds to reconnect as a player, preserving their identity, equipment, health, team and reward tracking.',
+  'Expired recovery removes only the disconnected player. Repeated handoffs and authenticated reconnects retain the same match without duplicate players. Version 6.27.0 / protocol 87.'
+ ]},
  {number:'219',title:'Team cup entry and tournament editing',changes:[
   'Duos, Trios and Squads cups explain how to join your teammates’ lobby party before the leader enters. Oversized parties receive a clear popup; smaller parties keep empty slots without bots or other players filling them.',
   'Every member of a podium team receives the full listed prize, including teammates eliminated before a win. Party-size limits also apply when retrying entry.',

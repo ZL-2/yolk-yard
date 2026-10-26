@@ -88,3 +88,34 @@ test('custom title, entry duration, capacities and awards reach public cards; ze
   e.complete('finished','Winner',[{identity:'zero-winner',name:'Zero',place:1}]);assert.deepEqual(e.rewards('zero-winner').owned,[event.pickaxe]);assert.equal(t.f.app.owner.grantSummary('zero-winner').marks,0);
  }finally{await t.close();}
 });
+
+for(const size of [1,2,3,4])test(`website-created then edited ${size}-player cup runs real admission, podium and durable custom payouts`,async()=>{
+ const t=await setup();try{
+  const created=await t.action({action:'tournament-save',event:definition()});
+  const event={...definition(Date.parse('2026-10-28T16:00Z')),name:'Edited Website Cup',teamSize:size,capacity:size*3,spectators:1,prizes:[7131,3241,987],duplicateReward:4321,startsAt:Date.parse('2026-10-28T16:03Z')};
+  await t.action({action:'tournament-save',eventId:created.eventId,event});
+  await t.f.restart();await t.login();const service=t.f.app.relay.tournament,e=service.event(created.eventId);
+  assert.equal(e.phase,'scheduled');assert.equal(e.event.teamSize,size);assert.deepEqual(e.event.prizes,event.prizes);
+  t.setTime(event.opensAt-7200001);assert.equal(tournamentCard(e.summary(),true,event.opensAt-7200001),'');
+  t.setTime(event.opensAt-7200000);assert.match(tournamentCard(e.summary(),true,event.opensAt-7200000),/Edited Website Cup/);
+  const groups=[];for(let team=0;team<3;team++){const users=[];for(let i=0;i<size;i++)users.push(await t.f.user(['Alpha','Bravo','Charlie'][team]+' '+i));const p=t.f.app.relay.parties;for(const u of users.slice(1))p.join(p.users.get(u.id),p.users.get(users[0].id).party);groups.push(users);}
+  await assert.rejects(groups[0][0].ask('tournament-join',{eventId:created.eventId}),/entry opens/);
+  t.setTime(event.opensAt);service.tick();const games=[];
+  for(const group of groups){await group[0].ask('tournament-join',{eventId:created.eventId});const loaded=[];for(const u of group){const g=await t.f.game(u);g.net.input({seq:1,dt:1/60,yaw:0,pitch:0});loaded.push(g);}games.push(loaded);}
+  await until(()=>[...e.room.sim.players.values()].filter(p=>p.contestant&&!p.loading).length===size*3,'All website cup players ready');
+  const extra=await t.f.user('Cup Late Watcher');await assert.rejects(extra.ask('tournament-join',{eventId:created.eventId}),/enough seats/);
+  t.f.app.owner.db.setMeta('tournament-entitlements',{[groups[0][0].id]:[event.pickaxe]});
+t.setTime(event.startsAt);service.tick();assert.equal(e.phase,'running');
+  await extra.ask('tournament-join',{eventId:created.eventId,spectate:true});const watch=await t.f.game(extra);assert.ok(e.room.sim.players.get(watch.net.id).lateSpectator);
+  const overflow=await t.f.user('Cup Watch Overflow');await assert.rejects(overflow.ask('tournament-join',{eventId:created.eventId,spectate:true}),/spectator seats are full/);
+  const sim=e.room.sim;assert.equal(sim.options.bots,0);assert.equal(sim.options.teamFill,false);
+  if(size>1){const p=sim.players.get(games[0].at(-1).net.id);p.flight='ground';sim.damage(p,null,10000,'Disconnected');}
+  for(const team of [2,1])for(const g of games[team]){const p=sim.players.get(g.net.id);p.flight='ground';sim.damage(p,null,10000,'Disconnected');sim.time+=1;}
+sim.finish();service.tick();assert.equal(e.phase,'finished');assert.equal(e.state.results.length,size*3);assert.equal(service.locked,false);
+  for(let team=0;team<3;team++)for(const u of groups[team]){const expected=event.prizes[team]+(u===groups[0][0]?event.duplicateReward:0),r=e.state.results.find(r=>r.identity===u.id);assert.equal(r.place,team+1);assert.equal(r.marks,expected);assert.equal(t.f.app.owner.grantSummary(u.id).marks,expected);assert.equal(service.career(u.id).results[0].marks,expected);if(team===0)assert.ok(service.rewards(u.id).owned.includes(event.pickaxe));}
+  assert.equal(t.f.app.owner.grantSummary(extra.id).marks,0);const saved=structuredClone(e.state);
+  for(const g of t.f.games){clearInterval(g.clock);g.net.destroy();}for(const u of t.f.users)u.ws.close();
+  await t.f.restart();await t.login();assert.deepEqual(t.f.app.relay.tournament.event(created.eventId).state,saved);
+  for(const r of saved.results)assert.equal(t.f.app.owner.grantSummary(r.identity).marks,r.marks);
+ }finally{await t.close();}
+});

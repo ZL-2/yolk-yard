@@ -70,3 +70,18 @@ test('simulation warns then removes at 59 seconds and suspends the clock during 
  for(let t=1;t<=58;t++){sim.time=t;sim.tickActivity(1);}assert.equal(p.afkRemaining,1);assert.equal(p.afkRemoved,undefined);sim.time=59;sim.tickActivity(1);assert.equal(p.afkRemoved,true);assert.equal(p.activity.active,0);
  Object.assign(p,{afkRemoved:false,health:100,spectating:false,flight:'transport',activity:newActivity(59)});sim.time=300;sim.tickActivity(1);assert.equal(p.afkRemaining,59);p.flight='ground';sim.time=358;sim.tickActivity(1);assert.equal(p.afkRemoved,false);sim.time=359;sim.tickActivity(1);assert.equal(p.afkRemoved,true);
 });
+
+test('demoted hosts keep their authenticated reward identity and settle only once',async()=>{
+ let now=0;const sent=[],relay={peers:new Map(),send:(p,m)=>sent.push([p.id,m])},service=new ProgressionService(relay,{clock:()=>now,path:null});await service.ready;
+ try{
+  const old={id:'room',progressId:'original-account',ws:{},listing:{},links:new Map(),rewardPublic:true},next={id:'successor',progressId:'successor-account',ws:{},links:new Map([['g',old]])};old.links.set('g',next);relay.peers.set(old.id,old);relay.peers.set(next.id,next);
+  const state={round:1,matchId:'same-round',mode:'royale',phase:'playing',stage:'active',hostId:'host',players:[{id:'host',x:0,y:0,z:0,health:100,place:2},{id:'successor',x:2,y:0,z:0,health:100,place:1}],events:[]};
+  service.frame(old,state);const match=[...service.matches.values()][0];assert.equal(match.players.get('host').identity,'original-account');
+  relay.peers.delete('room');old.id='relocated';old.listing=null;old.hostRecovery={address:'room',playerId:'host'};relay.peers.set(old.id,old);
+  const alias={id:'room',progressId:next.progressId,ws:{},listing:{},rewardPublic:true,links:new Map([['old',old]])};old.links=new Map([['old',alias]]);relay.peers.set('room',alias);
+  now=1;service.frame(alias,{...state,hostId:'successor'});
+  assert.equal(match.players.size,2);assert.equal(match.players.get('host').peer,old);assert.equal(match.players.get('host').identity,'original-account');assert.equal(match.players.get('successor').identity,'successor-account');
+  now=2;service.frame(alias,{...state,hostId:'successor',phase:'results'});const count=sent.filter(([,m])=>m.type==='reward').length;
+  now=3;service.frame(alias,{...state,hostId:'successor',phase:'results'});assert.equal(sent.filter(([,m])=>m.type==='reward').length,count);assert.equal(match.finished,true);
+ }finally{await service.close();}
+});

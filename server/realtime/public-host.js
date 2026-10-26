@@ -24,10 +24,10 @@ export class PublicRoom {
   const next=this.successor();
   return next?.peer===peer.id;
  }
- ready(peer,m){const member=this.members.get(peer.id);if(!member||typeof m.matchId!=='string'||m.matchId.length>80)return;member.ready=m.ready!==false;member.readyMatch=m.matchId;member.readyAt=Date.now();}
+ ready(peer,m){if(peer.hostRecovery?.expires)return;const member=this.members.get(peer.id);if(!member||typeof m.matchId!=='string'||m.matchId.length>80)return;member.ready=m.ready!==false;member.readyMatch=m.matchId;member.readyAt=Date.now();}
  registered(peer,m){
   const owner=m.publicHostProof?.id||peer.id;
-  this.host={address:peer.id,peer:owner,id:owner===peer.id?'host':owner,at:Date.now(),time:null,advancedAt:Date.now()};
+  this.host={address:peer.id,peer:owner,id:owner===peer.id?'host':this.members.get(owner)?.id||owner,at:Date.now(),time:null,advancedAt:Date.now()};
   peer.publicHostOwner=owner;peer.rewardPublic=true;this.pending=null;
   this.report(m.publicHostProof?'host-transferred':'host-created');
  }

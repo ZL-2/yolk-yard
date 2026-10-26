@@ -1,4 +1,4 @@
-import {HOST_STALL_MS,HOST_TIMEOUT_REASON,MATCH_ENDED_REASON} from '../../src/host-timeout.js';
+import {HOST_RECOVERY_MS,HOST_STALL_MS,HOST_TIMEOUT_REASON,MATCH_ENDED_REASON} from '../../src/host-timeout.js';
 
 // The relay is the only arbiter. Native socket pongs cannot keep a frozen
 // simulation alive, and a guest cannot evict a host by reporting it as stalled.
@@ -18,6 +18,7 @@ export class HostWatchdog{
   if(watch&&this.rooms.get(watch.address)===watch&&time>watch.time){watch.time=time;watch.advancedAt=Date.now();}
  }
  ready(peer,message){
+  if(peer.hostRecovery?.expires)return;
   const watch=this.rooms.get(message.hostAddress);if(!watch||message.matchId!==watch.matchId)return;
   if(![...peer.links.values()].some(p=>p.id===watch.address||p.id===watch.owner))return;
   peer.hostReady={address:watch.address,matchId:watch.matchId,at:Date.now(),ready:message.ready===true};
@@ -31,13 +32,19 @@ export class HostWatchdog{
    const guests=room?[...room.members.values()].filter(m=>m.peer!==address&&m.peer!==watch.owner).map(m=>this.relay.peers.get(m.peer)).filter(Boolean):[...new Set([...host.links.values(),...(owner?.links.values()||[])])].filter(p=>p!==host&&p!==owner);
    const active=room?guests.filter(p=>{const m=room.members.get(p.id);return m.ready&&now-m.readyAt<8000&&m.readyMatch===watch.matchId&&!m.admission.friendSpectator&&p.ws?.readyState===1;}):guests.filter(p=>p.ws?.readyState===1&&p.hostReady?.ready&&p.hostReady.address===address&&p.hostReady.matchId===watch.matchId&&now-p.hostReady.at<8000);
    this.rooms.delete(address);this.owners.delete(watch.owner);
-   if(active.length)for(const p of guests)this.relay.send(p,{type:'host-transfer',hostId:watch.hostId,candidates:active.map(p=>p.id),matchId:watch.matchId});
+   if(active.length){
+    // Notify guests before closed-channel events can start an uninformed election.
+    const recovery={id:watch.hostId,expires:now+HOST_RECOVERY_MS};
+    for(const p of guests)this.relay.send(p,{type:'host-transfer',hostId:watch.hostId,candidates:active.map(p=>p.hostRecovery?.playerId||p.id),matchId:watch.matchId,recovering:recovery});
+    this.relay.demoteHost(host,owner,watch,active);
+    continue;
+   }
    if(room)room.transferReason=HOST_TIMEOUT_REASON;
-   // Revoke both address and owner before anyone is authorized to take over.
    this.relay.remove(host,1008,HOST_TIMEOUT_REASON);
    if(owner&&owner!==host)this.relay.remove(owner,1008,HOST_TIMEOUT_REASON);
-   if(!active.length){for(const p of guests)this.relay.remove(p,1008,MATCH_ENDED_REASON);if(room){room.host=null;room.pending=null;room.state=null;}continue;}
-   if(room)delete room.transferReason;
+   for(const p of guests)this.relay.remove(p,1008,MATCH_ENDED_REASON);
+   if(room){room.host=null;room.pending=null;room.state=null;delete room.transferReason;}
+
   }
  }
 }

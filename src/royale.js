@@ -47,7 +47,7 @@ import {surfaceAt,navigation,navigationSteps} from './maps.js';
 import {groundAt} from './terrain.js';
 import {ITEMS,ammoType,AMMO_CAPS,makeStorm,stormAt,makeFlight,transportAt} from './royale-data.js';
 
-const battlePreparation=new WeakMap(),recoveryDeadlines=new WeakMap();
+const battlePreparation=new WeakMap(),recoveryDeadlines=new WeakMap(),recoveryFreezeDeadlines=new WeakMap();
 const movementItemKinds=new Set(['jumpRig','shadowstep','winch','impulse','launchpad']);
 
 export class RoyaleSimulation extends Simulation {
@@ -88,7 +88,7 @@ export class RoyaleSimulation extends Simulation {
  }
  teamPlace(p,place){if(this.matchTeams?.[p.team])this.matchTeams[p.team].place=place;for(const mate of this.players.values())if(mate.contestant&&teamKey(this.options,mate)===teamKey(this.options,p)){mate.place=place;const result=this.placements.find(r=>r.id===mate.id);if(result)result.place=place;else this.placements.push({id:mate.id,name:mate.name,team:mate.team,place,kills:mate.kills});}}
  humanContestants(){return [...this.players.values()].filter(p=>!p.bot&&p.connected!==false&&p.contestant&&!p.spectating&&!p.lateSpectator);}
- beginHostRecovery(milliseconds=10000){recoveryDeadlines.set(this,performance.now()+milliseconds);}
+ beginHostRecovery(milliseconds=10000){recoveryDeadlines.set(this,performance.now()+milliseconds);recoveryFreezeDeadlines.set(this,performance.now()+Math.min(10000,milliseconds));}
  recoveringHumans(){return performance.now()<(recoveryDeadlines.get(this)||0)&&[...this.players.values()].some(p=>!p.bot&&p.connected===false&&p.contestant&&p.health>0&&!p.spectating&&!p.lateSpectator);}
  suspendPlayer(id){this.inputs.delete(id);this.remoteInputs.delete(id);const p=this.players.get(id);if(p){p.fireLatch=false;p.popperLatch=false;}}
  setConnectedHumans(ids){
@@ -178,7 +178,7 @@ export class RoyaleSimulation extends Simulation {
   return job;
  }
  beginBattle(reason='manual'){
-  if(!isWarmup(this.stage)||this.phase!=='playing')return false;
+  if(!isWarmup(this.stage)||this.phase!=='playing'||this.recoveringHumans())return false;
   if(this.options.recurring&&!this.humanContestants().length){this.resetPublicWarmup();return false;}
   const departureStarted=performance.now();
   for(const p of [...this.players.values()])if(!p.bot&&p.connected===false)this.removePlayer(p.id);
@@ -451,7 +451,7 @@ export class RoyaleSimulation extends Simulation {
  }
  resetPublicWarmup(){this.queueEnds=0;this.stage=RP.ISLAND;this.lastCountdown=null;this.startReason=null;}
  advanceWarmupClock(unsteppedSeconds=0){
-  if(this.phase!=='playing'||!isWarmup(this.stage)||this.tournament)return;if(this.options.training){this.queueEnds=this.time+3600;return;}
+  if(this.phase!=='playing'||!isWarmup(this.stage)||this.tournament||this.recoveringHumans())return;if(this.options.training){this.queueEnds=this.time+3600;return;}
   if(this.options.recurring){
    if(!this.humanContestants().length){if(this.queueEnds&&!this.recoveringHumans())this.resetPublicWarmup();return;}
    if(!this.queueEnds){this.queueEnds=this.time+PUBLIC_ROYALE.warmupSeconds;this.stage=RP.ISLAND;this.lastCountdown=null;unsteppedSeconds=0;}
@@ -467,7 +467,7 @@ export class RoyaleSimulation extends Simulation {
    if(full||this.time>=this.queueEnds)this.beginBattle(full?'human-full':'timer');
  }
  tick(dt){
-  if(this.options.recurring&&this.recoveringHumans())return;
+  if(this.options.recurring&&performance.now()<(recoveryFreezeDeadlines.get(this)||0)&&this.recoveringHumans())return;
   dt=clamp(dt,0,1/30);this.time+=dt;
   if(this.options.recurring){
    if(this.phase==='results'){this.publicRestartAt??=this.time+PUBLIC_ROYALE.restartSeconds;if(this.time>=this.publicRestartAt){this.startRound();this.publicRestartAt=null;}}

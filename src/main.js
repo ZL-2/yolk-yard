@@ -696,6 +696,7 @@ function callbacks() {
     },
     getCheckpoint:()=>sim?.checkpoint(),
     getHostInput:()=>sim?.inputs.get(net?.id),
+    onDemoted:()=>{sim=null;pendingInputs=[];predicted=null;},
     onHost:(checkpoint,departed)=>{
       sim=checkpoint.options.mode==='zonewars'?new ZoneWarsSimulation(checkpoint.options):checkpoint.options.mode==='boxfight'?new BoxFightSimulation(checkpoint.options):checkpoint.options.mode==='zombies'?new ZombiesSimulation(checkpoint.options):checkpoint.options.mode==='royale'?new RoyaleSimulation(checkpoint.options):new Simulation(checkpoint.options);if(net.officialPublic&&checkpoint.options.mode==='royale')bindPublicCrowns(sim);sim.restore(checkpoint);
       if(sim instanceof RoyaleSimulation)for(const p of sim.players.values())if(!p.bot)p.connected=p.id===net.id;

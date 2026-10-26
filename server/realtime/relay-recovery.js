@@ -16,7 +16,7 @@ export class RelayRecovery {
   if(!this.path)return false;
   const r=this.relay,at=Date.now(),peers=[...r.peers.values()].filter(p=>!p.virtualRoom&&!p.authorityRoom),ids=new Set(peers.map(p=>p.id));
   const snapshot={format:1,version:VERSION,at,
-   peers:peers.map(p=>({...select(p,'id token progressId publicHostOwner rewardPublic publicMember listing listedAt seq acked clientSeq history historyBytes pending pendingBytes'),detachedAt:p.ws?at:p.detachedAt,links:[...p.links].filter(([,other])=>ids.has(other.id)).map(([channel,other])=>[channel,other.id])})),
+   peers:peers.map(p=>({...select(p,'id token progressId hostOwner hostRecovery previousHostAddress publicHostOwner rewardPublic publicMember listing listedAt seq acked clientSeq history historyBytes pending pendingBytes'),detachedAt:p.ws?at:p.detachedAt,links:[...p.links].filter(([,other])=>ids.has(other.id)).map(([channel,other])=>[channel,other.id])})),
    rooms:[...r.publicHost.rooms.values()].map(room=>select(room,'code options enabled key host pending state members order joinSerial lastJoin')),
    users:[...r.parties.users.values()].map(u=>({...select(u,'id profile ready party ticket inMatch matchPeer matchCode joined spectateLaunch'),inMatch:!!u.inMatch&&ids.has(u.matchPeer)})),
    parties:r.parties.parties,tickets:r.parties.tickets,invites:r.parties.invites,
