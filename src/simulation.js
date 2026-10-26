@@ -69,6 +69,7 @@ export class Simulation {
     this.winner = "";
   }
   emit(type, data = {}) {
+    if(!this.players.get(data.player)?.bot&&(type==='inventory-change'||type==='pickup'||type==='royale-cue'&&(data.cue==='weapon-swap'||data.cue?.startsWith('pickup-'))))this.responseVersion=(this.responseVersion||0)+1;
     const activity=activityEvent({type,...data}),actor=this.players.get(data.player);
     if(activity&&actor?.activity&&!actor.bot&&meaningfulActivity(actor.activity,'action',activity.signature+':'+Math.round(actor.x/3)+','+Math.round(actor.z/3),this.time)&&activity.contribution)actor.activity.contributions++;
     if(type==='hit'&&data.player&&this.players.get(data.player)?.activity){this.players.get(data.player).activity.damage+=Math.max(0,Math.min(100,data.amount||0));meaningfulActivity(this.players.get(data.player).activity,'damage',data.target,this.time);}
@@ -400,6 +401,7 @@ export class Simulation {
         p.reloadEnd = 0;
         p.burstLeft = 0;
         beginEquip(p,this.time,true);
+        if(!p.bot)this.responseVersion=(this.responseVersion||0)+1;
       }
       const previousPosition = { x: p.x, y: p.y, z: p.z };
       this.moveWithCommands(p,input,dt,p.emote&&commands?{...commands,steps:commands.steps.map(step=>({...step,yaw:p.emote.yaw,pitch:0,forward:0,strafe:0}))}:commands);

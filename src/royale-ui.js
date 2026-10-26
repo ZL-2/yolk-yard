@@ -186,7 +186,7 @@ export class RoyaleUI{
    const item=targetLoot(nearby,local,i=>!i.ammoType&&!i.resource&&!i.crown&&allowed(i),getMap(state.options.map))||targetLoot(nearby,local,allowed,getMap(state.options.map));
    if(item?.ammoType)prompt=`${escape(item.count)} ${escape(item.ammoType.toUpperCase())} AMMO<small>Automatic pickup</small>`;
    else if(chest)prompt=`<kbd>${escape(label('interact'))}</kbd> HOLD TO SEARCH ${chest.supply?'SUPPLY DROP':chest.epic?'RARE CHEST':'CHEST'}`;
-   else if(item){const info=itemInfo(item),swap=pickupNeedsSwap(local,item),rarity=RARITIES[item.rarity??ITEMS[item.id]?.rarity??0];prompt=`<kbd>${escape(label('interact'))}</kbd> ${escape(info.name)} <span style="color:${info.color}">${item.weapon||['jumpRig','shadowstep','anchorWinch','veilProjector','victoryCrown'].includes(item.id)?rarity.name:'×'+item.count}</span><small>${swap?'Press to swap selected slot':item.weapon?'Pick up':`Room for ${stackCapacity(local,item)} · Pick up`}</small>`;
+   else if(item){const info=itemInfo(item),swap=pickupNeedsSwap(local,item),rarity=RARITIES[item.rarity??ITEMS[item.id]?.rarity??0];prompt=`<kbd>${escape(label('interact'))}</kbd> ${escape(info.name)} <span style="color:${info.color}">${item.weapon||['jumpRig','shadowstep','anchorWinch','veilProjector','victoryCrown'].includes(item.id)?rarity.name:'×'+item.count}</span><small>${this.interactionPending?'Picking up…':swap?'Press to swap selected slot':item.weapon?'Pick up':`Room for ${stackCapacity(local,item)} · Pick up`}</small>`;
    }
    if(!prompt){const suggestion=healingSuggestion(local,state.time);if(suggestion?.label==='Health available')prompt=`<small>${suggestion.label} · ${escape(label(inventoryActionForSlot(suggestion.slot)))} to equip</small>`;}
   }

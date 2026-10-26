@@ -4,6 +4,7 @@ import {bindCrownStore,attachCrown} from '../../src/crowns.js';
 import {settleZombiesPlayer} from './zombies-service.js';
 import {timingPhase,roomTiming,recordTiming,startTiming,finishTiming} from './timing.js';
 import {SnapshotWork} from './snapshot-work.js';
+import {responseFrameDue} from '../../src/action-network.js';
 import {SnapshotInterest} from '../../src/snapshot-interest.js';
 import {randomInt,randomUUID} from 'node:crypto';
 import {Simulation} from '../../src/simulation.js';
@@ -201,7 +202,7 @@ export class MatchAuthority{
   }
   // One fresh broadcast after catch-up, never several obsolete broadcasts in a burst.
   // Three 60 Hz steps can sum just below 50 ms; use the same tolerance as catch-up.
-  for(const room of this.rooms.values())if(room.age-room.frameAt+1e-8>=(room.tournament&&room.members.size>32?1/15:.05)){room.frameAt=room.age;this.broadcast(room);}
+  for(const room of this.rooms.values())if(responseFrameDue(room.sim,room.age,room.frameAt,room.responseVersion,room.tournament&&room.members.size>32?1/15:.05)){room.frameAt=room.age;room.responseVersion=room.sim.responseVersion||0;this.broadcast(room);}
   if(!this.publicStatusAt||now-this.publicStatusAt>=1000){this.publicStatusAt=now;this.relay.parties.publishPublicMatch(this.publicSummary());}
   // A throttled tick must not be followed by five more ticks before socket IO.
   // Yield between catch-up slices while retaining earned simulation time.

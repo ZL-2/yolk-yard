@@ -557,7 +557,17 @@ export class View {
   clearOutgoing(owner) {
     if(!owner.outgoing)return;
     const {group}=owner.outgoing;
-    group.removeFromParent();this.disposeGroup(group);owner.outgoing=null;
+    group.removeFromParent();
+    if(owner===this&&owner.outgoing.bundle)this.cacheWeapon(owner.outgoing.bundle,group);else this.disposeGroup(group);
+    owner.outgoing=null;
+  }
+  cacheWeapon(bundle,group){
+    const cache=this.weaponCache??=new Map(),key=bundle.id+':'+bundle.appearance;
+    if(cache.has(key))this.disposeGroup(cache.get(key).group);
+    cache.set(key,{...bundle,group});
+    // Only inactive first-person models reside here. Eviction releases private
+    // arm buffers/materials while immutable weapon geometry stays shared.
+    while(cache.size>6){const [old,row]=cache.entries().next().value;cache.delete(old);this.disposeGroup(row.group);}
   }
   lowerOutgoing(owner,pose,visible=true) {
     const old=owner.outgoing;if(!old)return;
@@ -575,23 +585,29 @@ export class View {
     const appearance=JSON.stringify([armAppearance(p),p.wrap,p.outfit]);
     if (id === this.localWeapon && appearance === this.armStyle) return;
     this.clearOutgoing(this);
-    if(this.localModel && this.localWeapon!==id && draw.holster<1 && this.gunGroup.visible){
+    if(this.heldItem){this.heldItem.removeFromParent();this.disposeGroup(this.heldItem);}
+    if(this.localModel){
       updateArms(this.localArms,-1,this.localModel);
+      const bundle={id:this.localWeapon,appearance:this.armStyle,model:this.localModel,arms:this.localArms};
       const old=new THREE.Group();old.scale.copy(this.gunGroup.scale);
       old.position.copy(this.gunGroup.position);old.rotation.copy(this.gunGroup.rotation);
       while(this.gunGroup.children.length)old.add(this.gunGroup.children[0]);
-      this.viewmodelCamera.add(old);
-      this.outgoing={group:old,position:old.position.clone(),rotation:old.rotation.clone(),profile:itemDrawProfile(previousDrawItem||{id:this.localWeapon,weapon:true})};
+      if(this.localWeapon!==id && draw.holster<1 && this.gunGroup.visible){
+        this.viewmodelCamera.add(old);
+        this.outgoing={group:old,bundle,position:old.position.clone(),rotation:old.rotation.clone(),profile:itemDrawProfile(previousDrawItem||{id:this.localWeapon,weapon:true})};
+      }else this.cacheWeapon(bundle,old);
     }
     this.armStyle = appearance;
     this.localWeapon = id;
     this.disposeGroup(this.gunGroup);
     this.heldItem=null;this.heldItemKey=null;
-    const model = makeBlaster(id,p.wrap);
+    const key=id+':'+appearance,cached=this.weaponCache?.get(key);this.weaponCache?.delete(key);
+    const model = cached?.model||makeBlaster(id,p.wrap);
+    model.visible=true;
     this.gunGroup.add(model);
     this.localModel = model;
     this.opticLens = model.userData.lens || null;
-    if (this.opticLens) {
+    if (this.opticLens && !cached) {
       this.opticLens.material.map = this.scopeTarget.texture;
       this.opticLens.material.color.setHex(0xffffff);
       const radius = gun(p).ads?.radius-.012 || .103;
@@ -608,8 +624,10 @@ export class View {
       reticle.userData.ownedMaterial = true;
       model.add(reticle);
     }
-    this.localArms = makeArms(id, p, true);
+    this.localArms = cached?.arms||makeArms(id, p, true);
+    this.localArms.rotation.set(0,0,0);this.localArms.visible=true;
     this.gunGroup.add(this.localArms);
+    updateArms(this.localArms,-1,this.localModel);
   }
   event(e, localId,state=null) {
     this.royaleView.event(e);

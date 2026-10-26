@@ -88,9 +88,11 @@ import {arrangeSettings} from './settings-layout.js';
 import {eggsMarkup,formatEggs} from './currency-ui.js';
 import {GuestPresentation} from './guest-presentation.js';
 import {predictMovement,predictionCopy} from './guest-movement.js';
+import {GuestActions} from './guest-actions.js';
 import {GuestFire} from './guest-fire.js';
 const guestFire=new GuestFire();
 const guestPresentation=new GuestPresentation();
+const guestActions=new GuestActions();
 import {applyBuildState} from './building.js';
 import {BuildingUI} from './building-ui.js';
 import {snappedFacing} from './building-rules.js';
@@ -732,10 +734,11 @@ function callbacks() {
       state = s;
       const me = s.players.find((p) => p.id === localId);
       if (!me) return;
+      guestActions.receive(s,me,performance.now());
       pendingInputs = pendingInputs.filter((i) => i.seq > me.ack);
       predicted = predictionCopy(me);
-      for (const i of pendingInputs)
-        predictMovement(predicted, i, getMap(s.options.map), 1 / 60, s.royale,s.time);
+      for (let n=0;n<pendingInputs.length;n++)
+        predictMovement(predicted, pendingInputs[n], getMap(s.options.map), 1 / 60, s.royale,s.time+n/60);
       if (me.health > 0 && lastHealth <= 0) {
         input.yaw = me.yaw;
         input.pitch = me.pitch;
@@ -919,7 +922,7 @@ function launchRound(){
 function enterGame(capture = false) {
   const entering=state.players.find(p=>p.id===localId),watching=!!(entering?.friendSpectator||entering?.lateSpectator);
   showLoading(watching?'PREPARING SPECTATOR VIEW':'DEPLOYING TO THE FRONT',watching?'Connecting to the action. Spectators cannot affect the match.':'Preparing the battlefield and your operator.',{kind:watching?'spectate':'enter',...(state.zombies?{art:ZOMBIES_LOADING_ART}:state.zonewars?{art:ZONE_LOADING_ART}:state.boxfight?{art:BOX_LOADING_ART}:{})});
-  guestFire.reset();
+  guestFire.reset();guestActions.reset();
   connectionReport.network.reset();
   resultAt=0;$("#round-banner").hidden=true;matchEndUI.reset();
   screen = "game";
@@ -1237,8 +1240,11 @@ function processEvents() {
 const hudText=(node,value)=>{const text=String(value);if(node.textContent!==text)node.textContent=text;};
 function hud() {
   if (screen !== "game" || !state) return;
-  const p = state.players.find((p) => p.id === localId);
-  if (!p) return;
+  const authoritative = state.players.find((p) => p.id === localId);
+  if (!authoritative) return;
+  const hudPlayer=(!sim||sim.remote)&&predicted&&authoritative.health>0?{...authoritative,x:predicted.x,y:predicted.y,z:predicted.z,yaw:input.yaw,pitch:input.pitch}:authoritative;
+  const p=(!sim||sim.remote)?guestActions.present(hudPlayer,guestPresentation.time,performance.now()):hudPlayer;
+  royaleUI.interactionPending=(!sim||sim.remote)&&guestActions.interacting(performance.now());
   let afk=document.querySelector('#afk-warning');if(!afk){afk=document.createElement('div');afk.id='afk-warning';afk.className='afk-warning';afk.setAttribute('role','alert');document.body.append(afk);}
   afk.hidden=!(p.afkRemaining<=12&&p.health>0&&!p.spectating);afk.textContent=`You are about to be removed for inactivity. ${p.afkRemaining}s remaining.`;
   const m = mode(state.options.mode);
@@ -2105,6 +2111,7 @@ function pumpNetworkInput(now=performance.now()) {
       connectionReport.network.sent(i.seq,now);
       const me = state.players.find((p) => p.id === localId);
       if (me?.health > 0 && state.phase==='playing') {
+        if(guestActions.input(state,me,i,Math.max(state.time,guestPresentation.time),now))hudClock=1;
         if (!predicted) predicted = predictionCopy(me);
         predicted.emote=me.emote?{...me.emote}:null;
         const beforeMove={x:predicted.x,z:predicted.z};
@@ -2181,7 +2188,7 @@ function loop(now) {
   if(!framePacer.shouldRender(now,settings.fpsLimit)){requestAnimationFrame(loop);return;}
   const renderDt=Math.min(.1,framePacer.elapsedMs/1000);
   performanceHUD.update(now,framePacer.elapsedMs,net,settings,screen==='game'&&!document.hidden);
-  if(screen==='game'&&!document.hidden)connectionReport.performance.frame(Math.min(framePacer.elapsedMs,framePacer.elapsedMs*fpsLimit(settings.fpsLimit)/60||framePacer.elapsedMs),net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');
+  if(screen==='game'&&!document.hidden)connectionReport.performance.frame(framePacer.elapsedMs,net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
   view.cinematic=matchEndUI.update(state,localId,screen==='game',now);
@@ -2209,12 +2216,13 @@ function loop(now) {
   let renderPlayer = predicted;
   if (sim && !sim.remote && me) {
     renderPlayer = {
-      ...me,
+      ...(sim.players.get(localId)||me),
       yaw: input.yaw,
       pitch: input.pitch,
-      moving: me.moving,
+      moving: sim.players.get(localId)?.moving??me.moving,
     };
   } else if (renderPlayer) {
+    renderPlayer=guestActions.present(renderPlayer,guestPresentation.time,now);
     renderPlayer.yaw = input.yaw;
     renderPlayer.pitch = input.pitch;
   }
@@ -2223,7 +2231,7 @@ function loop(now) {
   const presentation=(!sim||sim.remote)&&state?guestPresentation.frame(state,renderPlayer,now,renderDt):{state,player:renderPlayer};
   view.update(
     presentation.state,
-    (!sim||sim.remote)&&presentation.player?.health>0?presentation.player:me,
+    presentation.player?.health>0?presentation.player:me,
     presentation.player,
     view.cinematic?.slowMotion?renderDt*.25:renderDt,
     screen === "game",

@@ -29,9 +29,10 @@ test('remote catch-up cannot simulate more time than the host grants',()=>{
  assert.equal(buffer.push({seq:121}),true);
  assert.equal(buffer.queue.length,30);
  assert.equal(buffer.queue[0].seq,92);
- assert.equal(buffer.take(1/60).length,1);
- assert.equal(buffer.take(1/60).length,1);
- assert.equal(buffer.take(10).length,5);
+  assert.equal(buffer.take(1/60).length,1);
+  assert.equal(buffer.last.seq,121,'An overfull queue retires stale movement instead of keeping a permanent tail');
+  assert.equal(buffer.take(1/60).length,0);
+  assert.equal(buffer.take(10).length,0);
 });
 
 test('a server running at 74 percent speed stays on current input without a speed boost',()=>{

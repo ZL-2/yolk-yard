@@ -5,9 +5,11 @@ import { weapon } from "./data.js";
 import {OPTICS} from './weapon-presentation.js';
 import {applyWrap} from './shop-models.js';
 import {modelMaterial,surfaceUV,surfaceAtlasMaterial} from './model-surfaces.js';
+import {cloneModelTemplate} from './model-template.js';
 
 // The same authored model is used in the player's hands, on other operators, and in previews.
 const geometries = new Map();
+const weaponTemplates=new Map();
 const ART_REVISION=155;
 const spikeGlow=new THREE.MeshStandardMaterial({color:0x75e7f7,emissive:0x26bde8,emissiveIntensity:1.5,roughness:.25,metalness:.15});spikeGlow.userData.shared=true;
 const finishKind=(hex,metal=false)=>metal?'metal':hex===0x896044||hex===0x67442f?'wood':hex===0x151c20||hex===0x30383c?'polymer':hex===0x748087?'metal':'paint';
@@ -248,6 +250,7 @@ function optic(g, kind, frontZ = -0.7) {
   }
 }
 export function makeBlaster(id,wrap='') {
+  if(weaponTemplates.has(id))return applyWrap(cloneModelTemplate(weaponTemplates.get(id)),wrap);
   const w = weapon(id),
     g = new THREE.Group(),
     c = finishes[id]||finishes.sprinter;
@@ -504,7 +507,11 @@ export function makeBlaster(id,wrap='') {
   g.add(muzzle);
   g.userData.muzzle = muzzle;
   g.userData.sightY = w.sightY;
-  return applyWrap(g,wrap);
+  // Geometry is immutable across instances; articulated sockets and owned
+  // materials (especially optic lenses) remain private to each clone.
+  g.traverse(m=>{if(m.geometry)m.geometry.userData.shared=true;});
+  if(weaponTemplates.size<32)weaponTemplates.set(id,g);
+  return applyWrap(cloneModelTemplate(g),wrap);
 }
 export function disposeBlaster(group) {
   group.traverse((o) => {

@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      input_response_update: ${{ steps.scope.outputs.input_response_update }}
       tournament_teams_update: ${{ steps.scope.outputs.tournament_teams_update }}
       performance217_update: ${{ steps.scope.outputs.performance217_update }}
       anatomy216_update: ${{ steps.scope.outputs.anatomy216_update }}
@@ -444,6 +445,14 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('icon_voting_update='+str(icon_update).lower()+'\n')
             if icon_update: out.write('focused=true\n')
+
+          response_files=set(subprocess.check_output(['git','diff','--name-only','0fb8e4f28f3611ca5f93b150433d5984a47267de','HEAD'],text=True).splitlines())
+          response_allowed={'tests/field-polish.test.js', 'src/main.js', 'server/realtime/authority.js', 'src/view.js', 'tests/input-response.test.js', 'src/simulation.js', 'src/remote-input.js', 'scripts/input-response-performance.mjs', 'src/action-network.js', 'scripts/input-response-browser-check.mjs', 'src/guest-actions.js', 'public/inventory-previews/manifest.json', 'src/weapons.js', 'package.json', '.github/workflows/pages.yml', 'src/model-template.js', 'docs/UPDATE_224.md', 'tests/remote-input.test.js', 'package-lock.json', 'src/frame-stats.js', 'src/releases.js', 'src/royale-ui.js'}
+          response_update={'src/guest-actions.js','src/model-template.js','tests/input-response.test.js'}<=response_files and response_files<=response_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.31.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('input_response_update='+str(response_update).lower()+'\n')
+            if response_update: out.write('focused=true\n')
+          print('Input responsiveness, queue recovery and switching reuse:',response_update)
           PY
   build:
     needs: scope
@@ -458,6 +467,22 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Input delay, pickups, model reuse and multiplayer regressions
+        if: needs.scope.outputs.input_response_update == 'true'
+        run: |
+          node --test --test-concurrency=2 tests/input-response.test.js tests/remote-input.test.js tests/input-clock.test.js tests/guest-responsiveness.test.js tests/guest-presentation.test.js tests/equip.test.js tests/arms.test.js tests/weapon-presentation.test.js tests/weapon-balance.test.js tests/authority-performance.test.js tests/snapshot-codec.test.js tests/match-integrity.test.js tests/performance217.test.js tests/render-performance.test.js tests/release-history.test.js tests/building-pickup-148.test.js tests/field-polish.test.js tests/frame-pacing.test.js tests/main-match-singleton.test.js
+          git worktree add --detach ../input-baseline 0fb8e4f28f3611ca5f93b150433d5984a47267de
+          ln -s "$GITHUB_WORKSPACE/node_modules" ../input-baseline/node_modules
+          INPUT_RESPONSE_BASELINE=../input-baseline node scripts/input-response-performance.mjs
+          node scripts/tournament-realtime-profile.mjs . 11 input-response
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.input_response_update == 'true'
+        with:
+          name: input-response-performance
+          path: |
+            test-results/input-response
+            test-results/performance217
+          retention-days: 14
       - name: Tournament admission, prizes, host handoff and player recovery
         if: needs.scope.outputs.tournament_teams_update == 'true'
         run: |
@@ -790,6 +815,19 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
+      - name: Real Cup keyboard responsiveness and complete WebGL presentation
+        if: needs.scope.outputs.input_response_update == 'true'
+        run: |
+          node scripts/input-response-browser-check.mjs
+          node scripts/performance-browser-check.mjs . input-response
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.input_response_update == 'true'
+        with:
+          name: input-response-browser
+          path: |
+            test-results/input-response
+            test-results/performance217
+          retention-days: 14
       - name: Icon voting modal and owner forms
         if: needs.scope.outputs.icon_voting_update == 'true'
         run: |
@@ -1384,7 +1422,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
+        if: needs.scope.outputs.input_response_update != 'true' && needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
       - name: Install the focused headless desktop runtime
         if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true'
         run: |
@@ -1399,7 +1437,9 @@ jobs:
       - name: Matching website/relay build, private PvP, paused Zombies and live lobby
         if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true'
         run: |
-          if [ "${{ needs.scope.outputs.tournament_teams_update }}" = "true" ]; then
+          if [ "${{ needs.scope.outputs.input_response_update }}" = "true" ]; then
+            node scripts/performance-live-check.mjs
+          elif [ "${{ needs.scope.outputs.tournament_teams_update }}" = "true" ]; then
             node scripts/tournament-teams-live-check.mjs
           elif [ "${{ needs.scope.outputs.performance217_update }}" = "true" ]; then
             node scripts/performance-live-check.mjs

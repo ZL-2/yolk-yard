@@ -1,4 +1,10 @@
 export const RELEASE_NOTES = [
+ {number:'224',title:'Responsive controls and smoother weapon switching',changes:[
+  'Weapon selection and draw animations respond locally before the host replies. Confirmations no longer restart the draw; inventory ownership, ammunition and hit results stay authoritative.',
+  'Persistent stale movement queues recover without increasing movement speed. Normal packet jitter keeps every movement step. Inventory and pickup confirmations receive earlier, rate-limited updates.',
+  'Weapon models and first-person arms are reused instead of rebuilt on every switch, with bounded caches and independent animated parts. Host movement renders from the current simulation step, and nearby pickup prompts follow predicted local movement.',
+  'Pickup requests show immediate pending feedback and only complete after confirmation. Performance reports now show actual frame durations, worst recent frames and freeze counts. Version 6.31.0 / protocol 87.'
+ ]},
  {number:'223',title:'Live owner controls and reviewable fair play',changes:[
   'In-match owner access opens a movable, mobile-friendly window for warnings, removals, suspensions, text mutes, full teaming or cheating penalties, announcements and match closure. Private slash commands never enter chat; affected players receive saved notices and restriction end times.',
   'Teaming checks use repeated cooperative encounters or strong deliberate cooperation with reciprocal supplies. Short separation and token shots do not erase evidence. Only violations during a Cup exclude the next scheduled Cup; the one-hour all-mode suspension and denied match rewards still apply in normal matches.',
