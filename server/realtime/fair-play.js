@@ -1,3 +1,4 @@
+import {PublicFairPlay} from './royale-fair-play.js';
 import {tournamentName} from '../../src/tournament.js';
 import {TeamingMonitor} from './teaming-monitor.js';
 
@@ -5,7 +6,7 @@ const HOUR=3600000;
 const clean=(v,n=1000)=>String(v??'').replace(/[\u0000-\u001f]/g,' ').trim().slice(0,n);
 export class FairPlayService{
  constructor(relay,{now=Date.now}={}){
-  this.relay=relay;this.db=relay.owner.db;this.now=now;this.byPlayer=new Map();
+  this.relay=relay;this.publicMatches=new PublicFairPlay(relay,{now});this.db=relay.owner.db;this.now=now;this.byPlayer=new Map();
   if(this.db.db)this.db.db.exec(`CREATE TABLE IF NOT EXISTS teaming_cases(id TEXT PRIMARY KEY, created INTEGER NOT NULL, updated INTEGER NOT NULL, status TEXT NOT NULL, data TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS teaming_penalties(id TEXT PRIMARY KEY, player TEXT NOT NULL, created INTEGER NOT NULL, until_at INTEGER NOT NULL, revoked INTEGER, data TEXT NOT NULL);
    CREATE INDEX IF NOT EXISTS teaming_player ON teaming_penalties(player);`);
@@ -33,9 +34,11 @@ export class FairPlayService{
  sync(player){const status=this.status(player);this.relay.parties.send(this.relay.parties.users.get(player),{type:'fair-play',status});return status;}
  assertPlay(player){if(!player)return;const r=this.penalties(player).filter(r=>r.until_at>this.now()).sort((a,b)=>b.until_at-a.until_at)[0];if(r)throw Error('Teaming suspension: all game modes are blocked until '+new Date(r.until_at).toISOString()+'. Your next scheduled Cup is also prohibited.');}
  assertCup(player,id){this.assertPlay(player);if(this.status(player).cups.some(c=>c.id===id))throw Error('You are prohibited from this Cup because of confirmed teaming. The Cup restriction continues after the one-hour suspension ends.');if(this.disqualified(player,id))throw Error('You were removed from this Cup for teaming and cannot re-enter.');}
+ disqualifiedMatch(player,room,matchId){return this.penalties(player).some(p=>p.data.room===room.split('-').at(-1)&&p.data.matchId===matchId);}
  disqualified(player,eventId){return !!eventId&&this.penalties(player).some(p=>p.data.eventId===eventId);}
  observe(room){
-  if(!room.tournament)return; // Client-hosted snapshots are not trusted evidence.
+  if(room.sim?.options.mode!=='royale')return;
+  if(room.teamingMatch!==room.sim.matchId){room.teamingMatch=room.sim.matchId;delete room.teamingMonitor;}
   if(!room.teamingMonitor){room.teamingMonitor=new TeamingMonitor({identity:id=>this.relay.progression.accounts.get(room.members.get(id)?.progressId)?.socialId,onFlag:data=>this.flag({...data,room:room.code,matchId:room.sim.matchId,eventId:room.eventId})});room.sim.fairPlayObserver=e=>room.teamingMonitor.combat(e,room.sim);room.sim.fairPlayTransfer=e=>room.teamingMonitor.transfer(e);}
   try{room.teamingMonitor.sample(room.sim);}catch{if(!this.lastErrorAt||this.now()-this.lastErrorAt>60000){this.lastErrorAt=this.now();this.relay.owner.systemEvent('fair-play-error','Fair-play evidence could not be saved. No unsaved penalty was applied.');}}
  }

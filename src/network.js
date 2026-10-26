@@ -1,3 +1,4 @@
+import {RoyaleFairPlay} from './royale-fair-play.js';
 import {checkpointWorldKey} from './action-network.js';
 import {isPublicCode} from './public-royale.js';
 import {rewardFrame} from './rewards.js';
@@ -264,6 +265,11 @@ export class Network {
     conn.on("error", close);
   }
   syncRoster(){this.callbacks.onRoster?.([this.id,...[...this.connections].filter(([,c])=>c.open).map(([id])=>id),...this.reconnectingMembers.keys()]);}
+  observeFairPlay(state){
+    if(!this.officialPublic||this.serverAuthority||state.options?.mode!=='royale')return;
+    this.fairPlayObserver??=new RoyaleFairPlay(data=>this.peer?.control?.({type:'royale-fair-play',...data}));
+    this.fairPlayObserver.observe(state,this.isHost?this.id:this.hostId);
+  }
   publicReady(){
     if(!this.ready||this.isHost||!this.lastCheckpoint?.simulation)return;
     const checkpoint=this.lastCheckpoint.simulation,ready=globalThis.document?.hidden!==true&&!this.members.find(m=>m.id===this.id)?.spectator,key=checkpoint.matchId+':'+ready;
@@ -361,6 +367,7 @@ export class Network {
           if(msg.checkpoint)this.lastCheckpoint=msg.checkpoint;
           this.publicReady();
           this.snapshot=s;
+          this.observeFairPlay(s);
           this.chatEnabled=s.chatEnabled !== false;
           this.chatMuted=Array.isArray(s.chatMuted)?s.chatMuted.filter(id=>typeof id==='string').slice(0,20):[];
           this.visibility = s.visibility === "public" ? "public" : "private";
@@ -488,6 +495,7 @@ export class Network {
     if(!this.isHost)return;
     if(this.serverAuthority)return;
     this.snapshot = state;
+    this.observeFairPlay(state);
     if (!this.lastPublish || performance.now() - this.lastPublish > 2000 || this.lastPublishedStage!==(state.boxfight?.stage||state.royale?.stage) || this.lastPublishedPhase!==state.phase) { this.lastPublish = performance.now();this.lastPublishedStage=state.boxfight?.stage||state.royale?.stage;this.lastPublishedPhase=state.phase;this.publishRoom(); }
     if(this.officialPublic){
       const scores=(state.royale?.matchId||state.matchId)+':'+state.phase+':'+state.players.filter(p=>!p.bot&&!p.lateSpectator).map(p=>p.id+','+(p.kills||0)+','+(p.place||0)).join(';');
@@ -606,6 +614,7 @@ export class Network {
         s.events=(s.events||[]).slice(-120).map(e=>{const next={...e};for(const key of ['name','targetName'])if(key in next)next[key]=safeName(next[key]);for(const key of ['text','winner','weapon'])if(key in next)next[key]=safeSystemText(next[key]);return next;});
         this.lastState=performance.now();this.snapshot=s;this.members=s.network?.members||this.members;this.hostId=s.network?.hostId||this.hostId;
         this.hostHeartbeat.contact(this.lastState);
+        this.observeFairPlay(s);
         this.chatEnabled=s.chatEnabled!==false;this.chatMuted=s.chatMuted||[];
         if(msg.checkpoint)this.lastCheckpoint=msg.checkpoint;this.publicReady();this.callbacks.onState?.(s);
       }else if(msg.type==='chat-message')this.callbacks.onChat?.(msg.message);

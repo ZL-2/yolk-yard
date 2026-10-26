@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'222',title:'Automatic fair play in regular Battle Royale',changes:[
+  'Regular public Battle Royale now checks sustained cross-team cooperation automatically. Removal requires matching automatic evidence from the host and two other non-accused players; reports alone never trigger penalties.',
+  'Detected players are removed during the match, suspended from every mode for one hour and excluded from the next scheduled Cup. If the host is removed, an eligible remaining player takes over. Removed players cannot collect final match rewards.',
+  'Fixed the live Royale phase check in Cup detection and reset evidence between rounds. Client-hosted checks are conservative and can miss cases with too few observers; they do not provide server-authoritative anti-cheat guarantees. Version 6.29.0 / protocol 87.'
+ ]},
  {number:'221',title:'Automatic Cup fair play and readable restrictions',changes:[
   'Server-run Cups automatically monitor sustained cooperation between opponents. Multiple independent gameplay signals are required; nearby players, ordinary third parties, legitimate teammates and reports alone do not trigger removals.',
   'Detected teamers are removed from the current Cup, excluded from its rewards, suspended from all game modes for one hour and prohibited from the next scheduled Cup. Restrictions persist across reconnects and remain visible with their end time and Cup details.',

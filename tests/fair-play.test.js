@@ -9,7 +9,7 @@ import {OwnerStore} from '../server/realtime/owner-store.js';
 import {fixture,until} from './helpers/public-match.js';
 import {TOURNAMENT} from '../src/tournament.js';
 
-function scenario({size=1,team=false,mutual=false,shots=false,shared=true,reciprocal=false,stage='battle',radius=1000,storm=false,visible=true,group=2,duration=215,gap=false,removeDuringFlag=false}={}){
+function scenario({size=1,team=false,mutual=false,shots=false,shared=true,reciprocal=false,stage='active',radius=1000,storm=false,visible=true,group=2,duration=215,gap=false,removeDuringFlag=false}={}){
  const flags=[],players=new Map();
  for(let i=0;i<group;i++)players.set('p'+i,{id:'p'+i,name:'Player '+i,x:0,y:0,z:i*3,team:team?0:i,health:100,contestant:true,connected:true,flight:'ground'});
  for(let i=0;i<3;i++)players.set('v'+i,{id:'v'+i,x:800,y:0,z:800+i*60,team:i+10,health:100,contestant:true,connected:true,flight:'ground'});
@@ -31,7 +31,7 @@ test('sustained repeated coordinated combat auto-detects each of three solo team
 });
 test('reciprocal supplies corroborate two distinct shared fights for earlier live removal',()=>{const {penalties}=scenario({reciprocal:true,duration:125});assert.equal(penalties.length,1);assert.equal(penalties[0].evidence.reciprocalSupplies,true);assert.ok(penalties[0].evidence.closeSeconds<180);});
 for(const size of [2,3,4])test(`legitimate ${size}-player teammates never trigger detection`,()=>{assert.equal(scenario({size,team:true,reciprocal:true}).flags.length,0);assert.equal(scenario({size}).penalties.length,1,'Opposing teams still monitored');});
-for(const [name,options]of Object.entries({proximity:{shared:false},'brief encounter':{duration:100},'ordinary third party':{duration:140},'shooting each other':{mutual:true},'missed hostile shots':{shots:true},'spawn island':{stage:'spawn-island'},'battle bus':{stage:'bus'},'final circle':{radius:50},'storm escape':{radius:100,storm:true},'separated by cover':{visible:false},'long telemetry gaps':{gap:true}}))test(name+' is not automatically punished',()=>{assert.equal(scenario(options).penalties.length,0);});
+for(const [name,options]of Object.entries({proximity:{shared:false},'brief encounter':{duration:100},'ordinary third party':{duration:140},'shooting each other':{mutual:true},'missed hostile shots':{shots:true},'spawn island':{stage:'spawn-island'},'battle bus':{stage:'battle-bus'},'final circle':{radius:50},'storm escape':{radius:100,storm:true},'separated by cover':{visible:false},'long telemetry gaps':{gap:true}}))test(name+' is not automatically punished',()=>{assert.equal(scenario(options).penalties.length,0);});
 
 function harness(path=null){
  let now=1000000;const db=new OwnerStore({path,now:()=>now}),removed=[],sent=[];
@@ -79,4 +79,99 @@ test('real Cup removal disconnects players, blocks reservations and rewards, kee
   assert.equal((await post('fair-play',{})).status,401);assert.equal((await post('action',{action:'teaming-revoke',caseId:id,requestId:randomUUID(),reason:'Untrusted penalty reversal attempt.'})).status,401);
   const token=(await post('login',{code})).data.token;const requestId=randomUUID(),body={token,action:'teaming-revoke',caseId:id,requestId,reason:'Verified fixture reversal of the automated penalty.'};assert.equal((await post('action',body)).status,200);assert.equal((await post('action',body)).status,200);assert.equal((await post('action',{...body,caseId:'different'})).status,409);assert.doesNotThrow(()=>r.fairPlay.assertCup(players[0].id,next.id));
  }finally{await f.close();}
+});
+
+test('public Battle Royale requires host plus two distinct non-accused observations before the same automatic penalties',async()=>{
+ const h=harness();try{
+  const {penalties}=scenario(),flag=penalties[0],ids=['p0','p1','v0','v1','v2'];
+  for(const id of ids)h.r.parties.store.identities.set(id,{id,profile:{name:id}});
+  const room={code:'PUBLIC22',options:{mode:'royale',teamSize:1},host:{peer:'v0',id:'v0'},state:{matchId:'public-match',phase:'playing',stage:'active',time:215},members:new Map(ids.map(id=>[id,{id,admission:{memberId:id,partyId:id}}]))};
+  h.r.publicHost={roomFor:peer=>room.members.has(peer.id)?room:null};const service=h.service.publicMatches;
+  const send=(id,flag,extra={})=>service.receive({id},{hostId:'v0',matchId:'public-match',flag,...extra});
+  for(let t=0;t<=180;t+=5){h.setTime(1000000+t*1000);for(const id of ids)send(id);}
+  send('v1',flag);send('v2',flag);service.flush();assert.deepEqual(h.removed,[],'Two clients cannot bypass missing host evidence');
+  send('v0',flag);service.flush();assert.deepEqual(h.removed,['p0','p1']);assert.throws(()=>h.service.assertPlay('p0'),/suspension/);assert.equal(h.service.status('p1').cups[0].id,'cup1');
+  const row=h.service.overview().cases[0];assert.equal(row.evidence.source,'corroborated public match');assert.deepEqual(row.evidence.witnesses.sort(),['v1','v2']);assert.equal(row.decision.automatic,true);
+  send('v0',flag);service.flush();assert.equal(h.removed.length,2,'Replay cannot extend a penalty');
+ }finally{await h.db.close();}
+});
+
+test('public evidence rejects single-host accusations, accused witnesses, short sessions, malformed data, mismatched trails and stale hosts',async()=>{
+ const h=harness();try{
+  const flag=scenario().penalties[0],ids=['p0','p1','v0','v1','v2'];for(const id of ids)h.r.parties.store.identities.set(id,{id,profile:{name:id}});
+  const room={code:'PUBLIC22',options:{mode:'royale',teamSize:1},host:{peer:'v0',id:'v0'},state:{matchId:'m',phase:'playing',stage:'active',time:215},members:new Map(ids.map(id=>[id,{id,admission:{memberId:id,partyId:id}}]))};h.r.publicHost={roomFor:()=>room};const service=h.service.publicMatches;
+  const send=(id,flag,extra={})=>service.receive({id},{hostId:'v0',matchId:'m',flag,...extra});
+  for(const id of ids)send(id,flag);service.flush();assert.deepEqual(h.removed,[],'Fresh connections cannot submit three minutes of invented history');
+  for(let t=5;t<=180;t+=5){h.setTime(1000000+t*1000);for(const id of ids)send(id);}
+  send('v0',flag);send('p0',flag);send('p1',flag);service.flush();assert.deepEqual(h.removed,[],'Accused cannot corroborate their own case');
+  send('outsider',flag);send('v1',{...flag,evidence:{...flag.evidence,trail:null}});send('v2',flag,{hostId:'old-host'});service.flush();assert.deepEqual(h.removed,[]);
+  const divergent=structuredClone(flag);for(const p of divergent.evidence.trail){p.a.x+=100;p.b.x+=100;}
+  send('v1',divergent);send('v2',flag);service.flush();assert.deepEqual(h.removed,[],'Observers must agree on actual movement, not just a verdict');
+  room.host={peer:'v1',id:'v1'};send('v0',flag);service.flush();assert.deepEqual(h.removed,[],'Demoted host evidence is fenced');
+ }finally{await h.db.close();}
+});
+
+test('actual Royale active/drop phase names are monitored and a new server match discards old evidence',async()=>{
+ assert.equal(scenario({stage:'active'}).penalties.length,1);assert.equal(scenario({stage:'drop'}).penalties.length,1);assert.equal(scenario({stage:'battle'}).penalties.length,0);
+ const h=harness();try{h.r.progression={accounts:new Map()};const room={code:'S',members:new Map(),sim:{...scenario().sim,matchId:'first'}};
+ h.service.observe(room);const first=room.teamingMonitor;room.sim.matchId='second';h.service.observe(room);assert.notEqual(room.teamingMonitor,first);assert.equal(room.teamingMatch,'second');
+ }finally{await h.db.close();}
+});
+
+test('regular client snapshot monitoring emits automatic evidence without a report button',async()=>{
+ const {RoyaleFairPlay}=await import('../src/royale-fair-play.js');const messages=[],client=new RoyaleFairPlay(m=>messages.push(m));
+ const {sim}=scenario();let eventId=0;
+ for(let time=0;time<=215;time++){
+  for(const p of sim.players.values()){p.y=100;if(p.id.startsWith('p'))p.x=time;}
+  const events=[];if([50,110,190].includes(time))for(const player of ['p0','p1'])events.push({id:++eventId,type:'hit',time,player,target:'v'+[50,110,190].indexOf(time),amount:35});
+  client.observe({options:{mode:'royale',teamSize:1,map:'sunnybreak'},time,phase:'playing',players:[...sim.players.values()],events,royale:{matchId:'real-snapshot-shape',stage:'active',elapsed:time,storm:sim.storm,builds:[],worldDamage:{},buildVersion:0}},'v0');
+ }
+ assert.ok(messages.filter(m=>!m.flag).length>=40,'Automatic authenticated heartbeats establish observation duration');assert.equal(messages.filter(m=>m.flag).length,1);assert.deepEqual(messages.find(m=>m.flag).flag.players,['p0','p1']);
+ client.observe({options:{mode:'royale',teamSize:1,map:'sunnybreak'},time:216,phase:'playing',players:[...sim.players.values()],events:[],royale:{matchId:'real-snapshot-shape',stage:'active',elapsed:216,storm:sim.storm,builds:[],worldDamage:{}}},'v1');assert.equal(client.monitor.pairs.size,1);assert.equal(client.monitor.pairs.values().next().value.seconds,0,'Host transfer starts fresh evidence');
+});
+
+test('regular live socket enforcement removes an accused host and guest, retains other players, and blocks rejoining',async()=>{
+ const f=await fixture();try{
+  const users=[];for(const name of ['Fair Host','Fair Guest','Fair Witness One','Fair Witness Two','Fair Witness Three'])users.push(await f.user(name));
+  const games=[];for(const u of users){await u.ask('queue');games.push(await f.game(u));}
+  for(const g of games)clearInterval(g.clock);
+  const relay=f.app.relay,room=relay.publicHost.roomFor(relay.peers.get(games[0].net.peer.id)),sim=games[0].sim;
+  sim.beginBattle();sim.time=215;sim.elapsed=215;sim.stage='active';games[0].net.broadcast(sim.snapshot());games[0].net.publishRoom();
+  await until(()=>room.state?.stage==='active','Active public match');
+  let now=1000000;relay.fairPlay.publicMatches.now=()=>now;
+  const send=(game,flag)=>game.net.peer.control({type:'royale-fair-play',matchId:sim.matchId,hostId:games[0].net.id,flag});
+  for(let t=0;t<=180;t+=5){now=1000000+t*1000;for(const game of games)send(game);await new Promise(resolve=>setTimeout(resolve,3));}
+  await until(()=>room.fairPlayObservers?.size===5,'All authenticated observers registered');
+  // Timing uses the server clock. Ensure the asynchronous socket queue observed
+  // the whole window even on a slow test runner.
+  for(const observer of room.fairPlayObservers.values())observer.since=now-180000;
+  const flag=structuredClone(scenario().penalties[0]);const ids=new Map(['p0','p1','v0','v1','v2'].map((id,i)=>[id,games[i].net.id]));
+  flag.players=flag.players.map(id=>ids.get(id));for(const hit of flag.evidence.hits){hit.player=ids.get(hit.player);hit.target=ids.get(hit.target);}
+  for(const game of [games[0],games[2],games[3]])send(game,flag);
+  await until(()=>relay.fairPlay.status(users[0].id).until,'Automatic public-match penalty');
+  for(const i of [0,1]){assert.equal(relay.parties.users.get(users[i].id).inMatch,false);assert.equal(room.members.has(games[i].net.peer?.id),false);assert.throws(()=>relay.fairPlay.assertPlay(users[i].id),/suspension/);assert.ok((await users[i].ask('fair-play-status')).until);}
+  for(const i of [2,3,4]){assert.doesNotThrow(()=>relay.fairPlay.assertPlay(users[i].id));assert.equal(relay.parties.users.get(users[i].id).inMatch,true);}
+  assert.equal(relay.fairPlay.disqualifiedMatch(users[0].id,room.key,sim.matchId),true,'No final rewards for the removed player');
+  await until(()=>games.slice(2).some(g=>g.promotions>0),'An innocent player takes over the removed host',12000);
+ }finally{await f.close();}
+});
+
+test('corroborated three-player rings are collected before the first removal changes membership',async()=>{
+ const h=harness();try{
+  const flags=scenario({group:3}).penalties,ids=['p0','p1','p2','v0','v1','v2'];for(const id of ids)h.r.parties.store.identities.set(id,{id,profile:{name:id}});
+  const room={code:'PUBLIC22',options:{mode:'royale',teamSize:1},host:{peer:'v0',id:'v0'},state:{matchId:'ring',phase:'playing',stage:'active',time:215},members:new Map(ids.map(id=>[id,{id,admission:{memberId:id,partyId:id}}]))};h.r.publicHost={roomFor:()=>room};const service=h.service.publicMatches;
+  h.r.owner.disconnectPlayer=id=>{h.removed.push(id);room.members.delete(id);};
+  const send=(id,flag)=>service.receive({id},{hostId:'v0',matchId:'ring',flag});
+  for(let t=0;t<=180;t+=5){h.setTime(1000000+t*1000);for(const id of ['v0','v1','v2'])send(id);}
+  for(const flag of flags)for(const id of ['v0','v1','v2'])send(id,flag);
+  service.flush();assert.deepEqual(h.removed.sort(),['p0','p1','p2']);assert.equal(h.service.penalties('p0').length,1);
+ }finally{await h.db.close();}
+});
+
+test('regular-match settlement cannot award a removed player after the hourly suspension expires',async()=>{
+ const {ProgressionService}=await import('../server/realtime/progression.js');const h=harness();try{
+  h.detect(['a','b'],{eventId:null});h.setTime(5000000);assert.doesNotThrow(()=>h.service.assertPlay('a'));
+  const progression=new ProgressionService(h.r,{path:null});await progression.ready;const account=progression.account('progress-a');account.socialId='a';
+  const match={id:'settlement',room:'yolk-yard-v87-ROOM',state:{matchId:'match1'},players:new Map([['a',{id:'a',identity:'progress-a'}]])};progression.settle(match);assert.equal(match.finished,true);assert.deepEqual(account.receipts,[]);
+ }finally{await h.db.close();}
 });
