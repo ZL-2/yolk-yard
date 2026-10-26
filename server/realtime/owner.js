@@ -146,9 +146,9 @@ export class OwnerService {
    if(route==='/owner/icon-voting'&&req.method==='POST'){
     if(!relay.iconVoting)throw Error('Voting is unavailable');
     if(body.action==='list'){json(res,200,relay.iconVoting.summary(),origin);return;}
-    if(!['edit','delete'].includes(body.action))throw Error('Unknown owner voting action');
+    if(!['nominate','edit','delete'].includes(body.action))throw Error('Unknown owner voting action');
     const data=await relay.iconVoting.mutate(null,body,true);
-    this.audit(req,body,'icon-vote-'+body.action,'Owner '+body.action+' voting option',body.id,{first:body.first,last:body.last,previousFirst:body.expectedFirst,previousLast:body.expectedLast});
+    this.audit(req,body,'icon-vote-'+body.action,'Owner '+body.action+' voting option',body.id,{pollId:body.pollId,category:body.category,text:body.text,previousRevision:body.expectedRevision});
     json(res,200,data,origin);return;
    }
    if(route==='/owner/match'&&req.method==='POST'){json(res,200,body.action?await this.match.action(req,body):this.match.overview(body),origin);return;}

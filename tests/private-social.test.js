@@ -1,3 +1,4 @@
+import {completeBundleVote} from './helpers/icon-vote.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
@@ -24,7 +25,7 @@ async function fixture(){
   const u={profile:safeProfile({name}),launches:[],invites:[],pending:new Map(),serial:0},ws=new globalThis.WebSocket(base+'/social');u.ws=ws;users.push(u);
   ws.on('open',()=>ws.send(JSON.stringify({type:'hello',version:VERSION,profile:u.profile})));
   ws.on('error',()=>{});ws.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='hello')Object.assign(u,m);if(m.type==='party')u.party=m.party;if(m.type==='invite')u.invites.push(m.invite);if(m.type==='launch')u.launches.push(m.launch);if(m.type==='reply'){const r=u.pending.get(m.request);if(r){u.pending.delete(m.request);clearTimeout(r.timer);m.error?r.reject(Error(m.error)):r.resolve(m.result);}}});
-  u.ask=(type,data={})=>new Promise((resolve,reject)=>{const request=++u.serial,timer=setTimeout(()=>reject(Error('No reply '+type)),10000);u.pending.set(request,{resolve,reject,timer});ws.send(JSON.stringify({type,...data,request}));});await wait(()=>u.party);return u;
+  u.ask=(type,data={})=>new Promise((resolve,reject)=>{const request=++u.serial,timer=setTimeout(()=>reject(Error('No reply '+type)),10000);u.pending.set(request,{resolve,reject,timer});ws.send(JSON.stringify({type,...data,request}));});await wait(()=>u.party);await completeBundleVote(app.relay.iconVoting,u.id);return u;
  }
  async function invite(a,b){await a.ask('invite',{id:b.id});await wait(()=>b.invites.length);await b.ask('accept',{id:b.invites.at(-1).id});await wait(()=>a.party.members.some(m=>m.id===b.id));}
  async function launch(u){

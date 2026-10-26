@@ -15,7 +15,7 @@ export class OwnerConsole{
   Object.assign(this,{modal,screen,dialog,wallet,onWalletChange,onMapEditor,onCampaign,identity,token:null,expires:0,progress:0,last:0,taps:0,lastTap:0,tab:'overview',range:'30',mode:'',q:'',offset:0,statusFilter:'',kind:'',historyType:'',auto:false,serial:0});
   this.replay=new OwnerReplay({api:this});
   tabs.fairplay=['Fair play','Automatic teaming enforcement, evidence and penalty reversals.'];
-  tabs.icons=['Icon Series','Edit or delete community voting options.'];
+  tabs.icons=['Icon Series','Jim McLaughlin’s bundle: add, edit or delete options in all five categories.'];
   tabs.campaign=['Campaign lab','An original single-player mission. Available only from this control room.'];
   tabs.compete=['Compete schedule','Create, edit, duplicate, cancel and remove tournaments. Server-saved dates, rewards and results.'];
   dialog.addEventListener('click',e=>{const b=e.target.closest('[data-oc-cup]');if(b&&!b.disabled){e.preventDefault();try{tournamentOwnerClick(this,b);}catch(error){this.fail(error);}}});

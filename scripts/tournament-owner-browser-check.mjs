@@ -1,3 +1,4 @@
+import {seedBundleVote,voteInBrowser} from '../tests/helpers/icon-vote.js';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {createServer} from 'vite';
@@ -12,9 +13,9 @@ const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleF
 try{
  await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${f.app.server.address().port}/game'};`}));
  await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Schedule Reviewer',weapon:'sprinter'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,fpsLimit:30}));localStorage.setItem('ravelfront-stormspike-kestrel-199-dismissed','yes');});
- f.app.relay.iconVoting.now=()=>Date.parse('2026-10-23T18:00Z');await f.app.relay.iconVoting.mutate('browser-fixture',{action:'nominate',first:'Fixture',last:'Operator'});
+ await seedBundleVote(f.app.relay.iconVoting);
  console.log('Opening full game owner editor');await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);await page.waitForFunction(()=>!document.querySelector('#loading')||document.querySelector('#loading').hidden);
- await page.locator('.icon-voting[open] [data-candidate]').first().click();await page.locator('.icon-voting [data-cast]').click();await page.locator('.icon-voting[open]').waitFor({state:'hidden'});
+ await voteInBrowser(page);
  await page.locator('body').click({position:{x:700,y:70}});await page.keyboard.type('RAVELFRONT');await page.locator('#owner-code').fill(code);await page.locator('#owner-form button').click();await page.locator('#oc-content[aria-busy="false"]').waitFor();
  await page.locator('[data-oc-nav="fairplay"]').click();await page.getByText('Automatic live enforcement',{exact:true}).waitFor();
  console.log('Owner authenticated');await page.locator('[data-oc-nav="compete"]').click();await page.locator('[data-oc-cup="new"]').waitFor();

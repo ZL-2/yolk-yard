@@ -47,6 +47,7 @@ class TournamentEvent{
  }
  queue(u,{spectate=false}={}){
   this.tick();const EVENT=this.event,phase=this.phase,p=this.relay.parties,size=tournamentTeamSize(EVENT);
+  if(!u.inMatch)this.relay.iconVoting?.assertCanPlay(u.id);
   this.relay.owner.assertAdmission(u.id,'royale','public');this.relay.fairPlay?.assertCup(u.id,this.id);
   if(u.inMatch)throw Error('Return to the lobby before joining the tournament.');
   if(phase!=='entry'&&phase!=='running')throw Error(phase==='scheduled'||phase==='preparing'?`Tournament entry opens at ${eventTime(EVENT.opensAt)} New York time.`:'The tournament is over. Normal matchmaking is open.');
@@ -66,6 +67,7 @@ class TournamentEvent{
    for(const member of members){
     if(!member||!p.connected(member)||member.inMatch)throw Error('Every party member must be online and in the lobby before entering.');
     if(this.entryTeams.has(member.id))throw Error('A party member already has a tournament team. They must rejoin their original entry.');
+    this.relay.iconVoting?.assertCanPlay(member.id);
     this.relay.owner.assertAdmission(member.id,'royale','public');this.relay.fairPlay?.assertCup(member.id,this.id);
    }
    group={id:randomUUID(),members:members.map(m=>m.id)};

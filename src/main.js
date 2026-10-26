@@ -320,6 +320,7 @@ const ownerRuntime=new OwnerRuntime();
 const fairPlay=new FairPlayRuntime({poll:()=>party?.ready?party.request('fair-play-status'):null,onRemoval:status=>{if(net||screen==='game')leave(false,false);modal('Removed for '+(status.kind||'teaming'),'<p>You have been removed from the match. All game modes are suspended for one hour.'+(status.cups?.length?' Because this violation occurred during a Cup, you also cannot enter the next scheduled Cup.':'')+'</p><p>Your restriction and remaining time stay visible in the lobby. Use Report a problem if you believe this was a mistake.</p><button data-action="close">RETURN TO LOBBY</button>','fair-play');}});ownerRuntime.fairPlay=fairPlay;
 const ownerNotices=new OwnerMatchNotices({poll:()=>party?.ready?party.request('owner-match-status'):null,ack:ids=>party.request('owner-match-ack',{ids})});ownerRuntime.ownerNotices=ownerNotices;
 const ownerConsole=new OwnerConsole({identity:()=>party?.id,onMapEditor:openOwnerMapEditor,onCampaign:openOwnerCampaign,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
+document.addEventListener('icon-owner-access',()=>ownerConsole.open());
 const ownerPanel=new OwnerMatchPanel({api:ownerConsole,context:()=>screen==='game'&&net?.ready?{code:net.code,matchId:state?.royale?.matchId||state?.matchId}:null,notify:message=>toast(message),onFocus:()=>{keys.clear();queuedActions.clear();scoreHeld=false;input.fire=false;input.aim=false;Object.assign(touch,{x:0,y:0,jump:false,fire:false,aim:false,reload:false,popper:false,sprint:false,interact:false});if(document.pointerLockElement)document.exitPointerLock();},onPlay:()=>{if(screen==='game'&&!dialog.open)void resume();}});
 startAnonymousVisits(()=>screen==='game'?(state?.options?.training?'training':state?.options?.mode||options.mode||'royale'):screen==='lobby'?'lobby':screen==='editor'?'editor':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
@@ -1369,12 +1370,14 @@ async function copy(text) {
   }
 }
 async function partyRequest(type,data={}){
+ if(type==='spectate-friend'&&!await requireIconVote())return null;
  try{return await party.request(type,data);}catch(error){errorToast(error.message);return null;}
 }
 let tournamentJoining=false;
 async function joinTournament(eventId,spectate=false){
  try{fairPlay.admission(eventId);}catch(error){return errorToast(error.message);}
  if(state)return toast('Return to the lobby to join the tournament.');
+ if(!await requireIconVote())return;
  if(tournamentJoining)return;
  tournamentJoining=true;
  try{return await party.request('tournament-join',{eventId,spectate});}
@@ -1440,6 +1443,7 @@ async function queueParty(custom=false,code=null){
 }
 async function queuePublicRoyale(spectate=false){
  if(state)return;
+ if(!await requireIconVote())return;
  if(await partyRequest('queue',{publicRoyale:true,spectate})){dialog.close();dialogType='';renderMenu();}
 }
 async function launchParty(launch){

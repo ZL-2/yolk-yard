@@ -1,3 +1,4 @@
+import {seedBundleVote,voteInBrowser} from '../tests/helpers/icon-vote.js';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {chromium} from 'playwright';
@@ -14,7 +15,7 @@ token=(await post('login',{code})).token;
 // Use the same authenticated schedule API as the website editor, not a coded event.
 const definition={...TOURNAMENTS[1],name:'Spectate Verification Cup',description:'Owner-created spectator verification event.',teamSize:3,opensAt:now+3600000,lockAt:now+3420000,startsAt:now+3660000,capacity:6,spectators:1};
 const created=await post('action',{action:'tournament-save',event:definition,revision:service.catalog.revision,requestId:randomUUID(),reason:'Isolated browser spectating verification.'}),event=service.event(created.eventId);
-f.app.relay.iconVoting.now=()=>Date.parse('2026-10-23T18:00Z');await f.app.relay.iconVoting.mutate('browser-fixture',{action:'nominate',first:'Fixture',last:'Operator'});
+await seedBundleVote(f.app.relay.iconVoting);
 const vite=await createServer({server:{host:'127.0.0.1',port:5300,strictPort:true,watch:null}});await vite.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage','--disable-background-timer-throttling','--disable-renderer-backgrounding']});
 const page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:.5,bypassCSP:true,permissions:['local-network-access']}),errors=[];page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(e.message));
@@ -22,7 +23,7 @@ try{
  if(process.env.SPARSE_ASSET_ORIGIN)await page.route(/\/(?:models|art|audio|inventory-previews|season|shop|loading|modes|compete|campaign)\//,async route=>{const url=new URL(route.request().url());if(url.origin!==origin)return route.continue();try{const response=await fetch(process.env.SPARSE_ASSET_ORIGIN+url.pathname,{signal:AbortSignal.timeout(30000)});await route.fulfill({status:response.status,contentType:response.headers.get('content-type')||'application/octet-stream',body:Buffer.from(await response.arrayBuffer())});}catch{await route.abort('failed');}});
  await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${f.app.server.address().port}/game'};`}));
  await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Cup Spectate Reviewer',weapon:'sprinter'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,fpsLimit:30}));localStorage.setItem('ravelfront-stormspike-kestrel-199-dismissed','yes');});
- console.log('Opening Cup lobby');await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);await page.locator('.icon-voting[open] [data-candidate]').first().click();await page.locator('.icon-voting [data-cast]').click();await page.locator('.icon-voting[open]').waitFor({state:'hidden'});
+ console.log('Opening Cup lobby');await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);await voteInBrowser(page);
  console.log('Lobby ready, starting edited Cup');const players=[await f.user('Cup Alpha'),await f.user('Cup Bravo')];now=definition.opensAt;service.tick();
  for(const u of players){console.log('Admitting',u.profile.name);await u.ask('tournament-join',{eventId:event.id});const g=await f.game(u);g.net.input({seq:1,dt:1/60,yaw:0,pitch:0});}
  await until(()=>[...event.room.sim.players.values()].every(p=>!p.loading),'Contestants loaded');event.room.sim.tickActivity=()=>{};

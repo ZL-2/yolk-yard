@@ -1,3 +1,4 @@
+import {seedBundleVote,voteInBrowser} from '../tests/helpers/icon-vote.js';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {createServer} from 'vite';
@@ -9,12 +10,12 @@ const vite=await createServer({server:{host:'127.0.0.1',port:5298,strictPort:tru
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']});
 const errors=[],pages=[],frames=[];
 try{
- f.app.relay.iconVoting.now=()=>Date.parse('2026-10-23T18:00Z');await f.app.relay.iconVoting.mutate('browser-fixture',{action:'nominate',first:'Fixture',last:'Operator'});
+ await seedBundleVote(f.app.relay.iconVoting);
  async function player(name){const context=await browser.newContext({viewport:{width:1280,height:900},deviceScaleFactor:.5,bypassCSP:true,permissions:['local-network-access']});const page=await context.newPage();pages.push(page);page.setDefaultTimeout(90000);page.on('pageerror',e=>{errors.push(e.message);console.error('Browser error:',e.message);});page.on('websocket',ws=>ws.on('framesent',frame=>frames.push(String(frame.payload))));
   if(process.env.SPARSE_ASSET_ORIGIN)await page.route(/\/(?:models|art|audio|inventory-previews|season|shop|loading|modes|compete|campaign)\//,async route=>{const url=new URL(route.request().url());if(url.origin!==origin)return route.continue();try{const response=await fetch(process.env.SPARSE_ASSET_ORIGIN+url.pathname);await route.fulfill({status:response.status,contentType:response.headers.get('content-type')||'application/octet-stream',body:Buffer.from(await response.arrayBuffer())});}catch{await route.abort('failed');}});
   await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${f.app.server.address().port}/game'};`}));
   await page.addInitScript(name=>{localStorage.setItem('yolk-profile',JSON.stringify({name,weapon:'sprinter'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,fpsLimit:30}));localStorage.setItem('ravelfront-stormspike-kestrel-199-dismissed','yes');},name);
-  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);await page.locator('.icon-voting[open] [data-candidate]').first().click();await page.locator('.icon-voting [data-cast]').click();await page.locator('.icon-voting[open]').waitFor({state:'hidden'});await page.evaluate(()=>window.__yolkTest.social('select',{mode:'ffa',access:'public'}));return page;
+  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);await voteInBrowser(page);await page.evaluate(()=>window.__yolkTest.social('select',{mode:'ffa',access:'public'}));return page;
  }
  const host=await player('Match Test Host'),owner=await player('Match Test Owner');
  await host.locator('#menu [data-action=lobby-play]').click();await host.waitForFunction(()=>window.__yolkTest.read().host&&window.__yolkTest.read().state?.phase==='playing');await host.locator('#loading-screen').waitFor({state:'hidden'});

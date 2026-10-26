@@ -3,6 +3,7 @@ import {chromium} from 'playwright';
 import {createServer} from 'vite';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {fixture,until} from '../tests/helpers/public-match.js';
+import {seedBundleVote,voteInBrowser} from '../tests/helpers/icon-vote.js';
 import {TOURNAMENT as E} from '../src/tournament.js';
 const origin='http://127.0.0.1:5302',out='test-results/input-response';await mkdir(out,{recursive:true});
 let now=E.lockAt-60000;
@@ -12,13 +13,14 @@ const vite=await createServer({server:{host:'127.0.0.1',port:5302,strictPort:tru
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage','--disable-background-timer-throttling','--disable-renderer-backgrounding']});
 const page=await browser.newPage({viewport:{width:1100,height:750},deviceScaleFactor:.5,bypassCSP:true,permissions:['local-network-access']}),errors=[];page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(e.message));
 try{
- f.app.relay.iconVoting.now=()=>Date.parse('2026-10-23T18:00Z');await f.app.relay.iconVoting.mutate('browser-fixture',{action:'nominate',first:'Fixture',last:'Operator'});
+ if(process.env.SPARSE_ASSET_ORIGIN)await page.route(/\/(?:models|art|audio|inventory-previews|season|shop|loading|modes|compete|campaign)\//,async route=>{const url=new URL(route.request().url());if(url.origin!==origin)return route.continue();try{const response=await fetch(process.env.SPARSE_ASSET_ORIGIN+url.pathname,{signal:AbortSignal.timeout(30000)});await route.fulfill({status:response.status,contentType:response.headers.get('content-type')||'application/octet-stream',body:Buffer.from(await response.arrayBuffer())});}catch{await route.abort('failed');}});
+ await seedBundleVote(f.app.relay.iconVoting);
  await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${f.app.server.address().port}/game'};`}));
  await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Response Reviewer',weapon:'sprinter'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,fpsLimit:60}));localStorage.setItem('ravelfront-stormspike-kestrel-199-dismissed','yes');});
  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest);
  await page.evaluate(()=>window.__yolkTest.loadingFixture(v=>{v.renderer.savedRender=v.renderer.render;v.renderer.render=()=>{};}));
  await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
- await page.locator('.icon-voting[open] [data-candidate]').first().click();await page.locator('.icon-voting [data-cast]').click();await page.locator('.icon-voting[open]').waitFor({state:'hidden'});
+ await voteInBrowser(page);
  now=E.opensAt;service.tick();await page.evaluate(id=>window.__yolkTest.social('tournament-join',{eventId:id}),E.id);
  await page.waitForFunction(()=>window.__yolkTest.read().screen==='game');await page.locator('#loading-screen').waitFor({state:'hidden'});
  await until(()=>event.room&&[...event.room.sim.players.values()].some(p=>p.name==='Response Reviewer'&&!p.loading),'Browser input reaches Cup authority',90000);

@@ -1,3 +1,4 @@
+import {completeBundleVote} from './icon-vote.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
@@ -34,7 +35,7 @@ export async function fixture({recovery=false,serverOptions={}}={}){
   ws.on('open',()=>ws.send(JSON.stringify({type:'hello',version:VERSION,profile:user.profile})));
   ws.on('message',raw=>{
    const m=JSON.parse(raw);
-   if(m.type==='hello')user.id=m.id;
+   if(m.type==='hello'){user.id=m.id;user.token=m.token;}
    if(m.type==='party')user.party=m.party;
    if(m.type==='launch')user.launches.push(m.launch);
    if(m.type==='reply'){
@@ -47,14 +48,7 @@ export async function fixture({recovery=false,serverOptions={}}={}){
    user.pending.set(request,{resolve,reject,timer});ws.send(JSON.stringify({type,...data,request}));
   });
   await until(()=>user.party,'Social connected');
-  // Game fixtures represent an admitted player. Complete the current lobby
-  // prerequisite against this isolated server, with an opt-out for gate tests.
-  const voting=app.relay.iconVoting;
-  if(voted&&voting&&!voting.summary(user.id).closed){
-   let candidate=voting.summary(user.id).candidates[0];
-   if(!candidate)candidate=(await voting.mutate('fixture',{action:'nominate',first:'Fixture',last:'Operator'})).candidates[0];
-   await user.ask('icon-voting',{body:{action:'vote',candidate:candidate.id}});
-  }
+  if(voted)await completeBundleVote(app.relay.iconVoting,user.id);
   return user;
  }
  async function game(user){

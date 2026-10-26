@@ -1,12 +1,10 @@
 import {esc,card,num} from './owner-ui.js';
 export function iconOwnerView(owner){
- const data=owner.extra;
- if(!data.candidates.length)return '<p>No voting options yet.</p>';
- return '<p class="oc-notice">Editing keeps existing votes. Deleting removes the option and its votes; affected players can vote again before the deadline. Both names require at least three letters. Changes are recorded in the audit trail.</p>'+data.candidates.map(c=>card(c.first+' '+c.last+' · '+num(c.votes)+' votes',`<form id="oc-icon-${esc(c.id)}" data-id="${esc(c.id)}"><div class="oc-form-grid"><label>First name<input name="first" value="${esc(c.first)}" required minlength="3" maxlength="40"></label><label>Last name<input name="last" value="${esc(c.last)}" required minlength="3" maxlength="40"></label></div><button type="submit">Save name</button><details><summary>Delete option</summary><p>Delete ${esc(c.first)} ${esc(c.last)} and all its votes?</p><button type="button" data-icon-delete>Delete option and votes</button></details></form>`)).join('');
+ const data=owner.extra;if(!data?.categories)return '<p>The bundle vote is loading. Refresh Owner Access.</p>';
+ return `<p class="oc-notice"><b>${esc(data.winner)} won the original Icon Series vote.</b> That vote is closed and archived. Manage all five bundle categories below. Editing preserves votes; deleting an option clears only that category for affected voters, who must choose again before their next game. Outfit photos go to the owner on Snapchat, outside this vote.</p>`+data.categories.map(c=>card(c.label,`<form id="oc-icon-add-${c.id}" data-category="${c.id}" data-vote-action="nominate"><label>Add an option<input name="text" required minlength="3" maxlength="100" placeholder="New ${esc(c.label.toLowerCase())} idea"></label><button type="submit">Add option</button></form>${c.options.length?c.options.map(o=>`<form id="oc-icon-${o.id}" data-id="${o.id}" data-category="${c.id}"><p><b>${num(o.votes)} votes</b></p><label>Option text<input name="text" value="${esc(o.text)}" required minlength="3" maxlength="100"></label><button type="submit">Save option</button><details><summary>Delete option</summary><p>Delete “${esc(o.text)}” and its votes? Affected players keep their other four choices.</p><button type="button" data-icon-delete>Delete option and votes</button></details></form>`).join(''):'<p>No options yet. Add the first one above; players can also suggest their own.</p>'}`)).join('');
 }
-export async function submitIconOwner(owner,form,action='edit'){
- const candidate=owner.extra.candidates.find(c=>c.id===form.dataset.id);if(!candidate)return;
- const f=new FormData(form);
- await owner.post('/icon-voting',{action,id:candidate.id,expectedFirst:candidate.first,expectedLast:candidate.last,first:f.get('first'),last:f.get('last')});
- await owner.refresh();owner.notify(action==='delete'?'Option and its votes deleted.':'Name updated. Existing votes preserved.');
+export async function submitIconOwner(owner,form,action){
+ action??=form.dataset.voteAction||'edit';const category=owner.extra.categories.find(c=>c.id===form.dataset.category);if(!category)return;const option=category.options.find(o=>o.id===form.dataset.id);if(action!=='nominate'&&!option)return;
+ await owner.post('/icon-voting',{pollId:owner.extra.pollId,category:category.id,action,id:option?.id,expectedRevision:option?.revision,text:new FormData(form).get('text')});
+ await owner.refresh();owner.notify(action==='delete'?'Option deleted. Other category votes are preserved.':action==='nominate'?'Bundle option added.':'Option updated. Existing votes preserved.');
 }

@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'225',title:'Jim won. Build his Icon Series bundle.',changes:[
+  'Jim McLaughlin is the first Icon Series winner. The original character vote is closed and archived. Send full-body photos of Jim to the game owner on Snapchat for outfit review.',
+  'Choose or suggest a pickaxe, weapon wrap, back accessory, glider and dive trail in a vibrant new five-part ballot. All five votes are required before entering a game, including party and Cup entry. Progress saves after each choice and can be changed from the lobby.',
+  'Owner Access can add, edit and delete options in every category. Editing preserves votes; deleting only clears that category for affected voters. Bundle ideas use a lighter filter than chat while blocking slurs, explicit content, severe profanity and threats. Version 6.32.0 / protocol 87.'
+ ]},
  {number:'224',title:'Responsive controls and smoother weapon switching',changes:[
   'Weapon selection and draw animations respond locally before the host replies. Confirmations no longer restart the draw; inventory ownership, ammunition and hit results stay authoritative.',
   'Persistent stale movement queues recover without increasing movement speed. Normal packet jitter keeps every movement step. Inventory and pickup confirmations receive earlier, rate-limited updates.',

@@ -440,8 +440,8 @@ jobs:
             if perf217_update: out.write('focused=true\n')
           print('Crowded combat, snapshot scheduling, bounded feedback and render budgets:',perf217_update)
 
-          icon_files=set(subprocess.check_output(['git','diff','--name-only','bf0d9f24776c735d41db4ee72a9df56cc8d5f5ac','HEAD'],text=True).splitlines())
-          icon_update=bool(icon_files) and icon_files <= {'server/realtime/parties.js', 'src/icon-voting-rules.js', 'src/owner-console.js', '.github/workflows/pages.yml', 'src/icon-voting.css', 'src/party-client.js', 'src/main.js', 'server/realtime/icon-voting.js', 'src/owner-icon-voting.js', 'scripts/icon-voting-browser-check.mjs', 'src/icon-voting-ui.js', 'tests/icon-voting.test.js', 'server/realtime/index.js', 'server/realtime/owner.js', 'docs/ICON_SERIES_VOTING.md', 'src/lobby-ui.js'}
+          icon_files=set(subprocess.check_output(['git','diff','--name-only','668b7cc240b8aa47c80a1d9fc70cc0aff1462233','HEAD'],text=True).splitlines())
+          icon_update=bool(icon_files) and icon_files <= {'scripts/input-response-browser-check.mjs', 'scripts/roster-browser-check.mjs', 'scripts/tournament-owner-browser-check.mjs', 'scripts/icon-bundle-game-browser-check.mjs', 'tests/icon-voting.test.js', 'src/icon-voting.css', 'scripts/icon-voting-browser-check.mjs', 'src/icon-voting-rules.js', 'src/owner-console.js', 'package-lock.json', 'scripts/owner-match-browser-check.mjs', 'docs/ICON_BUNDLE_VOTING.md', 'package.json', 'src/lobby-ui.js', 'src/owner-icon-voting.js', 'scripts/compete-browser-check.mjs', 'src/icon-voting-ui.js', 'server/realtime/index.js', 'scripts/tournament-spectate-browser-check.mjs', 'server/realtime/owner.js', '.github/workflows/pages.yml', 'server/realtime/tournament.js', 'tests/helpers/public-match.js', 'src/releases.js', 'src/main.js', 'tests/private-social.test.js', 'tests/helpers/icon-vote.js', 'server/realtime/icon-voting.js', 'server/realtime/parties.js', 'scripts/host-recovery-browser-check.mjs'} and json.loads(Path('package.json').read_text()).get('version')=='6.32.0'
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('icon_voting_update='+str(icon_update).lower()+'\n')
             if icon_update: out.write('focused=true\n')
@@ -494,9 +494,9 @@ jobs:
         run: |
           node --test --test-concurrency=2 tests/performance217.test.js tests/snapshot-codec.test.js tests/update-204.test.js tests/streaming-performance.test.js tests/guest-responsiveness.test.js tests/update-200.test.js tests/authority-performance.test.js tests/tournament.test.js tests/compete.test.js tests/anatomy-retarget.test.js tests/character-motion.test.js tests/building.test.js tests/building-overhaul.test.js tests/built-world-gameplay.test.js tests/arms.test.js tests/hitbox.test.js tests/relay-compact.test.js tests/realtime-resume.test.js tests/combat-overhaul.test.js tests/release-history.test.js
           node scripts/tournament-realtime-profile.mjs . 11 ci
-      - name: Icon voting persistence, deadlines and owner authorization
+      - name: Bundle ballot migration, five-part admission, owner controls and affected game entry
         if: needs.scope.outputs.icon_voting_update == 'true'
-        run: node --test tests/icon-voting.test.js
+        run: node --test --test-concurrency=2 tests/icon-voting.test.js tests/tournament-teams.test.js tests/tournament.test.js tests/public-pools.test.js tests/private-social.test.js tests/owner.test.js tests/owner-match.test.js tests/release-history.test.js tests/input-response.test.js tests/remote-input.test.js tests/main-match-singleton.test.js
       - name: Tournament lifecycle, spectators, rewards, camera and transport regressions
         if: needs.scope.outputs.tournament_update == 'true'
         run: |
@@ -828,12 +828,19 @@ jobs:
             test-results/input-response
             test-results/performance217
           retention-days: 14
-      - name: Icon voting modal and owner forms
+      - name: Bundle ballot, owner forms and real game admission
         if: needs.scope.outputs.icon_voting_update == 'true'
         run: |
-          mkdir -p /tmp
-          ln -sf "$(node --input-type=module -e "import {chromium} from 'playwright'; console.log(chromium.executablePath())")" /tmp/chromium
           node scripts/icon-voting-browser-check.mjs
+          node scripts/icon-bundle-game-browser-check.mjs
+          node scripts/input-response-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.icon_voting_update == 'true'
+        with:
+          name: icon-bundle-browser
+          path: |
+            test-results/icon-voting
+            test-results/icon-bundle-game
       - name: Install the headless desktop runtime with a missing-library fallback
         if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true' || needs.scope.outputs.performance217_update == 'true' || needs.scope.outputs.tournament_teams_update == 'true'
         run: |
@@ -1451,7 +1458,7 @@ jobs:
           const sha=process.env.GITHUB_SHA;
           for(let i=0;i<60;i++){
             const [front,health]=await Promise.all([fetch('https://zl-2.github.io/yolk-yard/version.json?t='+Date.now()).then(r=>r.json()),fetch('https://yolk-yard-relay.onrender.com/health').then(r=>r.json())]);
-            if(front.build===sha&&health.build===sha&&health.socialAvailable){console.log('PASS exact website and healthy relay build',sha);process.exit(0);}
+            if(front.build===sha&&health.build===sha&&health.socialAvailable){assert.equal(health.iconVoting?.winner,'Jim McLaughlin');assert.equal(health.iconVoting?.nominationClosed,true);assert.equal(health.iconVoting?.available,true);assert.deepEqual(health.iconVoting?.categories,['pickaxe','wrap','back','glider','trail']);console.log('PASS exact website/relay build, closed original vote and five-part Jim bundle ballot',sha);process.exit(0);}
             await new Promise(r=>setTimeout(r,5000));
           }
           assert.fail('Website and relay did not reach the published commit');

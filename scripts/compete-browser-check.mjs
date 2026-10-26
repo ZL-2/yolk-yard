@@ -1,3 +1,4 @@
+import {seedBundleVote,voteInBrowser} from '../tests/helpers/icon-vote.js';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {createServer} from 'vite';
@@ -6,8 +7,8 @@ import {fixture} from '../tests/helpers/public-match.js';
 import {TOURNAMENTS} from '../src/tournament.js';
 const [friday,monday]=TOURNAMENTS,origin='http://127.0.0.1:5292',out='test-results/compete';await mkdir(out,{recursive:true});let now=friday.startsAt+240000;
 const f=await fixture({serverOptions:{origins:[origin,'https://zl-2.github.io'],tournamentOptions:{events:[friday,{...monday,teamSize:2}],now:()=>now,autoStart:false}}}),service=f.app.relay.tournament;
-f.app.relay.iconVoting.now=()=>Date.parse('2026-10-23T18:00Z');
-await f.app.relay.iconVoting.mutate('browser-fixture',{action:'nominate',first:'Fixture',last:'Operator'});
+
+await seedBundleVote(f.app.relay.iconVoting);
 service.event(friday.id).complete('finished','Tournament complete. Normal matchmaking is open.',Array.from({length:30},(_,i)=>({identity:'fixture-'+i,name:i?'Player '+(i+1):'Archive Champion',place:i+1,kills:30-i})));
 const vite=await createServer({server:{host:'127.0.0.1',port:5292,strictPort:true,watch:null}});await vite.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
@@ -18,7 +19,7 @@ try{
  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);await page.waitForFunction(()=>!document.querySelector('#loading')||document.querySelector('#loading').hidden);
  // Complete the existing vote prerequisite on this isolated fixture before
  // asserting lobby focus or interacting with the underlying game menus.
- await page.locator('.icon-voting[open] [data-candidate]').first().click();await page.locator('.icon-voting [data-cast]').click();await page.locator('.icon-voting[open]').waitFor({state:'hidden'});
+ await voteInBrowser(page);
  await page.locator('[data-action="lobby-options"]').click();await page.locator('#lobby-teamSize').selectOption('3');await page.waitForFunction(()=>window.__yolkTest.party().party.selection.teamSize===3);
  await page.locator('#lobby-access').selectOption('private');await page.waitForFunction(()=>window.__yolkTest.party().party.selection.access==='private');assert.equal(await page.locator('#lobby-teamSize').inputValue(),'3');await page.screenshot({path:out+'/trios-options.png'});await page.locator('#lobby-options-form [data-action="close"]').click();
 
