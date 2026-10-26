@@ -223,7 +223,7 @@ export class TournamentService{
   this.catalog=catalog;
   if(existing){existing.event=next;if(cancelState){existing.state=cancelState;existing.releaseRoom(cancelState.message);}}
   else this.events.push(new TournamentEvent(this.relay,{event:next,now:()=>this.now(),onPublish:()=>this.publish()}));
-  this.events.sort((a,b)=>a.event.opensAt-b.event.opensAt);this.lastKey=null;this.publish();return result;
+  this.events.sort((a,b)=>a.event.opensAt-b.event.opensAt);this.relay.fairPlay?.reconcileSchedule();this.lastKey=null;this.publish();return result;
  }
  publish(){if(!this.events)return;const event=this.summary(),key=JSON.stringify({...event,serverNow:0,events:event.events.map(e=>({...e,serverNow:0}))});if(key===this.lastKey&&this.now()-(this.lastPublish||0)<15000)return;this.lastKey=key;this.lastPublish=this.now();for(const u of this.relay.parties.users.values())this.relay.parties.send(u,{type:'tournament',event});}
  assertNormal(target){for(const e of this.events)e.assertNormal(target);}

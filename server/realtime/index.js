@@ -31,7 +31,7 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
   if(publicRoyale)relay.authority.ensurePublicRoyale();
   relay.recovery=new RelayRecovery(relay,{path:recoveryPath});relay.recovery.restore();
   relay.fairPlay=new FairPlayService(relay,{now:()=>owner.now()});
-  relay.tournament=new TournamentService(relay,tournamentOptions);
+  relay.tournament=new TournamentService(relay,tournamentOptions);relay.fairPlay.reconcileSchedule();
   const iconVoting=relay.iconVoting=new IconVoting();
   const server=createServer((req,res)=>{
     if(req.url?.split('?')[0]==='/icon-voting'){void iconVoting.handle(req,res,{origins,store:relay.parties.store});return;}

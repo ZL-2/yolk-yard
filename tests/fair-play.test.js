@@ -54,6 +54,9 @@ test('cancelled cups roll restriction forward, edited dates keep ID, completed c
 test('no future cup keeps a pending exclusion and binds the next manually added cup',async()=>{
  const h=harness();try{h.cups.splice(1);h.detect();assert.equal(h.service.status('a').cups[0].pending,true);h.cups.push({id:'manual',phase:'scheduled',event:{name:'Owner Invitational',teamSize:3,opensAt:2000000,startsAt:2060000}});assert.equal(h.service.status('a').cups[0].id,'manual');assert.throws(()=>h.service.assertCup('a','manual'));}finally{await h.db.close();}
 });
+test('a manually scheduled Cup binds an offline player and is consumed even if they never log in',async()=>{
+ const h=harness();try{h.cups.splice(1);h.detect();const manual={id:'offline-cup',phase:'scheduled',state:{phase:'scheduled'},event:{name:'Owner Cup',teamSize:1,opensAt:2000000,startsAt:2060000}};h.cups.push(manual);h.service.reconcileSchedule();manual.phase=manual.state.phase='finished';h.setTime(3000000);h.cups.push({id:'later-cup',phase:'scheduled',event:{name:'Later Cup',teamSize:1,opensAt:4000000,startsAt:4060000}});assert.deepEqual(h.service.status('a').cups,[],'Missing the next Cup consumes the exclusion without requiring a login');}finally{await h.db.close();}
+});
 test('penalties and automatic evidence survive restart; untrusted/ambiguous reports never punish',async()=>{
  const dir=await mkdtemp(tmpdir()+'/fair-play-'),h=harness(dir+'/owner.sqlite');try{h.detect();h.detect(['c','d'],{evidence:{source:'player report',enforce:true}});assert.deepEqual(h.removed,['a','b']);await h.db.close();const restored=harness(dir+'/owner.sqlite');try{assert.throws(()=>restored.service.assertPlay('a'));assert.equal(restored.service.status('b').cups[0].id,'cup1');assert.equal(restored.service.overview().cases.length,2);assert.doesNotThrow(()=>restored.service.assertPlay('c'));}finally{await restored.db.close();}}finally{await rm(dir,{recursive:true,force:true});}
 });

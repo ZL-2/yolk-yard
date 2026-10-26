@@ -29,6 +29,7 @@ export class FairPlayService{
   }
   return {identity:player,serverNow:now,until:until>now?until:null,cups:[...new Map(cups.map(c=>[c.id||'pending',c])).values()],reason:'Confirmed teaming with opponents',appeal:'Use Report a problem to request a review. Include your Friend Code.'};
  }
+ reconcileSchedule(){for(const player of this.byPlayer.keys())this.status(player);}
  sync(player){const status=this.status(player);this.relay.parties.send(this.relay.parties.users.get(player),{type:'fair-play',status});return status;}
  assertPlay(player){if(!player)return;const r=this.penalties(player).filter(r=>r.until_at>this.now()).sort((a,b)=>b.until_at-a.until_at)[0];if(r)throw Error('Teaming suspension: all game modes are blocked until '+new Date(r.until_at).toISOString()+'. Your next scheduled Cup is also prohibited.');}
  assertCup(player,id){this.assertPlay(player);if(this.status(player).cups.some(c=>c.id===id))throw Error('You are prohibited from this Cup because of confirmed teaming. The Cup restriction continues after the one-hour suspension ends.');if(this.disqualified(player,id))throw Error('You were removed from this Cup for teaming and cannot re-enter.');}
