@@ -50,7 +50,8 @@ export class SnapshotBatch {
   return this.index(this.values.get(rows));
  }
  normalize(message){
-  const {state,checkpoint,...body}=message,value=this.clone(body);
+  const {state,checkpoint,localPlayers,...body}=message,value=this.clone(body);
+  if(localPlayers)value.localPlayers=this.players(Object.values(localPlayers));
   for(const [key,source]of [['state',state],['checkpoint',checkpoint]])if(source){
    if(this.normalized.has(source)){value[key]=this.normalized.get(source);continue;}
    const cached={};value[key]=cached;this.normalized.set(source,cached);
@@ -187,6 +188,9 @@ export class SnapshotDecoder {
   for(const key of recordKeys)if(message.state?.[key])message.state[key]=Object.values(message.state[key]);
   if(message.checkpoint?.simulation?.players)message.checkpoint.simulation.players=Object.values(message.checkpoint.simulation.players);
   for(const key of ['loot','chests','builds','vehicles']){if(message.state?.royale?.[key])message.state.royale[key]=Object.values(message.state.royale[key]);if(message.checkpoint?.simulation?.[key])message.checkpoint.simulation[key]=Object.values(message.checkpoint.simulation[key]);}
+  // Shared public actor rows keep broadcast work linear. Owner/watched rows
+  // have their own lossless delta and are restored before gameplay sees state.
+  if(message.localPlayers&&message.state?.players){message.state.players=message.state.players.map(p=>message.localPlayers[p.id]||p);delete message.localPlayers;}
   return message;
  }
 }

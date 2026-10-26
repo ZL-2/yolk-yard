@@ -59,7 +59,7 @@ export async function startRealtimeServer({port=Number(process.env.PORT)||3000,h
     });
   });
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,host,resolve);});
-  return {server,relay,owner,mapStore,async close({restart=false}={}){relay.deployment.close();await relay.serviceStatus.close();cpuQuota.close();let preserveSessions=false;if(restart){try{preserveSessions=relay.recovery.save();}catch{console.error('Relay recovery could not be saved');}}const relayClosed=relay.close({preserveSessions});for(const group of [sockets,voiceSockets]){for(const ws of group.clients)ws.terminate();await new Promise(r=>group.close(r));}await new Promise(r=>server.close(r));await owner.close();await relayClosed;await relay.parties.store.flush();await iconVoting.chain;await mapStore.close();}};
+  return {server,relay,owner,mapStore,async close({restart=false}={}){relay.deployment.close();await relay.serviceStatus.close();cpuQuota.close();let preserveSessions=false;if(restart){try{preserveSessions=relay.recovery.save();}catch{console.error('Relay recovery could not be saved');}}const relayClosed=relay.close({preserveSessions});for(const group of [sockets,voiceSockets]){for(const ws of group.clients)ws.terminate();await new Promise(r=>group.close(r));}await new Promise(r=>server.close(r));await relayClosed;await owner.close();await relay.parties.store.flush();await iconVoting.chain;await mapStore.close();}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const app=await startRealtimeServer();console.log(`Ravelfront relay listening on ${app.server.address().port}`);

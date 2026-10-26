@@ -1,4 +1,10 @@
 export const RELEASE_NOTES = [
+ {number:'226',title:'Smoother matches and responsive actions',changes:[
+  'Reloads, pickaxe swings and item-use feedback now begin locally and reconcile with authoritative results. Inventory, ammunition, healing and damage remain controlled by the match authority.',
+  'Builds and edits patch nearby collision buckets. Map textures and geometry build in smaller steps, early departures remain asynchronous, and crowded scenes spread character construction across frames while keeping opponents visible.',
+  'Replay compression and disk writes run in a background worker. Fair-play checks are spread across ticks with the same evidence rules. Large server Cups retain 20 Hz updates, with shared opponent data and complete owner/spectator state.',
+  'Adaptive resolution uses GPU timing and avoids reducing clarity for CPU stalls. Verification includes delayed-input Cup tests, host/client collision comparisons, replay recovery and sustained WebGL rendering. Version 6.33.0 / protocol 88.'
+ ]},
  {number:'225',title:'Jim won. Build his Icon Series bundle.',changes:[
   'Jim McLaughlin is the first Icon Series winner. The original character vote is closed and archived. Send full-body photos of Jim to the game owner on Snapchat for outfit review.',
   'Choose or suggest a pickaxe, weapon wrap, back accessory, glider and dive trail in a vibrant new five-part ballot. All five votes are required before entering a game, including party and Cup entry. Progress saves after each choice and can be changed from the lobby.',

@@ -1,3 +1,4 @@
+import {usableItem} from './item-use.js';
 import {supplyHit,damageSupply,tickSupplyDrops,blastSupply} from './supply-drops.js';
 import {SMOKE_RULES} from './throwables.js';
 import {recordCombatDamage} from './combat-feedback.js';
@@ -304,13 +305,7 @@ export class RoyaleSimulation extends Simulation {
   p.interactLatch=!!input.interact;
  }
  beginUse(p){
-  if(!canFight(p)||this.time<(p.equipUntil||0))return;
-  const item=p.inventory[p.slot],def=ITEMS[item?.id];if(!def||!(item.count>0)||def.kind==='keycard'||p.use||p.flight!=='ground'||p.traversal)return;
-  if(def.kind==='winch'&&this.time<(item.readyAt||0))return;
-  if(def.kind==='jumpRig'&&(!rigCharges(item,this.time)||this.time<(item.readyAt||0)))return;
-  if(def.kind==='shadowstep'&&(!shadowCharges(item,this.time)||this.time<(item.readyAt||0)))return;
-  if(def.kind==='popper'&&this.time<(p.nextPopper||0))return;
-  if(def.kind==='heal'&&p.health>=def.cap||def.kind==='shield'&&p.shield>=def.cap)return;
+  const def=usableItem(p,this.time);if(!def)return;const item=p.inventory[p.slot];
   p.reloadEnd=0;p.burstLeft=0;p.use={id:item.id,slot:p.slot,start:this.time,end:this.time+def.duration};
   this.emit('royale-cue',{player:p.id,cue:'use-'+item.id,x:p.x,y:p.y,z:p.z});
  }

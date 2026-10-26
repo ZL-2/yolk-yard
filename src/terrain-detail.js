@@ -27,12 +27,13 @@ function dataTexture(data,w,h,{repeat=false,srgb=false,mipmaps=true,type=T.Unsig
 // The six tiles contain actual original material color and relief, not a
 // magnified noise overlay: crossed grass fibers, soil stones, sand ripples,
 // stratified/fissured rock, asphalt aggregate, and a low-frequency blend tile.
-function terrainAtlas(){
+function terrainAtlas(){const steps=terrainAtlasSteps();let next;do{next=steps.next();}while(!next.done);return next.value;}
+function* terrainAtlasSteps(){
  if(detailAtlas)return detailAtlas;
  const tile=256,w=768,h=512,data=new Uint8Array(w*h*4),height=new Float32Array(tile*tile),rgb=new Float32Array(tile*tile*3);
  const palettes=[[0x66734c,0x85915b],[0x675944,0x99856a],[0xb7a47a,0xdac797],[0x6e7468,0xa0a291],[0x303b3d,0x606866],[0x68794d,0x9da16b]].map(p=>p.map(c=>new T.Color(c)));
  for(let layer=0;layer<6;layer++){
-  for(let y=0;y<tile;y++)for(let x=0;x<tile;x++){
+  for(let y=0;y<tile;y++){for(let x=0;x<tile;x++){
    const u=x/tile,v=y/tile,n=hash(x,y),n2=hash(x+129,y+541),patch=noise(x/29,y/29),grain=noise(x/3,y/3),i=y*tile+x;
    let tone=.4+patch*.25+(n-.5)*.18,relief=grain*.4;
    if(layer===0){
@@ -51,16 +52,16 @@ function terrainAtlas(){
    }else{tone=patch*.65+noise(x/72,y/72)*.35;relief=tone;}
    const a=palettes[layer][0],b=palettes[layer][1],blend=clamp(tone);
    rgb[i*3]=a.r+(b.r-a.r)*blend;rgb[i*3+1]=a.g+(b.g-a.g)*blend;rgb[i*3+2]=a.b+(b.b-a.b)*blend;height[i]=clamp(relief);
-  }
+  }if(y%4===3)yield;}
   // A periodic edge crossfade prevents seams while inset atlas sampling keeps
   // filtering from bleeding sand into grass or rock into asphalt.
   const edge=12;
-  for(let y=0;y<tile;y++)for(let x=0;x<tile;x++){
+  for(let y=0;y<tile;y++){for(let x=0;x<tile;x++){
    const i=y*tile+x,wx=x<edge?(edge-x)/(edge*2):x>=tile-edge?(x-(tile-edge))/(edge*2):0,wy=y<edge?(edge-y)/(edge*2):y>=tile-edge?(y-(tile-edge))/(edge*2):0;
    const xx=tile-1-x,yy=tile-1-y,ix=y*tile+xx,iy=yy*tile+x,ixy=yy*tile+xx,j=((Math.floor(layer/3)*tile+y)*w+(layer%3)*tile+x)*4;
    for(let k=0;k<3;k++)data[j+k]=Math.round(clamp(T.MathUtils.lerp(T.MathUtils.lerp(rgb[i*3+k],rgb[ix*3+k],wx),T.MathUtils.lerp(rgb[iy*3+k],rgb[ixy*3+k],wx),wy))*255);
    data[j+3]=Math.round(clamp(T.MathUtils.lerp(T.MathUtils.lerp(height[i],height[ix],wx),T.MathUtils.lerp(height[iy],height[ixy],wx),wy))*255);
-  }
+  }if(y%4===3)yield;}
  }
  // RGB is already linear; the alpha channel is the material's height signal.
  detailAtlas=dataTexture(data,w,h,{mipmaps:true});detailAtlas.userData={shared:true,terrainDetail:true,revision:TERRAIN_DETAIL_REVISION};return detailAtlas;
@@ -137,7 +138,7 @@ function* createRoadControl(map){
    // road resolution using only 8 MiB and half the bandwidth of RGBA8.
    data[i]=(Math.round(s.road*15)<<12)|(Math.round(s.path*15)<<8)|(Math.round(s.white*15)<<4)|Math.round(s.yellow*15);
   }
-  if(y%16===15)yield;
+  if(y%2===1)yield;
  }
  roadControlCache.set(map.terrain,{roads:map.roads,buildings:map.buildings,layout:map.layoutKey,data});
  return dataTexture(data,size,size,{mipmaps:true,type:T.UnsignedShort4444Type});
@@ -216,13 +217,14 @@ function* sharedNormals(terrain){
   }
   if(z%16===15)yield;
  }
- for(let i=0;i<n*n;i++){const j=i*3,length=Math.hypot(normals[j],normals[j+1],normals[j+2])||1;normals[j]/=length;normals[j+1]/=length;normals[j+2]/=length;}
+ for(let i=0;i<n*n;i++){const j=i*3,length=Math.hypot(normals[j],normals[j+1],normals[j+2])||1;normals[j]/=length;normals[j+1]/=length;normals[j+2]/=length;if(i%2048===2047)yield;}
  normalCache.set(terrain.heights,normals);
  return normals;
 }
 
 export function* buildDetailedTerrain(world,map){
  const t=map.terrain;if(!t)return;
+ yield* terrainAtlasSteps();
  const control=yield* createRoadControl(map),normals=yield* sharedNormals(t),material=terrainMaterial(map,control),chunk=TERRAIN_DETAIL_BUDGET.chunkCells;
  let chunks=0,vertices=0,triangles=0,geometryBytes=0;
  for(let cz=0;cz<t.n-1;cz+=chunk)for(let cx=0;cx<t.n-1;cx+=chunk){
@@ -242,19 +244,20 @@ export function* buildDetailedTerrain(world,map){
  world.userData.terrainEnvironment={material,ocean,uniforms:material.userData.uniforms,diagnostics:{revision:TERRAIN_DETAIL_REVISION,chunks,vertices,triangles,geometryBytes,controlBytes:control.image.data.byteLength,atlasBytes:terrainAtlas().image.data.byteLength,normalContinuity:'global triangle-weighted',collision:'exact original triangle grid'}};
 }
 
-function coastTexture(map){
+function* coastTexture(map){
  const n=TERRAIN_DETAIL_BUDGET.coastSize,size=map.terrain?.size||256,step=size*2/n,data=new Uint8Array(n*n*4),distance=new Float32Array(n*n),depth=new Float32Array(n*n);
- for(let z=0;z<n;z++)for(let x=0;x<n;x++){const i=z*n+x,h=groundAt(map,(x+.5)*step-size,(z+.5)*step-size);depth[i]=Math.max(0,.5-h);distance[i]=h>=.47?0:1000;}
+ for(let z=0;z<n;z++){for(let x=0;x<n;x++){const i=z*n+x,h=groundAt(map,(x+.5)*step-size,(z+.5)*step-size);depth[i]=Math.max(0,.5-h);distance[i]=h>=.47?0:1000;}if(z%8===7)yield;}
  // Two-pass chamfer distance gives a stable coast band with no depth render
  // target, extra camera, shoreline mesh, or per-frame CPU sampling.
  const diag=step*Math.SQRT2;
- for(let z=0;z<n;z++)for(let x=0;x<n;x++){const i=z*n+x;if(x)distance[i]=Math.min(distance[i],distance[i-1]+step);if(z)distance[i]=Math.min(distance[i],distance[i-n]+step);if(x&&z)distance[i]=Math.min(distance[i],distance[i-n-1]+diag);if(x<n-1&&z)distance[i]=Math.min(distance[i],distance[i-n+1]+diag);}
- for(let z=n-1;z>=0;z--)for(let x=n-1;x>=0;x--){const i=z*n+x;if(x<n-1)distance[i]=Math.min(distance[i],distance[i+1]+step);if(z<n-1)distance[i]=Math.min(distance[i],distance[i+n]+step);if(x<n-1&&z<n-1)distance[i]=Math.min(distance[i],distance[i+n+1]+diag);if(x&&z<n-1)distance[i]=Math.min(distance[i],distance[i+n-1]+diag);data[i*4]=Math.round(clamp(depth[i]/2)*255);data[i*4+1]=Math.round(clamp(distance[i]/48)*255);data[i*4+2]=Math.round(clamp(depth[i]*8)*255);data[i*4+3]=255;}
+ for(let z=0;z<n;z++){for(let x=0;x<n;x++){const i=z*n+x;if(x)distance[i]=Math.min(distance[i],distance[i-1]+step);if(z)distance[i]=Math.min(distance[i],distance[i-n]+step);if(x&&z)distance[i]=Math.min(distance[i],distance[i-n-1]+diag);if(x<n-1&&z)distance[i]=Math.min(distance[i],distance[i-n+1]+diag);}if(z%8===7)yield;}
+ for(let z=n-1;z>=0;z--){for(let x=n-1;x>=0;x--){const i=z*n+x;if(x<n-1)distance[i]=Math.min(distance[i],distance[i+1]+step);if(z<n-1)distance[i]=Math.min(distance[i],distance[i+n]+step);if(x<n-1&&z<n-1)distance[i]=Math.min(distance[i],distance[i+n+1]+diag);if(x&&z<n-1)distance[i]=Math.min(distance[i],distance[i+n-1]+diag);data[i*4]=Math.round(clamp(depth[i]/2)*255);data[i*4+1]=Math.round(clamp(distance[i]/48)*255);data[i*4+2]=Math.round(clamp(depth[i]*8)*255);data[i*4+3]=255;}if(z%8===0)yield;}
  return dataTexture(data,n,n,{mipmaps:false});
 }
 
-export function createDetailedOcean(map){
- const coast=coastTexture(map),uniforms={waterTime:{value:0},waterQuality:{value:1},waterSize:{value:map.terrain?.size||256},waterCoast:{value:coast}};
+export function createDetailedOcean(map){const steps=createDetailedOceanSteps(map);let next;do{next=steps.next();}while(!next.done);return next.value;}
+export function* createDetailedOceanSteps(map){
+ const coast=yield* coastTexture(map);const uniforms={waterTime:{value:0},waterQuality:{value:1},waterSize:{value:map.terrain?.size||256},waterCoast:{value:coast}};
  const material=new T.MeshPhysicalMaterial({color:0xffffff,roughness:.24,metalness:.06,ior:1.333,clearcoat:.22,clearcoatRoughness:.22,envMap:modelEnvironment(),envMapIntensity:.8});
  material.name='Breakwater tidal ocean';material.userData={terrainOcean:true,revision:TERRAIN_DETAIL_REVISION,uniforms};
  material.onBeforeCompile=shader=>{

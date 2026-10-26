@@ -36,6 +36,8 @@ test('warmup construction preserves the full island and departure adopts prepare
   const {applyBuildState}=await import('../src/building.js'),{getMap}=await import('../src/maps.js');
   applyBuildState(getMap('sunnybreak'),{matchId:'transition-test',round:1,builds:[],worldDamage:{}});
   direct.loadMap('sunnybreak');prepared.loadMap('sunnybreak');
+  assert.ok(direct.mapBuild,'cold joins keep construction resumable');
+  let slices=0;while(direct.mapBuild){direct.finishMapBuild();assert.ok(++slices<5000);}
   let identified=0;prepared.world.traverse(mesh=>{if(mesh.userData.objectRanges?.some(range=>range.id))identified++;});assert.ok(identified>0,'prepared streamed scenery has destruction IDs');
   assert.equal(prepared.preparedBattle,null);assert.equal(prepared.world.children.length,direct.world.children.length);
   meshes.forEach(mesh=>assert.equal(mesh.parent,prepared.world));

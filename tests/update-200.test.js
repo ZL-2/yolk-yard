@@ -8,10 +8,10 @@ import {CollisionIndex} from '../src/campaign-layout.js';
 import {relayRetryDelay} from '../src/relay-recovery.js';
 
 test('render budget responds to wall time, stabilizes and recovers without oscillating',()=>{
- const budget=new RenderBudget();for(let t=0;t<4000;t+=80)budget.sample(t,{quality:'medium'});
+ const budget=new RenderBudget();for(let t=0;t<4000;t+=80)budget.sample(t,{quality:'medium',gpuMs:70,cpuMs:2});
  assert.ok(budget.scale<=.7);assert.equal(budget.pressure,true);assert.equal(budget.shadows,false);
  const floor=budget.scale;budget.sample(12000,{active:false});assert.equal(budget.scale,floor);
- for(let t=12016;t<26000;t+=1000/60)budget.sample(t,{});
+ for(let t=12016;t<26000;t+=1000/60)budget.sample(t,{gpuMs:4,cpuMs:2});
  assert.equal(budget.scale,1);assert.equal(budget.pressure,false);assert.equal(budget.shadows,true);
  const thirty=new RenderBudget();for(let t=0;t<15000;t+=1000/30)thirty.sample(t,{limit:30});assert.equal(thirty.scale,1);
 });

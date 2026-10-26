@@ -40,28 +40,39 @@ export function rayBox(o, d, b, max = Infinity, radius = 0) {
 // Spatial buckets keep large-island collision proportional to nearby cover.
 const collisionIndex = new WeakMap();
 export function invalidateCollision(map){collisionIndex.delete(map);}
-// Destruction only removes geometry. Preserve the existing spatial index and
-// prune the affected buckets instead of rebuilding the entire island per hit.
-export function removeCollisionBoxes(map,removed){
- const gone=new Set(removed);if(!gone.size)return;
- const source=map.boxes,grid=collisionIndex.get(map);map.boxes=source.filter(b=>!gone.has(b));
- if(!grid||grid.source!==source||grid.count!==source.length){invalidateCollision(map);return;}
+// Patch only changed buckets. Stable IDs and recycled slots keep edits/destruction
+// bounded without rebuilding the island or growing an index throughout a match.
+export function updateCollisionBoxes(map,removed=[],added=[]){
+ const gone=new Set(removed);if(!gone.size&&!added.length)return;
+ const source=map.boxes,grid=collisionIndex.get(map);
+ map.boxes=source.filter(b=>!gone.has(b)).concat(added);
+ if(!grid||grid.source!==source||grid.count!==source.length||added.some(b=>Math.floor((b.x-b.w/2)/8)<grid.minX||Math.floor((b.x+b.w/2)/8)>grid.maxX||Math.floor((b.z-b.d/2)/8)<grid.minZ||Math.floor((b.z+b.d/2)/8)>grid.maxZ)){invalidateCollision(map);return;}
  const changed=new Set();
- for(const b of gone)for(let x=Math.max(grid.minX,Math.floor((b.x-b.w/2)/8));x<=Math.min(grid.maxX,Math.floor((b.x+b.w/2)/8));x++)for(let z=Math.max(grid.minZ,Math.floor((b.z-b.d/2)/8));z<=Math.min(grid.maxZ,Math.floor((b.z+b.d/2)/8));z++)changed.add((x-grid.minX)*grid.height+z-grid.minZ);
+ for(const b of gone){
+  const id=grid.ids.get(b);if(id===undefined)continue;
+  for(let x=Math.max(grid.minX,Math.floor((b.x-b.w/2)/8));x<=Math.min(grid.maxX,Math.floor((b.x+b.w/2)/8));x++)for(let z=Math.max(grid.minZ,Math.floor((b.z-b.d/2)/8));z<=Math.min(grid.maxZ,Math.floor((b.z+b.d/2)/8));z++)changed.add((x-grid.minX)*grid.height+z-grid.minZ);
+ }
  for(const key of changed){const bucket=grid.buckets[key];if(bucket){bucket.ids=bucket.ids.filter(id=>!gone.has(grid.boxes[id]));bucket.boxes=bucket.boxes.filter(b=>!gone.has(b));}}
- // Stable IDs still address the original array; removed IDs occur in no bucket.
- // A later addition/edit or moving door invalidates and rebuilds normally.
+ for(const b of gone){const id=grid.ids.get(b);if(id!==undefined){grid.ids.delete(b);grid.boxes[id]=null;grid.free.push(id);grid.seen[id]=0;}}
+ for(const b of added){
+  const id=grid.free.length?grid.free.pop():grid.boxes.length;grid.boxes[id]=b;grid.ids.set(b,id);
+  if(id>=grid.seen.length){const seen=new Uint32Array(Math.max(id+1,grid.seen.length*2,64));seen.set(grid.seen);grid.seen=seen;}
+  for(let x=Math.floor((b.x-b.w/2)/8);x<=Math.floor((b.x+b.w/2)/8);x++)for(let z=Math.floor((b.z-b.d/2)/8);z<=Math.floor((b.z+b.d/2)/8);z++){const key=(x-grid.minX)*grid.height+z-grid.minZ,bucket=grid.buckets[key]??={ids:[],boxes:[]};bucket.ids.push(id);bucket.boxes.push(b);}
+ }
  grid.source=map.boxes;grid.count=map.boxes.length;grid.queries.clear();
 }
+export function removeCollisionBoxes(map,removed){updateCollisionBoxes(map,removed);}
 function collisionGrid(map){
  let grid=collisionIndex.get(map);
  if(grid&&grid.source===map.boxes&&grid.count===map.boxes.length)return grid;
  let minX=Infinity,minZ=Infinity,maxX=-Infinity,maxZ=-Infinity;
  for(const b of map.boxes){minX=Math.min(minX,Math.floor((b.x-b.w/2)/8));maxX=Math.max(maxX,Math.floor((b.x+b.w/2)/8));minZ=Math.min(minZ,Math.floor((b.z-b.d/2)/8));maxZ=Math.max(maxZ,Math.floor((b.z+b.d/2)/8));}
  if(!map.boxes.length)minX=minZ=maxX=maxZ=0;
+ // Reserve empty buckets within the map so an edge build needs no full reindex.
+ if(Number.isFinite(map.size)){const extent=Math.ceil((map.size+8)/8);minX=Math.min(minX,-extent);minZ=Math.min(minZ,-extent);maxX=Math.max(maxX,extent);maxZ=Math.max(maxZ,extent);}
  const width=maxX-minX+1,height=maxZ-minZ+1,buckets=new Array(width*height);
  for(let id=0;id<map.boxes.length;id++){const b=map.boxes[id];for(let x=Math.floor((b.x-b.w/2)/8);x<=Math.floor((b.x+b.w/2)/8);x++)for(let z=Math.floor((b.z-b.d/2)/8);z<=Math.floor((b.z+b.d/2)/8);z++){const key=(x-minX)*height+z-minZ;const bucket=buckets[key]??={ids:[],boxes:[]};bucket.ids.push(id);bucket.boxes.push(b);}}
- grid={source:map.boxes,boxes:map.boxes,count:map.boxes.length,minX,minZ,maxX,maxZ,height,buckets,stamp:0,seen:new Uint32Array(map.boxes.length),queries:new Map()};collisionIndex.set(map,grid);return grid;
+ grid={source:map.boxes,boxes:map.boxes.slice(),ids:new Map(map.boxes.map((b,id)=>[b,id])),free:[],count:map.boxes.length,minX,minZ,maxX,maxZ,height,buckets,stamp:0,seen:new Uint32Array(map.boxes.length),queries:new Map()};collisionIndex.set(map,grid);return grid;
 }
 function queryStamp(grid){if(++grid.stamp===0xffffffff){grid.seen.fill(0);grid.stamp=1;}return grid.stamp;}
 const EMPTY_BOXES=Object.freeze([]);

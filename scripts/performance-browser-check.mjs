@@ -21,7 +21,7 @@ const state=sim.snapshot();state.events=[];const local=state.players[0];
 for(let i=0;i<state.players.length;i++)Object.assign(state.players[i],{x:i?((i%3)-1)*5:0,y:60,z:i?-(i<4?8+i*3:45+(i-4)*20):0,yaw:0,pitch:0,health:100,shield:100,flight:'ground',grounded:true,spectating:false,awaitingEntry:false,loading:false,vx:0,vz:-2.4,moving:true,weapon:'sprinter',slot:1,inventory:[null,{id:'sprinter',weapon:true,rarity:1,ammo:30}],equipUntil:0,reloadEnd:0});
 function frame(n){state.time=1+n/60;view.update(state,local,local,1/60,true,false,local);}
 frame(0);await Promise.all(OPERATOR_ASSET_IDS.map(id=>operatorAsset({outfit:'outfit-'+id})?.lodRequest));
-for(let n=0;n<360;n++){frame(n);if(n%30===0)await new Promise(r=>setTimeout(r,0));}
+for(let n=0;n<360||view.mapBuild;n++){if(n>6000)throw Error("Map build did not finish");frame(n);if(n%30===0)await new Promise(r=>setTimeout(r,0));}
 window.run=async()=>{
  const samples=[],poses=[];
  for(let n=360;n<660;n++){const start=performance.now();frame(n);samples.push(performance.now()-start);poses.push([...view.models.values()].filter(m=>m.userData.poseClock===view.clock).length);if(n%30===0)await new Promise(r=>setTimeout(r,0));}

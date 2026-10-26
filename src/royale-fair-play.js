@@ -16,7 +16,7 @@ export class RoyaleFairPlay {
   this.world={...this.world,...r};
   for(const e of state.events||[])if(e.id>this.cursor){this.pending.push(e);this.cursor=e.id;}
   if(this.pending.length>2000)this.pending.splice(0,this.pending.length-2000);
-  if(state.time-this.last<(this.focus?.size ? .5 : 1))return;this.last=state.time;
+  if(state.time-this.last<(this.focus?.size ? .5 : 1)){if(this.lastSim&&this.monitor.work)this.monitor.sample({...this.lastSim,phase:state.phase});return;}this.last=state.time;
   if(state.time-this.lastHeartbeat>=5){this.lastHeartbeat=state.time;this.send({matchId:r.matchId,hostId});}
   if(!this.world.builds||!this.world.worldDamage)return;
   if(!this.map||this.mapId!==state.options.map){this.mapId=state.options.map;const base=getMap(this.mapId);this.map={...base,boxes:[...base.boxes]};}
@@ -26,6 +26,6 @@ export class RoyaleFairPlay {
    return wallDistance(this.map,from,{x:d.x/len,y:d.y/len,z:d.z/len},len)>=len-.15;
   }};
   for(const e of this.pending)this.monitor.combat(e,sim);this.pending=[];
-  this.monitor.focus=this.focus;this.monitor.sample(sim);
+  this.lastSim=sim;this.monitor.focus=this.focus;this.monitor.sample(sim);
  }
 }

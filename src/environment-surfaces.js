@@ -28,12 +28,13 @@ function sample(kind,x,y){
  return {shade,relief,rough:T.MathUtils.clamp(rough+(n-.5)*.06,0,1),metal:finish[kind][1]};
 }
 function texture(data,w,h,srgb=false){const t=new T.DataTexture(data,w,h);t.colorSpace=srgb?T.SRGBColorSpace:T.NoColorSpace;t.wrapS=t.wrapT=T.RepeatWrapping;t.magFilter=T.LinearFilter;t.minFilter=T.LinearMipmapLinearFilter;t.generateMipmaps=true;t.anisotropy=2;t.needsUpdate=true;t.userData.shared=true;return t;}
-function maps(){
+function maps(){const steps=mapsSteps();let next;do{next=steps.next();}while(!next.done);return next.value;}
+function* mapsSteps(){
  if(atlas)return atlas;const data=Array.from({length:4},()=>new Uint8Array(width*height*4));
- for(let index=0;index<columns*rows;index++)for(let y=0;y<tile;y++)for(let x=0;x<tile;x++){
+ for(let index=0;index<columns*rows;index++)for(let y=0;y<tile;y++){for(let x=0;x<tile;x++){
   const kind=ENVIRONMENT_SURFACES[index]||'stone',s=sample(kind,x,y),dx=sample(kind,(x+1)%tile,y).relief-s.relief,dy=sample(kind,x,(y+1)%tile).relief-s.relief,i=((Math.floor(index/columns)*tile+y)*width+index%columns*tile+x)*4,c=Math.round(T.MathUtils.clamp(s.shade,0,1)*255),r=Math.round(s.rough*255),m=Math.round(s.metal*255);
   data[0].set([c,c,c,255],i);data[1].set([Math.round(T.MathUtils.clamp(128-dx*125,1,254)),Math.round(T.MathUtils.clamp(128-dy*125,1,254)),250,255],i);data[2].set([r,r,r,255],i);data[3].set([m,m,m,255],i);
- }
+ }if(y%4===3)yield;}
  atlas=Object.fromEntries(['map','normalMap','roughnessMap','metalnessMap'].map((name,i)=>[name,texture(data[i],width,height,i===0)]));return atlas;
 }
 function perKind(kind){if(kindTextures.has(kind))return kindTextures.get(kind);const index=ENVIRONMENT_SURFACES.indexOf(kind),result={};for(const [name,t]of Object.entries(maps())){const data=new Uint8Array(tile*tile*4);for(let y=0;y<tile;y++){const start=((Math.floor(index/columns)*tile+y)*width+(index%columns)*tile)*4;data.set(t.image.data.subarray(start,start+tile*4),y*tile*4);}result[name]=texture(data,tile,tile,name==='map');}kindTextures.set(kind,result);return result;}
@@ -90,3 +91,5 @@ export function environmentKit(raw={},defaultKind='paint'){
  k.beam=(g,a,b,r,c,kind)=>{const av=new T.Vector3(...a),bv=new T.Vector3(...b),v=bv.clone().sub(av),m=add(g,geo('beam',()=>new T.CylinderGeometry(1,1,1,6)),...av.add(bv).multiplyScalar(.5).toArray(),r,v.length(),r,c,kind);m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),v.normalize());return m;};return k;
 }
 export function environmentSurfaceDiagnostics(){return {revision:ENVIRONMENT_REVISION,atlas:[width,height],surfaceKinds:ENVIRONMENT_SURFACES.length,materials:materials.size,geometryTemplates:geometries.size,textureBytes:width*height*4*4+kindTextures.size*tile*tile*4*4};}
+
+export function* prepareEnvironmentSurfaces(){yield* mapsSteps();for(const kind of ENVIRONMENT_SURFACES){perKind(kind);yield;}}

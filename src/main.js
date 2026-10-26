@@ -1168,7 +1168,8 @@ function processEvents() {
     if(e.type==='vault-open')notice((e.name||'Vault').toUpperCase()+' UNLOCKED · Epic requisitions secured',3500);if(e.type==='boss-defeated'&&e.player===localId)notice(bossDefeatMessage(e),4500);if(e.type==='relay-captured'&&e.player===localId)notice('SIGNAL LIVE · Contacts revealed. Your location is exposed.',3500);
     const me = state.players.find((p) => p.id === localId);
     combatConfirmation.accept(e,localId,performance.now());
-    sound.event(e,me,state);
+    const actionEcho=e.player===localId&&guestActions.confirmFeedback(e,performance.now());
+    if(!actionEcho)sound.event(e,me,state);
     if(e.type==='royale-cue'&&e.player===localId&&e.cue==='use-cancel'&&e.reason)notice('Item use stopped · '+(USE_CANCEL_REASONS[e.reason]||'Another action'),1700);
     if(e.type==='duo-marker')sound.cue(e.kind==='danger'?'danger-ping':'world-ping',null,.75);
     if(e.type==='knocked'&&teammates(state.options,me,state.players.find(p=>p.id===e.target)))notice(`Teammate downed · ${e.targetName}`,1800);
@@ -1190,7 +1191,7 @@ function processEvents() {
         damageDirections.hit(e,performance.now());
       }
     }
-    if (e.type === "reload" && e.player === localId) sound.reload(Math.max(.3,(me?.reloadEnd||state.time+1.2)-state.time),e.weapon||gun(me).id,e.empty!==false);
+    if (e.type === "reload" && e.player === localId && !actionEcho) sound.reload(Math.max(.3,(me?.reloadEnd||state.time+1.2)-state.time),e.weapon||gun(me).id,e.empty!==false);
     if (e.type === "pickup" && e.player === localId) {
       sound.pickup();
       notice(
@@ -1251,7 +1252,7 @@ function hud() {
   const m = mode(state.options.mode);
   const watched=p.spectating?state.players.find(k=>k.id===spectateTarget):null;
   if(state?.royale){const me=state.players.find(p=>p.id===localId);if(me)buildUI.update(state,localBuildPose(me),view.buildMap,controlLabel);}
-  royaleUI.update(state,{...p,...localPerspective()},watched,controlLabel,paused);
+  royaleUI.update((!sim||sim.remote)?{...state,time:Math.max(state.time,guestPresentation.time)}:state,{...p,...localPerspective()},watched,controlLabel,paused);
   fieldUI.update(state,p,!state.zombies&&!state.boxfight,paused,point=>view.projectMarker(point));zombiesUI.update(state,p,controlLabel,paused,point=>view.projectMarker(point));boxUI.update(state,p,paused,sound);zoneUI.update(state,p,paused,sound);
   view.waypoint=royaleUI.waypoint;
   hudText($("#hud-mode"), m.name.toUpperCase());
@@ -2116,6 +2117,7 @@ function pumpNetworkInput(now=performance.now()) {
       const me = state.players.find((p) => p.id === localId);
       if (me?.health > 0 && state.phase==='playing') {
         if(guestActions.input(state,me,i,Math.max(state.time,guestPresentation.time),now))hudClock=1;
+        for(const e of guestActions.takeFeedback()){if(e.type==='reload')sound.reload(e.duration,e.weapon,e.empty);else sound.event(e,me,state);}
         if (!predicted) predicted = predictionCopy(me);
         predicted.emote=me.emote?{...me.emote}:null;
         const beforeMove={x:predicted.x,z:predicted.z};
@@ -2123,7 +2125,7 @@ function pumpNetworkInput(now=performance.now()) {
         predicted.vx=(predicted.x-beforeMove.x)*60;predicted.vz=(predicted.z-beforeMove.z)*60;
         predicted.moving = Math.abs(i.forward) + Math.abs(i.strafe) > 0.1;
         {
-          const shot=state.boxfight&&state.boxfight.stage!=='fight'?null:guestFire.step(predicted,i,Math.max(state.time,guestPresentation.time),now/1000,state.round);
+          const shot=(state.boxfight&&state.boxfight.stage!=='fight'||['reload','use'].includes(guestActions.action?.kind))?null:guestFire.step(predicted,i,Math.max(state.time,guestPresentation.time),now/1000,state.round);
           if(shot){view.event(shot,localId);sound.shot(shot.weapon,0,shot.origin,!!gun(predicted).suppressed);}
         }
         pendingInputs.push(i);
@@ -2143,6 +2145,7 @@ const lobbyStatus=new LobbyStatus();
 const snapshotTimes=new WeakMap(),framePacer=new FramePacer();
 const publicJoinNotice=new PublicJoinNotice(async event=>{if(screen!=='menu'||state)return;if(await partyRequest('queue',{targetPublic:event.code,targetMatch:event.matchId})){dialog.close();dialogType='';publicJoinNotice.events=[];renderMenu();}});
 function loop(now) {
+  const frameCpuStarted=performance.now();
   if(screen==='editor'||screen==='campaign'){lastTime=now;requestAnimationFrame(loop);return;}
   lobbyStatus.update(now,now-lastTime,net,screen);
   publicJoinNotice.update(screen==='menu'&&!dialog.open,party);
@@ -2233,6 +2236,7 @@ function loop(now) {
   if(renderPlayer)Object.assign(renderPlayer,localPerspective(),{building:!!buildControls.buildMode||!!buildControls.editing,editing:!!buildControls.editing});
   view.lobbyCrown=!!crownStatus.owned;
   const presentation=(!sim||sim.remote)&&state?guestPresentation.frame(state,renderPlayer,now,renderDt):{state,player:renderPlayer};
+  view.inputCpuMs=performance.now()-frameCpuStarted;
   view.update(
     presentation.state,
     presentation.player?.health>0?presentation.player:me,

@@ -1,3 +1,4 @@
+import {GpuFrameTimer} from './gpu-frame-timer.js';
 import {DamageNumbers} from './damage-numbers.js';
 import {CombatParticles,visibleShot} from './combat-particles.js';
 import {ShaderPreparation} from './shader-preparation.js';
@@ -153,8 +154,8 @@ function label(text, color = "#ffffff", compact = false, critical = false, runs 
 }
 export const worldKit={block,ball,cylinder,mat,palette};
 export class View {
-  get mapCompile(){return this.mapPreparation.pending;}
-  cancelMapPreparation(){if(this.mapCompile){this.mapPreparation.cancel();this.needsMapCompile=true;}}
+  get mapCompile(){return this.mapBuild||this.mapPreparation.pending;}
+  cancelMapPreparation(){if(this.mapBuild){this.mapBuild.steps.return?.();this.disposeGroup(this.mapBuild.group);this.mapBuild=null;this.mapId=null;}this.mapPreparation.cancel();this.needsMapCompile=true;}
   constructor(canvas, settings) {
     this.mapPreparation=new ShaderPreparation();this.renderBudget=new RenderBudget();
     this.canvas = canvas;
@@ -164,6 +165,7 @@ export class View {
       antialias: settings.quality !== 'low',
       powerPreference: "high-performance",
     });
+    this.gpuTimer=new GpuFrameTimer(this.renderer);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.15;
     this.renderer.shadowMap.autoUpdate=false;
@@ -334,19 +336,36 @@ export class View {
       map.authored??=authoredBoxes(map);
       this.preparedBattle={group,layout,steps:buildIslandSteps(group,map.authored?{...map,boxes:map.authored}:map,{block,ball,cylinder,mat,palette}),done:false};
     }
-    const pending=this.preparedBattle,deadline=performance.now()+4;
-    do{pending.done=pending.steps.next().done;}while(!pending.done&&performance.now()<deadline);
-    if(pending.done){
-      // Compile the detached scene while the player is still on Spawn Island.
+    const pending=this.preparedBattle;this.advanceMapBuild(pending,2);
+    if(pending.done&&!pending.compiled){
+      pending.compiled=true;
       const scene=new THREE.Scene();scene.fog=new THREE.Fog(getMap('sunnybreak').sky,330,1000);scene.add(pending.group);
       this.renderer.compileAsync(scene,this.camera,this.scene).catch(()=>{});
     }
+  }
+  advanceMapBuild(pending,budget=3){
+    const deadline=performance.now()+budget;
+    do{pending.done=pending.steps.next().done;}while(!pending.done&&performance.now()<deadline);
+  }
+  finishMapBuild(){
+    const pending=this.mapBuild;if(!pending)return;
+    if(!pending.done)this.advanceMapBuild(pending);
+    if(!pending.done)return;
+    // Keep the generator's root alive until it finishes: early departure must
+    // never synchronously drain all remaining terrain and geometry work.
+    const children=pending.group.children.slice(),index=this.world.children.indexOf(pending.group),siblings=this.world.children.filter(c=>c!==pending.group);
+    this.world.add(...children);pending.group.removeFromParent();this.world.children=[...siblings.slice(0,index),...children,...siblings.slice(index)];
+    if(pending.group.userData.details)pending.group.userData.details.attach(this.world);
+    if(pending.group.userData.groundCover)pending.group.userData.groundCover.attach(this.world);
+    this.world.userData.terrainEnvironment=pending.group.userData.terrainEnvironment;
+    this.mapBuild=null;this.needsMapCompile=true;
   }
   loadMap(id) {
     const layout=getMap(id).layoutKey||'';
     if (id === this.mapId&&this.mapLayout===layout) return;
     this.mapLayout=layout;
     if(this.preparedBattle&&this.preparedBattle.layout!==(getMap('sunnybreak').layoutKey||'')){this.disposeGroup(this.preparedBattle.group);this.preparedBattle=null;}
+    this.mapBuild?.steps.return?.();this.mapBuild=null;
     this.mapId = id;
     this.mapPreparation.cancel();
     this.needsMapCompile=true;
@@ -357,12 +376,12 @@ export class View {
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;
     this.camera.near=map.theme==='royale'?.15:.12;
     this.camera.updateProjectionMatrix();this.scopeCamera.updateProjectionMatrix();
-    if(id==='sunnybreak'&&this.preparedBattle){
-      const pending=this.preparedBattle;
-      // A full-human early departure may arrive before preparation finishes.
-      if(!pending.done)for(const _ of pending.steps){}
-      this.world.add(...pending.group.children.slice());if(pending.group.userData.details)pending.group.userData.details.attach(this.world);if(pending.group.userData.groundCover)pending.group.userData.groundCover.attach(this.world);this.world.userData.terrainEnvironment=pending.group.userData.terrainEnvironment;this.preparedBattle=null;
-    }else if(map.zoneWars)buildZoneDistrict(this.world,map);else if(map.theme==='boxfight')buildBoxArena(this.world,map);else if(map.theme==='zombies')buildBlacktide(this.world);else (map.theme==='royale'?buildIsland:buildArena)(this.world, map.authored?{...map,boxes:map.authored}:map, { block, ball, cylinder, mat, palette });
+    if(map.theme==='royale'){
+      const group=new THREE.Group();
+      this.mapBuild=id==='sunnybreak'&&this.preparedBattle?this.preparedBattle:{group,done:false,steps:buildIslandSteps(group,map.authored?{...map,boxes:map.authored}:map,{block,ball,cylinder,mat,palette})};
+      if(id==='sunnybreak')this.preparedBattle=null;
+      this.world.add(this.mapBuild.group);this.finishMapBuild();
+    }else if(map.zoneWars)buildZoneDistrict(this.world,map);else if(map.theme==='boxfight')buildBoxArena(this.world,map);else if(map.theme==='zombies')buildBlacktide(this.world);else buildArena(this.world,map,{block,ball,cylinder,mat,palette});
     for (let i = 0; i < (['zombies','boxfight','zonewars'].includes(map.theme)?0:2); i++) {
       const [x, z] = map.bases[i];
       const ring = new THREE.Mesh(
@@ -716,7 +735,7 @@ export class View {
     if(!playing){if(this.eliminations.active.length)this.eliminations.clear();if(this.damageNumbers.rows.length)this.damageNumbers.clear();}
     // Reduce GPU work when rendering itself delays input and socket processing.
     const updateStarted=performance.now();
-    const resized=this.renderBudget.sample(updateStarted,{quality:this.settings.quality,limit:this.settings.fpsLimit,active:!document.hidden});
+    const resized=this.renderBudget.sample(updateStarted,{quality:this.settings.quality,limit:this.settings.fpsLimit,active:!document.hidden,gpuMs:this.gpuTimer.poll(),cpuMs:this.frameCpuMs||0});
     this.renderScale=this.renderBudget.scale;this.detailPressure=this.renderBudget.pressure;
     if(resized)this.resize();
     const shadows=this.settings.quality!=='low'&&this.renderBudget.shadows;
@@ -724,6 +743,7 @@ export class View {
     this.clock += dt;
     this.recoil = Math.max(0, this.recoil - dt * (local?gun(local).recoilRecovery:7));
     if(playing)this.loadMap(state?.options.map || "yard");
+    if(playing)this.finishMapBuild();
     if(playing&&state?.royale?.practice&&!state.options.training)this.prepareBattleMap();
     this.world.visible=playing;const dark=playing&&!!state?.zombies;this.hemi.intensity=dark?1.65:2.25;this.hemi.color.setHex(dark?0x9ecbd3:0xe5f4ff);this.hemi.groundColor.setHex(dark?0x304c54:0x88a16a);this.sun.intensity=dark?1.5:2.2;this.sun.color.setHex(dark?0xaacbd8:0xfff3de);
     updateEnvironmentSurfaces(this.clock);
@@ -884,7 +904,9 @@ export class View {
       this.actorMatrix ||= new THREE.Matrix4();
       this.actorBounds ||= new THREE.Sphere(new THREE.Vector3(),2.5);
       this.actorFrustum.setFromProjectionMatrix(this.actorMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse));
-      for (const source of state.players) {
+      let actorsCreated=0;const actorDeadline=performance.now()+2;
+      const actorOrder=state.players.slice().sort((a,b)=>(a.x-this.camera.position.x)**2+(a.z-this.camera.position.z)**2-((b.x-this.camera.position.x)**2+(b.z-this.camera.position.z)**2));
+      for (const source of actorOrder) {
         let p=source.id===local?.id&&this.renderLocalActor?this.renderLocalActor:source;
         if((p.emote||p.id===this.celebrationTarget)&&(state.phase==='results'||state.boxfight?.stage==='intermission'||p.zExtracted))p={...p,health:100,spectating:false,flight:'ground',grounded:true,downed:false};
         // Transport passengers share one simulation position; the airship
@@ -901,7 +923,8 @@ export class View {
           (p.team+":"+p.teamSlot) +
           mode(state.options.mode).teams;
         let model = this.models.get(p.id);
-        if (!model || model.userData.signature !== sig) {
+        if ((!model || model.userData.signature !== sig)&&actorsCreated<2&&(actorsCreated===0||performance.now()<actorDeadline)) {
+          actorsCreated++;
           if (model) {
             this.disposeGroup(model);
             this.actors.remove(model);
@@ -928,6 +951,15 @@ export class View {
           this.models.set(p.id, model);
           model.position.set(p.x, p.y, p.z);
         }
+        if(!model){
+          // An affordable silhouette keeps opponents visible while cosmetic
+          // construction is spread over frames. It never changes their hitbox.
+          model=new THREE.Group();model.userData.pendingActor=true;
+          this.actorProxyGeometry??=new THREE.CapsuleGeometry(.22,.9,3,6);this.actorProxyGeometry.userData.shared=true;
+          const body=new THREE.Mesh(this.actorProxyGeometry,mat(p.color||0x8a9b85));body.position.y=1;model.add(body);
+          this.actors.add(model);this.models.set(p.id,model);
+        }
+        if(model.userData.pendingActor){model.position.set(p.x,p.y,p.z);model.rotation.y=p.yaw||0;model.visible=p.health>0;continue;}
         const distance=Math.hypot(this.camera.position.x-p.x,this.camera.position.y-p.y,this.camera.position.z-p.z)/Math.max(1,local?.aim?gun(local).magnification||1:1),poseInterval=p.id===local?.id?0:distance>90?.1:distance>40?.05:0;
         const poseDue=this.clock>=(model.userData.poseAt||0)||model.userData.poseSlot!==p.slot||p.health<=0;
         const poseDt=poseDue?Math.min(.15,this.clock-(model.userData.poseClock??this.clock-dt)):dt;
@@ -1155,7 +1187,8 @@ export class View {
     this.atmosphere.update(this.camera,getMap(state?.options.map||'yard'),playing,this.clock);
     // A departed match must never block rendering the lobby. Rewarm on reentry.
     if(!playing)this.cancelMapPreparation();
-    if(playing&&this.needsMapCompile){
+    const renderStarted=performance.now();this.gpuTimer.begin();
+    if(playing&&this.needsMapCompile&&!this.mapBuild){
       this.needsMapCompile=false;
       this.mapPreparation.start(()=>this.renderer.compileAsync(this.scene,this.camera));
     }
@@ -1192,6 +1225,8 @@ export class View {
 
     this.renderer.render(this.scene, this.camera);
     if(playing&&!this.thirdPersonEnabled&&(this.gunGroup.visible||this.outgoing?.group.visible)){this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.viewmodelScene,this.viewmodelCamera);this.renderer.autoClear=true;}
+    this.gpuTimer.end();
+    this.frameCpuMs=performance.now()-renderStarted+(renderStarted-updateStarted)+(this.inputCpuMs||0);
     this.updateMilliseconds=performance.now()-updateStarted;
   }
 }

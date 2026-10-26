@@ -7,7 +7,7 @@ export class TeamingMonitor{
   if(e.type==='supply-transfer'){this.transfer(e);return;}
   if(e.type==='hit'&&e.player&&e.target&&Number.isFinite(e.amount)&&e.amount>0)this.hits.push({time:e.time,player:e.player,target:e.target,amount:e.amount});
   if(this.hits.length>2000)this.hits.splice(0,this.hits.length-2000);
-  if(sim&&['shot','launch'].includes(e.type)&&e.origin)for(const target of sim.players.values()){
+  if(sim&&this.pairs.size&&['shot','launch'].includes(e.type)&&e.origin)for(const target of sim.players.values()){
    const pair=this.pairs.get(pairKey(e.player,target.id));if(!pair)continue;
    const dx=target.x-e.origin.x,dy=target.y+1-e.origin.y,dz=target.z-e.origin.z,len=Math.hypot(dx,dy,dz);
    if(len>22||len<.1)continue;
@@ -16,7 +16,18 @@ export class TeamingMonitor{
   }
  }
  transfer(e){this.transfers.push({time:e.time,from:e.from,to:e.to,drop:e.drop,item:e.item,amount:e.amount});if(this.transfers.length>200)this.transfers.shift();}
- sample(sim){
+ sample(sim,{budgetMs=1,now=()=>performance.now()}={}){
+  if(sim.phase!=='playing'||!['active','drop'].includes(sim.stage)||sim.elapsed<20||sim.storm?.radius<60){this.work=null;this.pairs.clear();return;}
+  if(!this.work){
+   if(sim.time-this.last<(this.focus?.size?.5:2))return;
+   const players=new Map([...sim.players].map(([id,p])=>[id,{...p}]));
+   const snapshot={time:sim.time,elapsed:sim.elapsed,phase:sim.phase,stage:sim.stage,options:sim.options,storm:sim.storm&&{...sim.storm},players,accessible:sim.accessible.bind(sim)};
+   this.work=this.sampleSteps(snapshot);
+  }
+  const end=now()+budgetMs;let steps=0;
+  do{if(this.work.next().done){this.work=null;break;}}while((budgetMs===Infinity||++steps<64)&&now()<end);
+ }
+ *sampleSteps(sim){
   if(sim.time-this.last<(this.focus?.size ? .5 : 2))return;this.last=sim.time;
   this.hits=this.hits.filter(h=>sim.time-h.time<=180);this.transfers=this.transfers.filter(e=>sim.time-e.time<=180);
   if(sim.phase!=='playing'||!['active','drop'].includes(sim.stage)||sim.elapsed<20||sim.storm?.radius<60){this.pairs.clear();return;}
@@ -24,6 +35,7 @@ export class TeamingMonitor{
   const byShooter=new Map();for(const h of this.hits){if(!byShooter.has(h.player))byShooter.set(h.player,[]);byShooter.get(h.player).push(h);}
   const active=new Set(),flags=[];
   for(let i=0;i<players.length;i++)for(let j=i+1;j<players.length;j++){
+   yield;
    const a=players[i],b=players[j];if(teammates(sim.options,a,b))continue;
    const ids=[a.id,b.id],key=pairKey(...ids);active.add(key);
    let pair=this.pairs.get(key);const interval=(this.focus?.has(a.id)||this.focus?.has(b.id)) ? .5 : 2;if(pair&&sim.time-(pair.sampled??-Infinity)<interval)continue;
@@ -44,6 +56,6 @@ export class TeamingMonitor{
    }
   }
   for(const key of this.pairs.keys())if(!active.has(key))this.pairs.delete(key);
-  for(const flag of flags)this.onFlag(flag);
+  for(const flag of flags){this.onFlag(flag);yield;}
  }
 }

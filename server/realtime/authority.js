@@ -156,8 +156,9 @@ export class MatchAuthority{
    }
    encoder.lootKey=lootKey;encoder.buildKey=buildKey;
    room.eventCursors.set(id,state.events.at(-1)?.id||room.eventCursors.get(id)||0);
-   room.interest??=new SnapshotInterest();const presentation={...outgoing,players:room.interest.players(outgoing,p)};
-   const message=encoder.encode({type:'authority-state',state:presentation},batch);this.send(peer,{type:'authority-frame',frame:message.frame},batch.serialize(message.frame));
+   room.interest??=new SnapshotInterest();const presentation={...outgoing,players:room.interest.players(outgoing,p,{privatePlayers:false})};
+   const localPlayers={[id]:p},watched=state.players.find(row=>row.id===(p.watchingId||p.killerId)&&row.health>0);if(watched)localPlayers[watched.id]=watched;
+   const message=encoder.encode({type:'authority-state',state:presentation,localPlayers},batch);this.send(peer,{type:'authority-frame',frame:message.frame},batch.serialize(message.frame));
    yield;
   }
   if(!room.publishedAt||room.age-room.publishedAt>=2){this.publish(room);room.publishedAt=room.age;}
@@ -202,7 +203,7 @@ export class MatchAuthority{
   }
   // One fresh broadcast after catch-up, never several obsolete broadcasts in a burst.
   // Three 60 Hz steps can sum just below 50 ms; use the same tolerance as catch-up.
-  for(const room of this.rooms.values())if(responseFrameDue(room.sim,room.age,room.frameAt,room.responseVersion,room.tournament&&room.members.size>32?1/15:.05)){room.frameAt=room.age;room.responseVersion=room.sim.responseVersion||0;this.broadcast(room);}
+  for(const room of this.rooms.values())if(responseFrameDue(room.sim,room.age,room.frameAt,room.responseVersion,.05)){room.frameAt=room.age;room.responseVersion=room.sim.responseVersion||0;this.broadcast(room);}
   if(!this.publicStatusAt||now-this.publicStatusAt>=1000){this.publicStatusAt=now;this.relay.parties.publishPublicMatch(this.publicSummary());}
   // A throttled tick must not be followed by five more ticks before socket IO.
   // Yield between catch-up slices while retaining earned simulation time.

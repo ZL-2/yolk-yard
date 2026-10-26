@@ -16,9 +16,9 @@ import {LootAuras} from './loot-auras.js';
 import {nearbyItems,itemById} from './nearby-items.js';
 import {ROYALE_MAP} from './royale-map.js';
 import {groundAt} from './terrain.js';
-import {buildDetailedTerrain,createDetailedOcean} from './terrain-detail.js';
-import {environmentAtlasMaterial,environmentUV,packEnvironmentGeometry,unpackEnvironmentGeometry} from './environment-surfaces.js';
-import {architectureAtlasMaterial,architectureUV,architectureKit,buildingSurface} from './architecture-surfaces.js';
+import {buildDetailedTerrain,createDetailedOceanSteps} from './terrain-detail.js';
+import {prepareEnvironmentSurfaces,environmentAtlasMaterial,environmentUV,packEnvironmentGeometry,unpackEnvironmentGeometry} from './environment-surfaces.js';
+import {prepareArchitectureSurfaces,architectureAtlasMaterial,architectureUV,architectureKit,buildingSurface} from './architecture-surfaces.js';
 import {dressWatchtower} from './watchtowers.js';
 import {supplyHeight} from './supply-drops.js';
 import {EnvironmentGroundCover} from './environment-groundcover.js';
@@ -41,19 +41,20 @@ function repeatedProp(group,p,kit){
 }
 
 export function bake(group,chunked=false,colored=chunked){for(const _ of bakeSteps(group,chunked,colored)){} }
-function* bakeSteps(group,chunked=false,colored=chunked){
+export function* bakeSteps(group,chunked=false,colored=chunked){
  group.updateMatrixWorld(true);const batches=new Map(),duplicates=new Set();
- for(const o of [...group.children])if(o.isMesh&&!o.userData.ownedMaterial&&!o.userData.keepDynamic){
+ try{for(const o of [...group.children])if(o.isMesh&&!o.userData.ownedMaterial&&!o.userData.keepDynamic){
   const architecture=o.material.userData.architectureSurface,surface=o.material.userData.environmentSurface,foliage=!!o.material.userData.environmentFoliage;
   const duplicate=[o.geometry.uuid,o.material.uuid,o.userData.objectId||'',...o.matrix.elements].join(':');if(duplicates.has(duplicate)){group.remove(o);continue;}duplicates.add(duplicate);
-  const detail=!!o.userData.architectureDetail,key=(colored?(architecture?'architecture':surface?'environment:'+foliage:'color'):o.material.uuid)+(detail?':surface-detail':'')+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');if(!batches.has(key)){let mat=colored?(architecture?architectureAtlasMaterial():surface?environmentAtlasMaterial(foliage):bakedMaterial):o.material;if(detail){const source=mat;mat=source.clone();mat.onBeforeCompile=source.onBeforeCompile;mat.customProgramCacheKey=source.customProgramCacheKey;mat.polygonOffset=true;mat.polygonOffsetFactor=-1;mat.polygonOffsetUnits=-2;mat.userData={...mat.userData,shared:false};}batches.set(key,{mat,parts:[],ranges:[],vertices:0,detail});}
+  const detail=!!o.userData.architectureDetail,baseKey=(colored?(architecture?'architecture':surface?'environment:'+foliage:'color'):o.material.uuid)+(detail?':surface-detail':'')+(chunked?':'+Math.floor(o.position.x/64)+':'+Math.floor(o.position.z/64):'');let part=0,key=baseKey;while(batches.get(key)?.vertices>=8192)key=baseKey+':part-'+(++part);if(!batches.has(key)){let mat=colored?(architecture?architectureAtlasMaterial():surface?environmentAtlasMaterial(foliage):bakedMaterial):o.material;if(detail){const source=mat;mat=source.clone();mat.onBeforeCompile=source.onBeforeCompile;mat.customProgramCacheKey=source.customProgramCacheKey;mat.polygonOffset=true;mat.polygonOffsetFactor=-1;mat.polygonOffsetUnits=-2;mat.userData={...mat.userData,shared:false};}batches.set(key,{mat,parts:[],ranges:[],vertices:0,detail});}
   const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();unpackEnvironmentGeometry(g);g.applyMatrix4(o.matrix);
   if(colored){if(architecture)architectureUV(g,architecture);else if(surface)environmentUV(g,surface);else g.deleteAttribute('uv');if(!g.attributes.color){const colors=new Float32Array(g.attributes.position.count*3),c=o.material.color;for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(colors,3));}else if(surface||architecture){const a=g.attributes.color,c=o.material.color;for(let i=0;i<a.count;i++)a.setXYZ(i,a.getX(i)*c.r,a.getY(i)*c.g,a.getZ(i)*c.b);}}
   const batch=batches.get(key);if(o.userData.objectId)batch.ranges.push({id:o.userData.objectId,start:batch.vertices,count:g.attributes.position.count});batch.vertices+=g.attributes.position.count;batch.parts.push(g);group.remove(o);
   if(o.geometry.type==='CylinderGeometry'&&!o.geometry.userData.shared)o.geometry.dispose();
   yield;
  }
- for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.userData.environmentAtlas=!!b.mat.userData.environmentAtlas;geometry.userData.architectureAtlas=!!b.mat.userData.architectureAtlas;packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());mesh.receiveShadow=true;mesh.castShadow=true;mesh.updateMatrix();mesh.matrixAutoUpdate=false;if(b.detail)mesh.userData.ownedMaterial=true;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);yield;}
+ for(const b of batches.values()){const geometry=mergeGeometries(b.parts);geometry.userData.environmentAtlas=!!b.mat.userData.environmentAtlas;geometry.userData.architectureAtlas=!!b.mat.userData.architectureAtlas;packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,b.mat);b.parts.forEach(g=>g.dispose());b.parts=[];mesh.receiveShadow=true;mesh.castShadow=true;mesh.updateMatrix();mesh.matrixAutoUpdate=false;if(b.detail)mesh.userData.ownedMaterial=true;if(b.ranges.length)mesh.userData.objectRanges=b.ranges;group.add(mesh);b.attached=true;yield;}
+ }finally{for(const b of batches.values()){for(const g of b.parts)g.dispose();if(b.detail&&!b.attached)b.mat.dispose();}}
 }
 export function islandLabel(text,size=1){
  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=96;
@@ -63,9 +64,11 @@ export function islandLabel(text,size=1){
 export function buildIsland(world,map,kit){for(const _ of buildIslandSteps(world,map,kit)){} }
 // Resumable construction lets warmup frames keep servicing input and sockets.
 export function* buildIslandSteps(world,map,kit){
+ yield* prepareEnvironmentSurfaces();yield* prepareArchitectureSurfaces();
  if(map.id==='sunnybreak'){yield* streamedIslandSteps(world,map,kit);buildMapObjects(world,map,kit);return;}
  const {palette}=kit,architecture=architectureKit(kit);
- world.add(createDetailedOcean(map));
+ world.add(yield* createDetailedOceanSteps(map));
+ yield;
  yield* buildDetailedTerrain(world,map);
  const byBuilding=map.buildings.map(()=>[]),treeBoxes=new Map(),propBoxes=new Map();
  for(const b of map.boxes){
@@ -89,9 +92,10 @@ export function* buildIslandSteps(world,map,kit){
 }
 function* streamedIslandSteps(world,map,kit){
  const architecture=architectureKit(kit);
- world.add(createDetailedOcean(map));
+ world.add(yield* createDetailedOceanSteps(map));
+ yield;
  yield* buildDetailedTerrain(world,map);
- const helipad=dressHelipad(world,map.helipad,architecture);if(helipad)bake(helipad,false,false);
+ const helipad=dressHelipad(world,map.helipad,architecture);if(helipad)yield* bakeSteps(helipad,false,false);
  const towers=new Map((map.watchtowers||[]).map(t=>[t.id,t]));
  const cells=new Map(),cellFor=(x,z)=>{const ix=Math.floor(x/64),iz=Math.floor(z/64),key=ix+':'+iz;if(!cells.has(key))cells.set(key,{key,x:(ix+.5)*64,z:(iz+.5)*64,radius:48,boxes:[],buildings:[],watchtowers:[],trees:[],props:[],coarse:new THREE.Group()});return cells.get(key);};
  for(const b of map.boxes){if(b.editorObject)continue;const parent=b.watchtowerId?towers.get(b.watchtowerId):b.building===undefined?b:map.buildings[b.building];cellFor(parent.x,parent.z).boxes.push(b);}

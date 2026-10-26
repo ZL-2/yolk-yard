@@ -44,6 +44,26 @@ try{
  await page.keyboard.press('1');await page.waitForFunction(()=>window.__yolkTest.loadingFixture(v=>v.localWeapon==='sprinter'));const rifle=await page.evaluate(()=>window.__yolkTest.loadingFixture(v=>v.localModel.uuid));
  for(let i=0;i<8;i++){await page.keyboard.press(i%2?'1':'2');await page.waitForFunction(id=>window.__yolkTest.loadingFixture(v=>v.localWeapon===id),i%2?'sprinter':'scatter');}
  assert.equal(await page.evaluate(()=>window.__yolkTest.loadingFixture(v=>v.localModel.uuid)),rifle,'Switching reuses the exact model instead of rebuilding it');
+ // Exercise the remaining action types with real key/mouse events while
+ // authority packets are held. Authoritative resources must remain untouched.
+ const hold=()=>page.evaluate(()=>window.__yolkTest.connectionFixture(n=>{n.callbacks.onState=s=>{n.pendingState=s;};}));
+ const release=()=>page.evaluate(()=>window.__yolkTest.connectionFixture(n=>{n.callbacks.onState=n.savedState;if(n.pendingState)n.savedState(n.pendingState);}));
+ p.inventory[1].ammo=10;p.bank.medium=100;sim.syncInventory(p);authority.broadcast(event.room);
+ await page.waitForFunction(()=>{const r=window.__yolkTest.read(),p=r.state.players.find(p=>p.id===r.localId);return p.ammo[1]===10&&p.slot===1&&p.equipUntil<=r.state.time;});
+ await hold();await page.keyboard.press('r');
+ await page.waitForFunction(()=>window.__yolkTest.loadingFixture(v=>v.localPlayer?.reloadEnd>v.lastStateTime));
+ assert.equal(await page.evaluate(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).reloadEnd;}),0);
+ await release();await until(()=>p.reloadEnd===0,'Reload completed');
+ await page.keyboard.press('p');await page.waitForFunction(()=>{const r=window.__yolkTest.read(),p=r.state.players.find(p=>p.id===r.localId);return p.slot===0&&p.equipUntil<=r.state.time;});
+ await hold();const oldSwing=await page.evaluate(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).swingAt??-100;});
+ await page.mouse.down();await page.waitForFunction(old=>window.__yolkTest.loadingFixture(v=>v.localPlayer?.swingAt>old),oldSwing);await page.mouse.up();await release();
+ p.inventory[3]={id:'bandage',count:2};p.health=50;sim.syncInventory(p);authority.broadcast(event.room);
+ await page.waitForFunction(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).inventory[3]?.id==='bandage';});
+ await page.keyboard.press('3');await page.waitForFunction(()=>{const r=window.__yolkTest.read(),p=r.state.players.find(p=>p.id===r.localId);return p.slot===3&&p.equipUntil<=r.state.time;});
+ await hold();await page.mouse.down();await page.waitForFunction(()=>window.__yolkTest.loadingFixture(v=>v.localPlayer?.use?.id==='bandage'));await page.mouse.up();
+ assert.equal(await page.evaluate(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).inventory[3].count;}),2);await release();
+ await page.keyboard.press('1');await page.waitForFunction(()=>{const r=window.__yolkTest.read();return r.state.players.find(p=>p.id===r.localId).slot===1;});
+ console.log('PASS reload, pickaxe and item-use presentation before acknowledgements');
  // Put one unique, reachable pickup at the player's feet. During the delay the
  // prompt reacts, but the inventory remains authoritative (no phantom item).
  console.log('Rapid switches passed; checking pickup');
@@ -59,6 +79,6 @@ try{
  // Full scene rendering is separately checked by performance-browser-check;
  // keep software GPU cost out of this input-isolation fixture.
  await page.screenshot({path:out+'/confirmed-inventory.png'});assert.deepEqual(errors,[]);
- await writeFile(out+'/browser.json',JSON.stringify({passed:true,beforeAck,checks:['real-cup-authority','weapon-before-ack','movement-before-ack','rapid-switch-cache','pending-pickup-feedback','single-authoritative-pickup'],errors},null,2));console.log('PASS real Cup inputs, immediate weapon/movement, cached switching and confirmed pickups');
+ await writeFile(out+'/browser.json',JSON.stringify({passed:true,beforeAck,checks:['real-cup-authority','weapon-before-ack','movement-before-ack','rapid-switch-cache','pending-pickup-feedback','single-authoritative-pickup','reload-before-ack','pickaxe-before-ack','use-before-ack'],errors},null,2));console.log('PASS real Cup inputs, immediate weapon/movement, cached switching and confirmed pickups');
 }catch(error){await page.screenshot({path:out+'/failure.png'}).catch(()=>{});console.error('Response test failure',await page.evaluate(()=>({screen:window.__yolkTest?.read().screen,paused:window.__yolkTest?.read().paused,dialog:document.querySelector('#dialog')?.innerText,prompt:document.querySelector('#royale-prompt')?.innerText,report:window.__yolkTest?.read().connection})).catch(()=>null),errors);throw error;}
 finally{await browser.close();await vite.close();await f.close();}

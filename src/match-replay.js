@@ -2,7 +2,16 @@
 const actorFields=['id','name','team','bot','x','y','z','yaw','pitch','health','shield','spectating','contestant','flight','downed','connected','killerId','kills','weapon','slot','ammo','reloading'];
 const eventFields=['id','type','time','player','target','from','to','drop','item','amount','weapon','head','x','y','z','origin','shots'];
 const eventTypes=new Set(['shot','launch','hit','elimination','kill','royale-eliminated','box-eliminated','supply-transfer','build','build-destroyed','revive']);
-const select=(value,keys)=>Object.fromEntries(keys.flatMap(k=>{const v=value[k];if(typeof v==='boolean'||typeof v==='number'&&Number.isFinite(v))return [[k,v]];if(typeof v==='string')return [[k,v.slice(0,100)]];if(k==='origin'&&v&&[v.x,v.y,v.z].every(Number.isFinite))return [[k,{x:v.x,y:v.y,z:v.z}]];if(k==='shots'&&Array.isArray(v))return [[k,v.slice(0,40).map(s=>select(s,['vx','vy','vz','x','y','z']))]];return [];}));
+const select=(value,keys)=>{
+ const row={};
+ for(const k of keys){const v=value[k];
+  if(typeof v==='boolean'||typeof v==='number'&&Number.isFinite(v))row[k]=v;
+  else if(typeof v==='string')row[k]=v.slice(0,100);
+  else if(k==='origin'&&v&&Number.isFinite(v.x)&&Number.isFinite(v.y)&&Number.isFinite(v.z))row[k]={x:v.x,y:v.y,z:v.z};
+  else if(k==='shots'&&Array.isArray(v))row[k]=v.slice(0,40).map(s=>select(s,['vx','vy','vz','x','y','z']));
+ }
+ return row;
+};
 export function replayFrame(state){
  if(!state||!Number.isFinite(state.time)||!Array.isArray(state.players)||state.players.length>80)return null;
  const players=state.players.filter(p=>p&&typeof p.id==='string'&&p.id.length<=100&&[p.x,p.y,p.z].every(n=>Number.isFinite(n)&&Math.abs(n)<20000)).map(p=>select(p,actorFields));

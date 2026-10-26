@@ -2,7 +2,7 @@ import {environmentCollision} from './environment-collision.js';
 import {sightRay,reachablePoint,thirdPersonActive} from './perspective.js';
 import {SHIELD_BARREL} from './field-refinement.js';
 import {worldDoorBox,cacheDoorCollisions,updateDoorCollisions} from './world-rules.js';
-import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,removeCollisionBoxes,candidates,playerBoxOverlap,canOccupy,pruneBuildPhases} from './physics.js';
+import {direction,rayBox,rayEgg,EYE,HEIGHT,RADIUS,wallDistance,worldHit,invalidateCollision,updateCollisionBoxes,removeCollisionBoxes,candidates,playerBoxOverlap,canOccupy,pruneBuildPhases} from './physics.js';
 import {bodyHeight,eyeHeight,canFight} from './stance.js';
 import {groundAt} from './terrain.js';
 import {MATERIALS,GRID,COST,CAP,EDIT_RANGE,PICKAXE,isBreakable,propAt,harvestDefinition,buildStats,snappedFacing,canEdit,selectMaterial} from './building-rules.js';
@@ -109,8 +109,31 @@ export function aimedObject(map,p,range=5){
  const sight=sightRay(map,p,range),hit=worldHit(map,sight.origin,sight.d,sight.range);
  return hit?.box&&(!sight.third||reachablePoint(map,p,hit.point,range))?hit:null;
 }
+const buildCollisionState=new WeakMap();
+const shapeKey=b=>`${b.type}:${b.x}:${b.y}:${b.z}:${b.rotation}:${b.mask}:${b.path}:${b.doorOpen}:${b.material}`;
+function syncBuildCollisions(map,world,builds,damage,doors,time){
+ let cache=buildCollisionState.get(map);
+ if(!cache||cache.world!==world){
+  cache={world,worldKey:null,worldBoxes:[],pieces:new Map()};buildCollisionState.set(map,cache);
+  map.boxes=[];invalidateCollision(map);
+ }
+ const removed=[],added=[],worldKey=Object.keys(damage||{}).filter(id=>damage[id].destroyed).sort().join('|')+JSON.stringify(doors||{});
+ if(cache.worldKey!==worldKey){
+  const next=world.filter(b=>!damage?.[b.objectId]?.destroyed).flatMap(b=>worldDoorBox(b,doors,map.doors,time)||[]),old=new Set(cache.worldBoxes),current=new Set(next);
+  for(const box of old)if(!current.has(box))removed.push(box);
+  for(const box of current)if(!old.has(box))added.push(box);
+  cache.worldBoxes=next;cache.worldKey=worldKey;
+ }
+ const seen=new Set();
+ for(const piece of builds){
+  seen.add(piece.id);const old=cache.pieces.get(piece.id),key=shapeKey(piece);if(old?.key===key)continue;
+  if(old)removed.push(...old.boxes);const boxes=pieceBoxes(piece);added.push(...boxes);cache.pieces.set(piece.id,{key,boxes});
+ }
+ for(const [id,old]of cache.pieces)if(!seen.has(id)){removed.push(...old.boxes);cache.pieces.delete(id);}
+ updateCollisionBoxes(map,removed,added);cacheDoorCollisions(map);updateDoorCollisions(map,doors,time);
+}
 export function rebuildMap(sim,{navigationChanged=true}={}){
- sim.map.boxes=[...sim.worldBoxes.filter(b=>!sim.worldDamage[b.objectId]?.destroyed).flatMap(b=>worldDoorBox(b,sim.doors,sim.map.doors,sim.time)||[]),...sim.builds.flatMap(pieceBoxes)];cacheDoorCollisions(sim.map);invalidateCollision(sim.map);sim.lootSupportDirty=true;if(navigationChanged)sim.navigationRevision=(sim.navigationRevision||0)+1;
+ syncBuildCollisions(sim.map,sim.worldBoxes,sim.builds,sim.worldDamage,sim.doors,sim.time);sim.lootSupportDirty=true;if(navigationChanged)sim.navigationRevision=(sim.navigationRevision||0)+1;
 }
 export function resetBuilding(sim){
  for(const p of sim.players?.values()||[])p.phasedBuilds=[];
@@ -277,6 +300,9 @@ export function applyBuildState(map,r){
  // Sparse packets may arrive before the first full world. Do not cache them.
  if(revision!==null&&r.builds&&r.worldDamage)map.appliedBuildRevision=revision;
 
- const key=r.matchId+':'+r.round+':'+(r.builds||[]).map(b=>[b.id,b.mask,b.path,b.doorOpen,b.rotation,b.material,b.x,b.y,b.z].join(',')).join(';')+':'+Object.keys(r.worldDamage||{}).filter(k=>r.worldDamage[k].destroyed).join(',')+':'+Object.keys(r.doors||{}).filter(k=>r.doors[k].open).join(',');if(map.buildKey===key)return;
- map.authored??=authoredBoxes(map);map.boxes=[...map.authored.filter(b=>!r.worldDamage?.[b.objectId]?.destroyed).flatMap(b=>worldDoorBox(b,r.doors,map.doors,r.time??0)||[]),...(r.builds||[]).flatMap(pieceBoxes)];cacheDoorCollisions(map);map.buildKey=key;invalidateCollision(map);
+ map.authored??=authoredBoxes(map);
+ // Sparse updates inherit the decoded world; never erase solids before that
+ // first full world arrives. Health-only versions keep every geometry identity.
+ if(!r.builds||!r.worldDamage)return;
+ syncBuildCollisions(map,map.authored,r.builds,r.worldDamage,r.doors,r.time??0);
 }

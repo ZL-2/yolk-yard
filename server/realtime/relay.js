@@ -67,10 +67,14 @@ export class RealtimeRelay {
         // Client commands are replayed after reconnect. Apply each exactly once.
         if(!Number.isSafeInteger(m.seq)||m.seq<1||m.seq>peer.clientSeq+1)throw Error('Command sequence');
         if(m.seq>peer.clientSeq){this.handle(peer,m);peer.clientSeq=m.seq;}
-        if(ws.readyState===1)ws.send(JSON.stringify({type:'command-ack',seq:peer.clientSeq}));
+        // Gameplay commands execute immediately. Their cumulative transport
+        // receipt can share a short window without delaying input or state.
+        if(m.type==='authority-command'&&m.command?.type==='input'){
+          if(!peer.commandAckTimer){peer.commandAckTimer=setTimeout(()=>{peer.commandAckTimer=null;if(peer.ws===ws&&ws.readyState===1)ws.send(JSON.stringify({type:'command-ack',seq:peer.clientSeq}));},25);peer.commandAckTimer.unref?.();}
+        }else{clearTimeout(peer.commandAckTimer);peer.commandAckTimer=null;if(ws.readyState===1)ws.send(JSON.stringify({type:'command-ack',seq:peer.clientSeq}));}
       }catch(error){const reason=['Rate limit','Command sequence','Expired resume','Register first','Invalid public host state','Invalid frame'].includes(error.message)?error.message:'Invalid relay message';if(peer&&(this.publicHost.isTarget(peer)||peer.publicMember))this.publicHost.report('connection-rejected',reason,peer);ws.close(1008,reason);}
     });
-    ws.on('close',(code)=>{clearTimeout(registration);if(peer?.ws===ws){if(this.publicHost.isTarget(peer))this.publicHost.report('host-transport-detached','WebSocket '+code,peer);peer.ws=null;peer.detachedAt=Date.now();this.authority.connection(peer,false);}});
+    ws.on('close',(code)=>{clearTimeout(registration);if(peer?.ws===ws){clearTimeout(peer.commandAckTimer);peer.commandAckTimer=null;if(this.publicHost.isTarget(peer))this.publicHost.report('host-transport-detached','WebSocket '+code,peer);peer.ws=null;peer.detachedAt=Date.now();this.authority.connection(peer,false);}});
     ws.on('error',()=>{});
     return ()=>peer;
   }
@@ -211,7 +215,7 @@ export class RealtimeRelay {
     if(this.peers.get(peer.id)!==peer)return;
     if(this.authority.disconnect(peer))return;
     if(this.publicHost.isTarget(peer))this.publicHost.report('host-removed',reason,peer);
-    this.peers.delete(peer.id);this.sessions.delete(peer);this.publicHost.left(peer);peer.ws?.close(code,reason);peer.ws=null;
+    clearTimeout(peer.commandAckTimer);peer.commandAckTimer=null;this.peers.delete(peer.id);this.sessions.delete(peer);this.publicHost.left(peer);peer.ws?.close(code,reason);peer.ws=null;
     for(const [channel,other] of peer.links){other.links.delete(channel);this.send(other,{type:'closed',channel});}
     peer.links.clear();peer.history=[];peer.pending=[];
   }
@@ -221,5 +225,5 @@ export class RealtimeRelay {
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
-  close({preserveSessions=false}={}){this.closing=true;this.fairPlay?.publicMatches.close();this.fairPlay?.replays.close();this.tournament?.close();this.voice.close();this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()]){if(preserveSessions)peer.ws?.close(1001,'Server restarting');else this.remove(peer,1001,'Server stopping');}return Promise.all([this.progression.close(),this.parties.close()]);}
+  close({preserveSessions=false}={}){this.closing=true;this.fairPlay?.publicMatches.close();const replayClosed=this.fairPlay?.replays.close();this.tournament?.close();this.voice.close();this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()]){if(preserveSessions)peer.ws?.close(1001,'Server restarting');else this.remove(peer,1001,'Server stopping');}return Promise.all([replayClosed,this.progression.close(),this.parties.close()]);}
 }

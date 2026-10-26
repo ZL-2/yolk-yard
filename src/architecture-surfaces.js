@@ -43,12 +43,13 @@ function sample(kind,x,y){
  return {shade:clamp(shade),relief,rough:clamp(rough+(n-.5)*.035),metal};
 }
 function texture(data,w,h,srgb=false){const t=new T.DataTexture(data,w,h);t.colorSpace=srgb?T.SRGBColorSpace:T.NoColorSpace;t.wrapS=t.wrapT=T.RepeatWrapping;t.magFilter=T.LinearFilter;t.minFilter=T.LinearMipmapLinearFilter;t.generateMipmaps=true;t.anisotropy=4;t.needsUpdate=true;t.userData.shared=true;return t;}
-function maps(){
+function maps(){const steps=mapsSteps();let next;do{next=steps.next();}while(!next.done);return next.value;}
+function* mapsSteps(){
  if(atlas)return atlas;const data=Array.from({length:4},()=>new Uint8Array(width*height*4));
- for(let index=0;index<columns*rows;index++)for(let y=0;y<tile;y++)for(let x=0;x<tile;x++){
+ for(let index=0;index<columns*rows;index++)for(let y=0;y<tile;y++){for(let x=0;x<tile;x++){
   const kind=ARCHITECTURE_SURFACES[index]||'plaster',s=sample(kind,x,y),dx=sample(kind,(x+1)%tile,y).relief-s.relief,dy=sample(kind,x,(y+1)%tile).relief-s.relief,i=((Math.floor(index/columns)*tile+y)*width+index%columns*tile+x)*4,c=Math.round(s.shade*255),r=Math.round(s.rough*255),m=Math.round(s.metal*255);
   data[0].set([c,c,c,255],i);data[1].set([Math.round(clamp(128-dx*170,1,254)),Math.round(clamp(128-dy*170,1,254)),250,255],i);data[2].set([r,r,r,255],i);data[3].set([m,m,m,255],i);
- }
+ }if(y%4===3)yield;}
  atlas=Object.fromEntries(['map','normalMap','roughnessMap','metalnessMap'].map((name,i)=>[name,texture(data[i],width,height,i===0)]));return atlas;
 }
 function perKind(kind){if(kindMaps.has(kind))return kindMaps.get(kind);const index=ARCHITECTURE_SURFACES.indexOf(kind),result={};for(const [name,t]of Object.entries(maps())){const data=new Uint8Array(tile*tile*4);for(let y=0;y<tile;y++){const from=((Math.floor(index/columns)*tile+y)*width+index%columns*tile)*4;data.set(t.image.data.subarray(from,from+tile*4),y*tile*4);}result[name]=texture(data,tile,tile,name==='map');}kindMaps.set(kind,result);return result;}
@@ -115,3 +116,5 @@ export function architectureSurfaceDiagnostics(){return {revision:ARCHITECTURE_R
 
 let architectureWarmed=false;
 export function warmArchitectureSurfaces(){if(architectureWarmed)return;for(const kind of ARCHITECTURE_SURFACES)architectureMaterial(0xffffff,kind);architectureAtlasMaterial();architectureWarmed=true;}
+
+export function* prepareArchitectureSurfaces(){yield* mapsSteps();for(const kind of ARCHITECTURE_SURFACES){perKind(kind);yield;}}
