@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture,until,pause} from './helpers/public-match.js';
-import {PublicHost} from '../server/realtime/public-host.js';
+import {PublicHost,PublicRoom} from '../server/realtime/public-host.js';
 import {publicMatchOptions} from '../src/public-royale.js';
 import {RoyaleSimulation} from '../src/royale.js';
 import {Simulation} from '../src/simulation.js';
@@ -81,4 +81,10 @@ test('Arena checkpoints retain round identity, timer and spectator roles',()=>{
 test('mode discovery and options distinguish available modes, coming soon, fixed public rules and party readiness',()=>{
  const mode=modeMarkup({mode:'ffa'});assert.equal((mode.match(/COMING SOON/g)||[]).length,0);for(const name of ['Box Fights','Zone Wars','Zombies','Training','Free For All','Frontier Royale'])assert.ok(mode.includes(name));assert.match(lobbyOptionsMarkup({...publicMatchOptions(),access:'public'}),/fieldset class="lobby-rule-fields" disabled/);assert.doesNotMatch(lobbyOptionsMarkup({...publicMatchOptions(),access:'private'}),/fieldset class="lobby-rule-fields" disabled/);
  const p={leader:'a',state:'idle',selection:{mode:'royale',teamSize:2,access:'public'},members:[{id:'a',profile:{name:'Captain'},ready:false},{id:'b',profile:{name:'Partner'},ready:true}]};const html=lobbyMarkup({profile:p.members[0].profile,party:p,id:'a',online:true,balance:0});assert.match(html,/data-lobby-player="0"/);assert.match(html,/NOT READY/);assert.match(html,/is-ready/);assert.doesNotMatch(html,/HOLD THE FRONTIER|ONE PUBLIC MATCH|public-royale-card/);assert.ok(html.indexOf('data-action="career"')<html.indexOf('data-action="feature-request"'));assert.ok(html.indexOf('class="yard-party"')<html.indexOf('data-action="feature-request"'));assert.ok(html.indexOf('data-action="feature-request"')<html.indexOf('class="frontier-leaderboard"'));
+});
+
+test('a fully reserved Arena accepts its host before the first state publication',()=>{
+ const code='RFAB2345',peer={id:'yolk-yard-v'+VERSION+'-'+code,progressId:'account'},tickets=new Map();for(let i=0;i<8;i++)tickets.set(i,{recurring:true,code,member:'member'+i,peer:i===0?peer.id:null,expires:Date.now()+60000});
+ const relay={parties:{tickets,store:{identities:new Map()}},progression:{account:()=>({})}},room=new PublicRoom(relay,code,publicMatchOptions({mode:'ffa'}));room.host={peer:peer.id,id:'host'};
+ assert.equal(room.summary().availableSeats,0);assert.ok(room.admission(peer,{recurring:true,code,memberId:'member0',teamSize:1,partySize:1}));assert.equal(room.summary().humanPlayers,1);assert.equal(room.summary().availableSeats,0);assert.equal(room.admission({id:'outsider',progressId:'other'},{recurring:true,code,memberId:'outside',teamSize:1,partySize:1}),null);
 });

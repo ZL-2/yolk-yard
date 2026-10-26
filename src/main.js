@@ -1,3 +1,5 @@
+import {OwnerMatchPanel} from './owner-match-panel.js';
+import {OwnerMatchNotices} from './owner-match-notices.js';
 import {tournamentClock} from './tournament-clock.js';
 import {requireIconVote} from './icon-voting-ui.js';
 import {updateTournamentCard,tournamentTeamEntryMarkup} from './tournament-ui.js';
@@ -280,7 +282,7 @@ const touch = {
   popper: false,
 };
 $("#app").innerHTML =
-  `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><i id="scope-spread" aria-hidden="true"></i><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="notice elimination-notice" id="elimination-notice" role="status"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">OPERATOR ELIMINATED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div id="arena-stamina" hidden><span>TACTICAL SPRINT</span><progress id="arena-stamina-fill" max="100" value="100"></progress></div><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Field ready</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="crouch">CROUCH / SLIDE</button><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
+  `<div id="menu"></div><div id="lobby" hidden></div><div id="hud"><div class="scope" id="scope"><i id="scope-spread" aria-hidden="true"></i><span id="scope-label"></span></div><div class="hud-top"><div class="match-label"><span id="hud-mode"></span><strong id="hud-map"></strong><span id="hud-network"></span></div><div class="match-center"><div class="score-pair"><b class="blue-score" id="score-blue"></b><b id="timer">5:00</b><b class="coral-score" id="score-coral"></b></div><small id="objective"></small></div><div class="hud-buttons"><button data-action="scores" aria-label="Scoreboard">Scores</button><button data-action="pause" aria-label="Pause menu">Ⅱ</button></div></div><div class="killfeed" id="feed"></div><div class="crosshair" id="crosshair"><i class="crosshair-arm left"></i><i class="crosshair-arm right"></i><i class="crosshair-arm top"></i><i class="crosshair-arm bottom"></i><span class="center-dot" id="center-dot"></span></div><div id="hit-marker" class="hit-marker" hidden></div><div class="hit-flash" id="damage"></div><div id="damage-directions" aria-hidden="true"></div><div id="round-banner" role="status" hidden></div><div class="notice" id="notice"></div><div class="notice elimination-notice" id="elimination-notice" role="status"></div><div class="respawn" id="respawn"><div class="eyebrow" id="spawn-heading">OPERATOR ELIMINATED</div><h2 id="spawn-status">Ready when you are</h2><button class="primary" id="spawn-button" data-action="enter-yard">Respawn</button><p class="small" id="respawn-by"></p><p class="small" id="spectator-stats"></p><button class="plain" data-action="report-eliminator">Report player</button><button class="plain" data-action="loadout">Change loadout</button></div><div class="hud-bottom"><div class="health-card"><div id="arena-stamina" hidden><span>TACTICAL SPRINT</span><progress id="arena-stamina-fill" max="100" value="100"></progress></div><div class="vital-row shield-row"><span class="vital-icon" aria-hidden="true">◆</span><span class="vital-value" id="shield">0</span><div class="vital-bar shield-bar"><span id="shield-fill"></span></div></div><div class="vital-row health-row"><span class="vital-icon" aria-hidden="true">＋</span><span class="vital-value" id="health">100</span><div class="vital-bar health-bar"><span id="health-fill"></span></div></div><div class="ammo-extra" id="streak">Field ready</div></div><div class="quick-controls"><span><kbd>W A S D</kbd> Move</span><span><kbd>R</kbd> Reload</span><span><kbd>E</kbd> Popper</span><span><kbd>1 / 2</kbd> Swap</span><span><kbd>Esc</kbd> Menu</span></div><div class="ammo-card"><div class="eyebrow" id="gun-name"></div><div class="ammo-count"><b id="ammo">30</b> <span>/ <span id="reserve">150</span></span></div><div class="ammo-extra" id="ammo-extra"></div></div></div><div id="spectate-panel" hidden><div class="eyebrow">SPECTATING</div><p id="spectate-info"></p><div class="split-actions"><button data-action="spectate-prev">← Previous</button><button data-action="spectate-next">Next →</button><button data-action="rejoin">Join game</button></div></div><div class="scoreboard" id="scoreboard"></div><div class="mobile-controls"><div class="touch-stick" id="touch-stick" aria-label="Movement joystick"><span></span></div><div class="touch-look" id="touch-look" aria-label="Drag to look"></div><div class="touch-buttons"><button data-touch="crouch">CROUCH / SLIDE</button><button data-touch="jump">JUMP</button><button data-touch="fire">FIRE</button><button data-touch="reload">LOAD</button><button data-touch="aim">AIM</button><button data-touch="popper">POP</button></div></div></div><dialog id="dialog"></dialog><div class="toast" id="toast" role="status"></div>`;
 const dialog = $("#dialog");
 let mapEditor=null,campaign=null,campaignOpening=false;
 async function openOwnerCampaign(){
@@ -313,8 +315,10 @@ const rankRewards=new RoyaleRewards({getView:()=>view,getProfile:()=>profile,con
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerRuntime=new OwnerRuntime();
-const fairPlay=new FairPlayRuntime({poll:()=>party?.ready?party.request('fair-play-status'):null,onRemoval:()=>{if(net||screen==='game')leave(false,false);modal('Removed for teaming','<p>You have been removed from the match. All game modes are suspended for one hour, and you cannot enter the next scheduled Cup.</p><p>Your restriction and remaining time stay visible in the lobby. Use Report a problem if you believe this was a mistake.</p><button data-action="close">RETURN TO LOBBY</button>','fair-play');}});ownerRuntime.fairPlay=fairPlay;
+const fairPlay=new FairPlayRuntime({poll:()=>party?.ready?party.request('fair-play-status'):null,onRemoval:status=>{if(net||screen==='game')leave(false,false);modal('Removed for '+(status.kind||'teaming'),'<p>You have been removed from the match. All game modes are suspended for one hour.'+(status.cups?.length?' Because this violation occurred during a Cup, you also cannot enter the next scheduled Cup.':'')+'</p><p>Your restriction and remaining time stay visible in the lobby. Use Report a problem if you believe this was a mistake.</p><button data-action="close">RETURN TO LOBBY</button>','fair-play');}});ownerRuntime.fairPlay=fairPlay;
+const ownerNotices=new OwnerMatchNotices({poll:()=>party?.ready?party.request('owner-match-status'):null,ack:ids=>party.request('owner-match-ack',{ids})});ownerRuntime.ownerNotices=ownerNotices;
 const ownerConsole=new OwnerConsole({identity:()=>party?.id,onMapEditor:openOwnerMapEditor,onCampaign:openOwnerCampaign,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
+const ownerPanel=new OwnerMatchPanel({api:ownerConsole,context:()=>screen==='game'&&net?.ready?{code:net.code,matchId:state?.royale?.matchId||state?.matchId}:null,notify:message=>toast(message),onFocus:()=>{keys.clear();queuedActions.clear();scoreHeld=false;input.fire=false;input.aim=false;Object.assign(touch,{x:0,y:0,jump:false,fire:false,aim:false,reload:false,popper:false,sprint:false,interact:false});if(document.pointerLockElement)document.exitPointerLock();},onPlay:()=>{if(screen==='game'&&!dialog.open)void resume();}});
 startAnonymousVisits(()=>screen==='game'?(state?.options?.training?'training':state?.options?.mode||options.mode||'royale'):screen==='lobby'?'lobby':screen==='editor'?'editor':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(eggWallet.value.balance);if(eggShop?.root?.isConnected)eggShop.render();if(screen==='menu'&&menuSection==='career')renderMenu(true);}});
@@ -330,9 +334,10 @@ let resultAt=0;const combatConfirmation=new CombatConfirmation(),damageDirection
 $('#hit-marker').insertAdjacentHTML('afterend','<span id="hit-confirm-label" hidden></span>');
 let matchRequest=0, autoQueue=false, swapSlot=-1;
 const chat = new ChatPanel($("#app"), {
-  context: () => ({state, localId, preference:settings.chatMode, connected:!!net?.ready && !net.closed && screen!=="menu", host:!!net?.isHost, enabled:net?.chatEnabled, roomMuted:net?.chatMuted||[]}),
+  context: () => ({state, localId, preference:settings.chatMode, connected:!!net?.ready && !net.closed && screen!=="menu", host:!!net?.isHost, enabled:net?.chatEnabled, roomMuted:ownerNotices.active('mute')?[...(net?.chatMuted||[]),localId]:net?.chatMuted||[]}),
   setPreference: value => {settings.chatMode=value;save("yolk-settings",settings);},
-  send: payload => net?.chat(payload) || {ok:false,reason:"disconnected"},
+  privateCommand:command=>void ownerPanel.command(command),
+  send: payload => ownerNotices.active('mute')?{ok:false,reason:'muted'}:net?.chat(payload) || {ok:false,reason:"disconnected"},
   report: (id,reason) => net?.reportChat(id,reason),
   silence: (id,value) => net?.setChatMuted(id,value),
   enable: value => net?.setChatEnabled(value),
@@ -344,7 +349,7 @@ const chat = new ChatPanel($("#app"), {
     if(document.pointerLockElement)document.exitPointerLock();
   },
   close: (controls) => {
-    keys.clear();queuedActions.clear();
+    keys.clear();queuedActions.clear();if(ownerPanel.interacting)return;
     if(controls&&screen==="game"){pauseMenu();return;}
     if(net?.ready && !net.closed && screen==="game" && state?.phase==="playing" && !dialog.open)void resume();
   },
@@ -826,7 +831,7 @@ async function createRoom(preset = null, visibilityOverride = null, automatic = 
   }
 }
 async function joinRoom(publicCode, quiet=false, ticket=null) {
-  try{fairPlay.admission();}catch(error){return errorToast(error.message);}
+  try{fairPlay.admission();ownerNotices.admission();}catch(error){return errorToast(error.message);}
   if(!ticket&&party?.ready){await queueParty(false,cleanCode(publicCode||$("#join-code")?.value));return;}
   if (checkingConnection) { toast('Wait for the connection check to finish.'); return; }
   if (busy) return;
@@ -939,7 +944,7 @@ function enterGame(capture = false) {
 let capturePendingUntil=0;
 function mouseCapturePrompt() {
   const player=state?.players.find(p=>p.id===localId);
-  if(screen!=='game'||state?.phase!=='playing'||player?.health<=0||player?.spectating||document.pointerLockElement||chat.opened||dialog.open&&dialogType!=='ready')return;
+  if(screen!=='game'||state?.phase!=='playing'||player?.health<=0||player?.spectating||document.pointerLockElement||chat.opened||ownerPanel.interacting||dialog.open&&dialogType!=='ready')return;
   modal("Enter Game", `<p>Click Enter Game to lock your mouse and use your mouse or trackpad to look around. Press Esc to release it.</p><button class="primary" data-action="resume" autofocus>ENTER GAME</button><button data-action="pause">GAME MENU</button>`, "ready");
 }
 document.addEventListener('pointerlockerror',()=>{capturePendingUntil=0;mouseCapturePrompt();});
@@ -1021,6 +1026,7 @@ function pauseMenu() {
   );
 }
 function leave(confirm = false,notifyParty=true) {
+  ownerPanel.reset();
   lastPreferenceSync='';actionToggles.reset();stopBlacktideNarration();zombiesUI.clear();boxUI.clear();zoneUI.clear();
   const returningFromMatch=screen==='game';
   if(returningFromMatch)showLoading('RETURNING TO LOBBY','Closing the match connection and preparing your operator in the lobby.',{kind:'exit'});else hideLoading(true);
@@ -1431,7 +1437,7 @@ async function queuePublicRoyale(spectate=false){
  if(await partyRequest('queue',{publicRoyale:true,spectate})){dialog.close();dialogType='';renderMenu();}
 }
 async function launchParty(launch){
- try{fairPlay.admission();}catch(error){await partyRequest('failed',{id:launch.id,reason:error.message});return errorToast(error.message);}
+ try{fairPlay.admission();ownerNotices.admission();}catch(error){await partyRequest('failed',{id:launch.id,reason:error.message});return errorToast(error.message);}
  campaign?.close({returnToOwner:false});
  if(activeLaunch===launch.id)return;activeLaunch=launch.id;
  if(net||state)leave(false,false);
@@ -1453,7 +1459,7 @@ function initializeParty(){
   'tournament-rewards':m=>{void eggWallet.syncTournamentRewards(m.record).then(()=>{if(screen==='menu')renderMenu();});},
   'royale-rank':m=>rankRewards.receive(m.record),
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
-  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void fairPlay.refresh();if(menuSection==='career')void refreshCompetitiveCareer(true);void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
+  status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void fairPlay.refresh();void ownerNotices.refresh();if(menuSection==='career')void refreshCompetitiveCareer(true);void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   'public-join':event=>publicJoinNotice.receive(event,party?.id),
@@ -1461,6 +1467,7 @@ function initializeParty(){
   'lobby-chat-cleared':m=>lobbyComms.clear(m.channel),
   'fair-play':m=>fairPlay.set(m.status),
   'owner-controls':m=>ownerRuntime.set(m.controls),
+  'owner-match-status':m=>ownerNotices.set(m.status),
   'owner-grants':m=>{void eggWallet.syncOwnerGrants(m.record).then(r=>{lobbyComms.setGrants(m.record.notices||[]);if(r.amount&&screen==='menu')renderMenu();}).catch(()=>toast('Your owner grant is saved online. Reconnect when browser storage is available.'));},
   'owner-session-ended':m=>{if(net||screen==='game')leave(false,false);errorToast(m.message);},
   'feature-updates':m=>lobbyComms.setUpdates(m.updates),
@@ -1491,6 +1498,12 @@ const actions = {
  'watch-winner':()=>{dialog.close();dialogType='';resultAt=0;paused=false;},
  'report-problem':reportProblemMenu,
  'report-connection':()=>{rememberProblem('Match connection interrupted',document.querySelector('#match-connection span')?.textContent||'Connection interrupted');reportProblemMenu();},
+ 'report-eliminator':async()=>{
+  const me=state?.players.find(p=>p.id===localId),target=state?.players.find(p=>p.id===me?.killerId);if(!party?.ready||!net||!target||target.bot)return toast('Only a real player who eliminated you can be reported.');
+  const matchId=state.royale?.matchId||state.matchId,targetId=target.id;
+  modal('Report '+target.name,`<p>Your report is saved for the owner and immediately increases monitoring of this player. Punishment still requires gameplay evidence.</p><form id="death-report-form"><label>Reason<select class="field" name="category"><option value="teaming">Teaming with opponents</option><option value="cheating">Hacking / cheating</option></select></label><label>What did you see? (optional)<textarea class="field" name="notes" rows="3" maxlength="1000"></textarea></label><button type="submit">SEND REPORT</button><p role="status"></p><button type="button" data-action="close">CLOSE</button></form>`,'death-report');
+  $('#death-report-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('[type=submit]'),status=form.querySelector('[role=status]'),values=new FormData(form);button.disabled=true;try{const r=await party.request('death-report',{matchId,target:targetId,category:values.get('category'),notes:values.get('notes')});status.textContent=r.message;}catch(error){status.textContent=error.message;button.disabled=false;}};
+ },
  'report-teaming':async()=>{
   if(!party?.ready)return errorToast('Connect to report teaming.');
   try{const roster=await party.request('teaming-roster');modal('Report teaming',`<p>Select the players cooperating against the rules and describe what you saw. Reports cannot cause an automatic ban; live enforcement uses server gameplay evidence.</p><form id="teaming-report-form"><div class="teaming-report-players">${roster.map(p=>`<label><input name="player" type="checkbox" value="${esc(p.id)}">${esc(p.name)}</label>`).join('')}</div><textarea class="field" name="notes" rows="4" minlength="15" maxlength="1000" required placeholder="What did these players do together?"></textarea><button type="submit">SEND REPORT</button><p role="status"></p></form>`,'teaming-report');$('#teaming-report-form').onsubmit=async e=>{e.preventDefault();const form=e.target,values=new FormData(form),button=form.querySelector('button'),status=form.querySelector('[role=status]');button.disabled=true;try{await party.request('teaming-report',{players:values.getAll('player'),notes:values.get('notes')});status.textContent='Report saved. Automatic fair-play checks continue during the match.';}catch(error){status.textContent=error.message;button.disabled=false;}};}catch(error){errorToast(error.message);}
@@ -1526,7 +1539,7 @@ const actions = {
  'copy-friend-code':()=>copy(party.code),
  'social-retry-identity':()=>{party.retryIdentity();closeDialog();},
  'social-new-identity':()=>modal('Create New Friend Code?',`<p>This creates a separate identity with an empty friend list. It does not restore your old friendships. Your previous browser credential will be kept for recovery.</p><div class="actions"><button class="primary" data-action="social-confirm-new-identity">CREATE NEW CODE</button><button data-action="social">GO BACK</button></div>`,'social-new-identity'),
- 'social-confirm-new-identity':()=>{try{fairPlay.admission();}catch(error){return errorToast(error.message);}party.newIdentity();closeDialog();},
+ 'social-confirm-new-identity':()=>{try{fairPlay.admission();ownerNotices.admission();}catch(error){return errorToast(error.message);}party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
  referrals:()=>showReferrals({party}),
  'midseason-briefing':()=>showMidseasonBriefing({force:true}),
@@ -1735,8 +1748,8 @@ document.addEventListener("pointerlockchange", () => {
   if(screen==='campaign')return;
   if(screen==='editor'&&mapEditor?.walking&&document.pointerLockElement===mapEditor.canvas)return;
   capturePendingUntil=0;
-  if(document.pointerLockElement&&(paused||dialog.open||chat.opened||screen!=="game")){document.exitPointerLock();return;}
-  if(needsMouseCapture({screen,phase:state?.phase,player:state?.players.find(p=>p.id===localId),locked:document.pointerLockElement,paused,dialog:dialog.open,chat:chat.opened,hidden:document.hidden,coarse:matchMedia("(pointer:coarse)").matches}))mouseCapturePrompt();
+  if(document.pointerLockElement&&(paused||dialog.open||chat.opened||ownerPanel.interacting||screen!=="game")){document.exitPointerLock();return;}
+  if(needsMouseCapture({screen,phase:state?.phase,player:state?.players.find(p=>p.id===localId),locked:document.pointerLockElement,paused,dialog:dialog.open,chat:chat.opened||ownerPanel.interacting,hidden:document.hidden,coarse:matchMedia("(pointer:coarse)").matches}))mouseCapturePrompt();
 });
 function pressControl(code) {
  const rider=state?.players.find(p=>p.id===localId);
@@ -1825,7 +1838,7 @@ document.addEventListener('mousedown',captureBinding,true);
 document.addEventListener('wheel',captureBinding,{capture:true,passive:false});
 // Panel toggles also work when assigned to mouse buttons or the wheel.
 function pointerPanelToggle(e){
- if(screen!=='game'||!state?.royale||!['royale-map','royale-inventory'].includes(dialogType)||e.target.closest('button,input,select,textarea'))return;
+ if(ownerPanel.interacting||screen!=='game'||!state?.royale||!['royale-map','royale-inventory'].includes(dialogType)||e.target.closest('button,input,select,textarea'))return;
  const code=e.type==='wheel'?(e.deltaY>0?'WheelDown':'WheelUp'):`Mouse${e.button}`;
  const panel=royalePanelAction(code,settings.keybinds,dialogType);
  if(panel){e.preventDefault();e.stopImmediatePropagation();if(panel==='close')resume();else if(panel==='royale-map')royaleMap();else royaleInventory();}
@@ -1837,7 +1850,8 @@ document.addEventListener("keydown", (e) => {
   if(e.key==='Escape'&&more&&!dialog.open){more.open=false;more.querySelector('summary').focus();e.preventDefault();return;}
   if(e.code==='F8'&&dialogType!=='problem-report'&&!e.target.matches('input,textarea,[contenteditable=true]')){const connection=!matchConnectionUI.root.hidden,problem=dialog.open&&!!dialog.querySelector('[data-action=report-problem]')||performance.now()<toastUntil&&!!$('#toast [data-action=report-problem]');if(connection||problem){e.preventDefault();if(!e.repeat)(connection?actions['report-connection']:reportProblemMenu)();return;}}
   if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();menuModel();const metrics=rankingMetrics(currentLeaderboardMode());leaderboardTab=metrics[e.key==='Home'?0:e.key==='End'?metrics.length-1:(metrics.indexOf(leaderboardTab)+(e.key==='ArrowLeft'?-1:1)+metrics.length)%metrics.length];renderLeaderboard(true);void refreshLeaderboards(true);return;}
-  if (chat.opened || e.target.matches("input,select,textarea,[contenteditable=true]")) return;
+  if(screen==='game'&&!dialog.open&&!chat.opened&&!ownerPanel.interacting&&e.code==='Slash'&&!e.target.matches('input,select,textarea,[contenteditable=true]')){e.preventDefault();chat.open();chat.input.value='/';chat.input.oninput();return;}
+  if (ownerPanel.interacting || chat.opened || e.target.matches("input,select,textarea,[contenteditable=true]")) return;
   if(screen==='game'&&!paused&&!dialog.open&&helicopterActions(state?.players.find(p=>p.id===localId),settings.keybinds,e.code).length){e.preventDefault();if(!e.repeat)pressControl(e.code);return;}
   const panel = screen==='game' && state?.royale && (!paused || ['royale-map','royale-inventory'].includes(dialogType))
     ? royalePanelAction(e.code, settings.keybinds, dialog.open ? dialogType : '') : null;
@@ -1887,7 +1901,7 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 $("#world").addEventListener("mousedown", (e) => {
-  if (screen !== "game" || paused || dialog.open || chat.opened) return;
+  if (screen !== "game" || paused || dialog.open || chat.opened || ownerPanel.interacting) return;
   e.preventDefault();
   pressControl(`Mouse${e.button}`);
 });
@@ -1904,7 +1918,7 @@ document.addEventListener("mousemove", (e) => {
   if (
     screen !== "game" ||
     paused ||
-    !document.pointerLockElement || chat.opened
+    !document.pointerLockElement || chat.opened || ownerPanel.interacting
   )
     return;
   if(e.movementX||e.movementY)lastEarnAction=performance.now();
@@ -1954,7 +1968,7 @@ dialog.addEventListener('pointercancel',finishInventoryDrag);
 dialog.addEventListener('click',e=>{if(performance.now()<suppressInventoryClickUntil){e.preventDefault();e.stopImmediatePropagation();}},{capture:true});
 dialog.addEventListener('keydown',e=>{if(e.key==='Escape'&&inventoryDrag){e.preventDefault();e.stopPropagation();finishInventoryDrag();}});
 dialog.addEventListener('keydown',e=>{if(dialogType!=='royale-inventory')return;const slot=e.target.closest('[data-royale-slot]');if(slot&&e.altKey&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const from=Number(slot.dataset.royaleSlot),to=1+((from-1+(e.key==='ArrowRight'?1:4))%5);inventoryAction('swap',to,from);dialog.querySelector(`[data-royale-slot="${to}"]`)?.focus();}});
-document.addEventListener('wheel',e=>{const ranks=e.target.closest?.('.frontier-board-ranks,.tournament-standings');if(ranks&&ranks.scrollHeight>ranks.clientHeight){e.preventDefault();ranks.scrollTop+=e.deltaY*(e.deltaMode===1?18:e.deltaMode===2?ranks.clientHeight:1);return;}if(scoreHeld&&screen==='game'&&!dialog.open){e.preventDefault();$('#scoreboard').scrollTop+=e.deltaY;return;}if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
+document.addEventListener('wheel',e=>{const ranks=e.target.closest?.('.frontier-board-ranks,.tournament-standings');if(ranks&&ranks.scrollHeight>ranks.clientHeight){e.preventDefault();ranks.scrollTop+=e.deltaY*(e.deltaMode===1?18:e.deltaMode===2?ranks.clientHeight:1);return;}if(scoreHeld&&screen==='game'&&!dialog.open){e.preventDefault();$('#scoreboard').scrollTop+=e.deltaY;return;}if(screen==='game'&&!paused&&!dialog.open&&!chat.opened&&!ownerPanel.interacting&&e.deltaY){e.preventDefault();const code=e.deltaY>0?'WheelDown':'WheelUp';pressControl(code);keys.delete(code);}},{passive:false});
 document.addEventListener("contextmenu", (e) => {
   if (screen === "game" || (dialog.open&&dialogType==='settings'&&!e.target.matches('input,textarea'))) e.preventDefault();
 });
@@ -2021,7 +2035,7 @@ function startPrivateRoyale(){
 }
 function frameInput() {
   for(const code of vehicleControlCodes)if(!keys.has(code))vehicleControlCodes.delete(code);
-  const active = !document.hidden && !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && state?.players.find(p => p.id === localId)?.health > 0;
+  const active = !document.hidden && !net?.migrating && screen === "game" && !paused && !dialog.open && !chat.opened && !ownerPanel.interacting && state?.players.find(p => p.id === localId)?.health > 0;
   if(!active)actionToggles.reset();
   const localRider=state?.players.find(p=>p.id===localId);
   const combat=active&&state?.phase==='playing'&&canFight(localRider)&&(!localRider.vehicleId||localRider.vehicleSeat>0);
@@ -2123,7 +2137,7 @@ function loop(now) {
   publicJoinNotice.update(screen==='menu'&&!dialog.open,party);
 
   matchConnectionUI.update(net,screen==='game',now);
-  if(needsMouseCapture({screen,phase:state?.phase,player:state?.players.find(p=>p.id===localId),locked:document.pointerLockElement,paused,dialog:dialog.open,chat:chat.opened,hidden:document.hidden,coarse:matchMedia("(pointer:coarse)").matches,pending:now<capturePendingUntil}))mouseCapturePrompt();
+  if(needsMouseCapture({screen,phase:state?.phase,player:state?.players.find(p=>p.id===localId),locked:document.pointerLockElement,paused,dialog:dialog.open,chat:chat.opened||ownerPanel.interacting,hidden:document.hidden,coarse:matchMedia("(pointer:coarse)").matches,pending:now<capturePendingUntil}))mouseCapturePrompt();
   pumpNetworkInput(now);
   if(state){view.buildMap=getMap(state.options.map);if(state.royale)applyBuildState(view.buildMap,state.royale);}
 
@@ -2213,7 +2227,7 @@ function loop(now) {
     presentation.player,
     view.cinematic?.slowMotion?renderDt*.25:renderDt,
     screen === "game",
-    !paused && !chat.opened && !buildControls.editing && (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim),
+    !paused && !chat.opened && !ownerPanel.interacting && !buildControls.editing && (actionToggles.value('aim',actionDown('aim'),settings) || touch.aim),
     profile,
   );
   // Keep the screen through map construction and asynchronous shader preparation.

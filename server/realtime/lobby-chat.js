@@ -1,3 +1,4 @@
+import {isPrivateCommand} from '../../src/private-commands.js';
 import {randomUUID} from 'node:crypto';
 import {moderateText,CHAT_LIMIT} from '../../src/moderation.js';
 // Ephemeral, bounded histories. Party membership and authenticated identity,
@@ -12,8 +13,9 @@ export class LobbyChat {
   if(channel==='private'&&m.to!==u.id&&p.members.includes(m.to)&&!s.store.blocked(u.id,m.to))return {key:p.id+':'+[u.id,m.to].sort().join(':'),channel,ids:[u.id,m.to],to:m.to};
   throw Error('Choose someone in your current party.');
  }
- history(u,m){const scope=this.scope(u,m),now=Date.now();return {channel:scope.channel,to:scope.to,messages:(this.rooms.get(scope.key)||[]).filter(x=>now-x.at<30*60000&&!this.service.store.blocked(u.id,x.sender))};}
+ history(u,m){const scope=this.scope(u,m),now=Date.now();return {channel:scope.channel,to:scope.to,messages:(this.rooms.get(scope.key)||[]).filter(x=>now-x.at<30*60000&&!isPrivateCommand(x.text)&&!this.service.store.blocked(u.id,x.sender))};}
  submit(u,m){
+  if(isPrivateCommand(m.text))throw Error('Private commands are not sent to chat.');
   const s=this.service;if(['in-match','spectating'].includes(s.presence(u.id)))throw Error('Return to the lobby to send lobby chat.');
   s.relay.owner?.assertChat(u.id);
   const slow=s.relay.owner?.controls.chatSlowSeconds||0;if(slow&&u.lastLobbyChat&&Date.now()-u.lastLobbyChat.at<slow*1000)throw Error('Chat slow mode: wait '+Math.ceil(slow-(Date.now()-u.lastLobbyChat.at)/1000)+' seconds.');

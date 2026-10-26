@@ -1,3 +1,4 @@
+import {replayFrame} from './match-replay.js';
 import {RoyaleFairPlay} from './royale-fair-play.js';
 import {checkpointWorldKey} from './action-network.js';
 import {isPublicCode} from './public-royale.js';
@@ -81,6 +82,7 @@ export class Network {
       },
     });
     for(const type of ['reward','afk','afk-enforce','rank-cosmetic'])this.peer.on(type,event=>this.callbacks.onProgress?.(type,event));
+    this.peer.on('fair-play-focus',m=>{if(m.matchId===(this.snapshot?.royale?.matchId||this.snapshot?.matchId)&&Array.isArray(m.players)){this.fairPlayFocus={matchId:m.matchId,players:m.players};if(this.fairPlayObserver)this.fairPlayObserver.focus=new Set(m.players);}});
     this.peer.on('host-transfer',m=>this.hostTransfer(m));
     this.peer.on('host-demoted',m=>this.hostDemoted(m));
     this.peer.on('deployment',status=>this.callbacks.onDeployment?.(status));
@@ -268,6 +270,7 @@ export class Network {
   observeFairPlay(state){
     if(!this.officialPublic||this.serverAuthority||state.options?.mode!=='royale')return;
     this.fairPlayObserver??=new RoyaleFairPlay(data=>this.peer?.control?.({type:'royale-fair-play',...data}));
+    this.fairPlayObserver.focus=this.fairPlayFocus?.matchId===(state.royale?.matchId||state.matchId)?new Set(this.fairPlayFocus.players):null;
     this.fairPlayObserver.observe(state,this.isHost?this.id:this.hostId);
   }
   publicReady(){
@@ -497,6 +500,7 @@ export class Network {
     this.snapshot = state;
     this.observeFairPlay(state);
     if (!this.lastPublish || performance.now() - this.lastPublish > 2000 || this.lastPublishedStage!==(state.boxfight?.stage||state.royale?.stage) || this.lastPublishedPhase!==state.phase) { this.lastPublish = performance.now();this.lastPublishedStage=state.boxfight?.stage||state.royale?.stage;this.lastPublishedPhase=state.phase;this.publishRoom(); }
+    if(this.peer?.control&&this.isHost&&performance.now()-(this.lastReplaySent||0)>=500){this.lastReplaySent=performance.now();this.peer?.control?.({type:'match-replay',state:replayFrame(state)});}
     if(this.officialPublic){
       const scores=(state.royale?.matchId||state.matchId)+':'+state.phase+':'+state.players.filter(p=>!p.bot&&!p.lateSpectator).map(p=>p.id+','+(p.kills||0)+','+(p.place||0)).join(';');
       if(scores!==this.lastPublicScores||performance.now()-(this.lastPublicProgress||0)>=500){this.lastPublicScores=scores;this.lastPublicProgress=performance.now();const hostPeer=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;if(hostPeer?.id===PREFIX+this.code)hostPeer.control({type:'public-progress',state:rewardFrame(state,this.id,this.callbacks.getHostInput?.()||{})});}

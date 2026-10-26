@@ -35,7 +35,7 @@ export class PublicRoom {
   if(!admission?.recurring||admission.code&&admission.code!==this.code||(admission.teamSize||1)!==this.options.teamSize||['royale','boxfight'].includes(this.options.mode)&&admission.partySize>this.options.teamSize)return null;
   const previous=this.members.get(peer.id);if(previous)return previous.admission;
   if(admission.exactMatch&&(this.state?.matchId!==admission.exactMatch||!this.summary().joinable||!this.summary().hostReady))return null;
-  const status=this.summary(),spectator=!!admission.spectator||this.state&&!status.joinable;
+  const status=this.summary(),spectator=!!(admission.spectator||this.state&&!status.joinable);
   const reserved=[...this.relay.parties.tickets.values()].some(t=>t.code===this.code&&t.peer===peer.id&&t.member===admission.memberId&&t.expires>Date.now()&&!!t.spectator===spectator);
   if((spectator?status.availableSpectators:status.availableSeats)<(reserved?0:1))return null;
   const record={...admission,spectator:!!spectator,publicSpectator:!!spectator,crownRecord:crownRecord(this.relay.progression.account(peer.progressId).crowns)};

@@ -1,3 +1,4 @@
+import {evaluateTeamingEvidence,TEAMING_RULE} from '../../src/teaming-evidence.js';
 // Client-hosted matches need corroboration. Reports never enter this path.
 // This cannot defeat a host that fabricates the world seen by every client.
 export class PublicFairPlay {
@@ -13,8 +14,8 @@ export class PublicFairPlay {
   // An observer must have been receiving this match for the full evidence window.
   const observer=previous&&now-previous.seen<15000?previous:{since:now,seen:now,flags:new Map()};
   observer.seen=now;observers.set(identity,observer);
-  if(!message.flag||now-observer.since<180000)return;
-  const flag=this.validate(room,message.flag);if(!flag)return;
+  if(!message.flag||now-observer.since<45000)return;
+  const flag=this.validate(room,message.flag);if(!flag||now-observer.since<(flag.evidence.path==='strong-cooperation'?45000:60000))return;
   const candidateKey=flag.players.slice().sort().join('|'),candidates=room.fairPlayCandidates;
   if(now-(observer.flags.get(candidateKey)||0)<1000)return;observer.flags.set(candidateKey,now);if(observer.flags.size>128)observer.flags.delete(observer.flags.keys().next().value);
   for(const [k,c]of candidates)if(now-c.updated>45000)candidates.delete(k);
@@ -27,7 +28,7 @@ export class PublicFairPlay {
   const witnesses=[...candidate.reports].filter(([id,r])=>id!==hostIdentity&&!accusedIds.includes(id)&&now-r.at<=45000&&this.agrees(host,r));
   if(witnesses.length<2)return;
   // Capture identities before removal mutates room membership or elects a host.
-  const evidence={...host.evidence,source:'corroborated public match',rule:'public-teaming-v1',witnesses:witnesses.map(([id])=>id),host:hostIdentity,note:'Host and at least two non-accused clients independently met the sustained combat threshold with matching trails and targets.'};
+  const evidence={...host.evidence,source:'corroborated public match',rule:TEAMING_RULE,witnesses:witnesses.map(([id])=>id),host:hostIdentity,note:'Host and at least two non-accused clients independently met the cooperation rule with matching movement and encounters.'};
   this.pending.set(room.code+':'+message.matchId+':'+candidateKey,{room,key,players:accusedIds,matchId:message.matchId,evidence});
   if(!this.timer){this.timer=setTimeout(()=>this.flush(),250);this.timer.unref?.();}
  }
@@ -41,22 +42,28 @@ export class PublicFairPlay {
  }
  validate(room,flag){
   const e=flag?.evidence,ids=flag?.players;
-  if(!Array.isArray(ids)||ids.length!==2||new Set(ids).size!==2||!e||e.enforce!==true||e.mutualDamage!==0||!Number.isFinite(e.closeSeconds)||e.closeSeconds<180||e.closeSeconds>3600||!Number.isFinite(e.coTravelMetres)||e.coTravelMetres<100||e.coTravelMetres>100000)return null;
+  if(!Array.isArray(ids)||ids.length!==2||new Set(ids).size!==2||ids.some(id=>typeof id!=='string')||!e||e.rule!==TEAMING_RULE)return null;
   const roster=new Map([...room.members.values()].map(m=>[m.id,m]));
   if(ids.some(id=>!roster.has(id)||roster.get(id).admission.spectator))return null;
   if(room.options.teamSize>1&&roster.get(ids[0]).admission.partyId===roster.get(ids[1]).admission.partyId)return null;
-  if(!Array.isArray(e.hits)||e.hits.length>40||!Array.isArray(e.trail)||e.trail.length<10||e.trail.length>18)return null;
-  if(e.trail.some((p,i)=>!Number.isFinite(p.time)||p.time>room.state.time+2||room.state.time-p.time>240||i&&p.time<=e.trail[i-1].time||![p.a?.x,p.a?.z,p.b?.x,p.b?.z].every(n=>Number.isFinite(n)&&Math.abs(n)<10000)||Math.hypot(p.a.x-p.b.x,p.a.z-p.b.z)>17))return null;
-  if(room.state.time-e.trail.at(-1).time>40)return null;
-  const hits=e.hits.filter(h=>ids.includes(h.player)&&roster.has(h.target)&&!ids.includes(h.target)&&Number.isFinite(h.amount)&&h.amount>0&&h.amount<=300&&Number.isFinite(h.time)&&h.time<=room.state.time+2&&room.state.time-h.time<=240);
-  const targets=new Map();
-  for(const h of hits){const same=hits.filter(o=>o.target===h.target&&Math.abs(o.time-h.time)<=6);if(ids.every(id=>same.filter(o=>o.player===id).reduce((n,o)=>n+o.amount,0)>=30))targets.set(h.target,h.time);}
-  const times=[...targets.values()].sort((a,b)=>a-b);let last=-Infinity,count=0;for(const time of times)if(time-last>=20){last=time;count++;}
-  if(targets.size<3||count<3)return null;
-  return {players:ids,evidence:{closeSeconds:e.closeSeconds,coTravelMetres:e.coTravelMetres,sharedTargets:targets.size,encounters:count,mutualDamage:0,trail:e.trail.map(p=>({time:p.time,a:{x:p.a.x,z:p.a.z},b:{x:p.b.x,z:p.b.z}})),hits:hits.map(h=>({time:h.time,player:h.player,target:h.target,amount:h.amount})),targets:[...targets.keys()].sort()}};
+  if(!Array.isArray(e.hits)||e.hits.length>120||!Array.isArray(e.trail)||e.trail.length<15||e.trail.length>361||!Array.isArray(e.shots)||e.shots.length>80||!Array.isArray(e.exchanges)||e.exchanges.length>200)return null;
+  const time=t=>Number.isFinite(t)&&t<=room.state.time+3&&room.state.time-t<=190;
+  if(e.trail.some((p,i)=>!p||!time(p.time)||i&&p.time<=e.trail[i-1].time||typeof p.close!=='boolean'||![p.a?.x,p.a?.z,p.b?.x,p.b?.z].every(n=>Number.isFinite(n)&&Math.abs(n)<10000)||p.close&&Math.hypot(p.a.x-p.b.x,p.a.z-p.b.z)>20.1))return null;
+  if(room.state.time-e.trail.at(-1).time>15)return null;
+  if(e.hits.some(h=>!h||!ids.includes(h.player)||!roster.has(h.target)||!time(h.time)||!Number.isFinite(h.amount)||h.amount<=0||h.amount>300))return null;
+  if(e.shots.some(h=>!h||!ids.includes(h.player)||!ids.includes(h.target)||!time(h.time)))return null;
+  if(e.exchanges.some(h=>!h||!ids.includes(h.from)||!ids.includes(h.to)||h.from===h.to||!time(h.time)||!Number.isSafeInteger(h.drop)||typeof h.item!=='string'||h.item.length>50||!Number.isFinite(h.amount)||h.amount<=0||h.amount>1000))return null;
+  const trail=e.trail.map(p=>({time:p.time,a:{x:p.a.x,z:p.a.z},b:{x:p.b.x,z:p.b.z},close:p.close}));
+  const hits=e.hits.map(h=>({time:h.time,player:h.player,target:h.target,amount:h.amount}));
+  const shots=e.shots.map(h=>({time:h.time,player:h.player,target:h.target}));
+  const exchanges=e.exchanges.map(h=>({time:h.time,from:h.from,to:h.to,drop:h.drop,item:h.item,amount:h.amount}));
+  const raw={players:ids,trail,hits,shots,exchanges},decision=evaluateTeamingEvidence(raw);
+  if(!decision.enforce)return null;
+  return {players:ids,evidence:{...raw,...decision,rule:TEAMING_RULE}};
  }
  agrees(a,b){
-  if(a.evidence.targets.filter(id=>b.evidence.targets.includes(id)).length<3)return false;
-  return a.evidence.trail.filter(p=>b.evidence.trail.some(q=>Math.abs(p.time-q.time)<=2&&Math.hypot(p.a.x-q.a.x,p.a.z-q.a.z)<=4&&Math.hypot(p.b.x-q.b.x,p.b.z-q.b.z)<=4)).length>=10;
+  if(!a.evidence.episodes.some(e=>b.evidence.episodes.some(f=>Math.abs(e.end-f.end)<=8&&e.targets.some(t=>f.targets.includes(t)))))return false;
+  const start=Math.max(a.evidence.trail.at(-1).time,b.evidence.trail.at(-1).time)-45;
+  return a.evidence.trail.filter(p=>p.time>=start&&p.close&&b.evidence.trail.some(q=>q.close&&Math.abs(p.time-q.time)<=2&&Math.hypot(p.a.x-q.a.x,p.a.z-q.a.z)<=4&&Math.hypot(p.b.x-q.b.x,p.b.z-q.b.z)<=4)).length>=10;
  }
 }

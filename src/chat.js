@@ -1,3 +1,4 @@
+import {isPrivateCommand} from './private-commands.js';
 import { CHAT_LIMIT, FILTER_VERSION, foldText, moderateText, safeName } from './moderation.js';
 
 export const QUICK_MESSAGES = Object.freeze({
@@ -18,6 +19,7 @@ export function audienceFor(sender, channel, state) {
     channel === 'team' ? !p.spectating && p.team === sender.team : true)).map(p => p.id);
 }
 export function chatPayload(payload) {
+  if (isPrivateCommand(payload?.text))return null;
   if (!payload || typeof payload !== 'object' || payload.version !== FILTER_VERSION ||
       !['room','team'].includes(payload.channel)) return null;
   if (typeof payload.quick === 'string' && Object.hasOwn(QUICK_MESSAGES, payload.quick))
@@ -76,6 +78,7 @@ export class ChatRoom {
 export class ChatInbox {
   constructor() { this.rows=[]; this.muted=new Set(); this.lastId=0; this.recent=new Map(); }
   accept(message, state, localId, preference='all', now=Date.now()) {
+    if(isPrivateCommand(message?.text))return null;
     if (preference==='off' || !message || message.version!==FILTER_VERSION ||
         !Number.isSafeInteger(message.id) || message.id<=this.lastId || typeof message.sender!=='string' ||
         !['room','team','spectators'].includes(message.channel)) return null;

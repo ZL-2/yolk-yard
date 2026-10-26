@@ -246,11 +246,11 @@ export class RoyaleSimulation extends Simulation {
   this.emit('royale-cue',{player:p.id,cue:'item-drop',x:p.x,y:p.y,z:p.z});
  }
  recordFairPlayTransfer(p,item,amount){
-  if(!this.fairPlayTransfer||!item.droppedBy||item.droppedBy===p.id)return;
+  if(p.bot||!item.droppedBy||item.droppedBy===p.id)return;
   const donor=this.players.get(item.droppedBy),droppedAt=(item.pickupAfter||0)-(item.resource||item.ammoType?2:1.5);
   if(!donor||donor.bot||donor.health<=0||donor.downed||donor.eliminated||donor.connected===false||donor.flight!=='ground'||this.time-droppedAt>15||this.time-droppedAt<0||!this.accessible(p,donor,10))return;
   if(amount<(item.resource||item.ammoType?10:1))return;
-  this.fairPlayTransfer({time:this.time,from:donor.id,to:p.id,drop:item.uid,item:item.id,amount});
+  this.emit('supply-transfer',{from:donor.id,to:p.id,drop:item.uid,item:item.id,amount});
  }
  takeLoot(p,item,{stackOnly=false}={}){
   if(item?.droppedBy===p.id&&item.pickupAfter>this.time)return false;

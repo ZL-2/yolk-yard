@@ -82,8 +82,9 @@ jobs:
           tournament_teams_allowed={'src/owner-console.js', 'src/tournament.css', 'src/compete-ui.js', 'src/royale.js', 'package-lock.json', 'src/tournament-ui.js', 'package.json', 'scripts/compete-browser-check.mjs', 'tests/tournament-owner.test.js', '.github/workflows/pages.yml', 'tests/compete.test.js', 'server/realtime/parties.js', 'src/tournament.js', 'tests/tournament-teams.test.js', 'src/chat.js', 'server/realtime/relay.js', 'scripts/tournament-owner-browser-check.mjs', 'tests/public-pools.test.js', 'server/realtime/tournament.js', 'server/realtime/match-launch.js', 'src/data.js', 'src/lobby-ui.js', 'src/owner-tournaments.js', 'src/public-royale.js', 'server/realtime/authority.js', 'src/match-options.js', 'src/spectator-status.js', 'src/releases.js', 'src/royale-ui.js', 'docs/UPDATE_218.md', 'src/teams.js', 'src/main.js', 'src/tournament-schedule.js', 'scripts/tournament-teams-live-check.mjs', 'src/chat-ui.js'}
           tournament_teams_allowed.update({'server/realtime/host-watchdog.js','server/realtime/public-host.js','server/realtime/relay-recovery.js','server/realtime/progression.js','src/host-timeout.js','src/network.js','src/relay-peer.js','tests/host-watchdog.test.js','tests/rewards-afk.test.js','scripts/host-recovery-browser-check.mjs'})
           tournament_teams_allowed.update({'src/royale-fair-play.js', 'src/teaming-monitor.js', 'server/realtime/royale-fair-play.js', 'docs/UPDATE_222.md', 'src/owner-fair-play.js', 'server/realtime/index.js', 'docs/UPDATE_221.md', 'server/realtime/owner.js', 'scripts/fair-play-browser-check.mjs', 'server/realtime/fair-play.js', 'src/simulation.js', 'tests/fair-play.test.js', 'server/realtime/teaming-monitor.js', 'src/fair-play.css', 'src/leaderboard-scroll.js', 'src/fair-play.js', 'src/owner-runtime.js'})
+          tournament_teams_allowed.update(['docs/UPDATE_223.md', 'scripts/fair-play-review-browser-check.mjs', 'scripts/owner-match-browser-check.mjs', 'scripts/owner-match-panel-check.mjs', 'scripts/tournament-spectate-browser-check.mjs', 'server/realtime/authority.js', 'server/realtime/fair-play-reports.js', 'server/realtime/fair-play.js', 'server/realtime/lobby-chat.js', 'server/realtime/match-integrity.js', 'server/realtime/match-replays.js', 'server/realtime/owner-match.js', 'server/realtime/owner.js', 'server/realtime/parties.js', 'server/realtime/relay.js', 'server/realtime/royale-fair-play.js', 'src/chat-ui.js', 'src/chat.js', 'src/fair-play.js', 'src/lobby-comms.js', 'src/main.js', 'src/match-end-ui.js', 'src/match-replay.js', 'src/network.js', 'src/owner-console.js', 'src/owner-fair-play.js', 'src/owner-match-notices.js', 'src/owner-match-panel.js', 'src/owner-match.css', 'src/owner-replay.css', 'src/owner-replay.js', 'src/owner-runtime.js', 'src/private-commands.js', 'src/royale-fair-play.js', 'src/royale.js', 'src/teaming-evidence.js', 'src/teaming-monitor.js', 'tests/fair-play.test.js', 'tests/helpers/public-match.js', 'tests/match-integrity.test.js', 'tests/owner-match.test.js'])
           tournament_teams_files=set(subprocess.check_output(['git','diff','--name-only','f486a2fa7dcde87f28a3bf1d64f9d6b759199bc6','HEAD'],text=True).splitlines())
-          tournament_teams_update='tests/tournament-teams.test.js' in tournament_teams_files and tournament_teams_files<=tournament_teams_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.29.0'
+          tournament_teams_update='tests/tournament-teams.test.js' in tournament_teams_files and tournament_teams_files<=tournament_teams_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.30.0'
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('tournament_teams_update='+str(tournament_teams_update).lower()+'\n')
             if tournament_teams_update: out.write('focused=true\n')
@@ -460,7 +461,7 @@ jobs:
       - name: Tournament admission, prizes, host handoff and player recovery
         if: needs.scope.outputs.tournament_teams_update == 'true'
         run: |
-          node --test --test-concurrency=2 tests/fair-play.test.js tests/owner.test.js tests/tournament-teams.test.js tests/tournament.test.js tests/tournament-owner.test.js tests/compete.test.js tests/tournament-clock.test.js tests/public-pools.test.js tests/team-entry.test.js tests/chat.test.js tests/spectator-status.test.js tests/royale-teammate-bots.test.js tests/release-history.test.js
+          node --test --test-concurrency=2 tests/fair-play.test.js tests/match-integrity.test.js tests/owner-match.test.js tests/owner-network.test.js tests/input-clock.test.js tests/remote-input.test.js tests/snapshot-codec.test.js tests/authority-performance.test.js tests/owner.test.js tests/tournament-teams.test.js tests/tournament.test.js tests/tournament-owner.test.js tests/compete.test.js tests/tournament-clock.test.js tests/public-pools.test.js tests/team-entry.test.js tests/chat.test.js tests/spectator-status.test.js tests/royale-teammate-bots.test.js tests/release-history.test.js
           node --test --test-concurrency=2 tests/host-watchdog.test.js tests/public-host.test.js tests/public-disconnect.test.js tests/realtime-resume.test.js tests/match-recovery.test.js tests/host-heartbeat.test.js tests/rewards-afk.test.js tests/exact-public-join.test.js
           node --test --test-name-pattern='Duo knock|revive stops|final active|finishing' tests/field-systems.test.js
       - name: Combat performance, interpolation, builds, spectators and unchanged match rules
@@ -806,6 +807,10 @@ jobs:
         if: needs.scope.outputs.tournament_teams_update == 'true'
         run: |
           node scripts/fair-play-browser-check.mjs
+          node scripts/owner-match-panel-check.mjs
+          node scripts/fair-play-review-browser-check.mjs
+          node scripts/owner-match-browser-check.mjs
+          node scripts/tournament-spectate-browser-check.mjs
           node scripts/host-recovery-browser-check.mjs
           node scripts/tournament-owner-browser-check.mjs
           node scripts/compete-browser-check.mjs
@@ -815,6 +820,10 @@ jobs:
           name: tournament-teams-browser
           path: |
             test-results/fair-play
+            test-results/owner-match-panel
+            test-results/fair-play-review
+            test-results/owner-match
+            test-results/tournament-spectate
             test-results/host-recovery
             test-results/tournament-owner
             test-results/compete

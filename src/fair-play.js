@@ -4,7 +4,7 @@ const time=t=>new Date(t).toLocaleString('en-US',{month:'short',day:'numeric',ho
 export function fairPlayText(status,now){
  if(!status)return '';
  const remaining=Math.max(0,Math.ceil(((status.until||0)-now)/1000)),parts=[];
- if(remaining)parts.push(`REMOVED FOR TEAMING · All game modes suspended for ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')} more. Play resumes ${time(status.until)}.`);
+ if(remaining)parts.push(`REMOVED FOR ${(status.kind||'teaming').toUpperCase()} · All game modes suspended for ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')} more. Play resumes ${time(status.until)}.`);
  for(const cup of status.cups||[])parts.push(cup.pending?'CUP RESTRICTION · You are prohibited from the next Cup added to the schedule.':`CUP RESTRICTION · You cannot enter ${cup.name} (${time(cup.opensAt)}), even after the one-hour suspension ends.`);
  if(parts.length)parts.push('You can request a review through Report a problem.');
  return parts.join(' ');
@@ -27,7 +27,7 @@ export class FairPlayRuntime{
   this.render();if(newBan)this.onRemoval(status);
  }
  async refresh(){try{const status=await this.poll();if(status)this.set(status);}catch{} }
- admission(eventId){if(this.status?.until>this.now())throw Error('You were removed for teaming. All game modes are suspended until '+time(this.status.until)+'.');if(eventId&&this.status?.cups.some(c=>c.id===eventId))throw Error('You are prohibited from this Cup because of teaming.');}
+ admission(eventId){if(this.status?.until>this.now())throw Error('You were removed for '+(this.status.kind||'teaming')+'. All game modes are suspended until '+time(this.status.until)+'.');if(eventId&&this.status?.cups.some(c=>c.id===eventId))throw Error('You are prohibited from this Cup because of teaming.');}
  render(){
   const text=fairPlayText(this.status,this.now());if(this.banner.textContent!==text)this.banner.textContent=text;this.banner.hidden=!text;
   const dialog=document.querySelector('#dialog[open]');let notice=dialog?.querySelector('[data-fair-play-notice]');

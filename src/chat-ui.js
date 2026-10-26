@@ -1,3 +1,4 @@
+import {isPrivateCommand} from './private-commands.js';
 import { ChatInbox, QUICK_MESSAGES, REPORT_REASONS } from './chat.js';
 import { CHAT_LIMIT, safeName, SAFETY_MESSAGES } from './moderation.js';
 
@@ -37,7 +38,7 @@ export class ChatPanel {
     this.hud.querySelector('form').onsubmit=e=>{e.preventDefault();this.send();};
     this.panel.addEventListener('keydown',e=>e.stopPropagation());
     this.hud.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.isComposing)e.preventDefault();if(e.key==='Escape'){e.preventDefault();this.close();}e.stopPropagation();});
-    this.input.oninput=()=>{this.hud.querySelector('#chat-count').textContent=`${this.input.value.length}/${CHAT_LIMIT}`;};
+    this.input.oninput=()=>{this.input.type=isPrivateCommand(this.input.value)?'password':'text';this.input.spellcheck=!isPrivateCommand(this.input.value);this.hud.querySelector('#chat-count').textContent=`${this.input.value.length}/${CHAT_LIMIT}`;};
     this.channel.onchange=()=>{this.updateAudience();};
     this.hud.querySelector('.chat-hud-close').onclick=()=>this.close();
     this.hud.addEventListener('pointerdown',e=>e.stopPropagation());
@@ -78,6 +79,7 @@ export class ChatPanel {
     if(seconds)this.nextSend=Math.max(this.nextSend,Date.now()+seconds*1000);
   }
   send(quick) {
+    if(!quick&&isPrivateCommand(this.input.value)){const command=this.input.value;this.input.value='';this.input.oninput();this.callbacks.privateCommand?.(command);this.close();return;}
     const ctx=this.context();
     if(ctx.preference==='off'||(ctx.preference==='quick'&&!quick))return;
     if(Date.now()<this.nextSend){this.feedback({reason:'slow',retryAfter:Math.ceil((this.nextSend-Date.now())/1000)});return;}
@@ -121,7 +123,7 @@ export class ChatPanel {
     this.spectatorChannel=false;this.updateAudience();
     this.preference.value=ctx.preference;
     const disabled=ctx.preference==='off'||ctx.enabled===false||ctx.roomMuted?.includes(ctx.localId);
-    this.input.disabled=disabled||ctx.preference==='quick';this.hud.querySelector('.chat-send').disabled=this.input.disabled;
+    this.input.disabled=false;this.hud.querySelector('.chat-send').disabled=false;this.input.placeholder=disabled||ctx.preference==='quick'?'Private /command (chat is unavailable)':'Type a message…';
     for(const button of this.panel.querySelectorAll('[data-quick]'))button.disabled=disabled;
     if(ctx.preference==='quick')this.panel.querySelector('.chat-quick').open=true;
     if(ctx.preference==='off')this.status.textContent='Chat is off. Change Show chat in Players & safety to turn it on.';

@@ -1,4 +1,10 @@
 export const RELEASE_NOTES = [
+ {number:'223',title:'Live owner controls and reviewable fair play',changes:[
+  'In-match owner access opens a movable, mobile-friendly window for warnings, removals, suspensions, text mutes, full teaming or cheating penalties, announcements and match closure. Private slash commands never enter chat; affected players receive saved notices and restriction end times.',
+  'Teaming checks use repeated cooperative encounters or strong deliberate cooperation with reciprocal supplies. Short separation and token shots do not erase evidence. Only violations during a Cup exclude the next scheduled Cup; the one-hour all-mode suspension and denied match rewards still apply in normal matches.',
+  'Death-screen reports raise monitoring priority without causing punishment by themselves. Detection History includes reports and saved tactical match replays with player focus, timeline controls and report/removal markers. Recordings start with this update; gaps and player-host sources are labeled.',
+  'Added relay checks against forged game-state messages, invalid controls and input floods. Verified repeated state forgery triggers automatic removal. Checked the actual lobby Spectate flow, full spectator seats, camera switching and rejoining owner-created Cups. Version 6.30.0 / protocol 87.'
+ ]},
  {number:'222',title:'Automatic fair play in regular Battle Royale',changes:[
   'Regular public Battle Royale now checks sustained cross-team cooperation automatically. Removal requires matching automatic evidence from the host and two other non-accused players; reports alone never trigger penalties.',
   'Detected players are removed during the match, suspended from every mode for one hour and excluded from the next scheduled Cup. If the host is removed, an eligible remaining player takes over. Removed players cannot collect final match rewards.',

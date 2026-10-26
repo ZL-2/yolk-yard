@@ -1,3 +1,4 @@
+import {isPrivateCommand} from '../../src/private-commands.js';
 import {tournamentName} from '../../src/tournament.js';
 import {bindCrownStore,attachCrown} from '../../src/crowns.js';
 import {settleZombiesPlayer} from './zombies-service.js';
@@ -83,6 +84,7 @@ export class MatchAuthority{
   if(message.type==='authority-create'){this.create(peer,message);return;}
   const room=this.roomFor(peer),id=peer.authorityId;if(!room||room.members.get(id)!==peer)return;
   const sim=room.sim,m=message.command||{},leader=id===room.owner;
+  if(m.type!=='inputs'&&!this.relay.fairPlay.integrity.guard(peer,room.hostPeer,m))return;
   if(m.type==='snapshot-reset'){room.encoders.delete(id);return;}
   if(m.type==='inputs'){
    if(!Array.isArray(m.inputs)||m.inputs.length>30)return;
@@ -92,7 +94,7 @@ export class MatchAuthority{
   if(m.type==='input'){sim.setInput(id,m.input,true);if(!peer.controlReady&&sim.inputs.has(id)){peer.controlReady=true;sim.players.get(id).loading=false;this.connection(peer,true);}this.relay.progression.input(peer,m.input);return;}
   if(m.type==='player-action'&&typeof m.action==='string'&&m.action.length<350){sim.playerAction(id,m.action);return;}
   if(m.type==='profile'){const ok=sim.setProfile(id,this.relay.progression.rankRewards.sanitizePeer(safeProfile(m.profile),peer));this.send(peer,{type:'authority-notice',event:ok===false?'name-required':'name-accepted'});return;}
-  if(m.type==='chat-send'){const result=room.chat.submit(id,m,sim.snapshot());if(!result.ok)this.send(peer,{type:'authority-notice',event:'chat-status',data:result});else for(const recipient of result.recipients){const target=room.members.get(recipient);if(target)this.send(target,{type:'authority-notice',event:'chat-message',data:result.message});}return;}
+  if(m.type==='chat-send'){if(isPrivateCommand(m.text))return;if(this.relay.owner?.match&&!this.relay.owner.match.chatAllowed(peer,m)){this.send(peer,{type:'authority-notice',event:'chat-status',data:{reason:'muted'}});return;}const result=room.chat.submit(id,m,sim.snapshot());if(!result.ok)this.send(peer,{type:'authority-notice',event:'chat-status',data:result});else for(const recipient of result.recipients){const target=room.members.get(recipient);if(target)this.send(target,{type:'authority-notice',event:'chat-message',data:result.message});}return;}
   if(m.type==='chat-report'){const report=room.chat.report(id,m.target,m.reason,sim.snapshot());if(report)this.send(room.members.get(room.owner),{type:'authority-notice',event:'chat-report',data:report});return;}
   if(room.zombies&&m.type==='configure')return;
   if(room.recurring||room.tournament||!leader)return;

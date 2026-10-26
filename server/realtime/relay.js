@@ -1,3 +1,4 @@
+import {isPrivateCommand} from '../../src/private-commands.js';
 import {HOST_RECOVERY_MS,HOST_TIMEOUT_REASON} from '../../src/host-timeout.js';
 import {isPublicCode} from '../../src/public-royale.js';
 import {acceptFrame} from './rate-budget.js';
@@ -103,6 +104,7 @@ export class RealtimeRelay {
     }
   }
   handle(peer,m){
+    if(m.type==='match-replay'){try{this.fairPlay?.replays.receive(peer,m);}catch{this.fairPlay.replayError='Recording storage unavailable; some replay intervals may be missing.';}return;}
     if(m.type==='royale-fair-play'){this.fairPlay?.publicMatches.receive(peer,m);return;}
     if(m.type==='performance-report'){this.serviceStatus?.report(peer,m.metrics);return;}
     if(m.type==='authority-create'||m.type==='authority-command'){this.authority.command(peer,m);return;}
@@ -154,6 +156,11 @@ export class RealtimeRelay {
         const other=peer.links.get(entry.channel);
         if(!other){this.send(peer,{type:'closed',channel:entry.channel});continue;}
         if(peer.hostRecovery&&!peer.hostRecovery.activeHost&&entry.type==='data'&&['state','snapshot-v1','welcome','host-left'].includes(entry.data?.type))continue;
+        if(entry.type==='data'&&['chat-send','chat-message'].includes(entry.data?.type)){
+          if(isPrivateCommand(entry.data.text)||isPrivateCommand(entry.data.message?.text))continue;
+          if(this.owner?.match&&!this.owner.match.chatAllowed(peer,entry.data)){if(entry.data.type==='chat-send')this.send(peer,{type:'data',channel:entry.channel,data:{type:'chat-status',reason:'muted'}});continue;}
+        }
+        if(entry.type==='data'&&!this.authority.roomFor(peer)&&!this.authority.rooms.has(other.id)&&!this.fairPlay.integrity.guard(peer,other,entry.data))continue;
         if(entry.type==='data'&&this.authority.data(peer,other,entry))continue;
         if(entry.type==='data'&&entry.data?.type==='input')this.progression.input(peer,entry.data.input||entry.data);
         if(entry.type==='data'&&entry.data?.type==='hello'){
@@ -208,11 +215,11 @@ export class RealtimeRelay {
     for(const [channel,other] of peer.links){other.links.delete(channel);this.send(other,{type:'closed',channel});}
     peer.links.clear();peer.history=[];peer.pending=[];
   }
-  sweep(){this.progression.sweep();this.publicHost.sweep();this.hostWatchdog.sweep();for(const peer of this.peers.values()){
+  sweep(){try{this.fairPlay?.replays.sweep();}catch{this.fairPlay.replayError='Recording maintenance unavailable; some recordings may be interrupted.';}this.progression.sweep();this.publicHost.sweep();this.hostWatchdog.sweep();for(const peer of this.peers.values()){
     if(peer.hostRecovery?.expires&&Date.now()>peer.hostRecovery.expires){this.remove(peer,1008,HOST_TIMEOUT_REASON);continue;}
     if(peer.detachedAt&&Date.now()-peer.detachedAt>GRACE)this.remove(peer,1001,'Reconnect grace expired');
     else if(peer.ws&&Date.now()-peer.lastSeen>15000){peer.ws.terminate();}
     else {if(peer.ws?.readyState===1&&Date.now()>=(peer.nextPing||0)){peer.nextPing=Date.now()+5000;peer.ws.ping();}this.flush(peer);}
   }}
-  close({preserveSessions=false}={}){this.closing=true;this.fairPlay?.publicMatches.close();this.tournament?.close();this.voice.close();this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()]){if(preserveSessions)peer.ws?.close(1001,'Server restarting');else this.remove(peer,1001,'Server stopping');}return Promise.all([this.progression.close(),this.parties.close()]);}
+  close({preserveSessions=false}={}){this.closing=true;this.fairPlay?.publicMatches.close();this.fairPlay?.replays.close();this.tournament?.close();this.voice.close();this.authority.close();clearInterval(this.timer);for(const peer of [...this.peers.values()]){if(preserveSessions)peer.ws?.close(1001,'Server restarting');else this.remove(peer,1001,'Server stopping');}return Promise.all([this.progression.close(),this.parties.close()]);}
 }

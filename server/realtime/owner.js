@@ -1,3 +1,4 @@
+import {OwnerMatchService} from './owner-match.js';
 import {randomBytes,randomUUID,scryptSync,timingSafeEqual,createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {OwnerStore,OWNER_MODES,ownerDefaults,ownerMode} from './owner-store.js';
@@ -10,7 +11,7 @@ const reasonOf=body=>{const reason=clean(body.reason);if(reason.length<3)throw E
 export class OwnerService {
  constructor({code=process.env.YOLK_OWNER_CODE,storePath,dbPath,now=Date.now}={}){
   this.now=now;this.salt=randomBytes(24);this.digest=/^\d{12,32}$/.test(code||'')?scryptSync(code,this.salt,64):null;
-  this.tokens=new Map();this.attempts=new Map();this.openedAt=now();this.db=new OwnerStore({...(dbPath!==undefined?{path:dbPath}:storePath!==undefined?{path:storePath?storePath+'.sqlite':null}:{}),legacyPath:storePath??process.env.YOLK_OWNER_DATA_PATH,now});this.ready=Promise.resolve();this.errors=new Map();this.controls=this.db.db?this.db.policy():ownerDefaults();
+  this.tokens=new Map();this.attempts=new Map();this.openedAt=now();this.db=new OwnerStore({...(dbPath!==undefined?{path:dbPath}:storePath!==undefined?{path:storePath?storePath+'.sqlite':null}:{}),legacyPath:storePath??process.env.YOLK_OWNER_DATA_PATH,now});this.ready=Promise.resolve();this.errors=new Map();this.match=new OwnerMatchService(this);this.controls=this.db.db?this.db.policy():ownerDefaults();
  }
  attach(relay){
   this.relay=relay;relay.owner=this;relay.parties.store.ownerArchive=ticket=>this.recordTicket(ticket);
@@ -41,7 +42,7 @@ export class OwnerService {
  assertChat(id){this.assertPlayer(id);const mute=this.sanction(id,'mute');if(mute)throw Error('Lobby chat is muted for this browser identity. '+mute.reason);if(!this.controls.chatEnabled)throw Error('Lobby chat is temporarily paused.');}
  grantSummary(id){return {id,marks:this.db.get('SELECT coalesce(sum(amount),0) n FROM grants WHERE player=?',id).n,notices:this.db.all('SELECT g.id,g.at,g.amount FROM grants g LEFT JOIN grant_reads r ON r.id=g.id WHERE g.player=? AND r.id IS NULL ORDER BY g.at,g.id LIMIT 100',id).map(g=>({...g,kind:'marks-grant',request:'Marks award',body:g.amount.toLocaleString('en-US')+' Marks were added to your balance.'}))};}
  acknowledgeGrants(id,ids){if(!Array.isArray(ids)||ids.length>100||ids.some(x=>typeof x!=='string'||x.length>200))throw Error('Invalid grant acknowledgement');this.db.transaction(()=>{for(const grant of ids)this.db.run('INSERT OR IGNORE INTO grant_reads SELECT id,player,? FROM grants WHERE id=? AND player=?',this.now(),grant,id);});return this.grantSummary(id).notices;}
- onIdentity(user){this.assertPlayer(user.id);if(!this.db.db)return;this.relay.fairPlay?.sync(user.id);if(user.sessions.size===1)this.systemEvent('player-connected',user.profile.name+' connected',user.id);this.relay.parties.send(user,{type:'owner-controls',controls:this.publicControls()});this.relay.parties.send(user,{type:'owner-grants',record:this.grantSummary(user.id)});}
+ onIdentity(user){if(!this.db.db)return;this.relay.fairPlay?.sync(user.id);this.match.sync(user.id);if(user.sessions.size===1)this.systemEvent('player-connected',user.profile.name+' connected',user.id);this.relay.parties.send(user,{type:'owner-controls',controls:this.publicControls()});this.relay.parties.send(user,{type:'owner-grants',record:this.grantSummary(user.id)});}
  liveRooms(){
   const relay=this.relay;if(!relay)return [];
   return [...relay.peers.values()].filter(p=>p.listing&&(p.ws||p.virtualRoom)&&this.now()-p.listedAt<20000).map(p=>{
@@ -150,7 +151,9 @@ export class OwnerService {
     this.audit(req,body,'icon-vote-'+body.action,'Owner '+body.action+' voting option',body.id,{first:body.first,last:body.last,previousFirst:body.expectedFirst,previousLast:body.expectedLast});
     json(res,200,data,origin);return;
    }
+   if(route==='/owner/match'&&req.method==='POST'){json(res,200,body.action?await this.match.action(req,body):this.match.overview(body),origin);return;}
    if(route==='/owner/summary'){json(res,200,this.summary(body),origin);return;}
+   if(route==='/owner/replay'&&req.method==='POST'){json(res,200,relay.fairPlay.replays.read(body),origin);return;}
    if(route==='/owner/fair-play'&&req.method==='POST'){json(res,200,relay.fairPlay.overview(),origin);return;}
    if(route==='/owner/tournaments'&&req.method==='POST'){json(res,200,relay.tournament.overview(),origin);return;}
    if(route==='/owner/players'){json(res,200,this.players(body),origin);return;}

@@ -9,7 +9,7 @@ import {OwnerStore} from '../server/realtime/owner-store.js';
 import {fixture,until} from './helpers/public-match.js';
 import {TOURNAMENT} from '../src/tournament.js';
 
-function scenario({size=1,team=false,mutual=false,shots=false,shared=true,reciprocal=false,stage='active',radius=1000,storm=false,visible=true,group=2,duration=215,gap=false,removeDuringFlag=false}={}){
+function scenario({size=1,team=false,mutual=false,tokenShot=false,shots=false,shared=true,fightTimes=[50,110,190],separate=false,reciprocal=false,stage='active',radius=1000,storm=false,visible=true,group=2,duration=215,gap=false,removeDuringFlag=false}={}){
  const flags=[],players=new Map();
  for(let i=0;i<group;i++)players.set('p'+i,{id:'p'+i,name:'Player '+i,x:0,y:0,z:i*3,team:team?0:i,health:100,contestant:true,connected:true,flight:'ground'});
  for(let i=0;i<3;i++)players.set('v'+i,{id:'v'+i,x:800,y:0,z:800+i*60,team:i+10,health:100,contestant:true,connected:true,flight:'ground'});
@@ -17,21 +17,21 @@ function scenario({size=1,team=false,mutual=false,shots=false,shared=true,recipr
  const identities=new Set(players.keys());
  const monitor=new TeamingMonitor({identity:id=>identities.has(id)?id:null,onFlag:r=>{flags.push(r);if(removeDuringFlag&&r.evidence.enforce)for(const id of r.players)identities.delete(id);}});
  for(let t=0;t<=duration;t++){
-  sim.time=sim.elapsed=t;for(let i=0;i<group;i++)players.get('p'+i).x=t;
-  if(shared&&[50,110,190].includes(t))for(let i=0;i<group;i++)monitor.combat({type:'hit',time:t,player:'p'+i,target:'v'+[50,110,190].indexOf(t),amount:35},sim);
-  if(mutual&&t===75)monitor.combat({type:'hit',time:t,player:'p0',target:'p1',amount:1},sim);
-  if(shots&&t===75)monitor.combat({type:'shot',time:t,player:'p0',origin:{x:t,y:1,z:0},shots:[{vx:0,vy:0,vz:100}]},sim);
+  sim.time=sim.elapsed=t;for(let i=0;i<group;i++)players.get('p'+i).x=t+(separate&&t>=80&&t<94&&i===1?35:0);
+  if(shared&&fightTimes.includes(t))for(let i=0;i<group;i++)monitor.combat({type:'hit',time:t,player:'p'+i,target:'v'+(fightTimes.indexOf(t)%3),amount:35},sim);
+  if(mutual&&[75,80].includes(t))monitor.combat({type:'hit',time:t,player:'p0',target:'p1',amount:50},sim);
+  if((shots&&[75,77,80].includes(t)||tokenShot&&t===75))monitor.combat({type:'shot',time:t,player:'p0',origin:{x:t,y:1,z:0},shots:[{vx:0,vy:0,vz:100}]},sim);
   if(reciprocal&&[80,85,90,95].includes(t))monitor.transfer({time:t,from:t%10===0?'p0':'p1',to:t%10===0?'p1':'p0',drop:t,item:t<90?'wood':'light',amount:50});
   if(!gap||t%12===0)monitor.sample(sim);
  }
- return {flags,penalties:flags.filter(f=>f.evidence.enforce),monitor,sim};
+ return {flags,penalties:[...new Map(flags.filter(f=>f.evidence.enforce).map(f=>[f.players.join('|'),f])).values()],monitor,sim};
 }
 test('sustained repeated coordinated combat auto-detects each of three solo teamers, without transitive guilt',()=>{
- const {penalties}=scenario({group:3,removeDuringFlag:true});assert.equal(new Set(penalties.flatMap(p=>p.players)).size,3);assert.equal(penalties.length,3);assert.ok(penalties.every(p=>p.evidence.closeSeconds>=180&&p.evidence.sharedTargets===3&&p.evidence.encounters===3));
+ const {penalties}=scenario({group:3,removeDuringFlag:true});assert.equal(new Set(penalties.flatMap(p=>p.players)).size,3);assert.equal(penalties.length,3);assert.ok(penalties.every(p=>p.evidence.path==='repeated-cooperation'&&p.evidence.episodes.length>=2));
 });
 test('reciprocal supplies corroborate two distinct shared fights for earlier live removal',()=>{const {penalties}=scenario({reciprocal:true,duration:125});assert.equal(penalties.length,1);assert.equal(penalties[0].evidence.reciprocalSupplies,true);assert.ok(penalties[0].evidence.closeSeconds<180);});
 for(const size of [2,3,4])test(`legitimate ${size}-player teammates never trigger detection`,()=>{assert.equal(scenario({size,team:true,reciprocal:true}).flags.length,0);assert.equal(scenario({size}).penalties.length,1,'Opposing teams still monitored');});
-for(const [name,options]of Object.entries({proximity:{shared:false},'brief encounter':{duration:100},'ordinary third party':{duration:140},'shooting each other':{mutual:true},'missed hostile shots':{shots:true},'spawn island':{stage:'spawn-island'},'battle bus':{stage:'battle-bus'},'final circle':{radius:50},'storm escape':{radius:100,storm:true},'separated by cover':{visible:false},'long telemetry gaps':{gap:true}}))test(name+' is not automatically punished',()=>{assert.equal(scenario(options).penalties.length,0);});
+for(const [name,options]of Object.entries({proximity:{shared:false},'brief encounter':{duration:100},'ordinary third party':{fightTimes:[50]},'shooting each other':{mutual:true},'missed hostile shots':{shots:true},'spawn island':{stage:'spawn-island'},'battle bus':{stage:'battle-bus'},'final circle':{radius:50},'storm escape':{radius:100,storm:true},'separated by cover':{visible:false},'long telemetry gaps':{gap:true}}))test(name+' is not automatically punished',()=>{assert.equal(scenario(options).penalties.length,0);});
 
 function harness(path=null){
  let now=1000000;const db=new OwnerStore({path,now:()=>now}),removed=[],sent=[];
@@ -90,7 +90,7 @@ test('public Battle Royale requires host plus two distinct non-accused observati
   const send=(id,flag,extra={})=>service.receive({id},{hostId:'v0',matchId:'public-match',flag,...extra});
   for(let t=0;t<=180;t+=5){h.setTime(1000000+t*1000);for(const id of ids)send(id);}
   send('v1',flag);send('v2',flag);service.flush();assert.deepEqual(h.removed,[],'Two clients cannot bypass missing host evidence');
-  send('v0',flag);service.flush();assert.deepEqual(h.removed,['p0','p1']);assert.throws(()=>h.service.assertPlay('p0'),/suspension/);assert.equal(h.service.status('p1').cups[0].id,'cup1');
+  send('v0',flag);service.flush();assert.deepEqual(h.removed,['p0','p1']);assert.throws(()=>h.service.assertPlay('p0'),/suspension/);assert.deepEqual(h.service.status('p1').cups,[],'Normal games do not prohibit a Cup');
   const row=h.service.overview().cases[0];assert.equal(row.evidence.source,'corroborated public match');assert.deepEqual(row.evidence.witnesses.sort(),['v1','v2']);assert.equal(row.decision.automatic,true);
   send('v0',flag);service.flush();assert.equal(h.removed.length,2,'Replay cannot extend a penalty');
  }finally{await h.db.close();}
@@ -128,8 +128,8 @@ test('regular client snapshot monitoring emits automatic evidence without a repo
   const events=[];if([50,110,190].includes(time))for(const player of ['p0','p1'])events.push({id:++eventId,type:'hit',time,player,target:'v'+[50,110,190].indexOf(time),amount:35});
   client.observe({options:{mode:'royale',teamSize:1,map:'sunnybreak'},time,phase:'playing',players:[...sim.players.values()],events,royale:{matchId:'real-snapshot-shape',stage:'active',elapsed:time,storm:sim.storm,builds:[],worldDamage:{},buildVersion:0}},'v0');
  }
- assert.ok(messages.filter(m=>!m.flag).length>=40,'Automatic authenticated heartbeats establish observation duration');assert.equal(messages.filter(m=>m.flag).length,1);assert.deepEqual(messages.find(m=>m.flag).flag.players,['p0','p1']);
- client.observe({options:{mode:'royale',teamSize:1,map:'sunnybreak'},time:216,phase:'playing',players:[...sim.players.values()],events:[],royale:{matchId:'real-snapshot-shape',stage:'active',elapsed:216,storm:sim.storm,builds:[],worldDamage:{}}},'v1');assert.equal(client.monitor.pairs.size,1);assert.equal(client.monitor.pairs.values().next().value.seconds,0,'Host transfer starts fresh evidence');
+ assert.ok(messages.filter(m=>!m.flag).length>=40,'Automatic authenticated heartbeats establish observation duration');assert.ok(messages.filter(m=>m.flag).length>=1);assert.deepEqual(messages.find(m=>m.flag).flag.players,['p0','p1']);
+ client.observe({options:{mode:'royale',teamSize:1,map:'sunnybreak'},time:216,phase:'playing',players:[...sim.players.values()],events:[],royale:{matchId:'real-snapshot-shape',stage:'active',elapsed:216,storm:sim.storm,builds:[],worldDamage:{}}},'v1');assert.equal(client.monitor.pairs.size,1);assert.equal(client.monitor.pairs.values().next().value.trail.length,1,'Host transfer starts fresh evidence');
 });
 
 test('regular live socket enforcement removes an accused host and guest, retains other players, and blocks rejoining',async()=>{
@@ -176,4 +176,21 @@ test('regular-match settlement cannot award a removed player after the hourly su
   const progression=new ProgressionService(h.r,{path:null});await progression.ready;const account=progression.account('progress-a');account.socialId='a';
   const match={id:'settlement',room:'yolk-yard-v87-ROOM',state:{matchId:'match1'},players:new Map([['a',{id:'a',identity:'progress-a'}]])};progression.settle(match);assert.equal(match.finished,true);assert.deepEqual(account.receipts,[]);
  }finally{await h.db.close();}
+});
+
+test('option 3 retains repeated cooperation through brief separation and a token shot',()=>{
+ assert.equal(scenario({separate:true}).penalties[0].evidence.path,'repeated-cooperation');
+ const token=scenario({tokenShot:true}).penalties;assert.equal(token.length,1);assert.equal(token[0].evidence.aimedShots,1);assert.ok(token[0].evidence.episodes.length>=3,'A counter-signal requires more corroboration, not erased history');
+});
+test('option 3 accepts repeated episodes against one opponent without supplies or three unique victims',()=>{
+ const result=scenario({fightTimes:[50,110],duration:145});assert.equal(result.penalties[0].evidence.path,'repeated-cooperation');assert.equal(result.penalties[0].evidence.reciprocalSupplies,false);assert.ok(result.penalties[0].evidence.closeSeconds<180);
+ const proof=structuredClone(result.penalties[0].evidence);for(const h of proof.hits)h.target='v0';
+ return import('../src/teaming-evidence.js').then(({evaluateTeamingEvidence})=>{const d=evaluateTeamingEvidence(proof);assert.equal(d.enforce,true);assert.equal(d.sharedTargets,1);});
+});
+test('one continuous fight is not multiple independent cooperation episodes',()=>{
+ assert.equal(scenario({fightTimes:[50,55,62,70],duration:145}).penalties.length,0);
+});
+test('strong path requires deliberate reciprocal supplies plus combat and post-fight regrouping',()=>{
+ const strong=scenario({fightTimes:[50],reciprocal:true,duration:115});assert.equal(strong.penalties[0].evidence.path,'strong-cooperation');assert.equal(strong.penalties[0].evidence.episodes.length,1);
+ assert.equal(scenario({shared:false,reciprocal:true}).penalties.length,0,'Supplies and proximity without combat never punish');
 });

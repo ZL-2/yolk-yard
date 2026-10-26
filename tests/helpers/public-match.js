@@ -82,7 +82,7 @@ export async function fixture({recovery=false,serverOptions={}}={}){
   if(launch.host){
    game.sim=launch.options.mode==='zonewars'?new ZoneWarsSimulation(launch.options):launch.options.mode==='boxfight'?new BoxFightSimulation(launch.options):launch.options.mode==='royale'?new RoyaleSimulation(launch.options):new Simulation(launch.options);const player=game.sim.addPlayer('host',user.profile);game.sim.assignTeam(player,launch.admission);
    await game.net.host(launch.code,launch.ticket);game.net.visibility='public';game.sim.startRound();
-   game.state=game.sim.snapshot();game.net.broadcast(game.state);await user.ask('host-ready',{id:launch.id});
+   game.state=game.sim.snapshot();game.net.broadcast(game.state);await until(()=>app.relay.peers.get(game.net.peer.id)?.listing,'Host published its room');await user.ask('host-ready',{id:launch.id});
   }else await game.net.join(launch.code,user.profile,launch.ticket);
   await user.ask('joined',{id:launch.id});await until(()=>game.state,'Match snapshot');return game;
  }
