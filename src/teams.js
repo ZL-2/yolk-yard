@@ -1,6 +1,6 @@
 // Parties are lobby groups; team numbers belong only to a match.
 export const isDuos=options=>options?.mode==='royale'&&options.teamSize===2;
-export const isTeamRoyale=options=>options?.mode==='royale'&&[2,4].includes(options.teamSize);
+export const isTeamRoyale=options=>options?.mode==='royale'&&[2,3,4].includes(options.teamSize);
 export const teamMode=options=>options?.mode==='teams'||options?.mode==='boxfight'&&options.boxFormat!=='ffa'||options?.mode==='zombies'||isTeamRoyale(options);
 export const teammates=(options,a,b)=>!!(a&&b&&a.id!==b.id&&teamMode(options)&&a.team>=0&&a.team===b.team);
 export const teamKey=(options,p)=>isTeamRoyale(options)?p.team:p.id;

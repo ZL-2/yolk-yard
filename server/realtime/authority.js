@@ -1,3 +1,4 @@
+import {tournamentName} from '../../src/tournament.js';
 import {bindCrownStore,attachCrown} from '../../src/crowns.js';
 import {settleZombiesPlayer} from './zombies-service.js';
 import {timingPhase,roomTiming,recordTiming,startTiming,finishTiming} from './timing.js';
@@ -109,7 +110,7 @@ export class MatchAuthority{
   if(m.type==='chat-muted'&&room.members.has(m.id)&&m.id!==id){if(m.muted)room.chat.muted.add(m.id);else room.chat.muted.delete(m.id);}
   if(m.type==='kick'&&m.id!==id){const target=room.members.get(m.id);if(target){room.kicked.add(target.progressId);this.send(target,{type:'authority-notice',event:'kicked'});this.disconnect(target);}}
  }
- publish(room){const s=room.sim,p=room.hostPeer;const humans=[...s.players.values()].filter(p=>!p.bot&&!p.lateSpectator&&p.connected!==false);p.listedAt=Date.now();p.listing={code:room.code,version:VERSION,host:room.tournament?'Frontier Cup':room.recurring?'Recurring Frontier Royale':s.players.get(room.owner)?.name||'Operator',map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize,players:humans.length,capacity:Math.min(MAX_HUMANS,s.options.capacity),contestantCapacity:s.options.capacity,public:room.visibility==='public',recurring:!!room.recurring,phase:isWarmup(s.stage)?'lobby':s.phase};}
+ publish(room){const s=room.sim,p=room.hostPeer;const humans=[...s.players.values()].filter(p=>!p.bot&&!p.lateSpectator&&p.connected!==false);p.listedAt=Date.now();p.listing={code:room.code,version:VERSION,host:room.tournament?tournamentName({name:room.eventName,teamSize:s.options.teamSize}):room.recurring?'Recurring Frontier Royale':s.players.get(room.owner)?.name||'Operator',map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize,players:humans.length,capacity:Math.min(MAX_HUMANS,s.options.capacity),contestantCapacity:s.options.capacity,public:room.visibility==='public',recurring:!!room.recurring,phase:isWarmup(s.stage)?'lobby':s.phase};}
  broadcast(room){this.snapshotWork.enqueue(room,()=>this.broadcastSteps(room));}
  flushBroadcast(room,budget=Infinity){this.snapshotWork.flush(room,budget);}
  *broadcastSteps(room){

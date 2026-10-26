@@ -126,7 +126,7 @@ export class RealtimeRelay {
         this.publicHost.report('publish-rejected','Invalid public host state',peer);
         this.send(peer,{type:'publish-rejected'});return;
       }
-      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:r.mode,players:r.players,capacity:Math.max(2,Math.min(MAX_HUMANS,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(MAX_CONTESTANTS,Number(r.contestantCapacity)||8)),teamSize:(r.mode==='boxfight'?[2,3,4]:[2,4]).includes(r.teamSize)?r.teamSize:1,boxFormat:r.mode==='boxfight'&&r.boxFormat==='ffa'?'ffa':'teams',public:!!this.publicHost.roomByAddress(peer.id),hostRun:true,recurring:!!this.publicHost.roomByAddress(peer.id),phase:r.phase}:null;
+      peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:r.mode,players:r.players,capacity:Math.max(2,Math.min(MAX_HUMANS,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(MAX_CONTESTANTS,Number(r.contestantCapacity)||8)),teamSize:[2,3,4].includes(r.teamSize)?r.teamSize:1,boxFormat:r.mode==='boxfight'&&r.boxFormat==='ffa'?'ffa':'teams',public:!!this.publicHost.roomByAddress(peer.id),hostRun:true,recurring:!!this.publicHost.roomByAddress(peer.id),phase:r.phase}:null;
       this.hostWatchdog?.publish(peer,r);peer.listedAt=Date.now();return;
     }
     if(m.type==='connect'){

@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      tournament_teams_update: ${{ steps.scope.outputs.tournament_teams_update }}
       performance217_update: ${{ steps.scope.outputs.performance217_update }}
       anatomy216_update: ${{ steps.scope.outputs.anatomy216_update }}
       icon_voting_update: ${{ steps.scope.outputs.icon_voting_update }}
@@ -78,6 +79,12 @@ jobs:
           import json,os,re,subprocess
           from pathlib import Path
           files=set(subprocess.check_output(['git','diff','--name-only','HEAD^','HEAD'],text=True).splitlines())
+          tournament_teams_allowed={'src/compete-ui.js', 'src/royale.js', 'package-lock.json', 'src/tournament-ui.js', 'package.json', 'scripts/compete-browser-check.mjs', 'tests/tournament-owner.test.js', '.github/workflows/pages.yml', 'tests/compete.test.js', 'server/realtime/parties.js', 'src/tournament.js', 'tests/tournament-teams.test.js', 'src/chat.js', 'server/realtime/relay.js', 'scripts/tournament-owner-browser-check.mjs', 'tests/public-pools.test.js', 'server/realtime/tournament.js', 'server/realtime/match-launch.js', 'src/data.js', 'src/lobby-ui.js', 'src/owner-tournaments.js', 'src/public-royale.js', 'server/realtime/authority.js', 'src/match-options.js', 'src/spectator-status.js', 'src/releases.js', 'src/royale-ui.js', 'docs/UPDATE_218.md', 'src/teams.js', 'src/main.js', 'src/tournament-schedule.js', 'scripts/tournament-teams-live-check.mjs', 'src/chat-ui.js'}
+          tournament_teams_update='tests/tournament-teams.test.js' in files and files<=tournament_teams_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.26.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('tournament_teams_update='+str(tournament_teams_update).lower()+'\n')
+            if tournament_teams_update: out.write('focused=true\n')
+          print('Tournament team formats and Trios:',tournament_teams_update)
           allowed={'src/atv-model.js','src/vehicle-view.js','scripts/atv-browser-check.mjs','tests/atv-presentation.test.js','package.json','package-lock.json','src/releases.js','docs/UPDATE_152.md','.github/workflows/pages.yml'}
           visual={'src/atv-model.js','src/vehicle-view.js'}
           previous=set(subprocess.check_output(['git','diff','--name-only','HEAD^^','HEAD^'],text=True).splitlines())
@@ -447,6 +454,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Tournament team admission, saved formats, prizes, public Trios and team communication
+        if: needs.scope.outputs.tournament_teams_update == 'true'
+        run: |
+          node --test --test-concurrency=2 tests/tournament-teams.test.js tests/tournament.test.js tests/tournament-owner.test.js tests/compete.test.js tests/tournament-clock.test.js tests/public-pools.test.js tests/team-entry.test.js tests/chat.test.js tests/spectator-status.test.js tests/royale-teammate-bots.test.js tests/release-history.test.js
+          node --test --test-name-pattern='Duo knock|revive stops|final active|finishing' tests/field-systems.test.js
       - name: Combat performance, interpolation, builds, spectators and unchanged match rules
         if: needs.scope.outputs.performance217_update == 'true'
         run: |
@@ -772,7 +784,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true'
+        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
       - name: Icon voting modal and owner forms
         if: needs.scope.outputs.icon_voting_update == 'true'
         run: |
@@ -780,12 +792,25 @@ jobs:
           ln -sf "$(node --input-type=module -e "import {chromium} from 'playwright'; console.log(chromium.executablePath())")" /tmp/chromium
           node scripts/icon-voting-browser-check.mjs
       - name: Install the headless desktop runtime with a missing-library fallback
-        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true' || needs.scope.outputs.performance217_update == 'true'
+        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true' || needs.scope.outputs.performance217_update == 'true' || needs.scope.outputs.tournament_teams_update == 'true'
         run: |
           npx playwright install chromium --only-shell
           # Ubuntu runners already carry the Chromium libraries. Avoid a full
           # font/system upgrade on slow mirrors; install dependencies if needed.
           node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium
+      - name: Owner team-format editor, public/private Trios, Compete and two-hour lobby card
+        if: needs.scope.outputs.tournament_teams_update == 'true'
+        run: |
+          node scripts/tournament-owner-browser-check.mjs
+          node scripts/compete-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.tournament_teams_update == 'true'
+        with:
+          name: tournament-teams-browser
+          path: |
+            test-results/tournament-owner
+            test-results/compete
+          retention-days: 14
       - name: Tournament browser flow and reticle-aligned third-person gameplay
         if: needs.scope.outputs.tournament_update == 'true'
         run: |
@@ -1342,7 +1367,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true'
+        if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
       - name: Install the focused headless desktop runtime
         if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true'
         run: |
@@ -1357,7 +1382,9 @@ jobs:
       - name: Matching website/relay build, private PvP, paused Zombies and live lobby
         if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true'
         run: |
-          if [ "${{ needs.scope.outputs.performance217_update }}" = "true" ]; then
+          if [ "${{ needs.scope.outputs.tournament_teams_update }}" = "true" ]; then
+            node scripts/tournament-teams-live-check.mjs
+          elif [ "${{ needs.scope.outputs.performance217_update }}" = "true" ]; then
             node scripts/performance-live-check.mjs
           elif [ "${{ needs.scope.outputs.anatomy216_update }}" = "true" ]; then
             node scripts/anatomy-live-check.mjs

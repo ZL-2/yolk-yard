@@ -12,7 +12,7 @@ export function spectatorMessage(previous,current){const known=new Set(previous)
 
 export function spectatorTargets(state,localId){
  const me=state?.players?.find(p=>p.id===localId),alive=(state?.players||[]).filter(p=>canSpectate(p,localId));
- const teamMode=(state?.options?.mode==='royale'&&[2,4].includes(state.options.teamSize))||(state?.options?.mode==='boxfight'&&state.options.boxFormat!=='ffa');
+ const teamMode=(state?.options?.mode==='royale'&&[2,3,4].includes(state.options.teamSize))||(state?.options?.mode==='boxfight'&&state.options.boxFormat!=='ffa');
  const mates=teamMode&&me?.team>=0?alive.filter(p=>p.team===me.team):[];
  if(state?.players?.find(p=>p.id===me?.killerId)?.bot){const humans=alive.filter(p=>!p.bot);if(humans.length)return humans.sort((a,b)=>Number(b.team===me.team)-Number(a.team===me.team));}
  const roundMode=['boxfight','zonewars'].includes(state?.options?.mode);

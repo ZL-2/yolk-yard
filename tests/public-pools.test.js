@@ -51,8 +51,8 @@ test('eight concurrent Arena reservations fill one room; ninth opens a separate 
  }finally{await f.close();}
 });
 
-test('Duos and Squads keep each ready party on one team and reset readiness when rules or membership change',async()=>{
- for(const size of [2,4]){const f=await fixture();try{
+test('Duos, Trios and Squads keep each ready party on one team and reset readiness when rules or membership change',async()=>{
+ for(const size of [2,3,4]){const f=await fixture();try{
   const users=[];for(let i=0;i<size;i++)users.push(await f.user('Team '+size+' Member '+i));const [leader,...mates]=users;await party(leader,mates);
   assert.equal(leader.party.selection.teamSize,size);await assert.rejects(leader.ask('select',{mode:'royale',teamSize:1}),/fit|Duos|Squads/);await assert.rejects(mates[0].ask('queue'),/leader/);await assert.rejects(leader.ask('queue'),/ready/);
   for(const u of mates)await u.ask('ready',{value:true});await leader.ask('select',{mode:'royale',teamSize:size,access:'public',options:{capacity:2,bots:0,building:false,difficulty:4}});await until(()=>leader.party.members.every(m=>!m.ready),'Rule change resets readiness');

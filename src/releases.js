@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'218',title:'Frontier Cup team formats and Trios',changes:[
+  'Tournament cards appear exactly two hours before entry opens. Event titles include the format: Frontier Cup - Solos, Duos, Trios or Squads.',
+  'Owner Compete scheduling supports all four team sizes. Team cups enter the leader’s party together with no filler bots; every teammate shares the team’s placement and receives the full listed prize. Teams must finish loading before the entry cutoff, and at least two opposing teams are required.',
+  'Trios is available in public and private Frontier Royale, with team matchmaking, teammate HUDs, team chat, downing and reviving, shared victories and three-player party support. Version 6.26.0 / protocol 86.'
+ ]},
  {number:'217',title:'Smoother combat and tournament delivery',changes:[
   'Server snapshots run in short batches so movement input and the 60 Hz match simulation can run between recipients. Unchanged buildings and doors reuse immutable snapshots, with temporary comparison caches bounded to each broadcast; private HUD data stays with its owner or spectator target.',
   'Distant operators now use their authored lighter models, with staggered animation updates and batched distant weapons. Nearby operators keep full detail, and combat hitboxes are unchanged.',

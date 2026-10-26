@@ -35,7 +35,7 @@ export function queueMatch(service,u,m){
  const rooms=[...service.relay.peers.values()].filter(peer=>peer.ws&&peer.listing&&!authority?.rooms.has(peer.id)&&Date.now()-peer.listedAt<15000).map(peer=>peer.listing);
  const pending=code=>[...service.tickets.values()].filter(t=>!t.spectator&&t.code===code&&t.expires>Date.now()&&(!t.peer||t.claimedAt>(service.relay.peers.get(address(code))?.listedAt||0))).length;
  if(m.code){room=rooms.find(r=>r.code===m.code&&r.version===VERSION);if(!room)throw Error('That private room is unavailable. Check the code with its host.');options=matchOptions({...options,mode:room.mode,boxFormat:room.boxFormat,teamSize:room.teamSize,capacity:room.contestantCapacity,recurring:false});}
- if((options.mode==='royale'||options.mode==='boxfight'&&options.recurring)&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
+ if((options.mode==='royale'||options.mode==='boxfight'&&options.recurring)&&p.members.length>options.teamSize)throw Error('Choose Duos, Trios or Squads to fit your party.');
  if(room)options=matchOptions({...options,mode:room.mode,boxFormat:room.boxFormat,capacity:room.contestantCapacity||room.capacity,teamSize:room.teamSize});
  if(!room&&options.mode==='royale'&&options.capacity<options.teamSize*2)throw Error('Team Royale needs positions for at least two full teams.');
  let roomCode=room?.code||newCode();while(!room&&(isPublicCode(roomCode)||service.relay.peers.has(address(roomCode))))roomCode=newCode();
@@ -57,7 +57,7 @@ function queuePublicMatch(service,u,m={}){
  const target=m.targetPublic?pool.rooms.get(m.targetPublic):null;
  if(m.targetPublic&&(!target||typeof m.targetMatch!=='string'||target.state?.matchId!==m.targetMatch))throw Error('That public match has ended.');
  const options=target?target.options:publicMatchOptions(p.selection);
- if((options.mode==='royale'||options.mode==='boxfight'&&options.recurring)&&p.members.length>options.teamSize)throw Error('Choose Duos or Squads to fit your party.');
+ if((options.mode==='royale'||options.mode==='boxfight'&&options.recurring)&&p.members.length>options.teamSize)throw Error('Choose Duos, Trios or Squads to fit your party.');
  const room=target||pool.findRoom(options,p.members.length),summary=room.summary();
  if(target&&(!summary.hostReady||!summary.joinable||summary.recovering))throw Error('This match has started or is transferring hosts.');
  if(target&&summary.availableSeats<p.members.length)throw Error('This match is full or cannot fit your entire party.');

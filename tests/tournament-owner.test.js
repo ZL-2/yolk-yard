@@ -40,11 +40,11 @@ test('create, edit, concurrency, idempotency and disk restart preserve schedule,
   assert.deepEqual(await t.action(command),created);assert.equal(service.events.length,3);
   await assert.rejects(t.action({...command,event:{...definition(),name:'Changed retry'}}),/already used/);
   await assert.rejects(t.action({action:'tournament-save',eventId:created.eventId,event:definition(),revision:0}),/another session/);
-  const edit={...definition(),name:'Revised Cup',prizes:[7000,3500,1500],duplicateReward:12000,capacity:24,spectators:8};await t.action({action:'tournament-save',eventId:created.eventId,event:edit});
+  const edit={...definition(),name:'Revised Cup',teamSize:3,prizes:[7000,3500,1500],duplicateReward:12000,capacity:24,spectators:8};await t.action({action:'tournament-save',eventId:created.eventId,event:edit});
   assert.deepEqual(service.event(created.eventId).event.prizes,[7000,3500,1500]);assert.equal(service.overview().events.find(e=>e.id===created.eventId).definition.spectators,8);
   assert.equal(t.f.app.owner.db.get("SELECT count(*) n FROM events WHERE kind='tournament-save'").n,2);
   await t.f.restart();await t.login();const restored=t.f.app.relay.tournament;
-  assert.equal(restored.catalog.revision,2);assert.equal(restored.event(created.eventId).event.name,'Revised Cup');assert.deepEqual(restored.event(TOURNAMENTS[0].id).state,archive);assert.deepEqual(restored.rewards('old-winner').owned,[TOURNAMENTS[0].pickaxe]);
+  assert.equal(restored.catalog.revision,2);assert.equal(restored.event(created.eventId).event.name,'Revised Cup');assert.equal(restored.event(created.eventId).event.teamSize,3);assert.deepEqual(restored.event(TOURNAMENTS[0].id).state,archive);assert.deepEqual(restored.rewards('old-winner').owned,[TOURNAMENTS[0].pickaxe]);
  }finally{await t.close();}
 });
 test('invalid schedules and overlapping events fail before writes, audit or broadcasts',async()=>{
@@ -63,6 +63,7 @@ test('active cancellation removes only tournament room, releases reservations an
   t.setTime(event.startsAt);service.tick();assert.equal(service.event(created.eventId).phase,'running');
   await assert.rejects(t.action({action:'tournament-save',eventId:created.eventId,event:{...event,prizes:[9999,2,1]}}),/locked/);
   await t.action({action:'tournament-save',eventId:created.eventId,event:{...event,name:'Renamed live event'}});
+  await assert.rejects(t.action({action:'tournament-save',eventId:created.eventId,event:{...event,teamSize:3}}),/locked/);
   await assert.rejects(t.action({action:'tournament-remove',eventId:created.eventId}),/Cancel/);
   await t.action({action:'tournament-cancel',eventId:created.eventId});assert.equal(service.locked,false);assert.equal(service.event(created.eventId).room,null);assert.equal(t.f.app.relay.parties.tickets.size,0);assert.equal(t.f.app.owner.grantSummary(a.id).marks,0);assert.deepEqual(service.event(created.eventId).state.results,[]);
   const after=await t.f.user('After Cancellation');await after.ask('select',{mode:'ffa',access:'public'});await after.ask('queue');assert.ok(after.launches.length);

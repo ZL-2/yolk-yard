@@ -9,12 +9,12 @@ const [friday,monday]=TOURNAMENTS;
 test('Monday schedule uses noon EDT, one-minute entry, three-minute lockdown and no recurring events',()=>{
  assert.equal(new Date(monday.opensAt).toISOString(),'2026-10-26T16:00:00.000Z');assert.equal(monday.startsAt-monday.opensAt,60000);assert.equal(monday.opensAt-monday.lockAt,180000);assert.equal(monday.duplicateReward,10000);assert.equal(friday.duplicateReward,0);assert.deepEqual(monday.prizes,[5000,2500,1000]);
 });
-test('lobby spotlight opens exactly one hour before entry and expires exactly two hours after completion',()=>{
+test('lobby spotlight opens exactly two hours before entry and expires exactly two hours after completion',()=>{
  const upcoming={...monday,phase:'scheduled'},finished={...friday,phase:'finished',endedAt:friday.startsAt+180000};
- assert.equal(visibleTournament([upcoming],monday.opensAt-3600001),null);assert.equal(visibleTournament([upcoming],monday.opensAt-3600000).id,monday.id);
+ assert.equal(visibleTournament([upcoming],monday.opensAt-7200001),null);assert.equal(visibleTournament([upcoming],monday.opensAt-7200000).id,monday.id);
  assert.equal(visibleTournament([finished],finished.endedAt+7199999).id,friday.id);assert.equal(visibleTournament([finished],finished.endedAt+7200000),null);
  assert.equal(visibleTournament([finished,{...upcoming,phase:'running'}],monday.startsAt).id,monday.id);
- assert.equal(tournamentCard({events:[upcoming],serverNow:monday.opensAt-3600001},true),'');
+ assert.equal(tournamentCard({events:[upcoming],serverNow:monday.opensAt-7200001},true),'');
 });
 test('real second event preserves the archive, saves all placements, pays repeat winner once and reopens',async()=>{
  let now=friday.lockAt-1;const f=await fixture({serverOptions:{tournamentOptions:{now:()=>now,autoStart:false}}});try{

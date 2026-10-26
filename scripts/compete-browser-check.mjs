@@ -6,6 +6,8 @@ import {fixture} from '../tests/helpers/public-match.js';
 import {TOURNAMENTS} from '../src/tournament.js';
 const [friday,monday]=TOURNAMENTS,origin='http://127.0.0.1:5292',out='test-results/compete';await mkdir(out,{recursive:true});let now=friday.startsAt+240000;
 const f=await fixture({serverOptions:{origins:[origin,'https://zl-2.github.io'],tournamentOptions:{now:()=>now,autoStart:false}}}),service=f.app.relay.tournament;
+f.app.relay.iconVoting.now=()=>Date.parse('2026-10-23T18:00Z');
+await f.app.relay.iconVoting.mutate('browser-fixture',{action:'nominate',first:'Fixture',last:'Operator'});
 service.event(friday.id).complete('finished','Tournament complete. Normal matchmaking is open.',Array.from({length:30},(_,i)=>({identity:'fixture-'+i,name:i?'Player '+(i+1):'Archive Champion',place:i+1,kills:30-i})));
 const vite=await createServer({server:{host:'127.0.0.1',port:5292,strictPort:true,watch:null}});await vite.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
@@ -14,6 +16,12 @@ try{
  await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:`window.YOLK_NETWORK={relay:'ws://127.0.0.1:${f.app.server.address().port}/game'};`}));
  await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Compete Reviewer',weapon:'sprinter'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,fpsLimit:30}));localStorage.setItem('ravelfront-stormspike-kestrel-199-dismissed','yes');});
  await page.goto(origin+'/?qa');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);await page.waitForFunction(()=>!document.querySelector('#loading')||document.querySelector('#loading').hidden);
+ // Complete the existing vote prerequisite on this isolated fixture before
+ // asserting lobby focus or interacting with the underlying game menus.
+ await page.locator('.icon-voting[open] [data-candidate]').first().click();await page.locator('.icon-voting [data-cast]').click();await page.locator('.icon-voting[open]').waitFor({state:'hidden'});
+ await page.locator('[data-action="lobby-options"]').click();await page.locator('#lobby-teamSize').selectOption('3');await page.waitForFunction(()=>window.__yolkTest.party().party.selection.teamSize===3);
+ await page.locator('#lobby-access').selectOption('private');await page.waitForFunction(()=>window.__yolkTest.party().party.selection.access==='private');assert.equal(await page.locator('#lobby-teamSize').inputValue(),'3');await page.screenshot({path:out+'/trios-options.png'});await page.locator('#lobby-options-form [data-action="close"]').click();
+
  await page.locator('.tournament-standings').waitFor();const table=await page.locator('.tournament-standings').evaluate(e=>({height:e.clientHeight,scroll:e.scrollHeight}));assert.ok(table.scroll>table.height,'Lobby placements scroll');await page.screenshot({path:out+'/lobby-results.png'});
  assert.ok(await page.evaluate(async event=>{const {updateTournamentCard}=await import('/src/tournament-ui.js');const list=document.querySelector('.tournament-standings');list.scrollTop=60;list.focus();updateTournamentCard(document,event,true,event.serverNow+1000);return list.isConnected&&list.scrollTop===60&&document.activeElement===list;},service.summary()),'Clock refresh retains standings scroll and keyboard focus');
  const tabs=await page.locator('nav[aria-label="Main navigation"] button').allTextContents();assert.equal(tabs[tabs.indexOf('CAREER')-1],'COMPETE');
@@ -25,7 +33,7 @@ try{
  await page.getByRole('button',{name:'PLAY',exact:true}).click();now+=7200001;service.tick();await page.waitForFunction(()=>!document.querySelector('.tournament-card'));
  // The client clock correctly advances between server updates. Keep this
  // browser assertion clear of the boundary; the unit test checks the exact ms.
- now=monday.opensAt-3660000;service.tick();await page.waitForTimeout(300);assert.equal(await page.locator('.tournament-card').count(),0);now=monday.opensAt-3600000;service.tick();await page.locator('.tournament-card').waitFor();assert.match(await page.locator('.tournament-card').innerText(),/12:00 PM/);assert.equal(await page.locator('[data-action="tournament-join"]').isDisabled(),true);
+ now=monday.opensAt-7260000;service.tick();await page.waitForTimeout(300);assert.equal(await page.locator('.tournament-card').count(),0);now=monday.opensAt-7200000;service.tick();await page.locator('.tournament-card').waitFor();assert.match(await page.locator('.tournament-card').innerText(),/12:00 PM/);assert.equal(await page.locator('[data-action="tournament-join"]').isDisabled(),true);
  now=monday.opensAt;service.tick();await page.getByRole('button',{name:'JOIN TOURNAMENT',exact:true}).waitFor();assert.equal(await page.locator('[data-action="tournament-join"]').isEnabled(),true);assert.equal(await page.locator('.lobby-play').isDisabled(),true);
  assert.ok(await page.evaluate(async event=>{const {updateTournamentCard}=await import('/src/tournament-ui.js');const button=document.querySelector('[data-action="compete-event"]');button.focus();for(let i=1;i<=3;i++)updateTournamentCard(document,event,true,event.serverNow+i*1000);return button.isConnected&&document.activeElement===button;},service.summary()),'Countdown retains the clickable event button');
  await page.locator('[data-action="compete-event"]').click();assert.match(await page.locator('.compete-event-hero').innerText(),/12:00 PM/);await page.setViewportSize({width:1024,height:768});await page.screenshot({path:out+'/desktop-1024.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

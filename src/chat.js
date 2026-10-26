@@ -8,7 +8,7 @@ export const QUICK_MESSAGES = Object.freeze({
 export const REPORT_REASONS = Object.freeze({ language:'Inappropriate language', privacy:'Personal information', behavior:'Harassment or spam' });
 const fail = (reason, retryAfter = 0) => ({ok:false, reason, retryAfter:Math.max(0, Math.ceil(retryAfter / 1000))});
 const playersOf = state => Array.isArray(state?.players) ? state.players : [];
-const teamMode = state => state?.options?.mode==='boxfight'&&state.options.boxFormat!=='ffa'||state?.options?.mode==='teams'||state?.options?.mode==='zombies'||state?.options?.mode==='royale'&&[2,4].includes(state.options.teamSize);
+const teamMode = state => state?.options?.mode==='boxfight'&&state.options.boxFormat!=='ffa'||state?.options?.mode==='teams'||state?.options?.mode==='zombies'||state?.options?.mode==='royale'&&[2,3,4].includes(state.options.teamSize);
 export function chatChannel(player, requested, state) {
   if (requested === 'team') return teamMode(state) && !player?.spectating ? 'team' : null;
   return requested === 'room' ? 'room' : null;

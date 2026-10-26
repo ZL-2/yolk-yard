@@ -140,7 +140,7 @@ export class RoyaleSimulation extends Simulation {
   return super.setProfile(id,profile);
  }
  configure(options){
-  const nextSize=[2,4].includes(options.teamSize)?options.teamSize:1;if([...this.players.values()].some(p=>!p.bot&&p.partySize>nextSize))return false;
+  const nextSize=[2,3,4].includes(options.teamSize)?options.teamSize:1;if([...this.players.values()].some(p=>!p.bot&&p.partySize>nextSize))return false;
   if(!super.configure({...options,mode:'royale'}))return false;
   this.map=this.battleMap();resetBuilding(this);this.maxPlayers=this.options.capacity;this.queueEnds=0;
   return true;
@@ -184,7 +184,7 @@ export class RoyaleSimulation extends Simulation {
   for(const p of [...this.players.values()])if(!p.bot&&p.connected===false)this.removePlayer(p.id);
   // Commit only complete invited groups. An invitation arriving at the cutoff
   // never sends one party member into combat and the other into spectating.
-  for(const p of this.players.values())if(p.contestant&&p.partyId&&p.partySize>1&&[...this.players.values()].filter(o=>!o.bot&&o.connected!==false&&o.partyId===p.partyId).length<p.partySize)Object.assign(p,{contestant:false,spectating:true,lateSpectator:true,health:0,flight:'out'});
+  for(const p of this.players.values())if(p.contestant&&p.partyId&&p.partySize>1&&[...this.players.values()].filter(o=>!o.bot&&o.contestant&&o.connected!==false&&!o.loading&&o.partyId===p.partyId).length<p.partySize)Object.assign(p,{contestant:false,spectating:true,lateSpectator:true,health:0,flight:'out'});
   this.addBots();this.fillBotTeammates();
   const seats=[...this.players.values()].filter(p=>p.contestant);
   if(seats.length<2||isTeamRoyale(this.options)&&livingTeams(this.options,seats).size<2){this.queueEnds=this.time+10;this.stage=RP.ISLAND;return false;}
@@ -576,7 +576,7 @@ export class RoyaleSimulation extends Simulation {
   const living=[...this.players.values()].filter(p=>p.contestant&&p.health>0&&!p.spectating);
   if(livingTeams(this.options,living).size>1)return;
   this.stage=RP.ENDING;
-  this.finishedAt=this.time;this.phase='results';this.stage=RP.FINISHED;this.winnerId=living[0]?.id||null;this.winnerTeam=living[0]?.team??-1;this.winner=living[0]?(isTeamRoyale(this.options)?(this.options.teamSize===4?'Squad victory!':'Duo victory!'):living[0].name+' wins'):'No surviving operators — draw';
+  this.finishedAt=this.time;this.phase='results';this.stage=RP.FINISHED;this.winnerId=living[0]?.id||null;this.winnerTeam=living[0]?.team??-1;this.winner=living[0]?(isTeamRoyale(this.options)?(this.options.teamSize===4?'Squad victory!':this.options.teamSize===3?'Trio victory!':'Duo victory!'):living[0].name+' wins'):'No surviving operators — draw';
   if(living[0])this.teamPlace(living[0],1);awardCrowns(this,living);
   // If the final pair fell in the same simulation tick, both share the final place.
   if(!living.length){const final=this.placements.filter(x=>x.place<=2);for(const p of final){p.place=1;const player=this.players.get(p.id);if(player)player.place=1;}}
