@@ -20,14 +20,14 @@ try{
   await page.addInitScript(name=>{localStorage.setItem('yolk-profile',JSON.stringify({name,weapon:'sprinter'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,fpsLimit:30}));localStorage.setItem('ravelfront-stormspike-kestrel-199-dismissed','yes');},name);
   await page.goto(origin+'/?qa');console.log('Game loaded',name);await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
   await page.locator('.icon-voting[open] [data-candidate]').first().click();await page.locator('.icon-voting [data-cast]').click();await page.locator('.icon-voting[open]').waitFor({state:'hidden'});
+  await page.evaluate(()=>window.__yolkTest.social('select',{mode:'ffa',access:'public'}));
   return page;
  }
  const host=await player('Recovery Captain'),guest=await player('Recovery Guest');
  console.log('Players loaded; entering public match');
- await host.locator('#menu [data-action=lobby-play]').click();await host.waitForFunction(()=>window.__yolkTest.read().host&&window.__yolkTest.read().state?.royale?.stage==='spawn-island');
+ await host.locator('#menu [data-action=lobby-play]').click();await host.waitForFunction(()=>window.__yolkTest.read().host&&window.__yolkTest.read().state?.phase==='playing');
  await host.waitForFunction(()=>window.__yolkTest.party().party?.state==='playing');
  await host.locator('#loading-screen').waitFor({state:'hidden'});
- await host.evaluate(()=>window.__yolkTest.fixture(sim=>sim.queueEnds=sim.time+600));
  await guest.locator('#menu [data-action=lobby-play]').click();await guest.waitForFunction(()=>window.__yolkTest.read().state?.players.filter(p=>!p.bot).length===2);
  await guest.evaluate(()=>window.__yolkTest.connectionFixture(net=>{net.lastReadySent=0;net.publicReady();}));
  const address=await host.evaluate(()=>window.__yolkTest.connectionFixture(net=>net.peer.id));
