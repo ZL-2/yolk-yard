@@ -1,6 +1,7 @@
 import {tournamentClock} from './tournament-clock.js';
 import {requireIconVote} from './icon-voting-ui.js';
-import {updateTournamentCard} from './tournament-ui.js';
+import {updateTournamentCard,tournamentTeamEntryMarkup} from './tournament-ui.js';
+import {tournamentEvents} from './tournament.js';
 import {preloadOperatorAssets} from './operator-assets.js';
 import {competeMarkup,createCompeteState,bindCompete} from './compete-ui.js';
 import {problemText,captureDialogPosition,restoreDialogPosition} from './problem-reports.js';
@@ -388,7 +389,7 @@ function renderMenu(force=false) {
  if(menuSection==='play'){root.innerHTML=lobbyMarkup(model);lobbyNews.mount(root.querySelector('.lobby-news'));view.lobbyLabels=[...root.querySelectorAll('[data-lobby-player]')];installLeaderboardScrollbars();const footer=root.querySelector('.yard-footer');if(footer){lobbyFooterObserver=new ResizeObserver(()=>document.documentElement.style.setProperty('--lobby-footer-height',Math.ceil(footer.getBoundingClientRect().height)+16+'px'));lobbyFooterObserver.observe(footer);}void refreshLeaderboards();return;}
  root.innerHTML=lobbyNavigation({...model,section:menuSection})+`<main class="hub-page hub-${menuSection}" aria-label="${menuSection==='shop'?'Item Shop':menuSection==='locker'?'Locker':menuSection==='compete'?'Compete':'Career'}" tabindex="-1">${menuSection==='compete'?competeMarkup(model,competeState):menuSection==='career'?careerMarkup({stats,competitive:competitiveCareer,competitiveError,online:!!party?.ready,wallet:eggWallet.value,profile,selected:careerMode,portrait:view.shopPortrait({id:'career-operator',slot:'outfit',characterInspection:true,starter:true,profile,previewKey:'career:'+JSON.stringify(profile)})}):'<div id="egg-shop"></div>'}</main>`;
  if(menuSection==='career'){$('#career-mode').onchange=e=>{careerMode=e.target.value;renderMenu(true);$('#career-mode').focus();};void refreshCompetitiveCareer();}
- else if(menuSection==='compete')bindCompete(root.querySelector('.compete-page'),competeState,refreshCompete,id=>{void partyRequest('tournament-join',{eventId:id});});
+ else if(menuSection==='compete')bindCompete(root.querySelector('.compete-page'),competeState,refreshCompete,id=>{void joinTournament(id);});
  else {
   eggShop??=new EggShop({wallet:eggWallet,view,rankRewards,getProfile:()=>profile,setProfile:next=>{profile=next;remember();view.preview(profile);}});
   eggShop.embedded=true;eggShop.onTab=tab=>selectMenuSection(tab==='locker'?'locker':'shop');eggShop.tab=menuSection==='locker'?'locker':'shop';
@@ -1352,6 +1353,18 @@ async function copy(text) {
 async function partyRequest(type,data={}){
  try{return await party.request(type,data);}catch(error){errorToast(error.message);return null;}
 }
+let tournamentJoining=false;
+async function joinTournament(eventId,spectate=false){
+ if(state)return toast('Return to the lobby to join the tournament.');
+ if(tournamentJoining)return;
+ tournamentJoining=true;
+ try{return await party.request('tournament-join',{eventId,spectate});}
+ catch(error){
+  const event=tournamentEvents(party?.tournament).find(e=>e.id===eventId);
+  modal('Tournament entry blocked',`<p data-tournament-entry-error role="alert">${esc(error.message)}</p>${event?tournamentTeamEntryMarkup(event):''}<div class="actions"><button class="primary" data-action="close">GOT IT</button><button data-action="social">OPEN SOCIAL</button></div>`,'tournament-entry');
+  return null;
+ }finally{tournamentJoining=false;}
+}
 function playMenu(){modal('CHOOSE GAME MODE',modeMarkup(party?.party?.selection,party?.party?.leader!==party?.id,party?.party?.members.length||1,party?.modeCounts),'play');}
 async function selectExperience(id){
  const e=EXPERIENCES.find(e=>e.id===id);if(!e||e.soon||!modeAvailable(e.mode))return;
@@ -1520,8 +1533,8 @@ const actions = {
  'lobby-options':()=>lobbyOptionsMenu(),
  'lobby-play':()=>queueParty(false),
  'public-join':()=>queuePublicRoyale(false),
- 'tournament-join':b=>{if(state)return toast('Return to the lobby to join the tournament.');void partyRequest('tournament-join',{eventId:b.dataset.eventId});},
- 'tournament-spectate':b=>{if(state)return;void partyRequest('tournament-join',{eventId:b.dataset.eventId,spectate:true});},
+ 'tournament-join':b=>{void joinTournament(b.dataset.eventId);},
+ 'tournament-spectate':b=>{void joinTournament(b.dataset.eventId,true);},
  'public-spectate':()=>queuePublicRoyale(true),
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
  'duo-fill':()=>partyRequest('select',{...party.party.selection,teamFill:true,duoFill:true}),

@@ -5,7 +5,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {fixture} from '../tests/helpers/public-match.js';
 import {TOURNAMENTS} from '../src/tournament.js';
 const [friday,monday]=TOURNAMENTS,origin='http://127.0.0.1:5292',out='test-results/compete';await mkdir(out,{recursive:true});let now=friday.startsAt+240000;
-const f=await fixture({serverOptions:{origins:[origin,'https://zl-2.github.io'],tournamentOptions:{now:()=>now,autoStart:false}}}),service=f.app.relay.tournament;
+const f=await fixture({serverOptions:{origins:[origin,'https://zl-2.github.io'],tournamentOptions:{events:[friday,{...monday,teamSize:2}],now:()=>now,autoStart:false}}}),service=f.app.relay.tournament;
 f.app.relay.iconVoting.now=()=>Date.parse('2026-10-23T18:00Z');
 await f.app.relay.iconVoting.mutate('browser-fixture',{action:'nominate',first:'Fixture',last:'Operator'});
 service.event(friday.id).complete('finished','Tournament complete. Normal matchmaking is open.',Array.from({length:30},(_,i)=>({identity:'fixture-'+i,name:i?'Player '+(i+1):'Archive Champion',place:i+1,kills:30-i})));
@@ -36,6 +36,26 @@ try{
  now=monday.opensAt-7260000;service.tick();await page.waitForTimeout(300);assert.equal(await page.locator('.tournament-card').count(),0);now=monday.opensAt-7200000;service.tick();await page.locator('.tournament-card').waitFor();assert.match(await page.locator('.tournament-card').innerText(),/12:00 PM/);assert.equal(await page.locator('[data-action="tournament-join"]').isDisabled(),true);
  now=monday.opensAt;service.tick();await page.getByRole('button',{name:'JOIN TOURNAMENT',exact:true}).waitFor();assert.equal(await page.locator('[data-action="tournament-join"]').isEnabled(),true);assert.equal(await page.locator('.lobby-play').isDisabled(),true);
  assert.ok(await page.evaluate(async event=>{const {updateTournamentCard}=await import('/src/tournament-ui.js');const button=document.querySelector('[data-action="compete-event"]');button.focus();for(let i=1;i<=3;i++)updateTournamentCard(document,event,true,event.serverNow+i*1000);return button.isConnected&&document.activeElement===button;},service.summary()),'Countdown retains the clickable event button');
- await page.locator('[data-action="compete-event"]').click();assert.match(await page.locator('.compete-event-hero').innerText(),/12:00 PM/);await page.setViewportSize({width:1024,height:768});await page.screenshot({path:out+'/desktop-1024.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
- assert.deepEqual(errors,[]);console.log('PASS Compete navigation, schedule, calendar, bookmarks, rewards, searchable standings, card windows and entry lock');await writeFile(out+'/result.json',JSON.stringify({errors,table,tabs},null,2));
+ // Exercise the actual server rejection and both client entry buttons.
+ assert.match(await page.locator('.tournament-card .tournament-team-entry').innerText(),/LOBBY PARTY FIRST/);
+ await page.screenshot({path:out+'/team-entry-lobby.png'});
+ const p=f.app.relay.parties,reviewer=p.users.get(await page.evaluate(()=>window.__yolkTest.party().id)),guests=[await f.user('Party Guest One'),await f.user('Party Guest Two')];
+ for(const guest of guests)p.join(p.users.get(guest.id),reviewer.party);
+ await page.waitForFunction(()=>window.__yolkTest.party().party.members.length===3);
+ await page.locator('[data-action="tournament-join"]').click();await page.locator('#dialog[data-kind="tournament-entry"][open]').waitFor();
+ assert.match(await page.locator('[data-tournament-entry-error]').innerText(),/Your party has 3 players.*Frontier Cup - Duos.*at most 2 players/);
+ assert.equal(service.event(monday.id).entryTeams.size,0);assert.equal(p.tickets.size,0);await page.screenshot({path:out+'/party-too-large.png'});
+ await page.locator('#dialog button[data-action="close"]').last().click();
+ await page.locator('[data-action="compete-event"]').click();assert.match(await page.locator('.compete-event-hero').innerText(),/12:00 PM/);
+ assert.match(await page.locator('.compete-event-hero .tournament-team-entry').innerText(),/1–2 players allowed.*2 maximum/);
+ await page.locator('[data-compete-join]').click();await page.locator('#dialog[data-kind="tournament-entry"][open]').waitFor();
+ assert.match(await page.locator('[data-tournament-entry-error]').innerText(),/Your party has 3 players.*at most 2 players/);
+ await page.locator('#dialog button[data-action="close"]').last().click();
+ // A valid-size party member gets the leader instruction instead of silently entering alone.
+ await guests[1].ask('leave');const current=p.parties.get(reviewer.party);current.leader=guests[0].id;p.sync(current);
+ await page.waitForFunction(()=>window.__yolkTest.party().party.members.length===2&&window.__yolkTest.party().party.leader!==window.__yolkTest.party().id);
+ await page.locator('[data-compete-join]').click();await page.locator('#dialog[data-kind="tournament-entry"][open]').waitFor();assert.match(await page.locator('[data-tournament-entry-error]').innerText(),/party leader must enter the team/);
+ assert.equal(service.event(monday.id).entryTeams.size,0);await page.locator('#dialog button[data-action="close"]').last().click();
+ await page.setViewportSize({width:1024,height:768});await page.screenshot({path:out+'/desktop-1024.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ assert.deepEqual(errors,[]);console.log('PASS Compete navigation, schedule, calendar, bookmarks, rewards, searchable standings, card windows, team entry directions, oversized-party popups, leader-only entry and entry lock');await writeFile(out+'/result.json',JSON.stringify({errors,table,tabs},null,2));
 }catch(error){await page.screenshot({path:out+'/failure.png'});console.log({errors});throw error;}finally{await browser.close();await vite.close();await f.close();}

@@ -7,3 +7,12 @@
 @media(min-width:761px){#menu .tournament-card{left:calc((100% + var(--lobby-left) - var(--lobby-right))/2);width:min(640px,calc(100% - var(--lobby-left) - var(--lobby-right) - var(--lobby-gap)*2 - 32px));background:linear-gradient(125deg,#112b41f5,#1c2539f5);border-top-color:#ffd477}}
 
 @media(max-width:760px){#menu:has(.tournament-card){--lobby-top:370px}#menu .tournament-card{background:linear-gradient(125deg,#112b41fa,#1c2539fa);border-top-color:#ffd477}#menu:has(.tournament-card) .yard-party-stack{top:370px;margin-top:0}#menu:has(.tournament-card) .lobby-news{top:370px}}
+
+.tournament-team-entry{grid-column:1/-1;border:1px solid #d1b16c88;border-left:3px solid #ffd477;border-radius:4px;background:#0b1d31;padding:10px 12px;color:#e0edff;text-shadow:none}
+.tournament-team-entry>strong{display:block;font-size:12px;line-height:1.4;color:#ffe1a1;letter-spacing:.025em}
+.tournament-team-entry p,.compete-event-hero .tournament-team-entry p{font-size:12px;line-height:1.5;margin:5px 0 0;color:#e0edff}
+.compete-event-hero .tournament-team-entry{margin-top:20px;max-width:560px}
+.compete-event-hero .tournament-team-entry>strong{font-size:14px}
+#dialog[data-kind="tournament-entry"] [data-tournament-entry-error]{font-size:16px;line-height:1.6}
+@media(max-width:760px){#menu:has(.tournament-team-entry){--lobby-top:510px}#menu:has(.tournament-team-entry) .yard-party-stack,#menu:has(.tournament-team-entry) .lobby-news{top:510px}}
+.tournament-prize-note{grid-column:1/-1;font-size:11px;color:#ffe1a1}

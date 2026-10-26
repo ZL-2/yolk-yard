@@ -55,11 +55,13 @@ class TournamentEvent{
   if(old?.connected)throw Error('This identity is already in the tournament.');
   const spectator=reconnect?!!old.spectating:!!(spectate||phase==='running');
   if(phase==='entry'&&spectator)throw Error('Spectating opens when the match starts.');
+  const party=p.parties.get(u.party),ids=size>1?party?.members||[u.id]:[u.id];
+  // A retry keeps its original team, but must still respect the current lobby limit.
+  if(!spectator&&!reconnect&&ids.length>size)throw Error(`Your party has ${ids.length} players. ${tournamentName(EVENT)} allows at most ${size} players per team. Leave this party or ask ${ids.length-size} ${ids.length-size===1?'player':'players'} to leave, then try again. Smaller parties can enter; empty slots stay empty.`);
   let group=this.entryTeams.get(u.id),members=[u];
+  if(!spectator&&!reconnect&&group&&ids.some(id=>!group.members.includes(id)))throw Error('Your tournament team is already entered. Rejoin the lobby party you entered with before retrying. New party members cannot be added to this entry.');
   if(!spectator&&!reconnect&&!group){
-   const party=p.parties.get(u.party),ids=size>1?party?.members||[u.id]:[u.id];
-   if(ids.length>size)throw Error(`This is ${tournamentName(EVENT)}. Your party must have at most ${size} players.`);
-   if(size>1&&ids.length>1&&party.leader!==u.id)throw Error('Your party leader must enter the team into this tournament.');
+   if(size>1&&ids.length>1&&party.leader!==u.id)throw Error('Your party leader must enter the team into this tournament. Join the same lobby party as your chosen teammates first, then ask the leader to select JOIN TOURNAMENT.');
    members=ids.map(id=>p.users.get(id));
    for(const member of members){
     if(!member||!p.connected(member)||member.inMatch)throw Error('Every party member must be online and in the lobby before entering.');

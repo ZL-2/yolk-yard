@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'219',title:'Team cup entry and tournament editing',changes:[
+  'Duos, Trios and Squads cups explain how to join your teammates’ lobby party before the leader enters. Oversized parties receive a clear popup; smaller parties keep empty slots without bots or other players filling them.',
+  'Every member of a podium team receives the full listed prize, including teammates eliminated before a win. Party-size limits also apply when retrying entry.',
+  'Tournament edits invalidate an older review so confirmation cannot save stale values. Invalid edits stay in the form with a visible explanation. Version 6.26.1 / protocol 86.'
+ ]},
  {number:'218',title:'Frontier Cup team formats and Trios',changes:[
   'Tournament cards appear exactly two hours before entry opens. Event titles include the format: Frontier Cup - Solos, Duos, Trios or Squads.',
   'Owner Compete scheduling supports all four team sizes. Team cups enter the leader’s party together with no filler bots; every teammate shares the team’s placement and receives the full listed prize. Teams must finish loading before the entry cutoff, and at least two opposing teams are required.',

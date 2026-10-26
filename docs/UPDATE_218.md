@@ -11,3 +11,11 @@ Team placements are ranked as a unit. Each teammate earns the full configured pl
 Trios also works in public and private Royale selection, matchmaking pools, party sizing, HUDs, chat, downing/reviving and victories. Protocol 86 requires the matching client/server release; version 6.26.0.
 
 Validation: tournament lifecycle, owner persistence and format locking, clock boundaries, real sockets for all team sizes, partial-party cutoff, oversized/full reservations, shared prizes and restart idempotency, public Trios, team chat, teammate bots, owner browser creation/edit/duplicate and frozen rules, and production build. The pre-existing `cached collision buckets` assertion in field-systems reproduces on unchanged upstream f486a2f; collision code is outside this patch.
+
+## Team entry and editing follow-up (6.26.1)
+
+Team cups display party-first directions next to lobby and Compete entry controls. The server rejects an oversized party before creating any reservations, including saved entrants retrying with a larger lobby party. Both entry controls display the server explanation in a modal. Nonleaders receive instructions to have their leader enter.
+
+Tests cover every undersized party count for Duos, Trios and Squads through battle start, with separate parties never combined and no filler competitors. Map bosses and guards are not team-fill players. Full first-, second- and third-place prizes are checked against each teammate’s durable grant ledger, including eliminated winners and repeat-champion bonuses.
+
+The owner editor discards a pending review when a form changes, closes, or opens another event. Client validation and server errors appear at the form without losing input. Browser checks run in the full game and verify invalid-edit correction, review invalidation and saved values.
