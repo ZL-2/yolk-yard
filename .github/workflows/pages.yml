@@ -814,7 +814,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
+        if: needs.scope.outputs.icon_voting_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
       - name: Real Cup keyboard responsiveness and complete WebGL presentation
         if: needs.scope.outputs.input_response_update == 'true'
         run: |
@@ -828,6 +828,13 @@ jobs:
             test-results/input-response
             test-results/performance217
           retention-days: 14
+      - name: Install the headless desktop runtime with a missing-library fallback
+        if: needs.scope.outputs.icon_voting_update == 'true' || needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true' || needs.scope.outputs.performance217_update == 'true' || needs.scope.outputs.tournament_teams_update == 'true'
+        run: |
+          npx playwright install chromium --only-shell
+          # Ubuntu runners already carry the Chromium libraries. Avoid a full
+          # font/system upgrade on slow mirrors; install dependencies if needed.
+          node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium
       - name: Bundle ballot, owner forms and real game admission
         if: needs.scope.outputs.icon_voting_update == 'true'
         run: |
@@ -841,13 +848,6 @@ jobs:
           path: |
             test-results/icon-voting
             test-results/icon-bundle-game
-      - name: Install the headless desktop runtime with a missing-library fallback
-        if: needs.scope.outputs.performance_update == 'true' || needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true' || needs.scope.outputs.performance217_update == 'true' || needs.scope.outputs.tournament_teams_update == 'true'
-        run: |
-          npx playwright install chromium --only-shell
-          # Ubuntu runners already carry the Chromium libraries. Avoid a full
-          # font/system upgrade on slow mirrors; install dependencies if needed.
-          node --input-type=module -e "import {chromium} from 'playwright'; const browser=await chromium.launch({args:['--no-sandbox']}); await browser.close();" || npx playwright install-deps chromium
       - name: Owner team-format editor, public/private Trios, Compete and two-hour lobby card
         if: needs.scope.outputs.tournament_teams_update == 'true'
         run: |
@@ -1429,7 +1429,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-        if: needs.scope.outputs.input_response_update != 'true' && needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
+        if: needs.scope.outputs.icon_voting_update != 'true' && needs.scope.outputs.input_response_update != 'true' && needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
       - name: Install the focused headless desktop runtime
         if: needs.scope.outputs.flight_combat_fix == 'true' || needs.scope.outputs.vehicle_field_fix == 'true' || needs.scope.outputs.water_lean_update == 'true' || needs.scope.outputs.combat_performance_update == 'true' || needs.scope.outputs.royale_prestige_update == 'true' || needs.scope.outputs.rank_match_fix == 'true' || needs.scope.outputs.prestige_sets_update == 'true' || needs.scope.outputs.wren_study_update == 'true' || needs.scope.outputs.tournament_update == 'true' || needs.scope.outputs.lobby_home_update == 'true' || needs.scope.outputs.field214_update == 'true' || needs.scope.outputs.roster215_update == 'true' || needs.scope.outputs.anatomy216_update == 'true'
         run: |
