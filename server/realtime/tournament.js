@@ -164,6 +164,19 @@ export class TournamentService{
   this.relay=relay;this.now=now;this.db=relay.owner.db;
   this.catalog=this.db.meta('tournament-schedule',{revision:0,events:events.map(e=>({...e}))});
   this.events=this.catalog.events.map(event=>new TournamentEvent(relay,{event,now:()=>this.now(),onPublish:()=>this.publish()}));
+  // One-time owner-requested correction to the saved October 26 Solo Cup.
+  // Keep other events, completed results and subsequent manual edits intact.
+  const correction='tournament-capacity-oct26-48-v1';
+  if(this.db.meta('tournament-schedule')&&!this.db.meta(correction)){
+   const target=this.event('frontier-cup-2026-10-26');
+   const apply=target?.phase==='scheduled'&&!target.event.removed&&tournamentTeamSize(target.event)===1&&target.event.capacity===23;
+   const catalog=apply?{...this.catalog,revision:this.catalog.revision+1,events:this.catalog.events.map(e=>e.id===target.id?{...e,capacity:48}:e)}:this.catalog;
+   this.db.transaction(()=>{
+    if(apply){this.db.setMeta('tournament-schedule',catalog);this.relay.owner.systemEvent('tournament-capacity-corrected','Owner requested 48 competitor seats for the October 26 Solo Cup.',target.id,{before:23,after:48});}
+    this.db.setMeta(correction,{at:this.now(),applied:!!apply});
+   });
+   if(apply){this.catalog=catalog;target.event={...target.event,capacity:48};}
+  }
   if(autoStart){this.tick();this.timer=setInterval(()=>this.tick(),250);this.timer.unref?.();}
  }
  get active(){return this.events.find(e=>e.locked)||this.events.find(e=>!['finished','cancelled'].includes(e.phase))||this.events.at(-1);}

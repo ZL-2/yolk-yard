@@ -119,3 +119,35 @@ sim.finish();service.tick();assert.equal(e.phase,'finished');assert.equal(e.stat
   for(const r of saved.results)assert.equal(t.f.app.owner.grantSummary(r.identity).marks,r.marks);
  }finally{await t.close();}
 });
+
+test('October 26 saved Solo Cup capacity correction persists once and preserves owner edits',async()=>{
+ const t=await setup();try{
+  const id=TOURNAMENTS[1].id;
+  await t.action({action:'tournament-save',eventId:id,event:{...t.f.app.relay.tournament.event(id).event,description:'Keep my event details',capacity:23,prizes:[3000,2000,1000],duplicateReward:2000}});
+  const before=structuredClone(t.f.app.relay.tournament.catalog),revision=before.revision;
+  await t.f.restart();const service=t.f.app.relay.tournament;
+  assert.equal(service.catalog.revision,revision+1);
+  assert.deepEqual(service.catalog.events,before.events.map(e=>e.id===id?{...e,capacity:48}:e));
+  assert.equal(service.summary().events.find(e=>e.id===id).capacity,48);
+  assert.equal(t.f.app.owner.db.meta('tournament-schedule').events.find(e=>e.id===id).capacity,48);
+  assert.equal(t.f.app.owner.db.meta('tournament-capacity-oct26-48-v1').applied,true);
+  service.event(id).createRoom();assert.equal(service.event(id).room.sim.options.capacity,48);
+  await t.f.restart();assert.equal(t.f.app.relay.tournament.catalog.revision,revision+1);
+  // A later intentional owner edit remains editable and is never overwritten.
+  await t.login();await t.action({action:'tournament-save',eventId:id,event:{...t.f.app.relay.tournament.event(id).event,capacity:32}});
+  await t.f.restart();assert.equal(t.f.app.relay.tournament.event(id).event.capacity,32);
+ }finally{await t.close();}
+});
+
+test('capacity correction leaves archived events and other event formats unchanged',async()=>{
+ for(const variant of ['finished','duos','already48']){
+  const t=await setup();try{
+   const id=TOURNAMENTS[1].id;
+   await t.action({action:'tournament-save',eventId:id,event:{...t.f.app.relay.tournament.event(id).event,description:'',capacity:variant==='already48'?48:23,teamSize:variant==='duos'?2:1}});
+   if(variant==='finished')t.f.app.relay.tournament.event(id).complete('finished','Preserve archive',[]);
+   const before=structuredClone(t.f.app.relay.tournament.catalog);
+   await t.f.restart();assert.deepEqual(t.f.app.relay.tournament.catalog,before);
+   assert.equal(t.f.app.owner.db.meta('tournament-capacity-oct26-48-v1').applied,false);
+  }finally{await t.close();}
+ }
+});
