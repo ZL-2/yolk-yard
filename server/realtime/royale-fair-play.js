@@ -33,11 +33,11 @@ export class PublicFairPlay {
  }
  flush(){
   clearTimeout(this.timer);this.timer=null;
-  const decisions=[...this.pending.values()].filter(d=>d.room.fairPlayKey===d.key&&d.room.state?.matchId===d.matchId);this.pending.clear();
-  for(const d of decisions){
+  const decisions=[...this.pending.values()].filter(d=>d.room.fairPlayKey===d.key&&d.room.state?.matchId===d.matchId&&d.room.state.phase==='playing'&&d.key===d.matchId+':'+d.room.host?.peer);this.pending.clear();
+  for(const d of decisions){try{
    const id=this.relay.fairPlay.flag({players:d.players,room:d.room.code,matchId:d.matchId,evidence:{...d.evidence,enforce:false}});
    if(id){const row=this.relay.fairPlay.db.get('SELECT * FROM teaming_cases WHERE id=?',id);if(row?.status==='pending')this.relay.fairPlay.enforce(id,{...JSON.parse(row.data),evidence:{...d.evidence,enforce:true}});}
-  }
+  }catch{if(!this.lastError||this.now()-this.lastError>60000){this.lastError=this.now();console.warn('Public fair-play enforcement could not complete; no unsaved penalty is applied.');}}}
  }
  validate(room,flag){
   const e=flag?.evidence,ids=flag?.players;

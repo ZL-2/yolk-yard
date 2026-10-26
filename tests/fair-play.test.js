@@ -108,6 +108,8 @@ test('public evidence rejects single-host accusations, accused witnesses, short 
   const divergent=structuredClone(flag);for(const p of divergent.evidence.trail){p.a.x+=100;p.b.x+=100;}
   send('v1',divergent);send('v2',flag);service.flush();assert.deepEqual(h.removed,[],'Observers must agree on actual movement, not just a verdict');
   room.host={peer:'v1',id:'v1'};send('v0',flag);service.flush();assert.deepEqual(h.removed,[],'Demoted host evidence is fenced');
+  room.host={peer:'v0',id:'v0'};h.setTime(h.now()+1000);for(const id of ['v0','v1','v2'])send(id,flag);assert.equal(service.pending.size,1);room.state.phase='results';service.flush();assert.deepEqual(h.removed,[],'A completed match cannot apply a delayed kick');
+  room.state.phase='playing';h.setTime(h.now()+1000);for(const id of ['v0','v1','v2'])send(id,flag);assert.equal(service.pending.size,1);room.host={peer:'v1',id:'v1'};service.flush();assert.deepEqual(h.removed,[],'Host change during batching invalidates pending evidence');
  }finally{await h.db.close();}
 });
 
