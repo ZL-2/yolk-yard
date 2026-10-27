@@ -1,0 +1,354 @@
+{
+  "result": "PASS",
+  "status": "PRIVATE APPROVAL STUDY \u2014 NOT DEPLOYED",
+  "assets": {
+    "normal": {
+      "id": "jim-normal",
+      "triangles": 78824,
+      "lodTriangles": 18814,
+      "bones": 32,
+      "validWeights": true,
+      "materials": 5,
+      "textures": true,
+      "maxTextureSize": 2048,
+      "alphaHair": true,
+      "footwearNormal": true,
+      "groups": 5,
+      "lodGroups": 5
+    },
+    "golf": {
+      "id": "jim-golf",
+      "triangles": 93626,
+      "lodTriangles": 22465,
+      "bones": 32,
+      "validWeights": true,
+      "materials": 5,
+      "textures": true,
+      "maxTextureSize": 2048,
+      "alphaHair": true,
+      "footwearNormal": true,
+      "groups": 5,
+      "lodGroups": 5
+    }
+  },
+  "bindError": 4.951850093707503e-08,
+  "poses": [
+    {
+      "pose": "idle",
+      "normal": {
+        "finite": true,
+        "min": 0.0012000000569968284,
+        "max": 1.7826537042264692,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.00019908463582407347,
+        "max": 1.7826537042264692,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "walk",
+      "normal": {
+        "finite": true,
+        "min": -0.005181002578535515,
+        "max": 1.757827671746763,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.006538162894761959,
+        "max": 1.757827671746763,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "run",
+      "normal": {
+        "finite": true,
+        "min": 0.0012000000569969368,
+        "max": 1.6354341710344262,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.00019904854707420436,
+        "max": 1.6354341710344262,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "sprint",
+      "normal": {
+        "finite": true,
+        "min": 0.0012000000569971437,
+        "max": 1.6250923658288985,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.00019908463582375802,
+        "max": 1.6250923658288985,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "strafe",
+      "normal": {
+        "finite": true,
+        "min": 0.0012000000569969093,
+        "max": 1.76658731498756,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.0001990846358240255,
+        "max": 1.76658731498756,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "backward",
+      "normal": {
+        "finite": true,
+        "min": 0.0012000000569970038,
+        "max": 1.7675693320858405,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.00019908463582384367,
+        "max": 1.7675693320858405,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "crouch",
+      "normal": {
+        "finite": true,
+        "min": -0.049952781146651484,
+        "max": 1.1936969656829057,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.04979902137803931,
+        "max": 1.1936969656829057,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "aim",
+      "normal": {
+        "finite": true,
+        "min": 0.0012000000569969574,
+        "max": 1.6920274589097415,
+        "gripError": 1.942890293094024e-16
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.0001990485470741804,
+        "max": 1.6920274589097415,
+        "gripError": 1.2412670766236366e-16
+      }
+    },
+    {
+      "pose": "jump",
+      "normal": {
+        "finite": true,
+        "min": 0.366948624417447,
+        "max": 1.7545424678992052,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": 0.36582480812604257,
+        "max": 1.7545424678992052,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "fall",
+      "normal": {
+        "finite": true,
+        "min": 0.3874903938069091,
+        "max": 1.7518126012131323,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": 0.386429929702003,
+        "max": 1.7518126012131323,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "slide",
+      "normal": {
+        "finite": true,
+        "min": 0.02995424004385608,
+        "max": 0.96368760021897,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.0058965904193424845,
+        "max": 0.96368760021897,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "crawl",
+      "normal": {
+        "finite": true,
+        "min": -0.055424004992505826,
+        "max": 0.6785076756014101,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.05419833261188328,
+        "max": 0.6668651348035952,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "revive",
+      "normal": {
+        "finite": true,
+        "min": -0.05417516806253833,
+        "max": 1.1232502540604812,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.05306857495544251,
+        "max": 1.1193124414016942,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "reload",
+      "normal": {
+        "finite": true,
+        "min": 0.001200000056996943,
+        "max": 1.7130186107148333,
+        "gripError": 2.2591401799415137e-16
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.00019904854707419767,
+        "max": 1.7130186107148333,
+        "gripError": 1.716587549445839e-16
+      }
+    },
+    {
+      "pose": "melee",
+      "normal": {
+        "finite": true,
+        "min": 0.001200000056996996,
+        "max": 1.6898987682267037,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.00019908463582391073,
+        "max": 1.6898987682267037,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "salute",
+      "normal": {
+        "finite": true,
+        "min": -0.0024224895032634625,
+        "max": 1.8042248501457891,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.004311427760225637,
+        "max": 1.8042248501457891,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "shuffle",
+      "normal": {
+        "finite": true,
+        "min": 0.007871657719935818,
+        "max": 1.6882301721987052,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": 0.006472462608436493,
+        "max": 1.6882301721987052,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "cheer",
+      "normal": {
+        "finite": true,
+        "min": 0.0006895426694477631,
+        "max": 1.9436095319424638,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.0007117655172915793,
+        "max": 1.9432307238871345,
+        "gripError": 0
+      }
+    },
+    {
+      "pose": "glide",
+      "normal": {
+        "finite": true,
+        "min": -0.09261056795244127,
+        "max": 1.9410832832281604,
+        "gripError": 0
+      },
+      "golf": {
+        "finite": true,
+        "min": -0.09317738803694275,
+        "max": 1.94472294652506,
+        "gripError": 0
+      }
+    }
+  ],
+  "lod": {
+    "normal": {
+      "active": true,
+      "groups": 5
+    },
+    "golf": {
+      "active": true,
+      "groups": 5
+    }
+  },
+  "closeUpCameras": [
+    "face",
+    "shoes"
+  ],
+  "mobile": {
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "controls": true
+  },
+  "errors": [],
+  "offlineReview": "PASS: standalone file opens with HTTP(S) blocked; both styles, face, footwear, compare and animation controls work.",
+  "productionChanges": false,
+  "deployment": "NOT DEPLOYED",
+  "baseCommit": "fc7d32af3d5bb81d34d913bd13ec6812d60aa8e5",
+  "sha256": {
+    "jim-golf-lod.glb": "280e1cc1096389cf9585b6afc68f5d92902e33e8f3ac3a4261ab728384ffacbf",
+    "jim-golf.glb": "b7ad44fcd523df36b635b8bd8d33be2eef511ba6fb8d7f0194a93535e25b9b8e",
+    "jim-normal-lod.glb": "4ee51911988731a4ea1b131ee6c284c977f86e53025ea146ba3d5e716d23513a",
+    "jim-normal.glb": "20bede1f6a185be4b4e6231e405242db343fbc2f9d34fd8b7f504133d2bf1366"
+  },
+  "reviewSHA256": "c9047202b77d1568985378161eba931f62460fef9eae477eca057b2deab64d2b"
+}

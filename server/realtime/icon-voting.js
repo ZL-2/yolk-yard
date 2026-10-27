@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {mkdir,open,rename} from 'node:fs/promises';
 import {dirname,join} from 'node:path';
 import {socialDataPath} from './data-path.js';
-import {ICON_POLL_ID,ICON_WINNER,ICON_CATEGORIES,iconOptionText,iconOptionKey} from '../../src/icon-voting-rules.js';
+import {ICON_POLL_ID,ICON_WINNER,ICON_CATEGORIES,ICON_BUNDLE_VOTE_CLOSED,iconOptionText,iconOptionKey} from '../../src/icon-voting-rules.js';
 export class IconVoting{
  constructor({path=join(dirname(socialDataPath()),'icon-vote-2026-10.json'),now=()=>Date.now()}={}){
   this.path=path;this.now=now;this.chain=Promise.resolve();this.limits=new Map();let old=null;
@@ -16,12 +16,13 @@ export class IconVoting{
  summary(user){
   if(this.error)throw this.error;const counts=new Map(),valid=new Map(this.data.options.map(o=>[o.id,o.category])),ballot=this.data.ballots[user]||{},answers={},categories=ICON_CATEGORIES.map(category=>{const options=this.data.options.filter(o=>o.category===category.id);if(options.some(o=>o.id===ballot[category.id]))answers[category.id]=ballot[category.id];return {...category,options};});
   for(const votes of Object.values(this.data.ballots))for(const [category,id]of Object.entries(votes))if(valid.get(id)===category)counts.set(id,(counts.get(id)||0)+1);
-  return {pollId:ICON_POLL_ID,phase:'bundle',winner:ICON_WINNER,nominationClosed:true,serverNow:this.now(),closesAt:null,closed:false,answers,completed:Object.keys(answers).length,total:ICON_CATEGORIES.length,complete:ICON_CATEGORIES.every(c=>!!answers[c.id]),categories:categories.map(c=>({...c,options:c.options.map(({id,text,revision})=>({id,text,revision,votes:counts.get(id)||0}))})),// Legacy clients must refresh; never reinterpret an old nominee vote as a bundle ballot.
+  return {pollId:ICON_POLL_ID,phase:ICON_BUNDLE_VOTE_CLOSED?'archived':'bundle',winner:ICON_WINNER,nominationClosed:true,serverNow:this.now(),closesAt:null,closed:ICON_BUNDLE_VOTE_CLOSED,answers,completed:Object.keys(answers).length,total:ICON_CATEGORIES.length,complete:ICON_BUNDLE_VOTE_CLOSED||ICON_CATEGORIES.every(c=>!!answers[c.id]),categories:categories.map(c=>({...c,options:c.options.map(({id,text,revision})=>({id,text,revision,votes:counts.get(id)||0}))})),// Closed responses release older clients without inventing ballots.
    vote:null,candidates:[]};
  }
- assertCanPlay(user){if(!this.summary(user).complete)throw Error('Complete all five Jim McLaughlin bundle votes before playing. Open ICON SERIES in the lobby.');}
+ assertCanPlay(user){if(ICON_BUNDLE_VOTE_CLOSED)return true;if(!this.summary(user).complete)throw Error('Complete all five Jim McLaughlin bundle votes before playing. Open ICON SERIES in the lobby.');}
  mutate(user,body,owner=false){
   const task=this.chain.then(async()=>{
+   if(ICON_BUNDLE_VOTE_CLOSED)throw Error('The Icon Series bundle vote has ended. The results are archived.');
    if(this.error)throw this.error;if(!body||body.pollId!==ICON_POLL_ID)throw Error('The original Icon Series vote has ended. Jim McLaughlin won. Refresh to vote on his bundle.');
    if(!ICON_CATEGORIES.some(c=>c.id===body.category))throw Error('Choose one of the five bundle categories.');
    const next=structuredClone(this.data),category=body.category;

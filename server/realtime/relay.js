@@ -112,6 +112,7 @@ export class RealtimeRelay {
     if(m.type==='royale-fair-play'){this.fairPlay?.publicMatches.receive(peer,m);return;}
     if(m.type==='performance-report'){this.serviceStatus?.report(peer,m.metrics);return;}
     if(m.type==='authority-create'||m.type==='authority-command'){this.authority.command(peer,m);return;}
+    if(m.type==='style-progress'){if(peer.listing&&!this.publicHost.roomByAddress(peer.id))this.progression.frame(peer,m.state,{styleOnly:true});return;}
     if(m.type==='public-progress'){if(!!this.publicHost.roomByAddress(peer.id)&&this.publicHost.isTarget(peer)&&m.state?.matchId===this.publicHost.roomFor(peer)?.state?.matchId)this.progression.frame(peer,m.state);return;}
     if(m.type==='public-crown'){this.publicHost.saveCrown(peer,m.record);return;}
     if(m.type==='match-member-ready'){this.hostWatchdog?.ready(peer,m);return;}

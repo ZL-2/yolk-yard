@@ -501,9 +501,9 @@ export class Network {
     this.observeFairPlay(state);
     if (!this.lastPublish || performance.now() - this.lastPublish > 2000 || this.lastPublishedStage!==(state.boxfight?.stage||state.royale?.stage) || this.lastPublishedPhase!==state.phase) { this.lastPublish = performance.now();this.lastPublishedStage=state.boxfight?.stage||state.royale?.stage;this.lastPublishedPhase=state.phase;this.publishRoom(); }
     if(this.peer?.control&&this.isHost&&performance.now()-(this.lastReplaySent||0)>=500){this.lastReplaySent=performance.now();this.peer?.control?.({type:'match-replay',state:replayFrame(state)});}
-    if(this.officialPublic){
+    if(this.officialPublic||this.peer?.protocol===2&&state.players.some(p=>!p.bot&&['outfit-jim-normal','outfit-jim-golf'].includes(p.outfit))){
       const scores=(state.royale?.matchId||state.matchId)+':'+state.phase+':'+state.players.filter(p=>!p.bot&&!p.lateSpectator).map(p=>p.id+','+(p.kills||0)+','+(p.place||0)).join(';');
-      if(scores!==this.lastPublicScores||performance.now()-(this.lastPublicProgress||0)>=500){this.lastPublicScores=scores;this.lastPublicProgress=performance.now();const hostPeer=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;if(hostPeer?.id===PREFIX+this.code)hostPeer.control({type:'public-progress',state:rewardFrame(state,this.id,this.callbacks.getHostInput?.()||{})});}
+      if(scores!==this.lastPublicScores||performance.now()-(this.lastPublicProgress||0)>=500){this.lastPublicScores=scores;this.lastPublicProgress=performance.now();const hostPeer=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;if(hostPeer?.id===PREFIX+this.code)hostPeer.control({type:this.officialPublic?'public-progress':'style-progress',state:rewardFrame(state,this.id,this.callbacks.getHostInput?.()||{})});}
     }
     this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     state = {...state, visibility:this.visibility,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,network:{hostId:this.id,members:this.members,chatSequence:this.chatRoom.sequence}};

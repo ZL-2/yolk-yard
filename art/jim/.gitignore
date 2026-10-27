@@ -1,0 +1,12 @@
+# Exported meshes and editable source are tracked; transient review builds are not.
+models/*.blend1
+review/site/
+review/Jim-Outfit-Review.html
+review/validation/
+review/viewer-draft.png
+review/jim-outfits.png
+review/*.png
+!review/Jim-Outfits-Approval.png
+textures/curl-card.png
+
+!review/Jim-Face-and-Footwear.png

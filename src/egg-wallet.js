@@ -5,12 +5,13 @@ export const EGG_REWARDS={welcome:300};
 const integer=(value,max=1e9)=>Number.isFinite(Number(value))?Math.max(0,Math.min(max,Math.floor(Number(value)||0))):0;
 export function normalizeWallet(value,legacyEggs=0){
  if(!value||value.version!==1)return {version:1,balance:integer(legacyEggs)+EGG_REWARDS.welcome,earned:integer(legacyEggs)+EGG_REWARDS.welcome,owned:[DEFAULT_OUTFIT_ID],favorites:[],presets:[null,null,null],receipts:[],lastReward:null};
- const owned=[...new Set([DEFAULT_OUTFIT_ID,...(Array.isArray(value.owned)?value.owned:[]).map(id=>typeof id==='string'&&id.endsWith('-alt')&&shopItem(id.slice(0,-4))?.slot==='outfit'?id.slice(0,-4):id)].filter(id=>shopItem(id)&&!shopItem(id).rankReward).flatMap(id=>shopItem(id).styleRoot?outfitStyles(id).map(i=>i.id):[id]))];
+ const owned=[...new Set([DEFAULT_OUTFIT_ID,...(Array.isArray(value.owned)?value.owned:[]).map(id=>typeof id==='string'&&id.endsWith('-alt')&&shopItem(id.slice(0,-4))?.slot==='outfit'?id.slice(0,-4):id)].filter(id=>shopItem(id)&&!shopItem(id).rankReward).flatMap(id=>shopItem(id).styleRoot?outfitStyles(id).filter(i=>!i.winReward||i.id===id).map(i=>i.id):[id]))];
  return {...value,rosterRevision:215,retiredOwned:[...new Set([...(Array.isArray(value.retiredOwned)?value.retiredOwned:[]),...(Array.isArray(value.owned)?value.owned:[]).filter(id=>typeof id==='string'&&id.startsWith('outfit-')&&!shopItem(id))])],identityVersion:2,migration:value.migration||{from:'legacy-v1',rate:1,ownership:'one-to-one replacement'},legacyOwned:value.legacyOwned||[...(Array.isArray(value.owned)?value.owned:[])],balance:integer(value.balance),earned:integer(value.earned),owned,favorites:[...new Set((Array.isArray(value.favorites)?value.favorites:[]).filter(id=>shopItem(id)))],presets:(Array.isArray(value.presets)?value.presets:[]).slice(0,3),receipts:(Array.isArray(value.receipts)?value.receipts:[]).filter(id=>typeof id==='string').slice(-200)};
 }
 export function purchase(wallet,id,expectedPrice){
  const quote=quoteOffer(wallet,id);if(!quote)throw Error('That item is unavailable.');
  if(quote.offer.tournamentReward)throw Error('This exclusive pickaxe is awarded only to the Frontier Cup winner.');
+ if(quote.offer.winReward)throw Error('Win an online match wearing Jim to unlock Golf.');
  if(quote.offer.rankReward)throw Error('Earn and claim this item through the live Royale rankings.');
  if(quote.owned)throw Error('You already own this item.');
  if(expectedPrice!==undefined&&expectedPrice!==quote.price)throw Error('Your collection changed. Review the updated price and confirm again.');

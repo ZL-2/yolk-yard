@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'227',title:'Jim McLaughlin — the first Icon',changes:[
+  'Jim’s approved sweatshirt outfit and five-piece equipment collection arrive in the Item Shop. The full bundle costs 3,000 Marks; already-owned items reduce its price.',
+  'Win a completed online match wearing Jim to permanently unlock Golf. A victory reward screen previews the actual style and lets you equip it. Buying the bundle does not unlock Golf; practice and spectating do not count.',
+  'The Jim announcement replaces the Stormspike and Kestrel carousel feature, with a saved Do not show again option. Icon voting is closed and no longer blocks play. Version 6.34.0 / protocol 89.'
+ ]},
  {number:'226',title:'Smoother matches and responsive actions',changes:[
   'Reloads, pickaxe swings and item-use feedback now begin locally and reconcile with authoritative results. Inventory, ammunition, healing and damage remain controlled by the match authority.',
   'Builds and edits patch nearby collision buckets. Map textures and geometry build in smaller steps, early departures remain asynchronous, and crowded scenes spread character construction across frames while keeping opponents visible.',

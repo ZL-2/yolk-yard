@@ -1,3 +1,4 @@
+import {makeIconGear,applyWatermelonWrap} from './icon-bundle-models.js';
 import {tournamentPickaxe} from './tournament-pickaxe.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
@@ -27,7 +28,7 @@ export function collectionWrapTexture(item){
  }
  const t=new THREE.DataTexture(data,n,n);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearMipmapLinearFilter;t.generateMipmaps=true;t.repeat.set(2,1);t.userData.shared=true;t.needsUpdate=true;wrapTextures.set(key,t);return t;
 }
-export function applyWrap(g,id){const item=shopItem(id);if(item?.slot!=='wrap')return g;g.userData.artRevision=155;let n=0;const texture=collectionWrapTexture(item);g.traverse(m=>{if(!m.isMesh||!m.material?.color||m.material.transparent||m===g.userData.lens)return;const material=m.material.clone(),base=new THREE.Color(item.color);material.color.copy(n++%6===0?new THREE.Color(item.accent).lerp(base,.4):base.multiplyScalar(.72+(n%4)*.09));if(n%3!==0){material.map=texture;material.color.set('#ffffff');}material.metalness=item.model==='voss'?.84:.56;material.roughness=item.rankReward?.38:.83;material.emissiveIntensity=0;m.material=material;m.userData.ownedMaterial=true;});return g;}
+export function applyWrap(g,id){const item=shopItem(id);if(item?.slot!=='wrap')return g;if(item.iconBundle)return applyWatermelonWrap(g);g.userData.artRevision=155;let n=0;const texture=collectionWrapTexture(item);g.traverse(m=>{if(!m.isMesh||!m.material?.color||m.material.transparent||m===g.userData.lens)return;const material=m.material.clone(),base=new THREE.Color(item.color);material.color.copy(n++%6===0?new THREE.Color(item.accent).lerp(base,.4):base.multiplyScalar(.72+(n%4)*.09));if(n%3!==0){material.map=texture;material.color.set('#ffffff');}material.metalness=item.model==='voss'?.84:.56;material.roughness=item.rankReward?.38:.83;material.emissiveIntensity=0;m.material=material;m.userData.ownedMaterial=true;});return g;}
 function buildShopPickaxe(id){const i=shopItem(id),g=new THREE.Group();if(i?.slot!=='pickaxe')return g;g.name=i.name;if(i.tournamentReward)return finish(tournamentPickaxe(g,{box,tube,part,blade}));if(i.rankReward)return finish(royalePickaxeModel(i,g,{box,tube,part,blade}));if(i.model)return finish(collectionGear(i,'pickaxe',g,{box,tube,part}));const k=i.shape%6,c=i.color,a=i.accent,steel='#98a7a8';tube(g,c,[0,-.62,0],[0,.7,0],.04,'polymer');for(let j=0;j<6;j++)box(g,'#18262c',0,-.4+j*.06,0,.091,.023,.091,'rubber');box(g,a,0,.47,0,.12,.09,.12,'metal');
  if(k===0){blade(g,steel,[[-.09,.56],[-.10,.81],[.15,.91],[.49,.95],[.56,.43],[.30,.49],[.17,.63]]);box(g,c,-.12,.7,0,.15,.18,.13,'paint');}
  if(k===4){blade(g,steel,[[-.09,.58],[-.1,.81],[.17,.89],[.39,.76],[.48,.53],[.34,.36],[.27,.51],[.30,.65],[.13,.71]]);box(g,c,-.1,.7,0,.15,.18,.13,'paint');}
@@ -54,7 +55,7 @@ function buildShopTrail(id){const i=shopItem(id),g=new THREE.Group();if(i?.slot!
   finish(g);g.children[0].material=g.children[0].material.clone();g.children[0].material.transparent=true;g.children[0].material.opacity=.46;g.children[0].material.depthWrite=false;g.children[0].userData.ownedMaterial=true;return g;
  }
  for(const side of [-1,1])for(let strand=0;strand<2;strand++){const points=Array.from({length:7},(_,j)=>new THREE.Vector3(side*(.45+j*.04)+Math.sin(j*.7+strand)*.05,1.3+j*.52,.25+Math.sin(j*.8)*.09));const m=part(g,new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),12,.022+strand*.014,4,false),strand?i.color:i.accent);m.material=m.material.clone();m.material.transparent=true;m.material.opacity=strand?.19:.44;m.material.depthWrite=false;m.userData.ownedMaterial=true;}return g;}
-export const makeShopPickaxe=id=>cached('pickaxe',id,buildShopPickaxe);
-export const makeShopBack=(id,rank,badgeOnly=false)=>cached('backbling',id+':'+(rank||'')+':'+badgeOnly,()=>buildShopBack(id,rank,badgeOnly));
-export const makeShopGlider=id=>cached('glider',id,buildShopGlider);
-export const makeShopTrail=id=>cached('trail',id,buildShopTrail);
+export const makeShopPickaxe=id=>shopItem(id)?.iconBundle?makeIconGear('pickaxe'):cached('pickaxe',id,buildShopPickaxe);
+export const makeShopBack=(id,rank,badgeOnly=false)=>shopItem(id)?.iconBundle?makeIconGear('backbling'):cached('backbling',id+':'+(rank||'')+':'+badgeOnly,()=>buildShopBack(id,rank,badgeOnly));
+export const makeShopGlider=id=>shopItem(id)?.iconBundle?makeIconGear('glider'):cached('glider',id,buildShopGlider);
+export const makeShopTrail=id=>shopItem(id)?.iconBundle?makeIconGear('trail'):cached('trail',id,buildShopTrail);

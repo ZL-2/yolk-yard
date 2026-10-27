@@ -14,3 +14,8 @@ art/wren/wren-albedo.png
 
 # Blender's automatic backups are reproducible from the checked-in source.
 art/operators/**/*.blend1
+
+# Rebuildable local approval deliverables and visual verification output.
+art/icon-bundle/site/
+art/icon-bundle/validation/
+art/icon-bundle/Jim-Bundle-Review.html

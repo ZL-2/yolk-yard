@@ -1,7 +1,7 @@
+import {JimStyleReward} from './jim-style-ui.js';
 import {OwnerMatchPanel} from './owner-match-panel.js';
 import {OwnerMatchNotices} from './owner-match-notices.js';
 import {tournamentClock} from './tournament-clock.js';
-import {requireIconVote} from './icon-voting-ui.js';
 import {updateTournamentCard,tournamentTeamEntryMarkup} from './tournament-ui.js';
 import {tournamentEvents} from './tournament.js';
 import {preloadOperatorAssets} from './operator-assets.js';
@@ -314,6 +314,7 @@ const rankRewards=new RoyaleRewards({getView:()=>view,getProfile:()=>profile,con
  for(const slot of PRESTIGE_SLOTS){const selected=record.loadout?.[slot]||(record.claimed.includes(pendingRankLoadout[slot])?pendingRankLoadout[slot]:'');if(selected||rankItem(profile[slot]))next[slot]=selected;}
  pendingRankLoadout={};if(JSON.stringify(next)!==JSON.stringify(profile)){profile=next;remember();if(screen==='menu')view.preview(profile);}
 },onChange:()=>{if(eggShop?.root?.isConnected&&eggShop.tab==='locker')eggShop.render();leaderboardFetchedAt=0;void refreshLeaderboards();}});
+const jimStyleReward=new JimStyleReward({getView:()=>view,wallet:eggWallet,ready:()=>briefingsComplete&&!busy&&(screen==='menu'&&!document.querySelector('dialog[open]')||screen==='game'&&state?.phase==='results'&&dialogType==='results'&&!document.querySelector('dialog[open]:not(#dialog)')),ack:()=>party.request('jim-style-ack'),equip:()=>{profile={...profile,outfit:'outfit-jim-golf'};remember();if(screen==='menu')view.preview(profile);},onChange:()=>{if(screen==='menu')renderMenu();},onError:error=>errorToast(error.message)});
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerRuntime=new OwnerRuntime();
@@ -321,6 +322,7 @@ const fairPlay=new FairPlayRuntime({poll:()=>party?.ready?party.request('fair-pl
 const ownerNotices=new OwnerMatchNotices({poll:()=>party?.ready?party.request('owner-match-status'):null,ack:ids=>party.request('owner-match-ack',{ids})});ownerRuntime.ownerNotices=ownerNotices;
 const ownerConsole=new OwnerConsole({identity:()=>party?.id,onMapEditor:openOwnerMapEditor,onCampaign:openOwnerCampaign,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 document.addEventListener('icon-owner-access',()=>ownerConsole.open());
+document.addEventListener('jim-shop',()=>{customizeMenu('shop');if(eggShop){eggShop.selected='bundle-jim-icon';eggShop.previewId=null;eggShop.inspecting=true;eggShop.render();}});
 const ownerPanel=new OwnerMatchPanel({api:ownerConsole,context:()=>screen==='game'&&net?.ready?{code:net.code,matchId:state?.royale?.matchId||state?.matchId}:null,notify:message=>toast(message),onFocus:()=>{keys.clear();queuedActions.clear();scoreHeld=false;input.fire=false;input.aim=false;Object.assign(touch,{x:0,y:0,jump:false,fire:false,aim:false,reload:false,popper:false,sprint:false,interact:false});if(document.pointerLockElement)document.exitPointerLock();},onPlay:()=>{if(screen==='game'&&!dialog.open)void resume();}});
 startAnonymousVisits(()=>screen==='game'?(state?.options?.training?'training':state?.options?.mode||options.mode||'royale'):screen==='lobby'?'lobby':screen==='editor'?'editor':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
@@ -1371,14 +1373,12 @@ async function copy(text) {
   }
 }
 async function partyRequest(type,data={}){
- if(type==='spectate-friend'&&!await requireIconVote())return null;
  try{return await party.request(type,data);}catch(error){errorToast(error.message);return null;}
 }
 let tournamentJoining=false;
 async function joinTournament(eventId,spectate=false){
  try{fairPlay.admission(eventId);}catch(error){return errorToast(error.message);}
  if(state)return toast('Return to the lobby to join the tournament.');
- if(!await requireIconVote())return;
  if(tournamentJoining)return;
  tournamentJoining=true;
  try{return await party.request('tournament-join',{eventId,spectate});}
@@ -1434,7 +1434,6 @@ function receiveInvite(invite){
  tray.append(node);while(tray.children.length>3)tray.firstChild.remove();setTimeout(()=>node.remove(),Math.max(0,invite.expires-Date.now()));sound.cue('queue-found');
 }
 async function queueParty(custom=false,code=null){
- if(!await requireIconVote())return;
  if(state){toast('Return to the lobby before finding another match.');return;}
  const selected=custom?getOptions():matchOptions(party?.party?.selection);
  if(!selected)return;
@@ -1444,7 +1443,6 @@ async function queueParty(custom=false,code=null){
 }
 async function queuePublicRoyale(spectate=false){
  if(state)return;
- if(!await requireIconVote())return;
  if(await partyRequest('queue',{publicRoyale:true,spectate})){dialog.close();dialogType='';renderMenu();}
 }
 async function launchParty(launch){
@@ -1468,6 +1466,7 @@ function initializeParty(){
  party=new PartyClient({...profile,...pendingRankLoadout},{
   tournament:event=>{const changed=ownerRuntime.tournament?.locked!==event.locked||ownerRuntime.tournament?.phase!==event.phase;tournamentClock.sync(event.serverNow);ownerRuntime.tournament=event;if(changed&&screen==='menu')renderMenu();updateTournamentCard(document,event,!!party?.ready&&tournamentClock.fresh,tournamentClock.now());refreshCompete();},
   'tournament-rewards':m=>{void eggWallet.syncTournamentRewards(m.record).then(()=>{if(screen==='menu')renderMenu();});},
+  'jim-style':m=>{void jimStyleReward.receive(m.record);},
   'royale-rank':m=>rankRewards.receive(m.record),
   referrals:record=>{void eggWallet.syncReferrals(record).then(()=>{if(screen==='menu')renderMenu();}).catch(()=>toast('Referral reward saved online. Reconnect when browser storage is available.'));},
   status:status=>{if(status!=='Connected')leaderboardError=status;if(screen==='menu')renderMenu();if(status==='Connected'){void fairPlay.refresh();void ownerNotices.refresh();if(menuSection==='career')void refreshCompetitiveCareer(true);void lobbyComms.connected();socialActivityKey='';void refreshLeaderboards(true);if(screen==='menu'&&!net&&!activeLaunch)void partyRequest('returned');}},
@@ -1559,7 +1558,7 @@ const actions = {
  'z-journal':openZombiesJournal,
  'quick-rematch':()=>{if(net?.officialPublic)return toast('The next public round starts automatically.');if(sim&&(!sim.remote||state?.zombies)&&state?.phase==='results'&&(!net||net.isHost)){launchRound();}},
  'training':()=>{modal('FIELD TRAINING','<p>A private offline exercise. Choose weapons, practice on moving targets, build and edit. No currency or mastery rewards.</p><button class="primary" data-action="start-training">START TRAINING</button>','training');},
- 'start-training':async()=>{if(!await requireIconVote())return;try{ownerRuntime.admission('training');}catch(error){return errorToast(error.message);}if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
+ 'start-training':async()=>{try{ownerRuntime.admission('training');}catch(error){return errorToast(error.message);}if((party?.party?.members.length||1)>1)return toast('Leave your party to train solo.');if(net)leave(false,false);options=matchOptions({mode:'royale',session:'offline',training:true,bots:3,capacity:4,fill:false});beginSim();launchRound();},
  'career':()=>selectMenuSection('career'),
  'competitive-career':()=>{selectMenuSection('career');competitiveScroll=competitivePending;$('#competitive-career')?.scrollIntoView({block:'start'});},
  'competitive-refresh':()=>{void refreshCompetitiveCareer(true);},
@@ -1576,7 +1575,7 @@ const actions = {
  'play-custom':()=>{options=matchOptions({...party?.party?.selection,fill:true});setupMenu();},
  'duo-fill':()=>partyRequest('select',{...party.party.selection,teamFill:true,duoFill:true}),
  'duo-no-fill':()=>partyRequest('select',{...party.party.selection,teamFill:false,duoFill:false}),
- 'party-ready':async()=>{if(await requireIconVote())return partyRequest('ready',{value:!party.party.members.find(m=>m.id===party.id)?.ready});},
+ 'party-ready':async()=>{return partyRequest('ready',{value:!party.party.members.find(m=>m.id===party.id)?.ready});},
  'party-cancel':()=>partyRequest('cancel'),
  'party-leave':()=>partyRequest('leave'),
  'party-privacy':()=>partyRequest('privacy',{value:party.party.privacy==='open'?'invite':'open'}),
@@ -2259,6 +2258,7 @@ function loop(now) {
   $('#hud').classList.toggle('low-health',!!current&&current.health>0&&current.health<25);
   damageFlash = Math.max(0, damageFlash - renderDt * 1.5);
   $("#damage").style.opacity = damageFlash*(settings.reducedMotion?.25:1);
+  jimStyleReward.update();
   rankRewards.update();
   referralRewards.update(now);
   lobbyComms.update();

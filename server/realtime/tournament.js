@@ -1,3 +1,4 @@
+import {grantJimStyle} from './jim-style.js';
 import {randomUUID,randomInt} from 'node:crypto';
 import {VERSION} from '../../src/data.js';
 import {RoyaleSimulation} from '../../src/royale.js';
@@ -145,6 +146,7 @@ class TournamentEvent{
     const rank=members=>({place:Math.min(...members.map(e=>e.p?.place||e.result.place)),survival:Math.max(...members.map(e=>e.p?.eliminatedAt??Infinity)),kills:members.reduce((n,e)=>n+(e.p?.kills||e.result?.kills||0),0),identity:members.map(e=>e.identity).sort()[0]});
     const teams=[...groups.values()].map(members=>({members,...rank(members)})).sort((a,b)=>a.place-b.place||b.survival-a.survival||b.kills-a.kills||a.identity.localeCompare(b.identity));
     const results=teams.flatMap((team,i)=>team.members.sort((a,b)=>a.identity.localeCompare(b.identity)).map(e=>({identity:e.identity,name:e.name,team:e.p?.team??e.result?.team,place:i+1,kills:e.p?.kills||e.result?.kills||0,marks:EVENT.prizes[i]||0})));
+    for(const result of results)if(result.place===1){const entry=entries.find(e=>e.identity===result.identity);grantJimStyle(this.relay,result.identity,{won:true,outfit:entry?.p?.outfit,afkRemoved:entry?.p?.afkRemoved,spectator:entry?.p?.lateSpectator});}
     this.complete('finished','Tournament complete. Normal matchmaking is open.',results);
    }
    if(this.phase==='running'&&now-EVENT.startsAt>30*60_000)this.complete('cancelled','The tournament exceeded its recovery deadline. Normal matchmaking is open.');

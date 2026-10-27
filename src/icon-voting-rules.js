@@ -1,6 +1,7 @@
 // The original nomination vote is archived when the bundle poll opens.
 export const ICON_CLOSES_AT=Date.parse('2026-10-27T15:15:00-04:00');
 export const ICON_POLL_ID='jim-bundle-2026-10';
+export const ICON_BUNDLE_VOTE_CLOSED=true;
 export const ICON_WINNER='Jim McLaughlin';
 export const ICON_CATEGORIES=Object.freeze([
  {id:'pickaxe',label:'Pickaxe',hint:'What should Jim swing?',description:'Suggest the shape, theme or fun detail of his harvesting tool.',color:'#c6fa58'},

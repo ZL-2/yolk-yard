@@ -1,0 +1,28 @@
+{
+  "reference": "textures/face-closeup-reference.jpeg",
+  "source": "User supplied IMG_0708.jpeg; used directly, without generating a replacement face",
+  "imageSize": [1206, 872],
+  "metersPerPixel": 0.000315,
+  "originPixel": [628, 842],
+  "chinHeight": 1.553,
+  "landmarks": {
+    "leftIris": [517, 476],
+    "rightIris": [734, 470],
+    "leftEyeOuter": [461, 482],
+    "leftEyeInner": [563, 483],
+    "rightEyeInner": [681, 478],
+    "rightEyeOuter": [788, 477],
+    "noseBridge": [627, 520],
+    "noseTip": [625, 565],
+    "leftNostril": [599, 588],
+    "rightNostril": [658, 582],
+    "leftMouthCorner": [537, 693],
+    "rightMouthCorner": [713, 690],
+    "upperLip": [624, 676],
+    "lowerLip": [625, 707],
+    "chin": [628, 842],
+    "leftEar": [352, 597],
+    "rightEar": [876, 589]
+  },
+  "note": "Landmarks control the frontal projection and sculpt. They constrain 2D alignment, not unobserved 3D profile anatomy."
+}

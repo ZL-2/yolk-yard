@@ -1,0 +1,27 @@
+{
+  "source": "face-closeup-reference.jpeg",
+  "cutout": "hair-closeup-cutout.png",
+  "sourceToCutout": [
+    [
+      1.2672936645748074,
+      -0.0003027867590134508,
+      -11.35488268913019
+    ],
+    [
+      0.0003027867590134508,
+      1.2672936645748074,
+      -0.585031972749019
+    ]
+  ],
+  "sourceSize": [
+    1206,
+    872
+  ],
+  "cutoutSize": [
+    1475,
+    1067
+  ],
+  "matchedFeatures": 118,
+  "inliers": 104,
+  "medianRegistrationErrorPixels": 0.8894628882408142
+}

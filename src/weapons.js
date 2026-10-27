@@ -515,6 +515,7 @@ export function makeBlaster(id,wrap='') {
 }
 export function disposeBlaster(group) {
   group.traverse((o) => {
+    if (o.userData.ownedGeometry) o.geometry?.dispose();
     if (o.userData.ownedMaterial) {
       o.material.dispose();
     }

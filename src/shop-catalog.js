@@ -1,7 +1,9 @@
+import {JIM_OUTFITS,JIM_NORMAL} from './jim-catalog.js';
 import {DEFAULT_OPERATOR,DEFAULT_OUTFIT_ID} from './default-operator.js';
 import {TOURNAMENT_PICKAXE} from './tournament.js';
 import {ROYALE_REWARDS} from './royale-ranking.js';
 import {NEW_COLLECTIONS} from './shop-collections.js';
+import {ICON_BUNDLE_ITEMS} from './icon-bundle-catalog.js';
 // Original Ravelfront cosmetics. IDs are stable save/network identifiers.
 export const SHOP_SLOTS=['outfit','pickaxe','wrap','backbling','glider','trail'];
 export const SHOP_LABELS={outfit:'Outfits',pickaxe:'Pickaxes',wrap:'Weapon wraps',backbling:'Back accessories',glider:'Gliders',trail:'Dive trails'};
@@ -30,14 +32,17 @@ for(const set of NEW_COLLECTIONS){
   SHOP_ITEMS.push({id:`${slot}-${set.id}`,slot,name:set[slot],set:set.id,tier:set.tier,price,color:set.color,accent:set.accent,shape:set.shape,model:set.model,armor:set.armor,skin:set.skin,hair:set.hair,featured:true,art:slot==='outfit'?set.art:null,styleLabel:'Signature',styleRoot:slot==='outfit'?`outfit-${set.id}`:null,profile:{color:set.color,accent:set.accent,hat:0,pattern:0,finish:2,eyewear:6},description:slot==='outfit'?set.story:`Part of ${set.name}. Original ${SHOP_LABELS[slot].toLowerCase()} with the ${set.outfit} collection’s own silhouette and materials.`});
  }
 }
-SHOP_ITEMS.push(DEFAULT_OPERATOR,...ROYALE_REWARDS,TOURNAMENT_PICKAXE);
-const byId=new Map(SHOP_ITEMS.map(item=>[item.id,item]));
+SHOP_SETS.push({id:'jim-icon',name:'Jim McLaughlin',featured:true,group:'icons',color:'#49566c',accent:'#a6d885'});
+SHOP_ITEMS.push(...JIM_OUTFITS,...ICON_BUNDLE_ITEMS,DEFAULT_OPERATOR,...ROYALE_REWARDS,TOURNAMENT_PICKAXE);
+// Approved release catalog, shared by shop, loadouts and model builders.
+const byId=new Map([...SHOP_ITEMS,...ICON_BUNDLE_ITEMS].map(item=>[item.id,item]));
 export const shopItem=id=>byId.get(id);
 export const outfitStyles=id=>{const item=shopItem(id);return item?.styleRoot?SHOP_ITEMS.filter(i=>i.styleRoot===item.styleRoot):item?[item]:[];};
 export const SHOP_BUNDLES=NEW_COLLECTIONS.map(set=>({id:`bundle-${set.id}`,name:set.name+' Bundle',slot:'bundle',set:set.id,tier:set.tier,price:set.bundlePrice,color:set.color,accent:set.accent,art:set.art,featured:true,items:SHOP_SLOTS.map(slot=>`${slot}-${set.id}`),description:`${set.outfit} and five matching pieces of equipment.`}));
+SHOP_BUNDLES.unshift({id:'bundle-jim-icon',name:'Jim McLaughlin Bundle',slot:'bundle',set:'jim-icon',tier:'epic',art:'season/jim-icon.webp',price:3000,color:'#49566c',accent:'#a6d885',featured:true,items:[JIM_NORMAL,...ICON_BUNDLE_ITEMS.map(i=>i.id)],description:'Jim’s sweatshirt outfit and all five accessories. Golf is earned separately by winning an online match while wearing Jim; purchasing the bundle does not unlock it.'});
 const bundleById=new Map(SHOP_BUNDLES.map(item=>[item.id,item]));
-export const shopOffer=id=>bundleById.get(id)||shopItem(id);
-export const offerGrants=offer=>[...new Set((offer.items||[offer.id]).flatMap(id=>{const item=shopItem(id);return item?.styleRoot?outfitStyles(id).map(i=>i.id):[id];}))];
+export const shopOffer=id=>bundleById.get(id)||(shopItem(id)?.reviewOnly?undefined:shopItem(id));
+export const offerGrants=offer=>[...new Set((offer.items||[offer.id]).flatMap(id=>{const item=shopItem(id);return item?.styleRoot?outfitStyles(id).filter(i=>!i.winReward).map(i=>i.id):[id];}))];
 // Recomputed inside the wallet lock, never trusted from a rendered button.
 export function quoteOffer(wallet,id){
  const offer=shopOffer(id);if(!offer)return null;
@@ -47,5 +52,5 @@ export function quoteOffer(wallet,id){
  const price=remaining.length?Math.max(0,offer.price-ownedValue):0;
  return {offer,price,total,owned:remaining.length===0,ownedCount:parts.length-remaining.length,count:parts.length,remaining,grants:offerGrants(offer).filter(id=>!owned.has(id)),saving:Math.max(0,remaining.reduce((n,id)=>n+shopItem(id).price,0)-price)};
 }
-export const validCosmetic=(slot,id)=>shopItem(id)?.slot===slot?id:slot==='outfit'?DEFAULT_OUTFIT_ID:'';
+export const validCosmetic=(slot,id)=>shopItem(id)?.slot===slot&&!shopItem(id).reviewOnly?id:slot==='outfit'?DEFAULT_OUTFIT_ID:'';
 export const cosmeticProfile=p=>Object.fromEntries(SHOP_SLOTS.map(slot=>[slot,validCosmetic(slot,p?.[slot])]));

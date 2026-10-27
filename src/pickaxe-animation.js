@@ -7,6 +7,7 @@ import {actionArms} from './arms.js';
 export const PICKAXE_STYLES=['crescent','hammer','fork','crystal','staff','hook'];
 export function pickaxeStyle(id){
  const item=shopItem(id);if(item?.slot!=='pickaxe')return 'classic';
+ if(item.swingStyle==='golf')return 'golf';
  // Model-based rewards need not have the legacy numbered shape. Never let a
  // missing cosmetic animation stop the gameplay loop for its owner or viewers.
  return PICKAXE_STYLES.includes(item.swingStyle)?item.swingStyle:PICKAXE_STYLES[item.shape%PICKAXE_STYLES.length]||'classic';
@@ -19,6 +20,7 @@ const styles={
  crystal:{wind:[.65,-.4,-.65],strike:[-1.6,.2,.55],end:[-1.9,.35,.8],offset:[-.32,-.18,-.38]},
  staff:{wind:[.25,-.65,.5],strike:[-1.2,.5,-.6],end:[-1.5,.8,-.9],offset:[-.37,.05,-.35]},
  hook:{wind:[.4,-.7,-.8],strike:[-1.55,.6,.5],end:[-1.9,.8,.85],offset:[-.38,-.1,-.3]},
+ golf:{wind:[.42,-.82,-.98],strike:[-1.45,.38,.47],end:[-1.76,1.08,1.08],offset:[-.34,-.16,-.42]},
 };
 const rest=[-.15,0,-.22],zero=[0,0,0];
 function path(points,t){for(let i=1;i<points.length;i++)if(t<=points[i][0]){const [a,p]=points[i-1],[b,q]=points[i];const x=Math.max(0,Math.min(1,(t-a)/(b-a))),f=x*x*(3-2*x);return p.map((v,j)=>v+(q[j]-v)*f);}return [...points.at(-1)[1]];}

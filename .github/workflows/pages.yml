@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      jim_release: ${{ steps.scope.outputs.jim_release }}
       frame_stalls_update: ${{ steps.scope.outputs.frame_stalls_update }}
       input_response_update: ${{ steps.scope.outputs.input_response_update }}
       tournament_teams_update: ${{ steps.scope.outputs.tournament_teams_update }}
@@ -461,6 +462,13 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('frame_stalls_update='+str(stalls_update).lower()+'\n')
             if stalls_update: out.write('focused=true\n')
+
+          jim_files=set(subprocess.check_output(['git','diff','--name-only','fc7d32af3d5bb81d34d913bd13ec6812d60aa8e5','HEAD'],text=True).splitlines())
+          jim_allowed={'art/jim/models/jim-normal.blend.gz.part1','art/jim/models/jim-normal.blend.gz.part2','art/jim/models/jim-golf.blend.gz.part2','art/jim/models/jim-golf.blend.gz.part1','art/jim/models/jim-normal.blend.gz.part3','art/jim/models/jim-golf.blend.gz.part3','art/jim/models/jim-normal.blend.gz','art/jim/models/jim-golf.blend.gz','scripts/jim-release-live-check.mjs','public/models/operators/jim-normal.glb', 'src/shop-catalog.js', 'scripts/art/render-jim-review.py', 'art/jim/models/normal-report.json', 'tests/helpers/icon-vote.js', 'server/realtime/royale-rank-rewards.js', 'art/jim/models/jim-golf-lod.glb', 'art/jim/models/jim-normal.blend', 'src/midseason-briefing.css', 'src/icon-voting-ui.js', 'vite.jim.config.mjs', 'src/icon-bundle-catalog.js', 'src/icon-voting-rules.js', 'package-lock.json', 'server/realtime/tournament.js', 'src/jim-style-ui.js', 'docs/UPDATE_227.md', 'public/models/operators/jim-normal-lod.glb', '.gitignore', 'art/jim/textures/face-closeup-reference.jpeg', 'src/midseason-briefing.js', 'src/lobby-news.js', 'tests/egg-shop.test.js', 'src/rewards.js', 'src/operator-assets.js', 'art/jim/models/jim-normal.glb', 'src/releases.js', 'src/view.js', 'art/jim/textures/clothing-reference.png', 'icon-bundle-review.html', 'art/jim/revision-provenance.json', 'scripts/jim-browser-check.mjs', 'server/realtime/jim-style.js', 'art/jim/.gitignore', 'jim-review.html', 'src/icon-bundle-models.js', 'art/jim/README.md', 'server/realtime/parties.js', 'art/jim/review/Jim-First-vs-Latest.png', 'scripts/package-jim-review.mjs', '.github/workflows/pages.yml', 'server/realtime/icon-voting.js', 'server/realtime/relay.js', 'src/main.js', 'scripts/export-icon-bundle-board.mjs', 'server/realtime/index.js', 'src/pickaxe-animation.js', 'public/CREDITS.txt', 'art/jim/review/Jim-Outfits-Approval.png', 'public/models/operators/jim-golf-lod.glb', 'src/weapons.js', 'src/credits.js', 'art/jim/hair-registration.json', 'src/data.js', 'scripts/art/build-jim.py', 'art/jim/textures/hair-silhouette.png', 'art/icon-bundle/review.js', 'package.json', 'art/jim/textures/face-reference.png', 'src/egg-shop.js', 'tests/icon-bundle.test.js', 'tests/shop-overhaul.test.js', 'tests/jim-release.test.js', 'art/jim/review/Jim-Face-and-Footwear.png', 'src/owner-console.js', 'art/jim/models/jim-golf.blend', 'art/jim/textures/hair-closeup-cutout.png', 'art/jim/models/jim-golf.glb', 'scripts/art/jim_detail_geometry.py', 'public/season/jim-icon.webp', 'src/jim-catalog.js', 'scripts/package-icon-bundle-review.mjs', 'src/owner-icon-voting.js', 'src/lobby-ui.js', 'art/jim/reference-validation.json', 'src/royale-view.js', 'src/network.js', 'scripts/art/render-jim-details.py', 'art/jim/viewer/review.css', 'src/shop-front.js', 'public/models/operators/jim-golf.glb', 'art/icon-bundle/review.css', 'art/icon-bundle/README.md', 'art/jim/validation.json', 'src/shop-models.js', 'art/jim/models/jim-normal-lod.glb', 'scripts/icon-bundle-review-check.mjs', 'art/jim/face-landmarks.json', 'src/egg-wallet.js', 'art/jim/models/golf-report.json', 'server/realtime/progression.js', 'art/jim/viewer/review.js', 'tests/icon-voting.test.js', 'scripts/jim-release-browser-check.mjs', 'art/jim/viewer/model.js', 'vite.icon-bundle.config.mjs'}
+          jim_release={'src/jim-style-ui.js','server/realtime/jim-style.js','tests/jim-release.test.js','scripts/jim-release-browser-check.mjs'}<=jim_files and jim_files<=jim_allowed and json.loads(Path('package.json').read_text()).get('version')=='6.34.0'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('jim_release='+str(jim_release).lower()+'\n')
+            if jim_release: out.write('focused=true\n')
           PY
   build:
     needs: scope
@@ -475,6 +483,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Jim catalog, victory rewards, vote retirement and shared progression
+        if: needs.scope.outputs.jim_release == 'true'
+        run: node --test --test-concurrency=2 tests/jim-release.test.js tests/icon-bundle.test.js tests/icon-voting.test.js tests/egg-shop.test.js tests/shop-overhaul.test.js tests/rewards-afk.test.js tests/social-persistence.test.js tests/royale-prestige.test.js tests/tournament.test.js
       - name: Frame stalls, responsive actions, replay recovery and multiplayer regressions
         if: needs.scope.outputs.frame_stalls_update == 'true'
         run: |
@@ -836,6 +847,14 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         if: needs.scope.outputs.frame_stalls_update != 'true' && needs.scope.outputs.icon_voting_update != 'true' && needs.scope.outputs.history_only != 'true' && needs.scope.outputs.visit_verify_only != 'true' && needs.scope.outputs.performance_update != 'true' && needs.scope.outputs.flight_combat_fix != 'true' && needs.scope.outputs.vehicle_field_fix != 'true' && needs.scope.outputs.water_lean_update != 'true' && needs.scope.outputs.combat_performance_update != 'true' && needs.scope.outputs.royale_prestige_update != 'true' && needs.scope.outputs.rank_match_fix != 'true' && needs.scope.outputs.prestige_sets_update != 'true' && needs.scope.outputs.wren_study_update != 'true' && needs.scope.outputs.tournament_update != 'true' && needs.scope.outputs.lobby_home_update != 'true' && needs.scope.outputs.field214_update != 'true' && needs.scope.outputs.roster215_update != 'true' && needs.scope.outputs.anatomy216_update != 'true' && needs.scope.outputs.performance217_update != 'true' && needs.scope.outputs.tournament_teams_update != 'true'
+      - name: Jim production models, announcement, shop and unlock dialog
+        if: needs.scope.outputs.jim_release == 'true'
+        run: node scripts/jim-release-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.jim_release == 'true'
+        with:
+          name: jim-release-browser
+          path: test-results/jim-release
       - name: Real Cup keyboard responsiveness and complete WebGL presentation
         if: needs.scope.outputs.input_response_update == 'true'
         run: |
@@ -1479,7 +1498,9 @@ jobs:
       - name: Matching website/relay build, private PvP, paused Zombies and live lobby
         if: needs.scope.outputs.owner_suite_update != 'true' && needs.scope.outputs.visit_update != 'true' && needs.scope.outputs.history_only != 'true'
         run: |
-          if [ "${{ needs.scope.outputs.frame_stalls_update }}" = "true" ] || [ "${{ needs.scope.outputs.input_response_update }}" = "true" ]; then
+          if [ "${{ needs.scope.outputs.jim_release }}" = "true" ]; then
+            node scripts/jim-release-live-check.mjs
+          elif [ "${{ needs.scope.outputs.frame_stalls_update }}" = "true" ] || [ "${{ needs.scope.outputs.input_response_update }}" = "true" ]; then
             node scripts/performance-live-check.mjs
           elif [ "${{ needs.scope.outputs.tournament_teams_update }}" = "true" ]; then
             node scripts/tournament-teams-live-check.mjs

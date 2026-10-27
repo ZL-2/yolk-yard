@@ -1,3 +1,4 @@
+import {updateIconGear} from './icon-bundle-models.js';
 import {dressHelipad} from './helipad-view.js';
 import {updateStormspikeView} from './stormspike-view.js';
 import {createSmokeCloud,updateSmokeCloud} from './smoke-view.js';
@@ -208,7 +209,7 @@ export class RoyaleView{
    if(mesh&&mesh.userData.style!==style){this.root.remove(mesh);this.view.disposeGroup(mesh);this.gliders.delete(p.id);mesh=null;}
    const close=!!observer&&Math.hypot(p.x-observer.x,p.z-observer.z)<(this.view.settings.quality==='low'?220:360);
    if(!mesh&&close&&['dive','glide'].includes(p.flight)){mesh=new THREE.Group();const sail=shopItem(p.glider)?makeShopGlider(p.glider):canopy(kit),trail=makeShopTrail(p.trail);mesh.add(sail,trail);Object.assign(mesh.userData,{sail,trail,style});this.gliders.set(p.id,mesh);this.root.add(mesh);}
-   if(mesh){mesh.visible=close&&p.health>0;if(!mesh.visible)continue;const interval=observer&&Math.hypot(p.x-observer.x,p.z-observer.z)>100?.1:0;if(t<(mesh.userData.poseAt||0)){mesh.position.set(p.x,p.y,p.z);continue;}const poseDt=Math.min(.15,t-(mesh.userData.poseClock??t-dt));mesh.userData.poseClock=t;mesh.userData.poseAt=t+interval;const pose=this.flightPose(p,t,poseDt);mesh.visible=p.health>0&&pose.air>.025;mesh.userData.sail.visible=pose.glide>.025;mesh.userData.sail.scale.setScalar(Math.max(.01,pose.glide));mesh.userData.trail.scale.y=(1+Math.sin(t*5)*.04)*pose.air;mesh.position.set(p.x,p.y+pose.bob,p.z);mesh.rotation.set(pose.pitch,pose.yaw,pose.roll);}
+   if(mesh){mesh.visible=close&&p.health>0;if(!mesh.visible)continue;const interval=observer&&Math.hypot(p.x-observer.x,p.z-observer.z)>100?.1:0;if(t<(mesh.userData.poseAt||0)){mesh.position.set(p.x,p.y,p.z);continue;}const poseDt=Math.min(.15,t-(mesh.userData.poseClock??t-dt));mesh.userData.poseClock=t;mesh.userData.poseAt=t+interval;const pose=this.flightPose(p,t,poseDt);mesh.visible=p.health>0&&pose.air>.025;mesh.userData.sail.visible=pose.glide>.025;mesh.userData.sail.scale.setScalar(Math.max(.01,pose.glide));mesh.userData.trail.scale.y=(1+Math.sin(t*5)*.04)*pose.air;updateIconGear(mesh.userData.sail,t,{deploy:pose.glide});updateIconGear(mesh.userData.trail,t);mesh.position.set(p.x,p.y+pose.bob,p.z);mesh.rotation.set(pose.pitch,pose.yaw,pose.roll);}
   }
   const padIds=new Set();for(const p of r.pads){padIds.add(p.id);let mesh=this.pads.get(p.id);if(!mesh){mesh=launchpadModel(kit);bake(mesh);this.root.add(mesh);this.pads.set(p.id,mesh);}mesh.position.set(p.x,p.y,p.z);mesh.scale.setScalar(1+Math.sin(t*3)*.035);}
   for(const [id,m]of this.pads)if(!padIds.has(id)){this.root.remove(m);this.view.disposeGroup(m);this.pads.delete(id);}

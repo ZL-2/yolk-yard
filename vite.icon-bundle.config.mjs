@@ -1,0 +1,2 @@
+import {defineConfig} from 'vite';
+export default defineConfig({base:'./',publicDir:false,define:{__APP_VERSION__:JSON.stringify('Jim bundle review'),__RUNTIME_LIBRARIES__:'[]',__BUILD_ID__:JSON.stringify('jim-bundle-unpublished'),__RELEASE_HISTORY__:'[]'},build:{target:'es2022',outDir:'art/icon-bundle/site',emptyOutDir:true,assetsInlineLimit:100_000_000,rollupOptions:{input:'icon-bundle-review.html'}},server:{host:'127.0.0.1',port:5284,strictPort:true}});

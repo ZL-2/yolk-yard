@@ -1,3 +1,4 @@
+import {updateIconGear} from './icon-bundle-models.js';
 import {GpuFrameTimer} from './gpu-frame-timer.js';
 import {DamageNumbers} from './damage-numbers.js';
 import {CombatParticles,visibleShot} from './combat-particles.js';
@@ -463,6 +464,7 @@ export class View {
     held.position.set(.07+pose.weaponSide,1.32+pose.breath+pose.grip+pose.weaponBob,-.14+pose.weaponDepth);
     held.rotation.set(pose.pitch,pose.weaponYaw,pose.roll,'YXZ');
     updateArms(model.userData.arms,-1,model.userData.blaster);
+    updateIconGear(model.userData.back,this.clock);
     animateHumanoid(model,{health:100,grounded:true,yaw:model.rotation.y,pitch:pose.pitch,
       scan:pose.scan,lobbyPatrol:pose,vx:-Math.sin(model.rotation.y)*pose.speed,vz:-Math.cos(model.rotation.y)*pose.speed},dt,motion.time,{menu:true});
   }
@@ -1041,7 +1043,7 @@ export class View {
           if(state.zonewars){const h=56*Math.tan(this.camera.fov*Math.PI/360)/Math.max(1,this.canvas.clientHeight);name.scale.set(h*512/96,h,1);}
         }
         if(p.boss||p.henchman)updateBossAlert(model,p,state.time,bodyHeight(p),distance);
-        updateCelebration(model,p,state.time,g=>this.disposeGroup(g));
+        updateCelebration(model,p,state.time,g=>this.disposeGroup(g));if(poseDue)updateIconGear(model.userData.back,state.time);
         if(poseDue)animateHumanoid(model,{...p,...(state.phase==='results'?{vx:0,vz:0,moving:false}:{}),throwProgress:(this.clock-(model.userData.throwStart??-100))/.78,shotRecoil:model.userData.armRecoil||0},poseDt,state.phase==='results'&&!p.emote?this.clock:state.time,{distance,scheduled:true,map:this.buildMap});
         if(p.id===local?.id&&this.thirdPersonEnabled)this.fadeLocalActor(model,Math.max(0,Math.min(1,(this.thirdPersonDistance-.35)/.5)));
         else if(model.userData.cameraFade!==undefined)this.fadeLocalActor(model,1);

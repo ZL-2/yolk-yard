@@ -5,7 +5,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Original, editable Blender assets. Geometry, maps and materials are shared;
 // makeHumanoid creates only the skeleton and pose state for each player.
-export const OPERATOR_ASSET_IDS=Object.freeze(['wren','rank-25','rank-10','rank-5','rank-1','voss','rook','nyx','pulse','morrow','scout']);
+export const OPERATOR_ASSET_IDS=Object.freeze(['jim-normal','jim-golf','wren','rank-25','rank-10','rank-5','rank-1','voss','rook','nyx','pulse','morrow','scout']);
 const assets=new Map(),pending=new Map();
 const swap=name=>name.replace(/(shoulder|arm|forearm|hand|thigh|shin|foot|toe|finger)([LR])/,(_,part,side)=>part+(side==='L'?'R':'L'));
 export function operatorAsset(profile){if(profile.infectedType||profile.infectedSkin||profile.henchman)return null;const id=profile.outfit?.replace(/^outfit-/,'');return assets.get(OPERATOR_ASSET_IDS.includes(id)?id:'scout');}
@@ -14,6 +14,7 @@ async function decode(id,suffix=''){
  const gltf=await new GLTFLoader().loadAsync(url);gltf.scene.updateMatrixWorld(true);
  const inputs=[];gltf.scene.traverse(o=>{if(o.isSkinnedMesh)inputs.push(o);});
  if(!inputs.length)throw Error(`No skinned geometry in ${id}${suffix}`);
+ if(id.startsWith('jim-'))inputs.sort((a,b)=>a.material.name.localeCompare(b.material.name));
  const joints={},names=inputs[0].skeleton.bones.map(b=>swap(b.name));
  inputs[0].skeleton.bones.forEach(b=>{const p=b.getWorldPosition(new T.Vector3());p.x=-p.x;p.z=-p.z;joints[swap(b.name)]=p;});
  const materials=[],parts=[];
@@ -21,7 +22,7 @@ async function decode(id,suffix=''){
   const g=input.geometry.clone().applyMatrix4(input.matrixWorld).rotateY(Math.PI);
   const skin=g.attributes.skinIndex;
   for(let i=0;i<skin.array.length;i++){const name=swap(input.skeleton.bones[skin.array[i]].name);const n=names.indexOf(name);if(n<0)throw Error(`Unknown joint ${name}`);skin.array[i]=n;}
-  g.deleteAttribute('color');g.deleteAttribute('tangent');g.clearGroups();
+  for(const key of Object.keys(g.attributes))if(!['position','normal','uv','skinIndex','skinWeight'].includes(key))g.deleteAttribute(key);g.clearGroups();
   // Each Blender mesh has one material; joining retains face/body material groups.
   if(Array.isArray(input.material))throw Error(`Unexpected material layout in ${id}`);
   const m=input.material;m.vertexColors=false;m.envMap=modelEnvironment();m.envMapIntensity=.72;m.side=T.DoubleSide;m.userData.shared=true;

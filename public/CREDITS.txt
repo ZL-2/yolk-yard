@@ -97,3 +97,5 @@ Update 208 — Royale Prestige collections
 Tempest Talon, Rift Reaver, Solar Dominion and Apex Sovereign each have original code-created outfits, wraps, capes, gliders, dive trails and pickaxes. Rank lettering is physical model geometry. These cosmetic designs use the standard gameplay skeleton and existing shared material atlas; no third-party character or vehicle assets were added.
 
 Operator roster (Update 215): eleven authored Blender meshes with UV-baked textures, skinning, reduced distance topology and game-rig conversion. Wren preserves the approved review mesh. Character artwork and construction references were generated using OpenAI image tools; hidden surfaces are interpreted. Editable source files and authoring scripts are included in the repository. Blender is an authoring tool; no Blender software is bundled with the game.
+
+Jim Icon Series (Update 227): Jim McLaughlin outfit meshes and textures authored from owner-supplied photographs; approved normal/Golf assets preserved. Promotional artwork generated with OpenAI image tools. Five accessories and their animation authored for this game; depicted product marks belong to their respective owners.

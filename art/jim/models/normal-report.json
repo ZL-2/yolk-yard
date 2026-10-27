@@ -1,0 +1,12 @@
+{
+  "id": "jim-normal",
+  "style": "Normal \u2014 Sweatshirt",
+  "status": "AWAITING USER APPROVAL \u2014 NOT DEPLOYED",
+  "triangles": 78824,
+  "lodTriangles": 18814,
+  "bones": 32,
+  "materials": 5,
+  "bytes": 5927860,
+  "reference": "Supplied face close-up directly mapped with measured landmarks; two outfit photographs; earlier garment construction sheet",
+  "limitations": "Unseen profile/back surfaces are inferred; likeness is subject to user review."
+}

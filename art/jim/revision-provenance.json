@@ -1,0 +1,29 @@
+{
+  "revision": "Face and footwear correction",
+  "approval": "PENDING — NOT DEPLOYED",
+  "face": {
+    "source": "IMG_0708.jpeg",
+    "asset": "textures/face-closeup-reference.jpeg",
+    "processing": "Original attachment copied byte-for-byte; no new face generated",
+    "mapping": "Uniform-scale frontal photo projection anchored to face-landmarks.json"
+  },
+  "hair": {
+    "mode": "Built-in image generation tool, background-extraction",
+    "source": "IMG_0708.jpeg",
+    "asset": "textures/hair-closeup-cutout.png",
+    "prompt": "Use case: background-extraction. Asset type: actual photo hair cutout texture for the user's 3D character. Edit target: the supplied close-up photograph. Extract ONLY the existing brown curly hair, preserving its exact curls, brown-gray color, silhouette, uneven fringe and fine flyaway strands from the input. Make every non-hair pixel fully transparent: remove face, skin, ears, neck, gray backdrop and the black rounded border. Where the face and ears were, leave a genuinely transparent hole, not dark hair fill. Keep the existing photograph's hair unchanged; no rerender, recolor, beautification, invented strands or different hairstyle. Preserve the same placement and full 1206-by-872 image framing if possible, including transparent margins. Output only the cutout, no labels, shadow, border or checkerboard.",
+    "registration": "hair-registration.json"
+  },
+  "footwear": {
+    "source": [
+      "IMG_0703(2).jpeg",
+      "IMG_0705(2).jpeg"
+    ],
+    "method": "Authored mesh surfaces, procedural materials, baked color and tangent normal textures"
+  },
+  "limits": [
+    "Source photos do not reveal exact profile and back anatomy.",
+    "The normal outfit photo crops the front of the clogs.",
+    "Image registration measures texture alignment, not identity accuracy."
+  ]
+}

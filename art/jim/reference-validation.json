@@ -1,0 +1,10 @@
+{
+  "sourcePhotoUnchanged": true,
+  "sourcePhotoSHA256": "33e516783a2fefc070acd72517f25e888d77e367863d5e4f6971dfb4ecdc83ca",
+  "faceTextureSHA256": {
+    "normal": "6e77e646efb95cea9f86c809c0500a5a8872d2c050e11260232c58c1403cf4a0",
+    "golf": "6e77e646efb95cea9f86c809c0500a5a8872d2c050e11260232c58c1403cf4a0"
+  },
+  "deployment": "NOT DEPLOYED",
+  "sameFaceInBothStyles": true
+}

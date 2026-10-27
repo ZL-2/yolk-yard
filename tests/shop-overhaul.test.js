@@ -14,7 +14,7 @@ import {safeProfile} from '../src/data.js';
 const funded=(balance=10000)=>({...normalizeWallet(null),balance});
 const hash=a=>createHash('sha256').update(Buffer.from(a.buffer,a.byteOffset,a.byteLength)).digest('hex');
 test('six original characters have six complete collections, one signature outfit, and optimized artwork',()=>{
- assert.equal(NEW_COLLECTIONS.length,6);assert.equal(SHOP_BUNDLES.length,6);assert.equal(SHOP_ITEMS.filter(i=>!i.rankReward).length,98);
+ assert.equal(NEW_COLLECTIONS.length,6);assert.equal(SHOP_BUNDLES.filter(b=>b.set!=='jim-icon').length,6);assert.equal(SHOP_ITEMS.filter(i=>!i.rankReward&&i.set!=='jim-icon').length,98);
  for(const set of NEW_COLLECTIONS){assert.equal(outfitStyles('outfit-'+set.id).length,1);for(const slot of SHOP_SLOTS)assert.ok(shopItem(slot+'-'+set.id));const bytes=readFileSync(new URL('../public/'+set.art,import.meta.url));assert.equal(bytes.toString('ascii',8,12),'WEBP');assert.ok(bytes.length<150000);}
  for(const boss of BOSSES){const item=shopItem(boss.outfit);assert.equal(item.name,boss.name);assert.equal(item.set,shopItem(boss.backbling).set);}
 });

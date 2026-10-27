@@ -1,3 +1,4 @@
+import {grantJimStyle} from './jim-style.js';
 import {RoyaleRankRewards} from './royale-rank-rewards.js';
 import {rankingMode} from '../../src/ranking-modes.js';
 import {progressionDataPath} from './data-path.js';
@@ -45,13 +46,13 @@ export class ProgressionService{
    observeInput(p.activity,input||{},now);p.inputAt=now;
   }
  }
- frame(peer,s){
+ frame(peer,s,{styleOnly=false}={}){
   if(!peer.listing||!Array.isArray(s?.players)||s.players.length>MAX_CONTESTANTS+MAX_SPECTATORS||!Number.isInteger(s.round)||!['playing','results'].includes(s.phase))return;
   // A room's public/custom provenance is assigned by matchmaking, not the host.
   const room=peer.id,now=this.clock(),key=room+':'+String(s.matchId).slice(0,64)+':'+s.round;
   if(warmup.has(s.stage))return;
   let m=this.matches.get(key);
-  if(!m){if(s.phase!=='playing'&&!(peer.rewardPublic===true&&['royale','boxfight','zonewars','ffa'].includes(s.mode)))return;m={id:randomUUID(),key,room,started:now,last:now-.5,event:-1,players:new Map(),eliminations:[],hits:new Map(),custom:peer.rewardPublic!==true,mode:s.mode==='royale'?'royale':['ffa','teams','boxfight','zonewars'].includes(s.mode)?s.mode:'arena',difficulty:Math.max(1,Math.min(4,s.difficulty||1)),hostIdentity:peer.progressId};this.matches.set(key,m);}
+  if(!m){if(s.phase!=='playing'&&!(peer.rewardPublic===true&&['royale','boxfight','zonewars','ffa'].includes(s.mode)))return;m={id:randomUUID(),key,room,started:now,last:now-.5,event:-1,players:new Map(),eliminations:[],hits:new Map(),custom:peer.rewardPublic!==true,mode:s.mode==='royale'?'royale':['ffa','teams','boxfight','zonewars'].includes(s.mode)?s.mode:'arena',difficulty:Math.max(1,Math.min(4,s.difficulty||1)),hostIdentity:peer.progressId,styleOnly};this.matches.set(key,m);}
   if(m.finished)return;
   const scoreChanged=!m.custom&&['royale','boxfight','zonewars','ffa'].includes(m.mode)&&s.players.some(p=>!p.bot&&Number.isInteger(p.kills)&&p.kills>(m.players.get(p.id)?.raw?.kills||0));
   if(s.phase!=='results'&&now-m.last<.35&&!scoreChanged)return;
@@ -89,6 +90,8 @@ export class ProgressionService{
    const ranked=all.filter(o=>!o.raw?.lateSpectator).sort((a,b)=>b.kills-a.kills||(a.raw?.deaths||0)-(b.raw?.deaths||0));
    const place=m.mode==='royale'?p.raw?.place:ranked.indexOf(p)+1;
    const won=m.mode==='zonewars'?m.state.winnerId===p.id:m.mode==='boxfight'?(m.state.boxFormat==='ffa'?m.state.winnerId===p.id:m.state.winnerTeam!=null&&m.state.winnerTeam===p.raw?.team):m.mode==='royale'?place===1&&(m.state.winnerId===undefined||m.state.winnerId===p.id||m.state.teamSize>1&&m.state.winnerId!=null&&m.state.winnerTeam===p.raw?.team):m.mode==='ffa'&&m.state.winnerId!==undefined?m.state.winnerId===p.id:m.mode==='teams'?(m.state.scores?.[p.raw?.team]||0)>(m.state.scores?.[1-p.raw?.team]||0):place===1&&p.kills>0;
+   grantJimStyle(this.relay,account.socialId,{won:won&&enemy.length>0,outfit:p.raw?.outfit,afkRemoved:p.afkRemoved,spectator:p.raw?.lateSpectator||p.raw?.contestant===false});
+   if(m.styleOnly)continue;
    if(won&&!m.custom&&['royale','boxfight','zonewars','ffa'].includes(m.mode))this.recordPublicRound(p,m,true);
    const result=calculateReward({player:{...p.activity,afkRemoved:p.afkRemoved},opponents:enemy.map(o=>({...o.activity,bot:o.bot,difficulty:o.difficulty,familiarity:account.encounters.filter(e=>e.target===o.identity).length,afkRemoved:o.afkRemoved})),elapsed,custom:m.custom,mode:m.mode,place,won,eliminations:kills,assists:p.assists,hourEarned:account.earned.reduce((n,e)=>n+e.amount,0)});
    const receipt={id:m.id+':'+p.identity.slice(0,12),amount:result.amount,label:won?'Frontier secured':'Match complete',mode:m.mode,place,won,kills:result.eligible?p.kills:0,assists:result.eligible?p.assists:0,eligible:result.eligible,reason:result.reason,time:now,challenge:result.challenge,population:result.population,custom:m.custom};
