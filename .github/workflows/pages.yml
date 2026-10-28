@@ -14,6 +14,7 @@ jobs:
   scope:
     runs-on: ubuntu-latest
     outputs:
+      community_goal: ${{ steps.scope.outputs.community_goal }}
       economy_release: ${{ steps.scope.outputs.economy_release }}
       jim_release: ${{ steps.scope.outputs.jim_release }}
       frame_stalls_update: ${{ steps.scope.outputs.frame_stalls_update }}
@@ -478,6 +479,13 @@ jobs:
             if economy_release:
               out.write('focused=true\n')
               for key in ['jim_release', 'frame_stalls_update', 'input_response_update', 'tournament_teams_update', 'performance217_update', 'anatomy216_update', 'icon_voting_update', 'roster215_update', 'field214_update', 'lobby_home_update', 'tournament_update', 'wren_study_update', 'prestige_sets_update', 'rank_match_fix', 'royale_prestige_update', 'combat_performance_update', 'water_lean_update', 'vehicle_field_fix', 'flight_combat_fix', 'performance_update', 'stormspike_kestrel_update', 'campaign_update', 'zombies_pause_update', 'match_flow_update', 'comms_preferences_update', 'crew_field_update', 'voice_celebration_update', 'scope_reticle_update', 'atv_only', 'kestrel_only', 'models_only', 'field_control_update', 'public_match_fix', 'operator_refresh', 'mixamo_update', 'field_repair_update', 'zombies_update', 'box_fights_update', 'zone_wars_update', 'human_pvp_update', 'tilted_map_update', 'match_recovery_update', 'round_room_update', 'service_action_update', 'loading_recovery_update', 'zone_spawn_update', 'owner_suite_update', 'built_world_update', 'environment_only', 'visual_only', 'crew_update', 'perspective_update', 'referral_edit_fix', 'visit_verify_only', 'visit_update', 'history_only']: out.write(key+'=false\n')
+          community_files=set(subprocess.check_output(['git','diff','--name-only','442ef5bd458ecde2be4d550f76042b16e39def71','HEAD'],text=True).splitlines())
+          community_allowed={'src/community-goal.js','src/midseason-briefing.js','src/midseason-briefing.css','src/main.js','src/lobby-news.js','src/lobby-ui.js','public/community-goal.json','public/season/community-goal.svg','tests/community-goal.test.js','scripts/community-goal-browser-check.mjs','scripts/release-live-check.mjs','.github/workflows/pages.yml'}
+          community_goal={'src/community-goal.js','tests/community-goal.test.js','scripts/community-goal-browser-check.mjs'}<=community_files and community_files<=community_allowed
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+            out.write('community_goal='+str(community_goal).lower()+'\n')
+            if community_goal: out.write('focused=true\n')
+          print('Community announcement presentation release:',community_goal)
           PY
 
   build:
@@ -493,6 +501,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Community goal, economy and announcement regressions
+        if: needs.scope.outputs.community_goal == 'true'
+        run: node --test --test-concurrency=2 tests/community-goal.test.js tests/update-199.test.js tests/economy-authority.test.js tests/deployment.test.js tests/replay-storage-budget.test.js
       - name: Authoritative economy, retention and deployment regressions
         if: needs.scope.outputs.economy_release == 'true'
         run: node --test tests/economy-authority.test.js tests/deployment.test.js tests/replay-storage-budget.test.js
@@ -865,6 +876,14 @@ jobs:
         run: |
           npx playwright install chromium --only-shell
           node --input-type=module -e "import {chromium} from 'playwright'; const b=await chromium.launch({args:['--no-sandbox']}); await b.close();" || npx playwright install-deps chromium
+      - name: Community announcement desktop and mobile acceptance
+        if: needs.scope.outputs.community_goal == 'true'
+        run: node scripts/community-goal-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.community_goal == 'true'
+        with:
+          name: community-goal-browser
+          path: test-results/community-goal
       - name: Real wallet migration, shop purchase, tampering and required notice
         if: needs.scope.outputs.economy_release == 'true'
         run: node scripts/economy-browser-check.mjs
