@@ -32,7 +32,7 @@ export class FairPlayService{
    if(!cup)cups.push({pending:true,name:'Next scheduled Frontier Cup'});
    else if(e?.phase!=='finished'&&e?.state?.phase!=='finished')cups.push({...cup,...this.cupData(e)});
   }
-  return {kind:rows.some(r=>r.until_at>now&&r.data.kind==='cheating')?'cheating':'teaming',identity:player,serverNow:now,until:until>now?until:null,cups:[...new Map(cups.map(c=>[c.id||'pending',c])).values()],reason:'Confirmed teaming with opponents',appeal:'Use Report a problem to request a review. Include your Friend Code.'};
+  return {kind:rows.some(r=>r.data.kind==='cheating'&&(r.until_at>now||cups.some(c=>c.pending||c.id===r.data.cup?.id)))?'cheating':'teaming',identity:player,serverNow:now,until:until>now?until:null,cups:[...new Map(cups.map(c=>[c.id||'pending',c])).values()],reason:rows.find(r=>r.until_at>now||cups.some(c=>c.pending||c.id===r.data.cup?.id))?.data.reason||'Confirmed fair-play violation',appeal:'Use Report a problem to request a review. Include your Friend Code.'};
  }
  reconcileSchedule(){for(const player of this.byPlayer.keys())this.status(player);}
  sync(player){const status=this.status(player);this.relay.parties.send(this.relay.parties.users.get(player),{type:'fair-play',status});return status;}

@@ -94,7 +94,8 @@ export class ProgressionService{
    if(m.styleOnly)continue;
    if(won&&!m.custom&&['royale','boxfight','zonewars','ffa'].includes(m.mode))this.recordPublicRound(p,m,true);
    const result=calculateReward({player:{...p.activity,afkRemoved:p.afkRemoved},opponents:enemy.map(o=>({...o.activity,bot:o.bot,difficulty:o.difficulty,familiarity:account.encounters.filter(e=>e.target===o.identity).length,afkRemoved:o.afkRemoved})),elapsed,custom:m.custom,mode:m.mode,place,won,eliminations:kills,assists:p.assists,hourEarned:account.earned.reduce((n,e)=>n+e.amount,0)});
-   const receipt={id:m.id+':'+p.identity.slice(0,12),amount:result.amount,label:won?'Frontier secured':'Match complete',mode:m.mode,place,won,kills:result.eligible?p.kills:0,assists:result.eligible?p.assists:0,eligible:result.eligible,reason:result.reason,time:now,challenge:result.challenge,population:result.population,custom:m.custom};
+   const humanOpponents=enemy.filter(o=>!o.bot&&participation({...o.activity,elapsed:o.activity.elapsed??elapsed,afkRemoved:o.afkRemoved})).length;
+   const receipt={humanOpponents,id:m.id+':'+p.identity.slice(0,12),amount:result.amount,label:won?'Frontier secured':'Match complete',mode:m.mode,place,won,kills:result.eligible?p.kills:0,assists:result.eligible?p.assists:0,eligible:result.eligible,reason:result.reason,time:now,challenge:result.challenge,population:result.population,custom:m.custom};
    for(const o of enemy)if(!o.bot&&result.eligible)account.encounters.push({target:o.identity,time:now});
    this.relay.owner?.recordReceipt(account,receipt);account.receipts.push(receipt);account.receipts=account.receipts.slice(-60);if(result.amount)account.earned.push({time:now,amount:result.amount});this.dirty=true;if(p.peer?.ws)this.relay.send(p.peer,{type:'reward',receipt});
   }

@@ -26,7 +26,7 @@ export function ownedLoadout(wallet,profile,rankAccess=[]){return Object.fromEnt
 export class EggWallet {
  constructor(storage,legacyEggs=0){this.listeners=new Set();this.storage=storage;this.legacyEggs=legacyEggs;this.value=this.read();this.error='';try{this.persist(this.value);}catch(error){this.error=error.message;}}
  configureServer(request){this.serverRequest=request;}
- syncServer(record){if(!record?.identity||record.economyRevision!==1)return;this.serverValue=record;this.value={...this.readLocal(),balance:record.balance,earned:record.earned,owned:record.owned};this.persist(this.value);}
+ syncServer(record){if(!record?.identity||record.economyRevision!==1)return;if(this.serverValue?.identity===record.identity&&record.revision<this.serverValue.revision)return;if(!this.serverValue){try{const key='ravelfront-legacy-wallet-review-v1';if(!this.storage.getItem(key))this.storage.setItem(key,this.storage.getItem(WALLET_KEY)||'{}');}catch{}}this.serverValue=record;this.value={...this.readLocal(),balance:record.balance,earned:record.earned,owned:record.owned};this.persist(this.value);}
  readLocal(){let raw;try{raw=JSON.parse(this.storage.getItem(WALLET_KEY));}catch{}return normalizeWallet(raw,this.legacyEggs);}
  read(){if(this.serverValue){const record=this.serverValue;return {...this.readLocal(),balance:record.balance,earned:record.earned,owned:record.owned};}let raw;try{raw=JSON.parse(this.storage.getItem(WALLET_KEY));}catch{}return normalizeWallet(raw,this.legacyEggs);}
  persist(next){try{this.storage.setItem(WALLET_KEY,JSON.stringify(next));}catch{throw Error('Browser storage is unavailable. Nothing was charged. Allow storage before buying.');}this.value=next;for(const listener of this.listeners)listener(next);return next;}
