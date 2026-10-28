@@ -315,6 +315,8 @@ const rankRewards=new RoyaleRewards({getView:()=>view,getProfile:()=>profile,con
  pendingRankLoadout={};if(JSON.stringify(next)!==JSON.stringify(profile)){profile=next;remember();if(screen==='menu')view.preview(profile);}
 },onChange:()=>{if(eggShop?.root?.isConnected&&eggShop.tab==='locker')eggShop.render();leaderboardFetchedAt=0;void refreshLeaderboards();}});
 const jimStyleReward=new JimStyleReward({getView:()=>view,wallet:eggWallet,ready:()=>briefingsComplete&&!busy&&(screen==='menu'&&!document.querySelector('dialog[open]')||screen==='game'&&state?.phase==='results'&&dialogType==='results'&&!document.querySelector('dialog[open]:not(#dialog)')),ack:()=>party.request('jim-style-ack'),equip:()=>{profile={...profile,outfit:'outfit-jim-golf'};remember();if(screen==='menu')view.preview(profile);},onChange:()=>{if(screen==='menu')renderMenu();},onError:error=>errorToast(error.message)});
+const legacyEconomyClaim={owned:[...eggWallet.value.owned]};
+eggWallet.configureServer((type,data)=>party?.ready?party.request(type,data):Promise.reject(Error('Connect to your online Marks wallet.')));
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerRuntime=new OwnerRuntime();
@@ -1464,6 +1466,7 @@ function initializeParty(){
  if(needsPlayerName(profile.name))return;
  if(party){party.updateProfile(profile);return;}
  party=new PartyClient({...profile,...pendingRankLoadout},{
+  economy:m=>{eggWallet.syncServer(m.wallet);if(m.wallet.migrated){profile={...profile,...ownedLoadout(eggWallet.value,profile,rankRewards.access)};remember();}if(!m.wallet.migrated)void party.request('economy-migrate',{legacy:legacyEconomyClaim}).then(r=>{eggWallet.syncServer(r);profile={...profile,...ownedLoadout(eggWallet.value,profile,rankRewards.access)};remember();party.updateProfile(profile);if(screen==='menu')renderMenu();}).catch(e=>errorToast(e.message));else if(screen==='menu')renderMenu();},
   tournament:event=>{const changed=ownerRuntime.tournament?.locked!==event.locked||ownerRuntime.tournament?.phase!==event.phase;tournamentClock.sync(event.serverNow);ownerRuntime.tournament=event;if(changed&&screen==='menu')renderMenu();updateTournamentCard(document,event,!!party?.ready&&tournamentClock.fresh,tournamentClock.now());refreshCompete();},
   'tournament-rewards':m=>{void eggWallet.syncTournamentRewards(m.record).then(()=>{if(screen==='menu')renderMenu();});},
   'jim-style':m=>{void jimStyleReward.receive(m.record);},

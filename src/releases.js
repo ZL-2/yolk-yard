@@ -1,4 +1,9 @@
 export const RELEASE_NOTES = [
+ {number:'234',title:'Verified Marks and secure purchases',changes:[
+  'Marks and Item Shop purchases are now saved and verified by the online service. Browser balances cannot create spendable currency. Existing collections are reconciled against recorded earnings.',
+  'Referrals reward qualified public play rather than registrations, with daily and lifetime limits. Purchases and awards use durable transaction records to prevent duplicate credits.',
+  'Official enforcement notices include a required reading acknowledgement. Compatible server-only fixes no longer leave Play stuck on an update screen. Version 6.35.0 / protocol 90.'
+ ]},
  {number:'227',title:'Jim McLaughlin — the first Icon',changes:[
   'Jim’s approved sweatshirt outfit and five-piece equipment collection arrive in the Item Shop. The full bundle costs 3,000 Marks; already-owned items reduce its price.',
   'Win a completed online match wearing Jim to permanently unlock Golf. A victory reward screen previews the actual style and lets you equip it. Buying the bundle does not unlock Golf; practice and spectating do not count.',

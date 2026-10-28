@@ -17,7 +17,10 @@ export class OwnerService {
   this.relay=relay;relay.owner=this;relay.parties.store.ownerArchive=ticket=>this.recordTicket(ticket);
   if(this.db.db){this.db.event('deployment','Relay started','',{build:process.env.RENDER_GIT_COMMIT||'local',version:relay.deployment?.version||null});this.capture();this.timer=setInterval(()=>this.capture(),15000);this.timer.unref?.();}
  }
- recordReceipt(account,r){try{if(this.db.db)this.db.receipt(account,r);}catch{this.db.error=Error('A history write failed; existing records have been preserved.');}}
+ recordReceipt(account,r){try{if(this.db.db){
+   if(account.socialId&&r.amount>0){const spent=this.db.get('SELECT coalesce(sum(marks),0) n FROM results WHERE player=? AND at>?',account.socialId,Math.round(r.time*1000)-3600000).n;r.amount=Math.max(0,Math.min(600,900-spent,Math.floor(r.amount)));}
+   this.db.receipt(account,r);if(account.socialId&&this.relay.economy){this.relay.economy.publish(account.socialId);this.relay.economy.qualifyReferral(account.socialId);}
+  }}catch{this.db.error=Error('A history write failed; existing records have been preserved.');}}
  recordTicket(r){try{if(this.db.db)this.db.ticket(r);}catch{this.db.error=Error('A support archive write failed.');}}
  systemEvent(kind,message,target='',data={}){if(!this.db.db)return;try{this.db.event(kind,clean(message),target,data);}catch{this.db.error=Error('An audit write failed.');}}
  authHash(){const configured=this.db.db?this.db.meta('accessHash'):null;return configured?{salt:Buffer.from(configured.salt,'hex'),digest:Buffer.from(configured.digest,'hex')}:{salt:this.salt,digest:this.digest};}
@@ -36,6 +39,7 @@ export class OwnerService {
  sanction(id,kind){if(!id||!this.db.db)return null;return this.db.get('SELECT * FROM sanctions WHERE player=? AND kind=? AND revoked IS NULL AND (expires IS NULL OR expires>?) ORDER BY created DESC LIMIT 1',id,kind,this.now());}
  assertPlayer(id){const ban=this.sanction(id,'ban');if(ban)throw Error('This browser identity is suspended'+(ban.expires?' until '+new Date(ban.expires).toISOString():'')+'. '+ban.reason);}
  assertAdmission(id,mode,access='public'){
+  if(this.db.db&&this.db.get("SELECT id FROM owner_match_notices WHERE player=? AND read_at IS NULL AND json_extract(data,'$.requiredRead')=1 LIMIT 1",id))throw Error('Read and acknowledge your official notice before playing.');
   this.assertPlayer(id);this.db.assert();this.relay?.fairPlay?.assertPlay(id);if(this.controls.maintenance)throw Error(this.controls.maintenanceMessage);
   if(this.controls.modes[mode]?.[access]===false)throw Error('This mode is temporarily closed to '+access+' matchmaking.');
  }

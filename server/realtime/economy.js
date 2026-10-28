@@ -1,0 +1,54 @@
+import {randomUUID} from 'node:crypto';
+import {SHOP_SLOTS,SHOP_BUNDLES,shopItem,quoteOffer,offerGrants} from '../../src/shop-catalog.js';
+import {DEFAULT_OUTFIT_ID} from '../../src/default-operator.js';
+export const ECONOMY_REVISION=1;
+const DAY=86400000,MAX=1e9;
+export class Economy{
+ constructor(relay){this.relay=relay;this.store=relay.owner.db;this.db=this.store.db;this.now=()=>relay.owner.now();this.correction=this.store.db?this.store.meta('economy-correction-v1'):null;if(!this.db)return;
+ this.db.exec(`CREATE TABLE IF NOT EXISTS marks_wallets(player TEXT PRIMARY KEY,balance INTEGER NOT NULL DEFAULT 0,earned INTEGER NOT NULL DEFAULT 0,owned TEXT NOT NULL,migrated INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 0);
+ CREATE TABLE IF NOT EXISTS marks_ledger(id TEXT PRIMARY KEY,player TEXT NOT NULL,at INTEGER NOT NULL,kind TEXT NOT NULL,amount INTEGER NOT NULL,data TEXT NOT NULL);
+ CREATE INDEX IF NOT EXISTS marks_player_time ON marks_ledger(player,at);
+ CREATE TABLE IF NOT EXISTS marks_purchases(id TEXT PRIMARY KEY,player TEXT NOT NULL,at INTEGER NOT NULL,offer TEXT NOT NULL,price INTEGER NOT NULL,grants TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS referral_awards(invitee TEXT PRIMARY KEY,inviter TEXT NOT NULL,at INTEGER NOT NULL);
+ CREATE INDEX IF NOT EXISTS referral_awards_inviter ON referral_awards(inviter,at);`);
+ if(!this.store.meta('legacy-referral-grants-v1')){const at=this.now(),records={};for(const p of this.relay.parties.store.identities.values()){const n=Number(p.referralCount)||0;if(n>0&&n<=25&&p.id!==this.correction?.player)records[p.id]=n*1000;}this.store.setMeta('legacy-referral-grants-v1',{at,records});}
+
+ }
+ row(id){this.store.assert();this.store.run('INSERT OR IGNORE INTO marks_wallets(player,balance,earned,owned) VALUES(?,300,300,?)',id,JSON.stringify([DEFAULT_OUTFIT_ID]));return this.store.get('SELECT * FROM marks_wallets WHERE player=?',id);}
+ credit(id,key,amount,kind,at,data={}){if(!Number.isSafeInteger(amount)||amount<0||amount>MAX)throw Error('Invalid server credit');this.row(id);if(this.store.get('SELECT id FROM marks_ledger WHERE id=?',key))return false;
+ const reset=this.store.meta('marks-reset:'+id,0),value=at<=reset?0:amount;
+ this.store.run('INSERT INTO marks_ledger VALUES(?,?,?,?,?,?)',key,id,at,kind,value,JSON.stringify(data));this.store.run('UPDATE marks_wallets SET balance=min(?,balance+?),earned=min(?,earned+?),revision=revision+1 WHERE player=?',MAX,value,MAX,value,id);return true;}
+ sync(id){this.store.transaction(()=>{this.row(id);const legacy=this.store.meta('legacy-referral-grants-v1');if(legacy?.records[id])this.credit(id,'legacy-referral:'+id,legacy.records[id],'legacy-referral',legacy.at);
+ for(const r of this.store.all('SELECT * FROM results WHERE player=? AND marks>0 ORDER BY at,id',id))this.credit(id,'match:'+r.id,r.marks,'match',r.at,{mode:r.mode});
+ for(const g of this.store.all('SELECT * FROM grants WHERE player=? ORDER BY at,id',id))this.credit(id,'grant:'+g.id,g.amount,'grant',g.at,{reason:g.reason});
+ });return this.view(id);}
+ view(id){const r=this.row(id),owned=JSON.parse(r.owned);const special=this.store.meta('tournament-entitlements',{})[id]||[];owned.push(...special);if(this.relay.parties.store.identities.get(id)?.jimGolfUnlocked)owned.push('outfit-jim-golf');return {identity:id,revision:r.revision,economyRevision:1,balance:r.balance,earned:r.earned,owned:[...new Set(owned)],migrated:!!r.migrated};}
+ publish(id){const value=this.sync(id);this.relay.parties.send(this.relay.parties.users.get(id),{type:'economy',wallet:value});return value;}
+ migrate(id,legacy){this.sync(id);this.store.transaction(()=>{const r=this.row(id);if(r.migrated)return;let balance=r.balance,owned=JSON.parse(r.owned);const claimed=[...new Set(Array.isArray(legacy?.owned)?legacy.owned.filter(x=>typeof x==='string').slice(0,300):[])];
+ // No client balance, earned count, receipt amount or grant counter is imported.
+ // Old ownership is reconciled only within the server's verified earning budget.
+ const available=new Set(claimed.filter(x=>{const i=shopItem(x);return i&&!i.rankReward&&!i.tournamentReward&&!i.winReward&&!i.reviewOnly&&i.price>0;}));
+ 
+ for(const offer of SHOP_BUNDLES){if(offer.items.every(x=>available.has(x))&&offer.price<=balance){const q=quoteOffer({owned},offer.id);if(q&&q.price<=balance){balance-=q.price;owned.push(...q.grants);for(const x of offer.items)available.delete(x);}}}
+ for(const x of available){const i=shopItem(x);if(owned.includes(x))continue;if(i.price<=balance){balance-=i.price;owned.push(x);}}
+ this.store.run('UPDATE marks_wallets SET balance=?,owned=?,migrated=1,revision=revision+1 WHERE player=?',balance,JSON.stringify([...new Set(owned)]),id);
+ this.store.event('economy-migration','Reconciled legacy collection against server-recorded earnings',id,{claimed:claimed.length,accepted:owned.length-1});});return this.publish(id);}
+ buy(id,{offer,price,requestId}){if(!/^[a-f0-9-]{36}$/.test(requestId||''))throw Error('Invalid purchase request');this.sync(id);this.store.transaction(()=>{const old=this.store.get('SELECT * FROM marks_purchases WHERE id=?',requestId);if(old){if(old.player!==id||old.offer!==offer||old.price!==price)throw Error('Purchase request conflict');return;}
+ const r=this.row(id);if(!r.migrated)throw Error('Restore your wallet before buying.');const q=quoteOffer({owned:JSON.parse(r.owned)},offer);if(!q||q.offer.reviewOnly||q.offer.rankReward||q.offer.tournamentReward||q.offer.winReward||q.owned)throw Error('This item cannot be purchased.');if(!Number.isSafeInteger(price)||price!==q.price)throw Error('Price changed. Review the purchase again.');if(r.balance<q.price)throw Error('Not enough Marks.');
+ const at=this.now();this.store.run('INSERT INTO marks_purchases VALUES(?,?,?,?,?,?)',requestId,id,at,offer,q.price,JSON.stringify(q.grants));this.store.run('UPDATE marks_wallets SET balance=balance-?,owned=?,revision=revision+1 WHERE player=?',q.price,JSON.stringify([...new Set([...JSON.parse(r.owned),...q.grants])]),id);this.store.run('INSERT INTO marks_ledger VALUES(?,?,?,?,?,?)','purchase:'+requestId,id,at,'purchase',-q.price,JSON.stringify({offer}));});return this.publish(id);}
+ qualifyReferral(id){const person=this.relay.parties.store.identities.get(id);if(!person?.referredBy||person.id===person.referredBy||this.now()-person.created<DAY)return;
+ if(this.store.get('SELECT invitee FROM referral_awards WHERE invitee=?',id))return;
+ const rows=this.store.all('SELECT id,at,marks FROM results WHERE player=? AND marks>0 AND public=1 ORDER BY at',id);if(rows.length<3||rows.at(-1).at-rows[0].at<20*60000)return;
+ const inviter=person.referredBy,all=this.store.get('SELECT count(*) n FROM referral_awards WHERE inviter=?',inviter).n,recent=this.store.get('SELECT count(*) n FROM referral_awards WHERE inviter=? AND at>?',inviter,this.now()-DAY).n;if(all>=20||recent>=3)return;
+ this.store.transaction(()=>{this.store.run('INSERT OR IGNORE INTO referral_awards VALUES(?,?,?)',id,inviter,this.now());this.credit(inviter,'referral:'+id,1000,'referral',this.now(),{invitee:id});});const personInviter=this.relay.parties.store.identities.get(inviter);if(personInviter){personInviter.qualifiedReferralCount=this.store.get('SELECT count(*) n FROM referral_awards WHERE inviter=?',inviter).n;this.relay.parties.store.save?.();this.relay.parties.send(this.relay.parties.users.get(inviter),{type:'referrals',referrals:{id:inviter,count:personInviter.referralCount||0,marks:personInviter.qualifiedReferralCount*1000}});}this.publish(inviter);}
+ sanitize(profile,id){if(!id)return profile;const owned=new Set(JSON.parse(this.row(id).owned));const rewards=this.store.meta('tournament-entitlements',{})[id]||[];for(const x of rewards)owned.add(x);
+ for(const slot of SHOP_SLOTS){const item=shopItem(profile[slot]);if(item&&item.price>0&&!item.rankReward&&!item.winReward&&!item.tournamentReward&&!owned.has(item.id))profile={...profile,[slot]:slot==='outfit'?DEFAULT_OUTFIT_ID:''};}return profile;}
+ applyOwnerCorrection(){const config=this.correction;if(!config?.player||!config.id)return;const actionKey='marks-correction-applied:'+config.id;if(this.store.meta(actionKey))return;const id=config.player,now=this.now(),bundle=offerGrants(SHOP_BUNDLES.find(x=>x.id===config.keepOffer));
+ this.store.transaction(()=>{this.row(id);this.store.setMeta('marks-reset:'+id,now);this.store.run('UPDATE marks_wallets SET balance=2000,earned=2000,owned=?,migrated=1,revision=revision+1 WHERE player=?',JSON.stringify([DEFAULT_OUTFIT_ID,...bundle]),id);this.store.setMeta(actionKey,{at:now,id,balance:2000,kept:'bundle-jim-icon'});
+ const next=this.relay.fairPlay.nextCup(now,'economy-abuse-20261028'),cup=this.relay.fairPlay.cupData(next),reason='Automated referral farming: 951 referred identities, repeated names and rapid registrations. Owner-directed economy correction.';
+ this.store.run('INSERT OR IGNORE INTO sanctions VALUES(?,?,?,?,?,NULL,?)','economy-ban:'+config.id,id,'ban',now,now+3600000,reason);
+ this.store.run('INSERT OR IGNORE INTO teaming_penalties VALUES(?,?,?,?,NULL,?)','economy-next-cup:'+config.id,id,now,0,JSON.stringify({kind:'cheating',eventId:'economy-abuse-20261028',cup,reason,room:'economy',matchId:'referral-audit-20261028'}));
+ const sections=['Our audit recorded 951 referral registrations credited to your identity, with only five distinct names and bursts of 28 registrations per minute. This pattern was treated as referral reward abuse.','Your Marks balance has been set to 2,000 by the owner. Your full Jim bundle remains available. You may earn legitimate Marks and buy shop items again in the future.','All play is suspended for one hour, ending '+new Date(now+3600000).toISOString()+'. You are excluded from '+(cup?.name||'the next scheduled Frontier Cup')+'. That Cup exclusion ends once that event finishes; it does not ban you from every future Cup.','Marks and purchases are now verified by the server. Referral signups alone no longer pay Marks. Use Report a problem if you believe this action is mistaken.'];
+ this.store.run('INSERT OR IGNORE INTO owner_match_notices VALUES(?,?,?,?,NULL)','economy-official-notice:'+config.id,id,now,JSON.stringify({title:'Official Ravelfront economy enforcement notice',kind:'economy-enforcement',requiredRead:true,minimumReadMs:15000,sections,message:sections.join('\n\n'),expires:now+3600000}));this.store.event('economy-enforcement',reason,id,{balance:2000,jimBundleKept:true,cup,banUntil:now+3600000,purchaseRollback:'Exact legacy purchase dates unavailable; no unsupported date claims.'});
+ });this.relay.fairPlay.reloadPenalties();}
+}
