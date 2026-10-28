@@ -1,7 +1,7 @@
 import {DatabaseSync,backup} from 'node:sqlite';
 import {randomUUID,createHash} from 'node:crypto';
 import {mkdirSync,readFileSync,existsSync,statSync,chmodSync} from 'node:fs';
-import {mkdir,readdir,rename,unlink,stat} from 'node:fs/promises';
+import {mkdir,readdir,rename,unlink,stat,statfs} from 'node:fs/promises';
 import {dirname,join} from 'node:path';
 import {recoverOwnerVisits} from './owner-recovery.js';
 import {socialDataPath,persistentMount} from './data-path.js';
@@ -151,7 +151,21 @@ export class OwnerStore{
  storage(){let bytes=0;for(const suffix of ['', '-wal'])try{bytes+=statSync(this.path+suffix).size;}catch{}return {available:!!this.db&&!this.error,persistent:persistentMount(this.path),mode:this.path===':memory:'?'memory':persistentMount(this.path)?'persistent-file':'configured-file',schema:1,bytes,integrityAt:this.integrityAt||null,lastWrite:this.writeAt||null,lastBackup:this.db?this.meta('lastBackup'):null,error:this.error?.message||null,retention:'No automatic history deletion',createdAt:this.db?this.meta('createdAt'):null};}
  async createBackup(){
   this.assert();if(this.path===':memory:')throw Error('Backups require configured storage');if(this.backupPromise)return this.backupPromise;
-  this.backupPromise=(async()=>{const dir=this.path+'.backups';await mkdir(dir,{recursive:true});const name='owner-'+new Date(this.now()).toISOString().replace(/[:.]/g,'-')+'.sqlite',path=join(dir,name),temp=path+'.tmp';await backup(this.db,temp);const check=new DatabaseSync(temp,{readOnly:true});try{if(check.prepare('PRAGMA quick_check').get().quick_check!=='ok')throw Error('Backup verification failed');}finally{check.close();}chmodSync(temp,0o600);await rename(temp,path);const info={name,at:this.now(),bytes:(await stat(path)).size};this.setMeta('lastBackup',info);this.event('backup','Created and verified a database backup','',info);const files=(await readdir(dir)).filter(n=>/^owner-[\dTZ-]+\.sqlite$/.test(n)).sort().reverse();for(const old of files.slice(14))await unlink(join(dir,old));return {path,...info};})().finally(()=>{this.backupPromise=null;});return this.backupPromise;
+  this.backupPromise=(async()=>{
+   const dir=this.path+'.backups';await mkdir(dir,{recursive:true});
+   const source=(await stat(this.path)).size,budget=256*1024*1024;
+   if(source>192*1024*1024)throw Error('Backup paused: compact replay storage before backing up an oversized database.');
+   const files=(await readdir(dir)).filter(n=>/^owner-[\dTZ-]+\.sqlite$/.test(n)).sort().reverse();
+   let used=0;for(let i=0;i<files.length;i++){const size=(await stat(join(dir,files[i]))).size;if(i>=1||used+size+source>budget)await unlink(join(dir,files[i]));else used+=size;}
+   // Failed partial copies are disposable; never leave them to accumulate.
+   for(const file of await readdir(dir))if(/^owner-[\dTZ-]+\.sqlite\.tmp(?:-wal|-shm)?$/.test(file))await unlink(join(dir,file));
+   const space=await statfs(dir);if(space.bavail*space.bsize<source+32*1024*1024)throw Error('Backup postponed: insufficient free disk space.');
+   const name='owner-'+new Date(this.now()).toISOString().replace(/[:.]/g,'-')+'.sqlite',path=join(dir,name),temp=path+'.tmp';
+   try{
+    await backup(this.db,temp);const check=new DatabaseSync(temp,{readOnly:true});try{if(check.prepare('PRAGMA quick_check').get().quick_check!=='ok')throw Error('Backup verification failed');}finally{check.close();}
+    chmodSync(temp,0o600);await rename(temp,path);const info={name,at:this.now(),bytes:(await stat(path)).size};this.setMeta('lastBackup',info);this.event('backup','Created and verified a database backup','',info);return {path,...info};
+   }finally{for(const suffix of ['', '-wal','-shm'])try{await unlink(temp+suffix);}catch(error){if(error.code!=='ENOENT')throw error;}}
+  })().finally(()=>{this.backupPromise=null;});return this.backupPromise;
  }
  exportHistory(){this.assert();return {format:'ravelfront-owner-history',version:1,exportedAt:this.now(),legacyVisitBaseline:this.meta('legacyVisitBaseline',0),tables:Object.fromEntries(HISTORY_TABLES.map(t=>[t,this.all(`SELECT * FROM ${t}`)]))};}
  mergeHistory(value,apply=false){

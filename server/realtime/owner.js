@@ -61,7 +61,7 @@ export class OwnerService {
     for(const ticket of r.parties.store.featureRequests)this.db.ticket(ticket);
    });
    this.db.error=null;const publicKey=JSON.stringify({type:'owner-controls',controls:this.publicControls()});if(publicKey!==this.publicKey)this.publishControls();
-   if(this.db.path!==':memory:'&&this.db.storage().bytes<64*1024*1024&&this.now()-(this.db.meta('lastBackup')?.at||0)>DAY)void this.db.createBackup().then(()=>{this.backupError=null;}).catch(()=>{this.backupError='Automatic backup failed. Check storage.';});
+   if(this.db.path!==':memory:'&&this.now()>(this.nextBackupAttempt||0)&&this.now()-(this.db.meta('lastBackup')?.at||0)>DAY)void (this.nextBackupAttempt=this.now()+3600000,this.db.createBackup()).then(()=>{this.backupError=null;}).catch(()=>{this.backupError='Automatic backup failed. Check storage.';});
   }catch(error){this.db.error=Error('Owner history could not be updated. Existing data has not been replaced.');console.error('Owner history capture failed:',error.code||error.message);}
  }
  players(input={}){
