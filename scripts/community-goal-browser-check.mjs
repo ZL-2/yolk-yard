@@ -2,12 +2,15 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {createServer} from 'vite';
 import {mkdir} from 'node:fs/promises';
+import {fixture} from '../tests/helpers/public-match.js';
 const out='test-results/community-goal';await mkdir(out,{recursive:true});
-const vite=await createServer({server:{host:'127.0.0.1',port:5299,strictPort:true}});await vite.listen();
+const f=await fixture({serverOptions:{origins:['http://127.0.0.1:5299']}}),target='http://127.0.0.1:'+f.app.server.address().port;
+const vite=await createServer({server:{host:'127.0.0.1',port:5299,strictPort:true,proxy:{'^/(game|social|health|leaderboards|tournament|icon-voting)(/|$|\\?)':{target,ws:true}}}});await vite.listen();
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:.6});page.setDefaultTimeout(120000);
 const errors=[];page.on('pageerror',e=>errors.push(e.message));let raised=0;
 await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Community QA'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,musicVolume:0}));for(const key of ['ravelfront-jim-icon-227-dismissed','ravelfront-season-1-update-150-dismissed','ravelfront-referrals-dismissed','ravelfront-perspective-157-dismissed','ravelfront-voice-192-dismissed'])localStorage.setItem(key,'yes');});
+await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.YOLK_NETWORK={relay:"ws://127.0.0.1:5299/game"};'}));
 await page.route('**/community-goal.json',r=>r.fulfill({json:{raised,donateUrl:'https://venmo.com/ZachL99'}}));
 try{
  await page.goto('http://127.0.0.1:5299/?qa=1');
@@ -19,6 +22,8 @@ try{
  assert.equal(await popup.locator('[data-goal-progress]').getAttribute('value'),'0');
  await popup.screenshot({path:out+'/desktop-announcement.png'});
  await popup.getByRole('button',{name:'Close community announcement'}).click();
+ await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
+ assert.equal(await page.locator('#menu .lobby-play').isEnabled(),true,'game remains playable');
  const bar=page.locator('#menu .community-top');await bar.waitFor();assert.match(await bar.innerText(),/\$0 \/ \$100/);
  await bar.getByRole('button',{name:'Open community support information'}).click();await popup.waitFor();
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:out+'/mobile-announcement.png'});
@@ -28,4 +33,4 @@ try{
  const overlap=await page.evaluate(()=>{const a=document.querySelector('#menu .community-top').getBoundingClientRect();return [...document.querySelectorAll('#menu .yard-nav nav button')].some(el=>{const b=el.getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});});assert.equal(overlap,false,'goal must not cover navigation');
  raised=25;await page.reload();await popup.waitFor();await page.waitForFunction(()=>document.querySelector('.community-announcement [data-goal-total]')?.textContent==='$25 / $100');assert.match(await popup.innerText(),/\$75 remaining/);
  assert.deepEqual(errors,[]);console.log('PASS community announcement, reopen, every-launch display, manual progress and mobile layout');
-}catch(e){await page.screenshot({path:out+'/failure.png'}).catch(()=>{});throw e;}finally{await browser.close();await vite.close();}
+}catch(e){await page.screenshot({path:out+'/failure.png'}).catch(()=>{});throw e;}finally{await browser.close();await vite.close();await f.close();}
