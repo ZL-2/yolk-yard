@@ -12,6 +12,7 @@ export class Economy{
  CREATE TABLE IF NOT EXISTS referral_awards(invitee TEXT PRIMARY KEY,inviter TEXT NOT NULL,at INTEGER NOT NULL);
  CREATE INDEX IF NOT EXISTS referral_awards_inviter ON referral_awards(inviter,at);`);
  if(!this.store.meta('legacy-referral-grants-v1')){const at=this.now(),records={};for(const p of this.relay.parties.store.identities.values()){const n=Number(p.referralCount)||0;if(n>0&&n<=25&&p.id!==this.correction?.player)records[p.id]=n*1000;}this.store.setMeta('legacy-referral-grants-v1',{at,records});}
+if(!this.store.meta('legacy-referral-awards-seeded-v1')){const legacy=this.store.meta('legacy-referral-grants-v1');this.store.transaction(()=>{for(const p of this.relay.parties.store.identities.values())if(legacy?.records[p.referredBy]&&p.referredAt<=legacy.at)this.store.run('INSERT OR IGNORE INTO referral_awards VALUES(?,?,?)',p.id,p.referredBy,p.referredAt);this.store.setMeta('legacy-referral-awards-seeded-v1',true);});}
 
  }
  row(id){this.store.assert();this.store.run('INSERT OR IGNORE INTO marks_wallets(player,balance,earned,owned) VALUES(?,300,300,?)',id,JSON.stringify([DEFAULT_OUTFIT_ID]));return this.store.get('SELECT * FROM marks_wallets WHERE player=?',id);}
