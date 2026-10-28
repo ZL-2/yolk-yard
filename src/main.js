@@ -70,6 +70,7 @@ import './referrals.css';
 import {showReferrals,ReferralRewards} from './referrals.js';
 import {showPerspectiveBriefing} from './perspective-briefing.js';
 import {showVoiceBriefing} from './voice-briefing.js';
+import {goalBarMarkup} from './community-goal.js';
 import {showMidseasonBriefing} from './midseason-briefing.js';
 import {creditsHTML} from './credits.js';
 import {perspectiveMode,thirdPersonActive} from './perspective.js';
@@ -368,7 +369,7 @@ function remember() {
   else net?.profile(profile);
 }
 function titleBar() {
-  return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
+  return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button>${goalBarMarkup()}<div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
 let socialActivityKey='';
 let competitiveCareer=null,competitiveError='',competitivePending=false,competitiveAt=0,competitiveScroll=false;
@@ -1555,7 +1556,7 @@ const actions = {
  'social-confirm-new-identity':()=>{try{fairPlay.admission();ownerNotices.admission();}catch(error){return errorToast(error.message);}party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
  referrals:()=>showReferrals({party}),
- 'midseason-briefing':()=>showMidseasonBriefing({force:true}),
+ 'midseason-briefing':()=>showMidseasonBriefing(),
  'voice-briefing':()=>showVoiceBriefing({force:true}),
  'perspective-briefing':()=>showPerspectiveBriefing({force:true}),
  'z-journal':openZombiesJournal,
