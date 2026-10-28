@@ -2,7 +2,8 @@ import {readFile,writeFile,rename,mkdir} from 'node:fs/promises';
 import {dirname} from 'node:path';
 import {socialDataPath} from './data-path.js';
 // Persist the update latch across the disk-backed service's mandatory restart.
-// Recovery requires both the frontend and this exact relay build to be ready.
+// Recovery requires compatible published game versions and healthy storage.
+// Server-only fixes can ship independently without blocking a compatible client.
 export class DeploymentStatus{
  constructor(relay,{build=process.env.RENDER_GIT_COMMIT,version,path=process.env.RENDER_GIT_COMMIT?dirname(socialDataPath())+'/deployment.json':null,fetcher=fetch}={}){
   Object.assign(this,{relay,build,version,path,fetcher});this.state={updating:false,build,version};this.ready=this.restore();
@@ -27,7 +28,7 @@ export class DeploymentStatus{
    const ahead=parts(latest.version).some((n,i,a)=>n>parts(this.version)[i]&&a.slice(0,i).every((x,j)=>x===parts(this.version)[j]));
    if(ahead){await this.set(true,latest.version);return;}
    const front=await get('https://zl-2.github.io/yolk-yard/version.json?t='+Date.now());
-   if(front.build!==this.build||front.appVersion!==this.version){await this.set(true,latest.version);return;}
+   if(front.appVersion!==this.version){await this.set(true,latest.version);return;}
    if(this.relay.parties.store.storage().available)await this.set(false,this.version);
   }catch{ /* A failed probe never clears a previously announced update. */ }
   finally{this.checking=false;}
