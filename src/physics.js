@@ -125,7 +125,7 @@ export function wallDistance(map, o, d, max = 200, ignoreChests=false) {
     }
    }
   }
-  if(!ignoreChests&&map.chestCollisionMap)for(const b of staticCandidates(map.chestCollisionMap,o,d,t,0))t=Math.min(t,rayBox(o,d,b,t));
+  if(ignoreChests!==true&&map.chestCollisionMap)for(const b of staticCandidates(map.chestCollisionMap,o,d,t,0))if(b.chestId!==ignoreChests)t=Math.min(t,rayBox(o,d,b,t));
   const ground=terrainHit(map,o,d,t);if(ground)t=Math.min(t,ground.distance);
   return t;
 }

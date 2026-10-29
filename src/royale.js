@@ -232,7 +232,7 @@ export class RoyaleSimulation extends Simulation {
  accessible(p,item,range=3){
   if((p.x-item.x)**2+(p.y-item.y)**2+(p.z-item.z)**2>range*range || item.landAt>this.time)return false;
   const from={x:p.x,y:p.y+.9,z:p.z},to={x:item.x-from.x,y:item.y+.6-from.y,z:item.z-from.z},len=Math.hypot(to.x,to.y,to.z)||1;
-  return wallDistance(this.map,from,{x:to.x/len,y:to.y/len,z:to.z/len},len)>=len-.15;
+  return wallDistance(this.map,from,{x:to.x/len,y:to.y/len,z:to.z/len},len,item.uid===undefined?item.id:false)>=len-.15;
  }
  syncInventory(p){
   // These arrays are simulation-owned; snapshots already copy them. Reusing
