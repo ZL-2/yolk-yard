@@ -1,3 +1,4 @@
+import {syncChestCollisions} from './chest-collision.js';
 import {environmentCollision} from './environment-collision.js';
 import {sightRay,reachablePoint,thirdPersonActive} from './perspective.js';
 import {SHIELD_BARREL} from './field-refinement.js';
@@ -137,7 +138,7 @@ export function rebuildMap(sim,{navigationChanged=true}={}){
 }
 export function resetBuilding(sim){
  for(const p of sim.players?.values()||[])p.phasedBuilds=[];
- sim.worldBoxes=authoredBoxes(sim.map);sim.worldDamage={};sim.builds=[];sim.buildId=0;sim.buildVersion=0;rebuildMap(sim);
+ sim.worldBoxes=authoredBoxes(sim.map);sim.worldDamage={};sim.builds=[];sim.buildId=0;sim.buildVersion=0;syncChestCollisions(sim.map,sim.chests||[],sim.time||0);rebuildMap(sim);
 }
 // Only players already intersecting newly added geometry can leave through it.
 // Geometry stays solid for everybody else and for bullets; the exception ends
@@ -293,6 +294,7 @@ export function constructionTick(sim){
 }
 // Remote prediction and rendering use their own map; simulation maps never mutate the authored island.
 export function applyBuildState(map,r){
+ if(r.chests)syncChestCollisions(map,r.chests,r.time??0);
  if(map.boxArena||map.zoneWars)map.boxPrep=['waiting','prepare'].includes(r.boxfightStage);
  updateDoorCollisions(map,r.doors,r.time??0);
  const revision=Number.isFinite(r.buildVersion)?r.matchId+':'+r.round+':'+r.buildVersion:null;

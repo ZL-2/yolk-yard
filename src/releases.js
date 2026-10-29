@@ -1,4 +1,11 @@
 export const RELEASE_NOTES = [
+ {number:'235',title:'Gifts, Icon earnings and Frontier Cup rules',changes:[
+  'Buy Item Shop gifts using a player’s Friend Code. Review their name and price before sending; gifts and Marks are verified by the online service.',
+  'Icon creators receive 5% of Marks spent on their collection. Jim earnings go to ballz, including recorded past purchases, with an explanation for each payout.',
+  'Private Royale matches preserve your public Victory Crown. Chests and door leaves now block movement and gunfire at their visible positions.',
+  'Frontier Cups have no vehicles. Eliminations restore 50 health/shield, health first, and opponents drop 50 of each material. The lobby Cup card can be minimized to its title.',
+  'Victory Score is now 100 × wins + 10 × kills. Saved match totals are preserved and rankings recalculate using the new formula.'
+ ]},
  {number:'234',title:'Verified Marks and secure purchases',changes:[
   'Marks and Item Shop purchases are now saved and verified by the online service. Browser balances cannot create spendable currency. Existing collections are reconciled against recorded earnings.',
   'Referrals reward qualified public play rather than registrations, with daily and lifetime limits. Purchases and awards use durable transaction records to prevent duplicate credits.',

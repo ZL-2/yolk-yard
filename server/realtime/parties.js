@@ -80,6 +80,9 @@ if(this.relay.deployment)this.send(user,{type:'deployment',deployment:this.relay
   switch(m.type){
    case 'economy-sync':this.limit(u,'economy',30,60000);this.relay.economy.qualifyReferral(u.id);return this.relay.economy.publish(u.id);
    case 'economy-migrate':this.limit(u,'economy-migrate',5,60000);return this.relay.economy.migrate(u.id,m.legacy);
+   case 'economy-gift-quote':this.limit(u,'economy-gift-quote',15,60000);return this.relay.economy.giftQuote(u.id,m);
+   case 'economy-gift':this.limit(u,'economy-gift',5,60000);return this.relay.economy.gift(u.id,m);
+   case 'economy-notice-ack':return this.relay.economy.acknowledge(u.id,m.ids);
    case 'economy-buy':this.limit(u,'economy-buy',15,60000);return this.relay.economy.buy(u.id,m);
 
    case 'voice-ticket':case 'voice-context':return this.relay.voice.command(u,m,ws);

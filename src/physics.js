@@ -77,6 +77,11 @@ function collisionGrid(map){
 function queryStamp(grid){if(++grid.stamp===0xffffffff){grid.seen.fill(0);grid.stamp=1;}return grid.stamp;}
 const EMPTY_BOXES=Object.freeze([]);
 export function candidates(map,o,d=null,max=0,radius=RADIUS){
+ const world=staticCandidates(map,o,d,max,radius),chests=map.chestCollisionMap;
+ if(!chests?.boxes.length)return world;
+ const extra=staticCandidates(chests,o,d,max,radius);return extra.length?world.concat(extra):world;
+}
+function staticCandidates(map,o,d=null,max=0,radius=RADIUS){
  if(map.boxes.length<32)return map.boxes;
  const grid=collisionGrid(map);
  // Reuse exact bucket unions for movement and short collision/LOS probes.
@@ -106,7 +111,7 @@ export function candidates(map,o,d=null,max=0,radius=RADIUS){
  }
  return found;
 }
-export function wallDistance(map, o, d, max = 200) {
+export function wallDistance(map, o, d, max = 200, ignoreChests=false) {
   let t = max;
   if(map.boxes.length<32){for(const b of map.boxes)t=Math.min(t,rayBox(o,d,b,t));}
   else{
@@ -120,6 +125,7 @@ export function wallDistance(map, o, d, max = 200) {
     }
    }
   }
+  if(!ignoreChests&&map.chestCollisionMap)for(const b of staticCandidates(map.chestCollisionMap,o,d,t,0))t=Math.min(t,rayBox(o,d,b,t));
   const ground=terrainHit(map,o,d,t);if(ground)t=Math.min(t,ground.distance);
   return t;
 }
@@ -179,12 +185,12 @@ export function boxVertical(b,x,z,radius=0,out={}){
  if(Math.abs(x-b.x)>=b.w/2+radius||Math.abs(z-b.z)>=b.d/2+radius)return null;out.min=b.y;out.max=b.y+b.h;return out;
 }
 export function boxTop(b,x,z,radius=0){return boxVertical(b,x,z,radius,shapeScratch)?.max??-Infinity;}
-export function canStand(map,p,margin=RADIUS) {
- return canOccupy(map,p,HEIGHT,margin);
+export function canStand(map,p,margin=RADIUS,ignoreChests=false) {
+ return canOccupy(map,p,HEIGHT,margin,p.phasedBuilds,ignoreChests);
 }
-export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS,phases=p.phasedBuilds) {
+export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS,phases=p.phasedBuilds,ignoreChests=false) {
  if(Math.abs(p.x)>map.size-margin||Math.abs(p.z)>map.size-margin)return false;
- for(const b of candidates(map,p,null,0,margin))if(movementBoxSolid(p,b,phases)&&(b.collisionShape?shapeOverlap(b.collisionShape,p,height,margin):p.y+.035<b.y+b.h&&p.y+height>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin))return false;
+ for(const b of candidates(map,p,null,0,margin))if(!(ignoreChests&&b.chestId)&&movementBoxSolid(p,b,phases)&&(b.collisionShape?shapeOverlap(b.collisionShape,p,height,margin):p.y+.035<b.y+b.h&&p.y+height>b.y+.02&&Math.abs(p.x-b.x)<b.w/2+margin&&Math.abs(p.z-b.z)<b.d/2+margin))return false;
  return true;
 }
 function pushAxis(p,map,axis,delta) {

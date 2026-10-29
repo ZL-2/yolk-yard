@@ -16,20 +16,20 @@ function fixture(){const identities=new Map(),sent=[],updates=[],users=new Map()
  const add=(id,wins=0,kills=0)=>{identities.set(id,{profile:{name:id,pickaxe:''}});users.set(id,{id,profile:identities.get(id).profile});service.accounts.set(id,account(id,wins,kills));service.rankRewards.invalidate();};return {service,relay,identities,sent,updates,add};}
 
 test('Victory Score preserves wins and gives every kill ten points without diminishing returns',()=>{
- assert.equal(royaleRating({wins:1,kills:25}),1250);assert.equal(royaleRating({wins:0,kills:100}),1000);assert.equal(royaleRating({wins:5,kills:100}),6000);
+ assert.equal(royaleRating({wins:1,kills:25}),350);assert.equal(royaleRating({wins:0,kills:100}),1000);assert.equal(royaleRating({wins:5,kills:100}),1500);
  assert.equal(royaleRating({wins:30,kills:500})-royaleRating({wins:30,kills:400}),1000);
  assert.equal(royaleRating({wins:NaN,kills:-10}),0);assert.equal(royaleRating({wins:Infinity,kills:Infinity}),0);
  for(const [rank,count]of [[1,4],[2,3],[5,3],[6,2],[10,2],[11,1],[25,1],[26,0],[0,0]])assert.equal(eligibleRankPickaxes(rank,100).length,count);
  assert.deepEqual(eligibleRankPickaxes(1,0),[]);
 });
 test('Royale score has unique stable places, rewards wins in a score tie and leaves other modes alone',()=>{
- const accounts=new Map([['a',account('a',1,0)],['b',account('b',0,100)],['c',account('c',1,0)]]),identities=new Map([['a',{profile:{name:'Zulu'}}],['c',{profile:{name:'Alpha'}}]]);
+ const accounts=new Map([['a',account('a',1,0)],['b',account('b',0,10)],['c',account('c',1,0)]]),identities=new Map([['a',{profile:{name:'Zulu'}}],['c',{profile:{name:'Alpha'}}]]);
  let ranks=rankPublicPlayers(accounts,identities,'royale');assert.deepEqual(ranks.rating.map(p=>p.socialId),['a','c','b']);identities.get('c').profile.name='AAAA';assert.deepEqual(rankPublicPlayers(accounts,identities,'royale').rating.map(p=>p.socialId),['a','c','b']);
- const board=publicLeaderboardView(ranks,'a');assert.equal(board.rating.self.rating,1000);assert.equal(board.rating.rows[0].you,true);assert.equal(JSON.stringify(board).includes('socialId'),false);assert.equal(rankPublicPlayers(accounts,identities,'ffa').rating,undefined);
+ const board=publicLeaderboardView(ranks,'a');assert.equal(board.rating.self.rating,100);assert.equal(board.rating.rows[0].you,true);assert.equal(JSON.stringify(board).includes('socialId'),false);assert.equal(rankPublicPlayers(accounts,identities,'ffa').rating,undefined);
  const html=leaderboardMarkup({leaderboards:board,leaderboardTab:'rating',profile:{name:'A'}});assert.match(html,/data-leaderboard-tab="rating"/);assert.match(html,/HOW SCORE WORKS/);assert.match(html,/>SCORE<\/span><span>WINS<\/span><span>KILLS/);assert.equal(leaderboardMarkup({leaderboardMode:'ffa',profile:{name:'A'}}).includes('royale-rank-info'),false);
 });
 test('claims are cumulative; dropping and regaining thresholds revoke and re-offer only affected rewards',async()=>{
- const f=fixture(),r=f.service.rankRewards;f.add('champion',2,20);f.add('rival',1,0);
+ const f=fixture(),r=f.service.rankRewards;f.add('champion',2,20);f.add('rival',3,0);
  assert.deepEqual(r.status('champion').pending,all);r.claim('champion',ids,ids[3]);assert.equal(f.identities.get('champion').profile.pickaxe,ids[3]);assert.deepEqual(r.status('champion').pending,extras);
  f.service.recordPublicStat({identity:'rival'},'wins');f.service.recordPublicStat({identity:'rival'},'wins');r.refresh();let status=r.status('champion');assert.equal(status.rank,2);assert.deepEqual(status.claimed,ids.slice(0,3));assert.equal(f.identities.get('champion').profile.pickaxe,'');assert.throws(()=>r.claim('champion',[ids[3]],ids[3]),/rank changed/);
  for(let i=0;i<25;i++)f.add('ahead-'+i,10,10);r.refresh();status=r.status('champion');assert.deepEqual(status.eligible,[]);assert.deepEqual(status.claimed,[]);

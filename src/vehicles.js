@@ -25,7 +25,7 @@ export function vehicleSupportHeight(map,v){
 }
 export function initializeVehicles(sim){
  sim.vehicles=[];for(const p of sim.players.values()){p.vehicleId=null;p.vehicleSeat=null;p.vehicleType=null;p.vehicleLock=0;}
- if(sim.map.id!=='sunnybreak')return;
+ if(sim.tournament||sim.map.id!=='sunnybreak')return;
  for(const [index,site]of ATV_SITES.entries()){
   let spot;for(const radius of [0,3,6,9,12,16]){for(let i=0;i<(radius?12:1);i++){const angle=i*Math.PI/6,x=site.x+Math.cos(angle)*radius,z=site.z+Math.sin(angle)*radius,y=groundAt(sim.map,x,z),probe={x,y,z,yaw:site.yaw};if(y>1.3&&fits(sim.map,probe)&&canOccupy(sim.map,{x,y:y+.1,z},2.1,1.8)){spot=probe;break;}}if(spot)break;}
   if(!spot)throw Error('ATV parking blocked: '+site.id);

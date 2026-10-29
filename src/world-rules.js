@@ -3,9 +3,9 @@ export const WORLD_RULES=Object.freeze({epicChestChance:.05,vaultUse:2,doorRange
 export const TACTICAL_SPRINT=Object.freeze({speed:8.8,arenaMultiplier:1.32,drain:18,recharge:22,delay:1.1,restart:25,raiseTime:.2,acceleration:5});
 
 export function worldDoorBox(box,doors,definitions=[],time=0){
- const state=doors?.[box.doorId];if(!box.doorId||!state?.open)return box;
+ const state=doors?.[box.doorId];if(!box.doorId)return box;
  const door=definitions.find(d=>d.id===box.doorId);
- if(!door?.vault)return state.passable!==false?null:box;
+ if(!door)return box;
  const frame=doorFrame(door),reach=frame.width+frame.depth;
  const owner={...box,x:frame.x,z:frame.z,w:reach*2,d:reach*2,doorLeaf:door,collisionShape:{kind:'obb'}};
  updateDoorLeaf(owner,state,time);return owner;

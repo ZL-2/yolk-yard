@@ -1,7 +1,7 @@
 // One public policy for ranking, eligibility, previews and the in-game explainer.
 const count=n=>Number.isFinite(n)?Math.max(0,Math.min(1e9,Math.floor(n))):0;
-export const ROYALE_RATING_VERSION=2;
-export const royaleRating=({wins=0,kills=0}={})=>1000*count(wins)+10*count(kills);
+export const ROYALE_RATING_VERSION=3;
+export const royaleRating=({wins=0,kills=0}={})=>100*count(wins)+10*count(kills);
 export const ROYALE_PICKAXES=Object.freeze([
  {id:'pickaxe-rank-25',name:'Tempest Talon',rank:25,label:'TOP 25',color:'#123b53',accent:'#58edff',metal:'#bddeeb',model:'rank-tempest',swingStyle:'hook',glyph:'XXV',story:'A hooked stormglass blade, machined silver armor and an electric cyan heart. Reserved for the coast’s Top 25.'},
  {id:'pickaxe-rank-10',name:'Rift Reaver',rank:10,label:'TOP 10',color:'#302045',accent:'#d19aff',metal:'#c7b6ef',model:'rank-rift',swingStyle:'crescent',glyph:'X',story:'Twin crescent edges surround a suspended violet singularity. A trophy for the ten who break the field.'},

@@ -10,7 +10,7 @@ const legacy=[];
 export class EggShop {
  constructor({wallet,view,getProfile,setProfile,rankRewards}){Object.assign(this,{wallet,view,getProfile,setProfile,rankRewards});this.tab='shop';this.category='all';this.search='';this.sort='featured';this.page=0;this.selected='outfit-voss';this.inspecting=false;this.previewId=null;this.artMode=false;this.notice='';this.angle=0;this.pending=false;this.characterAngle=0;}
  open(root){
-  this.root=root;this.confirm=false;this.inspecting=false;this.wallet.value=this.wallet.read();this.render();
+  this.root=root;this.gift=null;this.confirm=false;this.inspecting=false;this.wallet.value=this.wallet.read();this.render();
   root.onclick=e=>this.click(e);root.oninput=e=>this.filter(e);root.onchange=e=>this.filter(e);root.onkeydown=e=>this.navigate(e);
   root.onpointerdown=e=>{const target=e.target.closest('.locker-operator-view,.shop-model-view');if(!target||e.button!==0||this.artMode)return;this.dragStart={x:e.clientX,target,character:target.classList.contains('locker-operator-view')};target.setPointerCapture?.(e.pointerId);};
   root.onpointerup=e=>{const drag=this.dragStart;this.dragStart=null;if(!drag||Math.abs(e.clientX-drag.x)<5)return;const delta=Math.round((e.clientX-drag.x)/40)*Math.PI/8;if(drag.character)this.characterAngle=(this.characterAngle+delta)%(Math.PI*2);else this.angle=(this.angle+delta)%(Math.PI*2);this.render();};
@@ -36,12 +36,16 @@ export class EggShop {
    if(d.shopTab&&this.embedded&&d.shopTab!=='earn'){this.onTab?.(d.shopTab);return;}
    if(d.shopTab){this.inspecting=false;this.tab=d.shopTab;this.category='all';this.page=0;this.search='';this.confirm=false;}
    if(d.shopCategory){this.inspecting=false;this.category=d.shopCategory;this.page=0;this.confirm=false;}
-   if(d.shopItem&&shopOffer(d.shopItem)){this.selected=d.shopItem;this.previewId=null;this.inspecting=true;this.confirm=false;this.angle=0;this.artMode=false;}
+   if(d.shopItem&&shopOffer(d.shopItem)){this.gift=null;this.selected=d.shopItem;this.previewId=null;this.inspecting=true;this.confirm=false;this.angle=0;this.artMode=false;}
    if(d.shopPage!==undefined){this.page=Math.max(0,Number(d.shopPage));}
    if(d.shopTurn){this.angle=(this.angle+Number(d.shopTurn)*Math.PI/4)%(Math.PI*2);this.artMode=false;}
    if(d.shopArt)this.artMode=!this.artMode;
-   if(d.shopBack){this.inspecting=false;this.confirm=false;}
+   if(d.shopBack){this.gift=null;this.inspecting=false;this.confirm=false;}
    if(d.shopStyle||d.shopPreview){const id=d.shopStyle||d.shopPreview,offer=shopOffer(this.selected),candidate=shopItem(id);if(candidate&&candidate.set===offer?.set){this.previewId=id;this.artMode=false;this.confirm=false;}}
+   if(d.shopGiftStart){this.gift={code:''};this.confirm=false;}
+   if(d.shopGiftCancel)this.gift=null;
+   if(d.shopGiftQuote){const code=this.root.querySelector('.shop-gift-code')?.value||'';this.pending=true;const quote=await this.wallet.giftQuote(code,this.selected);this.pending=false;this.gift={code,...quote};}
+   if(d.shopGiftSend){if(!this.gift?.recipient)throw Error('Review the recipient and gift first.');this.pending=true;await this.wallet.gift(this.gift);this.pending=false;this.notice='Gift delivered to '+this.gift.name+'’s locker.';this.gift=null;}
    if(d.shopConfirm){const q=quoteOffer(this.wallet.value,this.selected);this.confirm={id:this.selected,price:q.price};}if(d.shopCancel)this.confirm=false;
    if(d.shopBuy){if(this.confirm?.id!==d.shopBuy)throw Error('Review and confirm your purchase first.');this.pending=true;this.render();await this.wallet.buy(d.shopBuy,this.confirm.price);this.pending=false;this.confirm=false;this.notice='Added to your locker. Ready to equip.';}
    if(d.shopEquip){const item=shopItem(d.shopEquip)||legacy.find(i=>i.id===d.shopEquip);this.wallet.value=this.wallet.read();if(!item||!item.legacy&&!this.wallet.value.owned.includes(item.id)&&!this.rankRewards?.access.includes(item.id))throw Error('Purchase this item before equipping it.');const p=this.getProfile();this.setProfile(safeProfile({...p,...(item.slot==='outfit'||item.legacy?item.profile:{}),...(item.legacy?{outfit:''}:{[item.slot]:item.id})}));this.notice='Equipped. Ready for your next spawn or match.';}

@@ -1,5 +1,6 @@
+import {payIconPurchase,reconcileIconEarnings} from './icon-earnings.js';
 import {randomUUID} from 'node:crypto';
-import {SHOP_SLOTS,SHOP_BUNDLES,shopItem,quoteOffer,offerGrants} from '../../src/shop-catalog.js';
+import {SHOP_SLOTS,SHOP_BUNDLES,shopItem,shopOffer,quoteOffer,offerGrants} from '../../src/shop-catalog.js';
 import {DEFAULT_OUTFIT_ID} from '../../src/default-operator.js';
 export const ECONOMY_REVISION=1;
 const DAY=86400000,MAX=1e9;
@@ -10,20 +11,23 @@ export class Economy{
  CREATE INDEX IF NOT EXISTS marks_player_time ON marks_ledger(player,at);
  CREATE TABLE IF NOT EXISTS marks_purchases(id TEXT PRIMARY KEY,player TEXT NOT NULL,at INTEGER NOT NULL,offer TEXT NOT NULL,price INTEGER NOT NULL,grants TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS referral_awards(invitee TEXT PRIMARY KEY,inviter TEXT NOT NULL,at INTEGER NOT NULL);
- CREATE INDEX IF NOT EXISTS referral_awards_inviter ON referral_awards(inviter,at);`);
+ CREATE INDEX IF NOT EXISTS referral_awards_inviter ON referral_awards(inviter,at);
+ CREATE TABLE IF NOT EXISTS marks_gifts(id TEXT PRIMARY KEY,sender TEXT NOT NULL,recipient TEXT NOT NULL,offer TEXT NOT NULL,price INTEGER NOT NULL,at INTEGER NOT NULL);
+ CREATE TABLE IF NOT EXISTS marks_icon_scanned(id TEXT PRIMARY KEY);
+ CREATE TABLE IF NOT EXISTS marks_notification_reads(id TEXT PRIMARY KEY,player TEXT NOT NULL,at INTEGER NOT NULL);`);
  if(!this.store.meta('legacy-referral-grants-v1')){const at=this.now(),records={};for(const p of this.relay.parties.store.identities.values()){const n=Number(p.referralCount)||0;if(n>0&&n<=25&&p.id!==this.correction?.player)records[p.id]=n*1000;}this.store.setMeta('legacy-referral-grants-v1',{at,records});}
 if(!this.store.meta('legacy-referral-awards-seeded-v1')){const legacy=this.store.meta('legacy-referral-grants-v1');this.store.transaction(()=>{for(const p of this.relay.parties.store.identities.values())if(legacy?.records[p.referredBy]&&p.referredAt<=legacy.at)this.store.run('INSERT OR IGNORE INTO referral_awards VALUES(?,?,?)',p.id,p.referredBy,p.referredAt);this.store.setMeta('legacy-referral-awards-seeded-v1',true);});}
-
+ reconcileIconEarnings(this);
  }
  row(id){this.store.assert();this.store.run('INSERT OR IGNORE INTO marks_wallets(player,balance,earned,owned) VALUES(?,300,300,?)',id,JSON.stringify([DEFAULT_OUTFIT_ID]));return this.store.get('SELECT * FROM marks_wallets WHERE player=?',id);}
  credit(id,key,amount,kind,at,data={}){if(!Number.isSafeInteger(amount)||amount<0||amount>MAX)throw Error('Invalid server credit');this.row(id);if(this.store.get('SELECT id FROM marks_ledger WHERE id=?',key))return false;
  const reset=this.store.meta('marks-reset:'+id,0),value=at<=reset?0:amount;
  this.store.run('INSERT INTO marks_ledger VALUES(?,?,?,?,?,?)',key,id,at,kind,value,JSON.stringify(data));this.store.run('UPDATE marks_wallets SET balance=min(?,balance+?),earned=min(?,earned+?),revision=revision+1 WHERE player=?',MAX,value,MAX,value,id);return true;}
- sync(id){this.store.transaction(()=>{this.row(id);const legacy=this.store.meta('legacy-referral-grants-v1');if(legacy?.records[id])this.credit(id,'legacy-referral:'+id,legacy.records[id],'legacy-referral',legacy.at);
+ sync(id){reconcileIconEarnings(this);this.store.transaction(()=>{this.row(id);const legacy=this.store.meta('legacy-referral-grants-v1');if(legacy?.records[id])this.credit(id,'legacy-referral:'+id,legacy.records[id],'legacy-referral',legacy.at);
  for(const r of this.store.all('SELECT * FROM results WHERE player=? AND marks>0 ORDER BY at,id',id))this.credit(id,'match:'+r.id,r.marks,'match',r.at,{mode:r.mode});
  for(const g of this.store.all('SELECT * FROM grants WHERE player=? ORDER BY at,id',id))this.credit(id,'grant:'+g.id,g.amount,'grant',g.at,{reason:g.reason});
  });return this.view(id);}
- view(id){const r=this.row(id),owned=JSON.parse(r.owned);const special=this.store.meta('tournament-entitlements',{})[id]||[];owned.push(...special);if(this.relay.parties.store.identities.get(id)?.jimGolfUnlocked)owned.push('outfit-jim-golf');return {identity:id,revision:r.revision,economyRevision:1,balance:r.balance,earned:r.earned,owned:[...new Set(owned)],migrated:!!r.migrated};}
+ view(id){const r=this.row(id),owned=JSON.parse(r.owned);const special=this.store.meta('tournament-entitlements',{})[id]||[];owned.push(...special);if(this.relay.parties.store.identities.get(id)?.jimGolfUnlocked)owned.push('outfit-jim-golf');return {identity:id,revision:r.revision,economyRevision:1,balance:r.balance,earned:r.earned,owned:[...new Set(owned)],migrated:!!r.migrated,notifications:this.store.all("SELECT id,at,kind,amount,data FROM marks_ledger WHERE player=? AND kind IN ('gift-received','icon-earnings') AND id NOT IN (SELECT id FROM marks_notification_reads WHERE player=?) ORDER BY at,id LIMIT 30",id,id).map(n=>({...n,data:JSON.parse(n.data)}))};}
  publish(id){const value=this.sync(id);this.relay.parties.send(this.relay.parties.users.get(id),{type:'economy',wallet:value});return value;}
  migrate(id,legacy){this.sync(id);this.store.transaction(()=>{const r=this.row(id);if(r.migrated)return;let balance=r.balance,owned=JSON.parse(r.owned);const claimed=[...new Set(Array.isArray(legacy?.owned)?legacy.owned.filter(x=>typeof x==='string').slice(0,300):[])];
  // No client balance, earned count, receipt amount or grant counter is imported.
@@ -36,7 +40,46 @@ if(!this.store.meta('legacy-referral-awards-seeded-v1')){const legacy=this.store
  this.store.event('economy-migration','Reconciled legacy collection against server-recorded earnings',id,{claimed:claimed.length,accepted:owned.length-1});});return this.publish(id);}
  buy(id,{offer,price,requestId}){if(!/^[a-f0-9-]{36}$/.test(requestId||''))throw Error('Invalid purchase request');this.sync(id);this.store.transaction(()=>{const old=this.store.get('SELECT * FROM marks_purchases WHERE id=?',requestId);if(old){if(old.player!==id||old.offer!==offer||old.price!==price)throw Error('Purchase request conflict');return;}
  const r=this.row(id);if(!r.migrated)throw Error('Restore your wallet before buying.');const q=quoteOffer({owned:JSON.parse(r.owned)},offer);if(!q||q.offer.reviewOnly||q.offer.rankReward||q.offer.tournamentReward||q.offer.winReward||q.owned)throw Error('This item cannot be purchased.');if(!Number.isSafeInteger(price)||price!==q.price)throw Error('Price changed. Review the purchase again.');if(r.balance<q.price)throw Error('Not enough Marks.');
- const at=this.now();this.store.run('INSERT INTO marks_purchases VALUES(?,?,?,?,?,?)',requestId,id,at,offer,q.price,JSON.stringify(q.grants));this.store.run('UPDATE marks_wallets SET balance=balance-?,owned=?,revision=revision+1 WHERE player=?',q.price,JSON.stringify([...new Set([...JSON.parse(r.owned),...q.grants])]),id);this.store.run('INSERT INTO marks_ledger VALUES(?,?,?,?,?,?)','purchase:'+requestId,id,at,'purchase',-q.price,JSON.stringify({offer}));});return this.publish(id);}
+ const at=this.now();this.store.run('INSERT INTO marks_purchases VALUES(?,?,?,?,?,?)',requestId,id,at,offer,q.price,JSON.stringify(q.grants));this.store.run('UPDATE marks_wallets SET balance=balance-?,owned=?,revision=revision+1 WHERE player=?',q.price,JSON.stringify([...new Set([...JSON.parse(r.owned),...q.grants])]),id);this.store.run('INSERT INTO marks_ledger VALUES(?,?,?,?,?,?)','purchase:'+requestId,id,at,'purchase',-q.price,JSON.stringify({offer}));const beneficiary=payIconPurchase(this,{id:requestId,offer,price:q.price,at});if(beneficiary)queueMicrotask(()=>this.publish(beneficiary));});return this.publish(id);}
+ giftQuote(id,{recipient,offer}){
+ const code=String(recipient||'').replace(/[^a-z0-9]/gi,'').toUpperCase();
+ const person=[...this.relay.parties.store.identities.values()].find(p=>String(p.code||'').replace(/[^a-z0-9]/gi,'').toUpperCase()===code);
+ if(!person||code.length<6)throw Error('No player found. Enter their exact Friend Code.');
+ if(person.id===id)throw Error('Choose another player to send a gift.');
+ if(this.relay.parties.store.blocked?.(id,person.id))throw Error('Gifting is unavailable for this player.');
+ this.relay.owner.assertPlayer?.(person.id);this.sync(id);this.sync(person.id);
+ const item=shopOffer(offer),q=quoteOffer({owned:JSON.parse(this.row(person.id).owned)},offer);
+ if(!item||item.default||item.reviewOnly||item.rankReward||item.winReward||item.tournamentReward||!q||q.owned||q.price<=0)throw Error('This item is unavailable or already owned by that player.');
+ return {recipient:person.id,name:person.profile?.name||'Player',code:person.code,offer,price:q.price,grants:q.grants};
+ }
+ gift(id,{recipient,offer,price,requestId}){
+ if(!/^[a-f0-9-]{36}$/.test(requestId||''))throw Error('Invalid gift request');
+ this.sync(id);let target;
+ this.store.transaction(()=>{
+ const old=this.store.get('SELECT * FROM marks_gifts WHERE id=?',requestId);
+ if(old){if(old.sender!==id||old.recipient!==recipient||old.offer!==offer||old.price!==price)throw Error('Gift request conflict');target=old.recipient;return;}
+ if(this.store.get('SELECT id FROM marks_purchases WHERE id=?',requestId))throw Error('Purchase request conflict');
+ const person=this.relay.parties.store.identities.get(recipient);if(!person)throw Error('Recipient is unavailable.');
+ // Revalidate the recipient, entitlement, and current discounted price at commit time.
+ const item=shopOffer(offer),recipientRow=this.row(recipient),q=quoteOffer({owned:JSON.parse(recipientRow.owned)},offer),sender=this.row(id);
+ if(recipient===id||!item||item.default||item.reviewOnly||item.rankReward||item.winReward||item.tournamentReward||!q||q.owned||q.price<=0)throw Error('This gift is no longer available.');
+ if(this.relay.parties.store.blocked?.(id,recipient))throw Error('Gifting is unavailable for this player.');
+ this.relay.owner.assertPlayer?.(recipient);
+ if(!sender.migrated)throw Error('Restore your wallet before gifting.');
+ if(!Number.isSafeInteger(price)||price!==q.price)throw Error('Gift price changed. Review the gift again.');
+ if(sender.balance<price)throw Error('Not enough Marks.');
+ const at=this.now(),senderName=this.relay.parties.store.identities.get(id)?.profile?.name||'A player';target=recipient;
+ this.store.run('INSERT INTO marks_gifts VALUES(?,?,?,?,?,?)',requestId,id,recipient,offer,price,at);
+ this.store.run('INSERT INTO marks_purchases VALUES(?,?,?,?,?,?)',requestId,id,at,offer,price,JSON.stringify(q.grants));
+ this.store.run('UPDATE marks_wallets SET balance=balance-?,revision=revision+1 WHERE player=?',price,id);
+ this.store.run('UPDATE marks_wallets SET owned=?,revision=revision+1 WHERE player=?',JSON.stringify([...new Set([...JSON.parse(recipientRow.owned),...q.grants])]),recipient);
+ this.store.run('INSERT INTO marks_ledger VALUES(?,?,?,?,?,?)','gift-sent:'+requestId,id,at,'gift-sent',-price,JSON.stringify({offer,recipient}));
+ this.store.run('INSERT INTO marks_ledger VALUES(?,?,?,?,?,?)','gift-received:'+requestId,recipient,at,'gift-received',0,JSON.stringify({offer,sender:id,reason:`${senderName} sent you ${item.name}. It is ready in your locker.`}));
+ const beneficiary=payIconPurchase(this,{id:requestId,offer,price,at});if(beneficiary)queueMicrotask(()=>this.publish(beneficiary));
+ });
+ if(target)this.publish(target);return this.publish(id);
+ }
+ acknowledge(id,ids){for(const key of Array.isArray(ids)?ids.slice(0,30):[])if(this.store.get('SELECT id FROM marks_ledger WHERE id=? AND player=?',key,id))this.store.run('INSERT OR IGNORE INTO marks_notification_reads VALUES(?,?,?)',key,id,this.now());return this.publish(id);}
  qualifyReferral(id){const person=this.relay.parties.store.identities.get(id);if(!person?.referredBy||person.id===person.referredBy||this.now()-person.created<DAY)return;
  if(this.store.get('SELECT invitee FROM referral_awards WHERE invitee=?',id))return;
  const rows=this.store.all("SELECT id,at,marks FROM results WHERE player=? AND marks>0 AND public=1 AND json_extract(data,'$.humanOpponents')>=2 ORDER BY at",id);if(rows.length<3||rows.at(-1).at-rows[0].at<20*60000)return;

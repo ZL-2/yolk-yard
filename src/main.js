@@ -1,3 +1,4 @@
+import {toggleTournamentCard} from './tournament-ui.js';
 import {JimStyleReward} from './jim-style-ui.js';
 import {OwnerMatchPanel} from './owner-match-panel.js';
 import {OwnerMatchNotices} from './owner-match-notices.js';
@@ -123,6 +124,7 @@ import './ravelfront.css';
 import {RoyaleRewards} from './royale-rewards-ui.js';
 import {rankItem,PRESTIGE_SLOTS,rankingMetrics} from './royale-ranking.js';
 import {EggShop} from './egg-shop.js';
+import {EconomyNotices} from './economy-notices.js';
 import {EggWallet,ownedLoadout} from './egg-wallet.js';
 import {KeybindEditor} from "./keybind-editor.js";
 import './field-update.css';
@@ -318,6 +320,7 @@ const rankRewards=new RoyaleRewards({getView:()=>view,getProfile:()=>profile,con
 const jimStyleReward=new JimStyleReward({getView:()=>view,wallet:eggWallet,ready:()=>briefingsComplete&&!busy&&(screen==='menu'&&!document.querySelector('dialog[open]')||screen==='game'&&state?.phase==='results'&&dialogType==='results'&&!document.querySelector('dialog[open]:not(#dialog)')),ack:()=>party.request('jim-style-ack'),equip:()=>{profile={...profile,outfit:'outfit-jim-golf'};remember();if(screen==='menu')view.preview(profile);},onChange:()=>{if(screen==='menu')renderMenu();},onError:error=>errorToast(error.message)});
 const legacyEconomyClaim={owned:[...eggWallet.value.owned]};
 eggWallet.configureServer((type,data)=>party?.ready?party.request(type,data):Promise.reject(Error('Connect to your online Marks wallet.')));
+const economyNotices=new EconomyNotices(eggWallet,()=>briefingsComplete&&screen==='menu'&&!busy);
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
 const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerRuntime=new OwnerRuntime();
@@ -1573,6 +1576,7 @@ const actions = {
  'lobby-options':()=>lobbyOptionsMenu(),
  'lobby-play':()=>queueParty(false),
  'public-join':()=>queuePublicRoyale(false),
+ 'tournament-card-toggle':b=>{toggleTournamentCard(b.dataset.eventId);updateTournamentCard(document,ownerRuntime.tournament,!!party?.ready&&tournamentClock.fresh,tournamentClock.now());},
  'tournament-join':b=>{void joinTournament(b.dataset.eventId);},
  'tournament-spectate':b=>{void joinTournament(b.dataset.eventId,true);},
  'public-spectate':()=>queuePublicRoyale(true),
@@ -2210,7 +2214,7 @@ function loop(now) {
   const emoteCameraKey=me?.emote?me.id+':'+me.emote.id+':'+me.emote.start:null;
   if(emoteCameraKey&&view.emoteCameraKey!==emoteCameraKey){input.yaw=me.emote.yaw;input.pitch=0;}
   view.emoteCameraKey=emoteCameraKey;view.emoteLook={yaw:input.yaw,pitch:input.pitch};
-  if(me&&!me.lateSpectator&&!me.friendSpectator&&state?.options.recurring){const record={season:1,wins:me.crownWins||0,unlocked:!!me.crownEmoteUnlocked,owned:!!me.crown};const key=JSON.stringify(record);if(key!==crownStatusKey){crownStatusKey=key;crownStatus=record;save('ravelfront-crown-status',record);if(net?.officialPublic)net.peer?.control?.({type:'public-crown',record});}}
+  if(me&&!me.lateSpectator&&!me.friendSpectator&&net?.officialPublic&&state?.options.recurring){const record={season:1,wins:me.crownWins||0,unlocked:!!me.crownEmoteUnlocked,owned:!!me.crown};const key=JSON.stringify(record);if(key!==crownStatusKey){crownStatusKey=key;crownStatus=record;save('ravelfront-crown-status',record);if(net?.officialPublic)net.peer?.control?.({type:'public-crown',record});}}
   const currentProgress=(state?.royale?.matchId||net?.code||'local')+':'+state?.round;
   if(currentProgress!==progressMatch){progressMatch=currentProgress;matchEarnings.total=0;matchEarnings.status=me?.friendSpectator?'Spectating · No Marks':net?.serverAuthority?'Match verification pending':net?'Private custom · No Marks':'Practice · No currency rewards';}
 

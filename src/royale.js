@@ -1,4 +1,5 @@
 import {usableItem} from './item-use.js';
+import {syncChestCollisions} from './chest-collision.js';
 import {supplyHit,damageSupply,tickSupplyDrops,blastSupply} from './supply-drops.js';
 import {SMOKE_RULES} from './throwables.js';
 import {recordCombatDamage} from './combat-feedback.js';
@@ -213,7 +214,7 @@ export class RoyaleSimulation extends Simulation {
   }
   if(isTeamRoyale(this.options))for(const p of seats.filter(p=>p.bot)){const mate=seats.find(o=>teammates(this.options,p,o)&&(!o.bot||seats.indexOf(o)<seats.indexOf(p)));if(mate){p.botLand={...mate.botLand,x:mate.botLand.x+3};p.botDrop=mate.botDrop+.25;}}
   this.alive=seats.filter(p=>p.health>0).length;
-  this.nav=prepared.nav||navigation(getMap('sunnybreak',this.mapLayouts));this.loot=prepared.loot;this.chests=prepared.chests;this.lootId=prepared.lootId;this.lootVersion++;
+  this.nav=prepared.nav||navigation(getMap('sunnybreak',this.mapLayouts));this.loot=prepared.loot;this.chests=prepared.chests;syncChestCollisions(this.map,this.chests,this.time);this.lootId=prepared.lootId;this.lootVersion++;
   // Preparation already validated loot and indexed this exact closed-door map.
   // Rebuilding it here discards that work and stalls the first bus movement.
   initializeFrontier(this,{rebuild:false});initializeSeason(this);initializeVehicles(this);initializeOperations(this);this.lootSupportDirty=false;this.emit('round',{round:this.round});this.emit('royale-cue',{cue:'transport-horn'});this.departureMs=Math.round(performance.now()-departureStarted);return true;
@@ -375,6 +376,9 @@ export class RoyaleSimulation extends Simulation {
  eliminate(p){
   if(p.eliminated)return;
   this.cancelUse(p);cancelEmote(p);dropCrown(this,p);
+  const credited=this.players.get(p.killerId);
+  if(this.tournament&&credited&&credited!==p&&!teammates(this.options,p,credited)&&credited.health>0&&!credited.downed&&!credited.spectating){const heal=Math.min(50,Math.max(0,100-credited.health));credited.health+=heal;credited.shield=Math.min(100,(credited.shield||0)+50-heal);this.emit('royale-cue',{cue:'siphon',player:credited.id,x:credited.x,y:credited.y,z:credited.z});}
+  if(this.tournament&&credited&&credited!==p&&!teammates(this.options,p,credited))for(const material of ['wood','brick','metal'])this.dropLoot(p,{id:material,resource:material,count:50});
   p.downed=false;p.lifeState='ELIMINATED';p.reviving=null;p.reviverId=null;p.reviveProgress=0;p.eliminated=true;p.eliminatedAt=this.time;p.place=0;p.flight='out';p.spectating=true;p.use=null;p.reloadEnd=0;p.burstLeft=0;
   for(let i=1;i<6;i++)if(p.inventory[i])this.dropSlot(p,i);
   for(const [type,count] of Object.entries(p.bank))if(count>0)this.dropAmmo(p,type,count);
@@ -469,6 +473,7 @@ export class RoyaleSimulation extends Simulation {
    if(full||this.time>=this.queueEnds)this.beginBattle(full?'human-full':'timer');
  }
  tick(dt){
+  syncChestCollisions(this.map,this.chests,this.time);
   if(this.options.recurring&&performance.now()<(recoveryFreezeDeadlines.get(this)||0)&&this.recoveringHumans())return;
   dt=clamp(dt,0,1/30);this.time+=dt;
   if(this.options.recurring){
