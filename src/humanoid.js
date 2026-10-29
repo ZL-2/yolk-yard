@@ -36,7 +36,7 @@ function template(profile){
  colors.cloth=new T.Color(colors.cloth).lerp(new T.Color('#43504b'),item?.model?0:item?.12:.58).getStyle();colors.trim=new T.Color(colors.trim).lerp(new T.Color('#b7b099'),item?.model?0:.25).getStyle();
  const key=JSON.stringify([colors,style,item?.model,profile.infectedType]);if(geometries.has(key))return geometries.get(key);
  let harvestHead=false;
- const parts=[],finishes=new Set(),light=['wren','pulse'].includes(item?.model),signature=item?.rankReward||['voss','rook','nyx','wren','pulse','morrow'].includes(item?.model),leather=item?.model==='wren'?'#604331':colors.dark;
+ const parts=[],finishes=new Set(),light=['wren','pulse'].includes(item?.model),signature=item?.rankReward||['hollow-jack','voss','rook','nyx','wren','pulse','morrow'].includes(item?.model),leather=item?.model==='wren'?'#604331':colors.dark;
  function finishFor(color,bone){const value=color?.isColor?color.getHexString():new T.Color(color).getHexString();if(value===new T.Color(colors.dark).getHexString())return bone.startsWith('hand')||bone.startsWith('finger')||bone.startsWith('foot')?'leather':'polymer';if(value===new T.Color(skin).getHexString())return 'skin';if(value===new T.Color(colors.hair).getHexString())return 'cloth';if(value===new T.Color(colors.sole).getHexString())return 'rubber';if(value===new T.Color(colors.armor).getHexString())return 'polymer';return 'cloth';}
  function add(g,color,bone,next=null,blend=null,finish=null){
   if(item?.model==='hollow-jack'&&bone==='head'&&!harvestHead){g.dispose();return;}
