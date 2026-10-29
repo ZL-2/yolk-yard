@@ -12,7 +12,10 @@ export function tournamentTeamEntryMarkup(e){
 }
 export function tournamentCard(event,online=false,now=tournamentClock.now()??event?.serverNow){
  if(!Number.isFinite(now))return '';
- const e=visibleTournament(tournamentEvents(event),now);if(!e)return '';
+ const events=tournamentEvents(event);
+ const active=events.find(e=>['preparing','entry','starting','running'].includes(e.phase));
+ const upcoming=events.filter(e=>e.phase==='scheduled'&&now>=e.opensAt-TOURNAMENT_CARD_LEAD_MS&&now<e.startsAt).sort((a,b)=>a.opensAt-b.opensAt)[0];
+ const e=active||upcoming||visibleTournament(events,now);if(!e)return '';
  if(cardMinimized(e.id))return `<section class="public-royale-card tournament-card tournament-minimized" aria-label="${esc(tournamentName(e))} tournament"><button class="tournament-card-toggle" data-action="tournament-card-toggle" data-event-id="${esc(e.id)}" aria-expanded="false" aria-label="Expand ${esc(tournamentName(e))}"><strong>${esc(tournamentName(e))}</strong><span>EXPAND ＋</span></button></section>`;
  const phase=e.phase,entry=phase==='entry',live=phase==='running',done=['finished','cancelled'].includes(phase),seconds=Math.max(0,Math.ceil(((entry?e.startsAt:e.opensAt)-now)/1000));
  const timer=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
