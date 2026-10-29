@@ -1,4 +1,5 @@
 export const RELEASE_NOTES = [
+ {number:'236',title:'Emergency Battle Bus stability recovery',changes:['Restored the previous world collision path to remove the Update 235 collision regression during bus departure and landing. Chest solidity changes are withdrawn pending a bounded implementation. Gifting, Icon earnings, tournament rules and Victory Score remain available.']},
  {number:'235',title:'Gifts, Icon earnings and Frontier Cup rules',changes:[
   'Buy Item Shop gifts using a player’s Friend Code. Review their name and price before sending; gifts and Marks are verified by the online service.',
   'Icon creators receive 5% of Marks spent on their collection. Jim earnings go to ballz, including recorded past purchases, with an explanation for each payout.',

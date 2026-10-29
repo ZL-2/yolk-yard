@@ -22,7 +22,7 @@ export function startLootFall(sim,item){
 }
 export function lootHeight(item,time){const m=item.motion;if(!m)return item.y;const age=Math.max(0,time-m.at);return Math.max(m.floor,m.from+m.vy*age-12*age*age);}
 export function tickLootMotion(sim){
- if(sim.lootSupportDirty){sim.lootSupportDirty=false;for(const kind of ['loot','chests'])for(const item of sim[kind]){if(item.landAt>sim.time)continue;item.y=lootHeight(item,sim.time);if(!canStand(sim.map,item,.35,true)){const spot=placeLoot(sim.map,item);if(spot){item.x=spot.x;item.z=spot.z;item.y=Math.max(item.y,spot.y);itemsChanged(sim,kind,item);sim.lootVersion++;}}startLootFall(sim,item);}}
+ if(sim.lootSupportDirty){sim.lootSupportDirty=false;for(const kind of ['loot','chests'])for(const item of sim[kind]){if(item.landAt>sim.time)continue;item.y=lootHeight(item,sim.time);if(!canStand(sim.map,item,.35)){const spot=placeLoot(sim.map,item);if(spot){item.x=spot.x;item.z=spot.z;item.y=Math.max(item.y,spot.y);itemsChanged(sim,kind,item);sim.lootVersion++;}}startLootFall(sim,item);}}
  // A roof can be destroyed after a drop. Keep the eventual landing clear too.
  for(const item of fallingItems(sim)){if(!item.motion){stopLootFall(sim,item);continue;}item.y=lootHeight(item,sim.time);if(item.y<=item.motion.floor+.001){settleLoot(sim,item,item.motion.floor);sim.lootVersion++;}}
 }

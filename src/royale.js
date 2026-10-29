@@ -1,5 +1,4 @@
 import {usableItem} from './item-use.js';
-import {syncChestCollisions} from './chest-collision.js';
 import {supplyHit,damageSupply,tickSupplyDrops,blastSupply} from './supply-drops.js';
 import {SMOKE_RULES} from './throwables.js';
 import {recordCombatDamage} from './combat-feedback.js';
@@ -214,7 +213,7 @@ export class RoyaleSimulation extends Simulation {
   }
   if(isTeamRoyale(this.options))for(const p of seats.filter(p=>p.bot)){const mate=seats.find(o=>teammates(this.options,p,o)&&(!o.bot||seats.indexOf(o)<seats.indexOf(p)));if(mate){p.botLand={...mate.botLand,x:mate.botLand.x+3};p.botDrop=mate.botDrop+.25;}}
   this.alive=seats.filter(p=>p.health>0).length;
-  this.nav=prepared.nav||navigation(getMap('sunnybreak',this.mapLayouts));this.loot=prepared.loot;this.chests=prepared.chests;syncChestCollisions(this.map,this.chests,this.time);this.lootId=prepared.lootId;this.lootVersion++;
+  this.nav=prepared.nav||navigation(getMap('sunnybreak',this.mapLayouts));this.loot=prepared.loot;this.chests=prepared.chests;this.lootId=prepared.lootId;this.lootVersion++;
   // Preparation already validated loot and indexed this exact closed-door map.
   // Rebuilding it here discards that work and stalls the first bus movement.
   initializeFrontier(this,{rebuild:false});initializeSeason(this);initializeVehicles(this);initializeOperations(this);this.lootSupportDirty=false;this.emit('round',{round:this.round});this.emit('royale-cue',{cue:'transport-horn'});this.departureMs=Math.round(performance.now()-departureStarted);return true;
@@ -232,7 +231,7 @@ export class RoyaleSimulation extends Simulation {
  accessible(p,item,range=3){
   if((p.x-item.x)**2+(p.y-item.y)**2+(p.z-item.z)**2>range*range || item.landAt>this.time)return false;
   const from={x:p.x,y:p.y+.9,z:p.z},to={x:item.x-from.x,y:item.y+.6-from.y,z:item.z-from.z},len=Math.hypot(to.x,to.y,to.z)||1;
-  return wallDistance(this.map,from,{x:to.x/len,y:to.y/len,z:to.z/len},len,item.uid===undefined?item.id:false)>=len-.15;
+  return wallDistance(this.map,from,{x:to.x/len,y:to.y/len,z:to.z/len},len)>=len-.15;
  }
  syncInventory(p){
   // These arrays are simulation-owned; snapshots already copy them. Reusing
@@ -473,7 +472,7 @@ export class RoyaleSimulation extends Simulation {
    if(full||this.time>=this.queueEnds)this.beginBattle(full?'human-full':'timer');
  }
  tick(dt){
-  syncChestCollisions(this.map,this.chests,this.time);
+  
   if(this.options.recurring&&performance.now()<(recoveryFreezeDeadlines.get(this)||0)&&this.recoveringHumans())return;
   dt=clamp(dt,0,1/30);this.time+=dt;
   if(this.options.recurring){

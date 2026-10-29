@@ -33,16 +33,16 @@ export function rollChest(random,source='chest'){
 // Highest support *below this floor*, never the highest rooftop at X/Z.
 // Include the shared edge of adjoining floor tiles. A zero-width point exactly
 // on that seam must not miss both slabs and send upper-floor loot downstairs.
-export function supportBelow(map,x,z,y){let floor=groundAt(map,x,z);for(const b of candidates(map,{x,y,z},null,0,.001)){if(b.chestId)continue;const top=boxTop(b,x,z,.001);if(top<=y+.24)floor=Math.max(floor,top);}return floor;}
-export function validLootPoint(map,p,margin=.7){return p.y>=groundAt(map,p.x,p.z)-.06&&Math.abs(supportBelow(map,p.x,p.z,p.y)-p.y)<.26&&canStand(map,p,margin,true);}
+export function supportBelow(map,x,z,y){let floor=groundAt(map,x,z);for(const b of candidates(map,{x,y,z},null,0,.001)){const top=boxTop(b,x,z,.001);if(top<=y+.24)floor=Math.max(floor,top);}return floor;}
+export function validLootPoint(map,p,margin=.7){return p.y>=groundAt(map,p.x,p.z)-.06&&Math.abs(supportBelow(map,p.x,p.z,p.y)-p.y)<.26&&canStand(map,p,margin);}
 export function placeLoot(map,point,existing=[],relays=map.relays||[]){
  const base={x:point.x,y:Number.isFinite(point.y)?point.y:groundAt(map,point.x,point.z),z:point.z};let best=null,bestScore=-Infinity;
  for(let i=0;i<64;i++){
   const a=i*2.399963,r=i===0?0:.65+Math.sqrt(i)*.42,x=base.x+Math.cos(a)*r,z=base.z+Math.sin(a)*r;
   const y=supportBelow(map,x,z,base.y+.02),candidate={x,y,z};
-  if(Math.abs(y-base.y)>1.0||map.chestCollisionState?.some(c=>Math.abs(x-c.x)<c.w/2+.25&&Math.abs(z-c.z)<c.d/2+.25&&y<c.y+c.h&&y+.1>=c.y)||!validLootPoint(map,candidate)||!clearOfRelays(candidate,relays))continue;
+  if(Math.abs(y-base.y)>1.0||!validLootPoint(map,candidate)||!clearOfRelays(candidate,relays))continue;
   const dx=x-base.x,dy=y-base.y,dz=z-base.z,len=Math.hypot(dx,dy,dz);
-  if(len>0&&wallDistance(map,{...base,y:base.y+.62},{x:dx/len,y:dy/len,z:dz/len},len,true)<len-.1)continue;
+  if(len>0&&wallDistance(map,{...base,y:base.y+.62},{x:dx/len,y:dy/len,z:dz/len},len)<len-.1)continue;
   let separation=2;for(const item of existing)if(Math.abs(item.y-y)<1.2)separation=Math.min(separation,Math.hypot(item.x-x,item.z-z));
   const score=separation-r*.025;if(score>bestScore){bestScore=score;best=candidate;}if(separation>1.15)return candidate;
  }
