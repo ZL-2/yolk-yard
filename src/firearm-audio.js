@@ -2,6 +2,7 @@
 // Each design has different envelopes, action timing and spectral structure;
 // none uses a sampled commercial game sound or a pitch-shifted shared recording.
 export const FIREARM_SOUNDS={
+ hollowfire:{duration:.34,body:102,crack:.79,bass:.48,tail:.16,decay:16,action:.077,metal:.24,bands:[.28,.47,.25],seed:237},
  stormspike:{duration:.58,body:83,crack:.85,bass:.6,tail:.23,decay:10,action:.24,metal:.32,bands:[.24,.46,.30],energy:true,seed:199},
  sprinter:{duration:.27,body:118,crack:.72,bass:.36,tail:.10,decay:19,action:.067,metal:.19,bands:[.17,.53,.30],seed:31},
  scatter:{duration:.49,body:68,crack:.91,bass:.65,tail:.24,decay:11,action:.16,metal:.10,bands:[.48,.41,.11],pellets:5,seed:47},

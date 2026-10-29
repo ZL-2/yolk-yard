@@ -1,6 +1,7 @@
 import {RELEASE} from './releases.js';
 const base=import.meta.env?.BASE_URL||'/';
 export const LOBBY_NEWS=[
+ {title:'NIGHTFALL HARVEST',label:'HALLOWEEN · HOLLOW JACK + HOLLOWFIRE',image:'season/nightfall-harvest-promo.webp',action:'halloween-briefing'},
  {title:'KEEP THE FRONT ALIVE',label:'SUPPORT RAVELFRONT · $100 COMMUNITY GOAL',image:'season/community-goal.svg',action:'midseason-briefing'},
  {title:'VOICE CHAT IS HERE',label:'NEW · SQUAD UP. SPEAK UP.',image:'season/voice-192.webp',action:'voice-briefing'},
  {title:'YOUR NEXT DEPLOYMENT',label:`QUALITY UPDATE ${RELEASE}`,image:'modes/choose.webp',action:'updates'},

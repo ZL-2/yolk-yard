@@ -35,9 +35,11 @@ function template(profile){
  const trouser=new T.Color(item?.model?colors.armor:colors.cloth).multiplyScalar(.84),seam=new T.Color(colors.cloth).multiplyScalar(.68);
  colors.cloth=new T.Color(colors.cloth).lerp(new T.Color('#43504b'),item?.model?0:item?.12:.58).getStyle();colors.trim=new T.Color(colors.trim).lerp(new T.Color('#b7b099'),item?.model?0:.25).getStyle();
  const key=JSON.stringify([colors,style,item?.model,profile.infectedType]);if(geometries.has(key))return geometries.get(key);
+ let harvestHead=false;
  const parts=[],finishes=new Set(),light=['wren','pulse'].includes(item?.model),signature=item?.rankReward||['voss','rook','nyx','wren','pulse','morrow'].includes(item?.model),leather=item?.model==='wren'?'#604331':colors.dark;
  function finishFor(color,bone){const value=color?.isColor?color.getHexString():new T.Color(color).getHexString();if(value===new T.Color(colors.dark).getHexString())return bone.startsWith('hand')||bone.startsWith('finger')||bone.startsWith('foot')?'leather':'polymer';if(value===new T.Color(skin).getHexString())return 'skin';if(value===new T.Color(colors.hair).getHexString())return 'cloth';if(value===new T.Color(colors.sole).getHexString())return 'rubber';if(value===new T.Color(colors.armor).getHexString())return 'polymer';return 'cloth';}
  function add(g,color,bone,next=null,blend=null,finish=null){
+  if(item?.model==='hollow-jack'&&bone==='head'&&!harvestHead){g.dispose();return;}
   if(bone==='head'){g.translate(0,-1.666,0);g.scale(1,1,1);g.translate(0,1.666,0);}
   finish??=finishFor(color,bone);surfaceUV(g,finish);finishes.add(finish);
   const n=g.attributes.position.count,c=new T.Color(color),rgb=new Float32Array(n*3),index=new Uint16Array(n*4),weights=new Float32Array(n*4);
@@ -169,6 +171,20 @@ function template(profile){
   if(type==='elite'){panel(0,1.72,-.13,.25,.2,.06,'#6d4041','head','metal');panel(0,1.46,.18,.32,.45,.1,'#743d43','chest','cloth');}
   if(type==='mimic'){ellipsoid(0,1.36,.19,.21,.24,.13,'#866866','chest',10,'skin');for(const side of [-1,1])panel(side*.44,.88,-.06,.1,.2,.09,'#6f655b','hand'+(side<0?'L':'R'),'skin');}
   if(type==='boss'){for(const side of [-1,1])panel(side*.32,1.48,0,.2,.25,.3,'#3e5960','arm'+(side<0?'L':'R'),'metal');panel(0,1.76,.01,.25,.1,.24,'#a2aa86','head','metal');}
+ }
+ if(item?.model==='hollow-jack'){
+  harvestHead=true;
+  for(let j=0;j<10;j++){const a=j*Math.PI/5;ellipsoid(Math.cos(a)*.105,1.70,Math.sin(a)*.105,.115,.205,.115,j%2?'#c25a17':'#e7781f','head',14,'paint');}
+  ellipsoid(0,1.70,0,.20,.19,.20,'#d86a1d','head',16,'paint');
+  panel(0,1.915,0,.052,.12,.05,'#514331','head','wood');
+  const face=(pts)=>{const shape=new T.Shape(pts.map(p=>new T.Vector2(...p))),g=new T.ShapeGeometry(shape);g.rotateY(Math.PI);g.translate(0,0,-.211);add(g,'#ffdd72','head',null,null,'paint');};
+  for(const s of [-1,1])face([[s*.045,1.73],[s*.145,1.76],[s*.12,1.665]]);
+  face([[-.035,1.65],[.035,1.65],[0,1.70]]);
+  face([[-.145,1.615],[-.075,1.59],[-.05,1.615],[0,1.585],[.04,1.61],[.075,1.59],[.145,1.62],[.105,1.55],[.035,1.53],[-.055,1.535],[-.12,1.56]]);
+  rings([[.72,.25,.16],[.87,.21,.14],[1.02,.18,.13],[1.18,.20,.15],[1.39,.26,.15]],'#33263f','hips','chest','cloth');
+  for(const s of [-1,1]){panel(s*.13,1.29,-.153,.10,.30,.027,'#51384c','chest');panel(s*.14,1.22,-.178,.035,.042,.015,'#b28a50','chest','metal');panel(s*.21,.78,-.09,.065,.20,.04,'#51384c','hips');}
+  for(const y of [1.08,1.16,1.25,1.34])ellipsoid(0,y,-.17,.015,.015,.008,'#bb8d4b','chest',8,'metal');
+  rings([[1.44,.12,.10],[1.49,.105,.085],[1.52,.09,.075]],'#bd7d32','neck',null,'cloth');
  }
  const geo=mergeGeometries(parts);parts.forEach(g=>g.dispose());geo.computeBoundingSphere();geo.userData.shared=true;geo.userData.artRevision=166;geo.userData.surfaceKinds=[...finishes];geometries.set(key,geo);return geo;
 }

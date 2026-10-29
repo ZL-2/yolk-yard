@@ -5,7 +5,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_ITEMS} from './shop-catalog.js';
 // Shared camera targeting and remote commands require matching host/client releases.
-export const VERSION = 90;
+export const VERSION = 91;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -98,6 +98,7 @@ export const WEAPONS = [
   }
 ];
 export const ROYALE_WEAPONS = [
+ {id:'hollowfire',muzzle:.9,sightY:.285,optic:'reflex',name:'Hollowfire Rifle',role:'HARVEST',desc:'Ember-forged precision.',color:0xff8b28,size:1.15,minRarity:2},
   {id:'stormspike',muzzle:1.12,sightY:.285,optic:'reflex',name:'Stormspike Rifle',role:'BREACH',desc:'Sticky electric spikes. Impact, charge, burst.',color:0x70ddff,size:1.25},
   {
     "id": "peeper",

@@ -489,6 +489,7 @@ jobs:
           print('Community announcement presentation release:',community_goal)
           feature_files=set(subprocess.check_output(['git','diff','--name-only','90a727bbf4f7804a631e24dc8e2011361c23b737','HEAD'],text=True).splitlines())
           feature_allowed=set(['tests/emergency-bus.test.js', 'src/royale-ui.js', '.github/workflows/pages.yml', 'package-lock.json', 'package.json', 'scripts/community-gameplay-browser-check.mjs', 'scripts/community-gameplay-live-check.mjs', 'server/realtime/economy.js', 'server/realtime/icon-earnings.js', 'server/realtime/index.js', 'server/realtime/parties.js', 'src/building.js', 'src/chest-collision.js', 'src/economy-notices.js', 'src/egg-shop.js', 'src/egg-wallet.js', 'src/loot-motion.js', 'src/main.js', 'src/physics.js', 'src/releases.js', 'src/royale-loot.js', 'src/royale-ranking.js', 'src/royale-rewards-ui.js', 'src/royale.js', 'src/shop-front.js', 'src/shop-overhaul.css', 'src/tournament-ui.js', 'src/tournament.css', 'src/vehicles.js', 'src/world-rules.js', 'tests/community-gameplay.test.js', 'tests/royale-prestige.test.js', 'tests/world-overhaul.test.js'])
+          feature_allowed.update(['src/halloween-catalog.js', 'src/halloween-models.js', 'src/halloween-world.js', 'src/halloween-ui.js', 'src/halloween.css',  'public/season/nightfall-harvest-promo.webp', 'tests/halloween.test.js', 'scripts/halloween-browser-check.mjs', 'docs/UPDATE_237.md', 'src/atmosphere.js', 'src/data.js', 'src/environment-trees.js', 'src/humanoid.js', 'src/lobby-news.js', 'src/lobby-scene.js', 'src/operator-assets.js', 'src/royale-data.js', 'src/royale-view.js', 'src/shop-catalog.js', 'src/shop-models.js', 'src/terrain.js', 'src/view.js', 'src/weapon-balance.js', 'src/weapon-presentation.js', 'src/weapon-rarities.js', 'src/weapons.js', 'src/firearm-audio.js', 'src/arms.js'])
           feature_release={'tests/community-gameplay.test.js','server/realtime/icon-earnings.js','src/chest-collision.js'}<=feature_files and feature_files<=feature_allowed
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
             out.write('community_gameplay='+str(feature_release).lower()+'\n')
@@ -511,7 +512,7 @@ jobs:
       - run: npm ci
       - name: Gifts, Icon earnings, collision, tournament and ranking regressions
         if: needs.scope.outputs.community_gameplay == 'true'
-        run: node --test --test-concurrency=2 tests/emergency-bus.test.js tests/economy-authority.test.js tests/royale-prestige.test.js tests/world-overhaul.test.js tests/crowns-bosses-emotes.test.js
+        run: node --test --test-concurrency=2 tests/halloween.test.js tests/emergency-bus.test.js tests/economy-authority.test.js tests/royale-prestige.test.js tests/world-overhaul.test.js tests/crowns-bosses-emotes.test.js
       - name: Community goal, economy and announcement regressions
         if: needs.scope.outputs.community_goal == 'true'
         run: node --test --test-concurrency=2 tests/community-goal.test.js tests/update-199.test.js tests/economy-authority.test.js tests/deployment.test.js tests/replay-storage-budget.test.js
@@ -889,7 +890,7 @@ jobs:
           node --input-type=module -e "import {chromium} from 'playwright'; const b=await chromium.launch({args:['--no-sandbox']}); await b.close();" || npx playwright install-deps chromium
       - name: Real gifting UI and server delivery acceptance
         if: needs.scope.outputs.community_gameplay == 'true'
-        run: node scripts/community-gameplay-browser-check.mjs
+        run: node scripts/halloween-browser-check.mjs && node scripts/community-gameplay-browser-check.mjs
       - uses: actions/upload-artifact@v4
         if: always() && needs.scope.outputs.community_gameplay == 'true'
         with:

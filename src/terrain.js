@@ -24,9 +24,9 @@ export function terrainColor(map,x,z){
  if(h<2||edge>.925)return 0xddc88e;
  if(Math.hypot((x+164)/44,(z-67)/40)<1.25)return h<6?0xb5a88d:0x9da397;
  if(h>24)return 0x9bab95;
- if(x<-38&&z>93)return 0x668f66;
- if(x<-95&&z<-85)return 0xabb26c;
- return h>14?0x88a477:0x81b178;
+ if(x<-38&&z>93)return 0x8c633f;
+ if(x<-95&&z<-85)return 0xb38d54;
+ return h>14?0x8e784f:0x9b7847;
 }
 export function createTerrain(buildings=[],districts=[],shelters=[]){
  const size=256,cell=2,n=257,heights=new Float32Array(n*n);let max=0;

@@ -8,7 +8,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 export const OPERATOR_ASSET_IDS=Object.freeze(['jim-normal','jim-golf','wren','rank-25','rank-10','rank-5','rank-1','voss','rook','nyx','pulse','morrow','scout']);
 const assets=new Map(),pending=new Map();
 const swap=name=>name.replace(/(shoulder|arm|forearm|hand|thigh|shin|foot|toe|finger)([LR])/,(_,part,side)=>part+(side==='L'?'R':'L'));
-export function operatorAsset(profile){if(profile.infectedType||profile.infectedSkin||profile.henchman)return null;const id=profile.outfit?.replace(/^outfit-/,'');return assets.get(OPERATOR_ASSET_IDS.includes(id)?id:'scout');}
+export function operatorAsset(profile){if(profile.outfit==='outfit-hollow-jack')return null;if(profile.infectedType||profile.infectedSkin||profile.henchman)return null;const id=profile.outfit?.replace(/^outfit-/,'');return assets.get(OPERATOR_ASSET_IDS.includes(id)?id:'scout');}
 async function decode(id,suffix=''){
  const source=new URL(`models/operators/${id}${suffix}.glb`,document.baseURI);source.searchParams.set('v','216');const url=source.href;
  const gltf=await new GLTFLoader().loadAsync(url);gltf.scene.updateMatrixWorld(true);

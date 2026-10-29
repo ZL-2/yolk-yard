@@ -1,3 +1,4 @@
+import {buildHalloweenWorld} from './halloween-world.js';
 import {updateIconGear} from './icon-bundle-models.js';
 import {dressHelipad} from './helipad-view.js';
 import {updateStormspikeView} from './stormspike-view.js';
@@ -66,7 +67,7 @@ export function buildIsland(world,map,kit){for(const _ of buildIslandSteps(world
 // Resumable construction lets warmup frames keep servicing input and sockets.
 export function* buildIslandSteps(world,map,kit){
  yield* prepareEnvironmentSurfaces();yield* prepareArchitectureSurfaces();
- if(map.id==='sunnybreak'){yield* streamedIslandSteps(world,map,kit);buildMapObjects(world,map,kit);return;}
+ if(map.id==='sunnybreak'){yield* streamedIslandSteps(world,map,kit);buildMapObjects(world,map,kit);buildHalloweenWorld(world,map);return;}
  const {palette}=kit,architecture=architectureKit(kit);
  world.add(yield* createDetailedOceanSteps(map));
  yield;
@@ -88,7 +89,7 @@ export function* buildIslandSteps(world,map,kit){
  }
  for(const [i,t]of map.trees.entries()){if(t.editorHidden)continue;const start=world.children.length;treeModel(world,t,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=treeBoxes.get(i)?.objectId;yield;}
  for(const [i,p]of map.props.entries()){if(p.editorHidden)continue;const start=world.children.length;propModel(world,p,kit);for(const mesh of world.children.slice(start))mesh.userData.objectId=propBoxes.get(i)?.objectId;yield;}
- yield* bakeSteps(world,true);buildMapObjects(world,map,kit);new EnvironmentGroundCover(world,map);
+ yield* bakeSteps(world,true);buildMapObjects(world,map,kit);buildHalloweenWorld(world,map);new EnvironmentGroundCover(world,map);
  // Landmark names remain on the map; the world has no floating signs.
 }
 function* streamedIslandSteps(world,map,kit){

@@ -1,3 +1,4 @@
+import {hollowfireModel} from './halloween-models.js';
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
@@ -250,6 +251,7 @@ function optic(g, kind, frontZ = -0.7) {
   }
 }
 export function makeBlaster(id,wrap='') {
+  if(id==='hollowfire'){if(!weaponTemplates.has(id)){const template=hollowfireModel(makeBlaster('sprinter'));template.traverse(m=>{if(m.geometry)m.geometry.userData.shared=true;});weaponTemplates.set(id,template);}return applyWrap(cloneModelTemplate(weaponTemplates.get(id)),wrap);}
   if(weaponTemplates.has(id))return applyWrap(cloneModelTemplate(weaponTemplates.get(id)),wrap);
   const w = weapon(id),
     g = new THREE.Group(),

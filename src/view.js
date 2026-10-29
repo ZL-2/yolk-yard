@@ -373,7 +373,7 @@ export class View {
     const map = getMap(id);
     this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;delete this.world.userData.groundCover;delete this.world.userData.terrainEnvironment;delete this.world.userData.blacktide;delete this.world.userData.boxfight;delete this.world.userData.zoneWars;
     this.scene.background = new THREE.Color(map.sky);
-    this.scene.fog = new THREE.Fog(map.theme==='royale'?0xc1e6f0:map.sky, map.theme==='royale'?280:72, map.theme==='royale'?1050:175);
+    this.scene.fog = new THREE.Fog(map.theme==='royale'?0x6d526e:map.sky, map.theme==='royale'?280:72, map.theme==='royale'?1050:175);
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;
     this.camera.near=map.theme==='royale'?.15:.12;
     this.camera.updateProjectionMatrix();this.scopeCamera.updateProjectionMatrix();
@@ -750,7 +750,7 @@ export class View {
     this.world.visible=playing;const dark=playing&&!!state?.zombies;this.hemi.intensity=dark?1.65:2.25;this.hemi.color.setHex(dark?0x9ecbd3:0xe5f4ff);this.hemi.groundColor.setHex(dark?0x304c54:0x88a16a);this.sun.intensity=dark?1.5:2.2;this.sun.color.setHex(dark?0xaacbd8:0xfff3de);
     updateEnvironmentSurfaces(this.clock);
     if(playing){const detailQuality=this.detailPressure?'low':this.settings.quality;updateTerrainEnvironment(this.world,this.clock,detailQuality);this.world.userData.groundCover?.update(predicted||local,{quality:detailQuality,time:this.clock});}
-    if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x6f9295;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(playing&&map.theme==='royale'?0xc1e6f0:sky,playing?(map.theme==='royale'?280:72):35,playing?(map.theme==='royale'?1050:175):125);}
+    if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0x33233e;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(playing&&map.theme==='royale'?0x6d526e:sky,playing?(map.theme==='royale'?280:72):35,playing?(map.theme==='royale'?1050:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
     if(this.lobbyStage)this.lobbyStage.visible=!playing;
     for(const egg of this.partyEggs||[])egg.visible=!playing;

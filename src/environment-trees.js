@@ -6,11 +6,11 @@ import {environmentAtlasMaterial,environmentUV} from './environment-surfaces.js'
 const ART_REVISION=159,VARIANTS=8,assemblies=new Map(),TAU=Math.PI*2;
 const up=new T.Vector3(0,1,0);
 const palette={
- oak:[0x31563b,0x426d43,0x648452],
+ oak:[0x8c3c29,0xb35b2d,0xd29443],
  autumn:[0x92502e,0xbc733b,0xc79950],
- orchard:[0x365735,0x507140,0x73904d],
- pine:[0x244d3c,0x37644a,0x557956],
- palm:[0x365d35,0x547b3c,0x7b9149],
+ orchard:[0xa64d25,0xcc762b,0xd7a846],
+ pine:[0x302c3d,0x494037,0x6c563d],
+ palm:[0x625131,0x8b6531,0xad853d],
 };
 const colors=new Map();
 function color(value){if(!colors.has(value))colors.set(value,new T.Color(value));return colors.get(value);}

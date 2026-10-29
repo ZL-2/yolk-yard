@@ -1,3 +1,4 @@
+import {HALLOWEEN_SET,HALLOWEEN_ITEMS,HALLOWEEN_BUNDLE} from './halloween-catalog.js';
 import {JIM_OUTFITS,JIM_NORMAL} from './jim-catalog.js';
 import {DEFAULT_OPERATOR,DEFAULT_OUTFIT_ID} from './default-operator.js';
 import {TOURNAMENT_PICKAXE} from './tournament.js';
@@ -33,13 +34,15 @@ for(const set of NEW_COLLECTIONS){
  }
 }
 SHOP_SETS.push({id:'jim-icon',name:'Jim McLaughlin',featured:true,group:'icons',color:'#49566c',accent:'#a6d885'});
-SHOP_ITEMS.push(...JIM_OUTFITS,...ICON_BUNDLE_ITEMS,DEFAULT_OPERATOR,...ROYALE_REWARDS,TOURNAMENT_PICKAXE);
+SHOP_SETS.unshift(HALLOWEEN_SET);
+SHOP_ITEMS.push(...HALLOWEEN_ITEMS,...JIM_OUTFITS,...ICON_BUNDLE_ITEMS,DEFAULT_OPERATOR,...ROYALE_REWARDS,TOURNAMENT_PICKAXE);
 // Approved release catalog, shared by shop, loadouts and model builders.
 const byId=new Map([...SHOP_ITEMS,...ICON_BUNDLE_ITEMS].map(item=>[item.id,item]));
 export const shopItem=id=>byId.get(id);
 export const outfitStyles=id=>{const item=shopItem(id);return item?.styleRoot?SHOP_ITEMS.filter(i=>i.styleRoot===item.styleRoot):item?[item]:[];};
 export const SHOP_BUNDLES=NEW_COLLECTIONS.map(set=>({id:`bundle-${set.id}`,name:set.name+' Bundle',slot:'bundle',set:set.id,tier:set.tier,price:set.bundlePrice,color:set.color,accent:set.accent,art:set.art,featured:true,items:SHOP_SLOTS.map(slot=>`${slot}-${set.id}`),description:`${set.outfit} and five matching pieces of equipment.`}));
 SHOP_BUNDLES.unshift({id:'bundle-jim-icon',name:'Jim McLaughlin Bundle',slot:'bundle',set:'jim-icon',tier:'epic',art:'season/jim-icon.webp',price:3000,color:'#49566c',accent:'#a6d885',featured:true,items:[JIM_NORMAL,...ICON_BUNDLE_ITEMS.map(i=>i.id)],description:'Jim’s sweatshirt outfit and all five accessories. Golf is earned separately by winning an online match while wearing Jim; purchasing the bundle does not unlock it.'});
+SHOP_BUNDLES.unshift(HALLOWEEN_BUNDLE);
 const bundleById=new Map(SHOP_BUNDLES.map(item=>[item.id,item]));
 export const shopOffer=id=>bundleById.get(id)||(shopItem(id)?.reviewOnly?undefined:shopItem(id));
 export const offerGrants=offer=>[...new Set((offer.items||[offer.id]).flatMap(id=>{const item=shopItem(id);return item?.styleRoot?outfitStyles(id).filter(i=>!i.winReward).map(i=>i.id):[id];}))];

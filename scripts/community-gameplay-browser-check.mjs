@@ -11,7 +11,7 @@ const vite=await createServer({server:{host:'127.0.0.1',port:5297,strictPort:tru
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:.6});page.setDefaultTimeout(90000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.YOLK_NETWORK={relay:"ws://127.0.0.1:5297/game"};'}));
-await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Gift Sender'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,musicVolume:0,fpsLimit:30}));});
+await page.addInitScript(()=>{localStorage.setItem('ravelfront-nightfall-237','seen');localStorage.setItem('yolk-profile',JSON.stringify({name:'Gift Sender'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,musicVolume:0,fpsLimit:30}));});
 try{
  await page.goto(origin+'/?qa=1');await page.getByRole('button',{name:'Close community announcement'}).click();await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
  const sender=await page.evaluate(()=>window.__yolkTest.party().id);f.app.relay.economy.credit(sender,'browser-gift-funds',5000,'grant',Date.now());f.app.relay.economy.publish(sender);

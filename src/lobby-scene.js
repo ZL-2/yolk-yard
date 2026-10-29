@@ -1,3 +1,4 @@
+import {buildHalloweenLobby} from './halloween-world.js';
 import * as THREE from 'three';
 import {FrontierArt} from './frontier-art.js';
 import {PATROL_SPEED} from './lobby-motion.js';
@@ -26,5 +27,6 @@ export function lobbyScene(){
  const sun=new THREE.Mesh(new THREE.SphereGeometry(4,16,10),new THREE.MeshBasicMaterial({color:0xe8d4ae}));sun.position.set(-24,16,-112);sun.userData.ownedMaterial=true;group.add(sun);
  group.userData.distance=0;group.userData.moving=moving;group.userData.style='ravel-coast-operations';
  group.userData.update=dt=>{const step=Number.isFinite(dt)?Math.min(.1,Math.max(0,dt)):0;group.userData.distance=(group.userData.distance+PATROL_SPEED*2.3*step)%120;for(const item of moving)item.model.position.z=((item.base-group.userData.distance+90)%120+120)%120-90;};
+ buildHalloweenLobby(group);
  return group;
 }

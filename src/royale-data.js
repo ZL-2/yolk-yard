@@ -8,7 +8,7 @@ export const RARITIES=[
 RARITIES.push({name:'Mythic',color:'#ffd46b',mult:1});
 export const AMMO_CAPS=Object.fromEntries(Object.entries(AMMO_RULES).map(([id,r])=>[id,r.cap]));
 export const ammoType=ammoTypeFor;
-export const ROYALE_GUN_IDS=['sprinter','scatter','needle','zipper','thumper','anchor','duet','pip','peeper','doubleyolk','comet','stormspike'];
+export const ROYALE_GUN_IDS=['sprinter','scatter','needle','zipper','thumper','anchor','duet','pip','peeper','doubleyolk','comet','stormspike','hollowfire'];
 export const ITEMS={
  rookKeycard:{name:'Rook Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#e8b958',icon:'▣'},
  nyxKeycard:{name:'Nyx Vault Keycard',kind:'keycard',duration:0,stack:1,color:'#83b68d',icon:'▣'},
