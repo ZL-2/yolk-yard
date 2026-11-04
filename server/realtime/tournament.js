@@ -5,7 +5,7 @@ import {RoyaleSimulation} from '../../src/royale.js';
 import {ChatRoom} from '../../src/chat.js';
 import {TOURNAMENT,TOURNAMENTS,tournamentPhase,eventAnnouncement,eventTime,visibleTournament,tournamentTeamSize,tournamentName,tournamentMode} from '../../src/tournament.js';
 import {livingTeams} from '../../src/teams.js';
-import {validateTournament,TOURNAMENT_RULE_FIELDS} from '../../src/tournament-schedule.js';
+import {validateTournament,TOURNAMENT_RULE_FIELDS,tournamentLocalTime} from '../../src/tournament-schedule.js';
 
 // The result and prizes commit in one durable transaction. The same event can
 // never restart or pay twice, including after a process restart.
@@ -130,6 +130,12 @@ class TournamentEvent{
    if(this.room&&this.phase==='entry')this.room.sim.queueEnds=this.room.sim.time+(EVENT.startsAt-now)/1000;
    if(this.phase==='starting'){
     const players=this.room?[...this.room.sim.players.values()].filter(p=>p.contestant&&!p.bot&&p.connected!==false&&!p.loading):[];
+    if(tournamentLocalTime(EVENT.startsAt).startsWith('2026-11-04T') && players.length<8){
+     const message = `Not enough players to start the match. ${tournamentName(EVENT)} is cancelled: ${players.length} ready, 8 required. Normal matchmaking is open.`;
+     this.complete('cancelled',message);
+     this.releaseRoom(message);
+     return;
+    }
     if(players.length<2||tournamentTeamSize(EVENT)>1&&livingTeams(this.room.sim.options,players).size<2)this.complete('cancelled','Fewer than two opposing players or teams were ready at the entry cutoff. Normal matchmaking is open.');
     else{
      for(const p of this.room.sim.players.values())if(p.loading){p.contestant=false;p.lateSpectator=true;p.spectating=true;p.health=0;}
