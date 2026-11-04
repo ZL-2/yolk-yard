@@ -58,7 +58,7 @@ test('guest prediction matches authority flight without mutating its received sn
  const v=flight(),r={vehicles:[structuredClone(v)]},p={id:'human',vehicleId:v.id,vehicleSeat:0,vehicleType:'helicopter',x:0,y:0,z:0,health:100},predicted=predictionCopy(p),before=structuredClone(r);for(let i=0;i<360;i++){const input={heliUp:i<240,forward:i>240?1:0,yaw:0};stepVehicle(v,input,flat,1/60);predictMovement(predicted,input,flat,1/60,r,i/60);}assert.ok(Math.abs(predicted.predictedVehicle.y-v.y)<1e-8);assert.ok(Math.abs(predicted.predictedVehicle.z-v.z)<1e-8);assert.deepEqual(r,before);
 });
 test('announcement, settings and controls expose the update in the intended locations',()=>{
- assert.equal(LOBBY_NEWS[0].action,'midseason-briefing');assert.ok(LOBBY_NEWS.some(s=>s.action==='voice-briefing'));assert.ok(!LOBBY_NEWS.some(s=>s.action==='perspective-briefing'));
+ assert.ok(!LOBBY_NEWS.some(s=>s.action==='midseason-briefing'));assert.ok(LOBBY_NEWS.some(s=>s.action==='voice-briefing'));assert.ok(!LOBBY_NEWS.some(s=>s.action==='perspective-briefing'));
  const categorized=CONTROL_GROUPS.flatMap(([,ids])=>ids);assert.equal(new Set(categorized).size,CONTROLS.length);assert.deepEqual([...categorized].sort(),CONTROLS.map(c=>c[0]).sort());const b=normalizeBindings();assert.ok(b.heliUp.includes('Mouse0'));assert.ok(b.fire.includes('Mouse0'));assert.ok(b.vehicleSeat.includes('ControlLeft'));assert.ok(b.sprint.includes('ControlLeft'));
  const settings=SETTINGS_CATEGORIES.flatMap(([, , ,groups])=>groups.flatMap(([,ids])=>ids));assert.equal(settings.length,new Set(settings).size);assert.ok(SETTINGS_CATEGORIES.find(c=>c[0]==='social')[3][0][1].includes('voiceSettings'));
 });

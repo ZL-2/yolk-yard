@@ -1,5 +1,3 @@
-import {showHalloweenBriefing} from './halloween-ui.js';
-import './halloween.css';
 import {toggleTournamentCard} from './tournament-ui.js';
 import {JimStyleReward} from './jim-style-ui.js';
 import {OwnerMatchPanel} from './owner-match-panel.js';
@@ -73,8 +71,6 @@ import './referrals.css';
 import {showReferrals,ReferralRewards} from './referrals.js';
 import {showPerspectiveBriefing} from './perspective-briefing.js';
 import {showVoiceBriefing} from './voice-briefing.js';
-import {goalBarMarkup} from './community-goal.js';
-import {showMidseasonBriefing} from './midseason-briefing.js';
 import {creditsHTML} from './credits.js';
 import {perspectiveMode,thirdPersonActive} from './perspective.js';
 import {showWelcomeBack} from './welcome-back.js';
@@ -330,8 +326,6 @@ const fairPlay=new FairPlayRuntime({poll:()=>party?.ready?party.request('fair-pl
 const ownerNotices=new OwnerMatchNotices({poll:()=>party?.ready?party.request('owner-match-status'):null,ack:ids=>party.request('owner-match-ack',{ids})});ownerRuntime.ownerNotices=ownerNotices;
 const ownerConsole=new OwnerConsole({identity:()=>party?.id,onMapEditor:openOwnerMapEditor,onCampaign:openOwnerCampaign,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 document.addEventListener('icon-owner-access',()=>ownerConsole.open());
-document.addEventListener('halloween-shop',()=>{customizeMenu('shop');if(eggShop){eggShop.selected='bundle-hollow-jack';eggShop.previewId=null;eggShop.inspecting=true;eggShop.render();}});
-document.addEventListener('jim-shop',()=>{customizeMenu('shop');if(eggShop){eggShop.selected='bundle-jim-icon';eggShop.previewId=null;eggShop.inspecting=true;eggShop.render();}});
 const ownerPanel=new OwnerMatchPanel({api:ownerConsole,context:()=>screen==='game'&&net?.ready?{code:net.code,matchId:state?.royale?.matchId||state?.matchId}:null,notify:message=>toast(message),onFocus:()=>{keys.clear();queuedActions.clear();scoreHeld=false;input.fire=false;input.aim=false;Object.assign(touch,{x:0,y:0,jump:false,fire:false,aim:false,reload:false,popper:false,sprint:false,interact:false});if(document.pointerLockElement)document.exitPointerLock();},onPlay:()=>{if(screen==='game'&&!dialog.open)void resume();}});
 startAnonymousVisits(()=>screen==='game'?(state?.options?.training?'training':state?.options?.mode||options.mode||'royale'):screen==='lobby'?'lobby':screen==='editor'?'editor':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
@@ -375,7 +369,7 @@ function remember() {
   else net?.profile(profile);
 }
 function titleBar() {
-  return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button>${goalBarMarkup()}<div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
+  return `<div class="topbar"><button class="brand" type="button" aria-label="Ravelfront">RAVEL<br><span>FRONT</span></button><div class="top-actions"><button class="pill" data-action="updates">QUALITY UPDATE · ${RELEASE}</button><button class="icon-btn" data-action="help">How to play</button><button class="icon-btn" data-action="settings" aria-label="Settings">Settings</button></div></div>`;
 }
 let socialActivityKey='';
 let competitiveCareer=null,competitiveError='',competitivePending=false,competitiveAt=0,competitiveScroll=false;
@@ -1562,8 +1556,6 @@ const actions = {
  'social-confirm-new-identity':()=>{try{fairPlay.admission();ownerNotices.admission();}catch(error){return errorToast(error.message);}party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
  referrals:()=>showReferrals({party}),
- 'halloween-briefing':()=>showHalloweenBriefing({force:true}),
- 'midseason-briefing':()=>showMidseasonBriefing(),
  'voice-briefing':()=>showVoiceBriefing({force:true}),
  'perspective-briefing':()=>showPerspectiveBriefing({force:true}),
  'z-journal':openZombiesJournal,
@@ -2291,7 +2283,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>showHalloweenBriefing()).then(()=>showMidseasonBriefing()).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);
