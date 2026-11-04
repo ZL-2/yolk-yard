@@ -1,7 +1,7 @@
 {
   "revision": 155,
   "renderer": "WebGL PBR gameplay models",
-  "source": "e6da2f998e8d16616c09d88f8ab1cbe4598fbb41547156ee87cbff4f94fea0f8",
+  "source": "b686140f97d831c11ea64a17e7279da2f2ef3ef3a2ef21c39068b2f0a2fb4199",
   "weapons": {
     "sprinter": {
       "name": "R-41 Service Rifle",
@@ -50,6 +50,22 @@
     "stormspike": {
       "name": "Stormspike Rifle",
       "sha256": "7c7ba76a3c5893a793a6a52ed89cf761b1ac8777846ef14d9eba22e4a2eb4a25"
+    },
+    "bastionburst": {
+      "name": "Bastion Burst Rifle",
+      "sha256": "1ec2e71ab4a9af9e955126d83a3737c7c330ffa7aef0e8950a9c3437cf9e8f38"
+    },
+    "breakwaterrepeater": {
+      "name": "Breakwater Repeater",
+      "sha256": "5ec175d57b63f765f46db4e71836bb3e1be2e18cdca574dd2acc238be77ff385"
+    },
+    "rimeglass": {
+      "name": "Rimeglass DMR",
+      "sha256": "228f466cfdc3bebaca7f74f075a4b2328d44af63dee53107c592721680f5cef7"
+    },
+    "hollowfire": {
+      "name": "Hollowfire Rifle",
+      "sha256": "fb1dbef74212ad7ba6215eee419f0288a8cd7f2f81a4a5d26a2299c274a5405b"
     }
   },
   "items": {

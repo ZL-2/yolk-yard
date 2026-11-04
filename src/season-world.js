@@ -2,6 +2,7 @@ import {BOSSES,bossDefinition,MYTHIC_WEAPONS} from './bosses.js';
 import {rollChest} from './royale-loot.js';
 import {SEASON,rigCharges,startJumpRig} from './season-one.js';
 import {Simulation} from './simulation.js';
+import {ITEMS} from './royale-data.js';
 import {weapon,gun} from './data.js';
 import {inventory} from './building.js';
 import {groundAt} from './terrain.js';
@@ -20,48 +21,64 @@ export function initializeSeason(sim){
  sim.bossCaches=[];
  for(const def of BOSSES){
   const house=def.id===SEASON.boss.id?sim.map.buildings[sim.map.bossHouse]:null,site=sim.map.bossSites?.find(s=>s.bossId===def.id);
-  const spot=house?{x:house.x-1.5,y:house.baseY,z:house.z-3}:site;
+  const spot=site||(house?{x:house.x-1.5,y:house.baseY,z:house.z-3}:null);
   if(!spot||!canStand(sim.map,spot))continue;
   const b=Simulation.prototype.addPlayer.call(sim,def.id,{name:def.name,color:def.color,accent:def.accent,outfit:def.outfit,backbling:def.backbling},true);
   if(!b)continue;Object.assign(b,{boss:true,bossId:def.id,contestant:false,spectating:false,lateSpectator:false,connected:false,team:-2,x:spot.x,y:spot.y,z:spot.z,home:{x:spot.x,y:spot.y,z:spot.z},health:def.health,shield:def.shield,maxHealth:def.health,maxShield:def.shield,grounded:true,flight:'ground',slot:1,inventory:inventory(),materials:{wood:0,brick:0,metal:0},bank:{medium:210,light:0,shells:60,heavy:36,rockets:0},stamina:100,lastDamage:-100,aggroAt:0});
-  b.patrol=house?[[-1.5,-7],[1.5,-3],[1.5,6],[-1.5,3]].map(([dx,dz])=>({x:house.x+dx,y:house.baseY,z:house.z+dz})):site.patrol;b.patrolIndex=0;b.patrolWait=0;
+  b.patrol=site?.patrol||(house?[[-1.5,-7],[1.5,-3],[1.5,6],[-1.5,3]].map(([dx,dz])=>({x:house.x+dx,y:house.baseY,z:house.z+dz})):[]);b.patrolIndex=0;b.patrolWait=0;
   b.inventory[1]={id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:MYTHIC_WEAPONS[def.id].magazine||weapon(def.weapon).magazine};b.inventory[1].ammo=gun(b).magazine;if(def.ability==='shadowstep')b.inventory[2]={id:'shadowstep',rarity:5,count:1,charges:6,rechargeAt:0};sim.syncInventory(b);initializeBossAwareness(sim,b);initializeHenchmen(sim,b,def);
  }
 }
 export function bossInput(sim,p){
  const boss=bossDefinition(p.bossId||p.id),def=p.henchman?henchmanDefinition(boss):boss,turn=p.henchman?.156:.026,input={yaw:p.yaw,pitch:p.pitch||0,slot:1,forward:0,strafe:0,interact:false};
  if(p.grapple&&p.grapple.phase!=='return')return {...input,fire:false};
- if(p.bossVeil){
-  const veil=p.bossVeil;input.fire=false;
-  if(sim.time>=veil.until)p.bossVeil=null;
-  else{
-   if(sim.time<veil.releaseAt)return input;
-   if(!veil.released){veil.released=true;sim.smokes.push({id:++sim.lootId,x:p.x,y:p.y+1.3,z:p.z,radius:3.2,until:sim.time+4});}
-   const yaw=Math.atan2(p.x-veil.goal.x,p.z-veil.goal.z);input.yaw=p.yaw+Math.max(-turn,Math.min(turn,wrap(yaw-p.yaw)));input.forward=dist(p,veil.goal)>.6&&Math.abs(wrap(yaw-p.yaw))<.4?.4:0;return input;
-  }
- }
  if(sim.time>=(p.scanAt||0)){p.scanAt=sim.time+.2;scanBossAwareness(sim,p,def,smokeBlocks);}
  const noticed=sim.players.get(p.targetId),target=p.bossAlert==='alerted'&&noticed?.health>0&&!noticed.spectating&&!(noticed.aimBreakUntil>sim.time)?noticed:null,farHome=dist(p,p.home)>def.leash&&!(p.pursuitUntil>sim.time);
  if(p.bossWindup){
-  const focus=sim.players.get(p.bossWindup.target);input.yaw=focus?Math.atan2(p.x-focus.x,p.z-focus.z):p.yaw;input.fire=false;
-  if(sim.time>=p.bossWindup.until){const victim=sim.players.get(p.bossWindup.target);p.bossWindup=null;
-   if(victim?.health>0&&!victim.downed&&dist(p,victim)<GRAPPLER.range&&bossHasSight(sim,p,victim,smokeBlocks)){
-    p.pursuitUntil=sim.time+5;startGrapple(p,{origin:{x:p.x,y:p.y+1.7,z:p.z},anchor:{x:victim.x,y:victim.y+1.3,z:victim.z},length:dist(p,victim),valid:true},sim.time);sim.emit('boss-winch',{player:p.id,target:victim.id,x:p.x,y:p.y,z:p.z});
-   }
-  }return input;
+  const attack=p.bossWindup,victim=sim.players.get(attack.target);
+  input.yaw=victim?Math.atan2(p.x-victim.x,p.z-victim.z):p.yaw;input.fire=false;
+  if(sim.time<attack.until)return input;
+  p.bossWindup=null;
+  if(!victim||victim.downed||!bossHasSight(sim,p,victim,smokeBlocks))return input;
+  const range=dist(p,victim);
+  if(def.ability==='winch'&&range<=30){
+   p.pursuitUntil=sim.time+3;
+   startGrapple(p,{origin:{x:p.x,y:p.y+1.7,z:p.z},anchor:{x:victim.x,y:victim.y+1.3,z:victim.z},length:range,valid:true},sim.time);
+   sim.emit('boss-winch',{player:p.id,target:victim.id,x:p.x,y:p.y,z:p.z});
+  }else if(def.ability==='barrage'&&range<=27){
+   // Throw toward the telegraphed target without replacing the boss's
+   // authoritative position or the currently interpolated view angles.
+   const pitch=Math.max(-.55,Math.min(.48,Math.atan2(victim.y-p.y,Math.hypot(victim.x-p.x,victim.z-p.z))+.27));
+   sim.launch({...p,yaw:input.yaw,pitch},true,0,{throwable:'popper'});
+  }
+  return input;
  }
  if(target&&!farHome&&sim.time>p.aggroAt&&sim.time>=(p.abilityAt||0)){
-  if(def.ability==='winch'&&dist(p,target)>8&&dist(p,target)<GRAPPLER.range&&bossHasSight(sim,p,target,smokeBlocks)){p.abilityAt=sim.time+5;p.bossWindup={target:target.id,until:sim.time+.6,damage:0};requestBossVoice(sim,p,'ability');sim.emit('royale-cue',{cue:'boss-windup',player:p.id,x:p.x,y:p.y,z:p.z});return input;}
-  if(def.ability==='shadowstep'&&sim.time-p.lastDamage<3&&p.patrol?.length){const goal=p.patrol[(p.patrolIndex+1)%p.patrol.length];p.shadowDirection={x:goal.x-p.x,z:goal.z-p.z};if(useSeasonItem(sim,p,p.inventory[2])){p.abilityAt=sim.time+4;p.patrolIndex++;p.patrolWait=0;input.fire=false;requestBossVoice(sim,p,'ability');return input;}}
+  const range=dist(p,target),winch=def.ability==='winch'&&range>7&&range<30,
+    barrage=def.ability==='barrage'&&range>5&&range<27;
+  if((winch||barrage)&&bossHasSight(sim,p,target,smokeBlocks)){
+   p.abilityAt=sim.time+(winch?6.5:8);
+   p.bossWindup={target:target.id,until:sim.time+(winch?.82:1.05),damage:0};
+   requestBossVoice(sim,p,'ability');sim.emit('royale-cue',{cue:'boss-windup',player:p.id,x:p.x,y:p.y,z:p.z});return input;
+  }
+  if(def.ability==='shadowstep'&&sim.time-p.lastDamage<3&&p.patrol?.length){
+   const next=(p.patrolIndex+1)%p.patrol.length,goal=p.patrol[next];
+   p.shadowDirection={x:goal.x-p.x,z:goal.z-p.z};
+   if(useSeasonItem(sim,p,p.inventory[2])){
+    sim.smokes.push({id:++sim.lootId,x:p.x,y:p.y+1.15,z:p.z,radius:2.65,until:sim.time+3.25});
+    p.abilityAt=sim.time+7;p.patrolIndex=next;p.patrolWait=0;input.fire=false;
+    requestBossVoice(sim,p,'ability');sim.emit('royale-cue',{cue:'boss-veil',player:p.id,x:p.x,y:p.y,z:p.z});return input;
+   }
+  }
  }
  const investigating=['suspicious','searching'].includes(p.bossAlert),look=noticed||p.bossPerception?.lastKnown;
  let goal=farHome?p.home:target||(investigating?look:null);
  if(!goal&&p.patrol?.length){goal=p.patrol[p.patrolIndex%p.patrol.length];if(dist(p,goal)<.85){if(!p.patrolWait)p.patrolWait=sim.time+1.6;if(sim.time>=p.patrolWait){p.patrolIndex++;p.patrolWait=0;goal=p.patrol[p.patrolIndex%p.patrol.length];}}}
  if(goal){const dx=goal.x-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz),yaw=Math.atan2(-dx,-dz),error=target&&!farHome?Math.sin(sim.time*1.37)*def.aimError:0;
   input.yaw=p.yaw+Math.max(-turn,Math.min(turn,wrap(yaw+error-p.yaw)));const pitch=target?Math.atan2(goal.y+.85-(p.y+1.55),d)+Math.sin(sim.time*.83)*.025:0;input.pitch=p.pitch+(pitch-p.pitch)*(p.henchman?.35:.07);
-  const close=def.ability==='winch'?8:23;
+  const close=def.ability==='winch'?8:def.ability==='barrage'?17:24;
   input.forward=farHome?.4:target?(d>close&&dist(p,p.home)<def.leash*.65?.3:0):investigating?(d>2&&dist(p,p.home)<def.leash*.65&&Math.abs(wrap(yaw-p.yaw))<.4?.22:0):!p.patrolWait&&Math.abs(wrap(yaw-p.yaw))<.4?.34:0;
-  input.aim=!!target&&def.ability==='shadowstep';input.fire=!!target&&!farHome&&d<(def.ability==='winch'?10:def.notice)&&sim.time>p.aggroAt&&Math.abs(wrap(yaw-p.yaw))<.13&&(sim.time+(p.guardIndex||0)*.8)%def.cycle<def.burst&&bossHasSight(sim,p,target,smokeBlocks);input.reload=p.ammo[1]===0;
+  input.aim=!!target&&['shadowstep','barrage'].includes(def.ability);input.fire=!!target&&!farHome&&d<(def.ability==='winch'?10:def.notice)&&sim.time>p.aggroAt&&Math.abs(wrap(yaw-p.yaw))<.13&&(sim.time+(p.guardIndex||0)*.8)%def.cycle<def.burst&&bossHasSight(sim,p,target,smokeBlocks);input.reload=p.ammo[1]===0;
  }return input;
 }
 export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
@@ -72,12 +89,12 @@ export function damageBoss(sim,p,attacker,amount,source,precision,shotId){
  if(p.health>0)alertBossToDamage(sim,p,attacker);
  sim.emit('hit',{player:attacker?.id,target:p.id,amount:shield+dealt,precision,shield:shield>0,shieldBreak:shield>0&&p.shield===0,shotId,weapon:source,x:p.x,y:p.y+1.4,z:p.z,sourceX:attacker?.x,sourceY:attacker?.y,sourceZ:attacker?.z});
  if(shield&&p.shield===0)sim.emit('royale-cue',{cue:'shield-break',player:p.id,x:p.x,y:p.y,z:p.z});
- if(p.health===0&&!p.bossDefeated){p.bossDefeated=true;p.spectating=true;p.flight='out';p.reloadEnd=0;p.bossWindup=null;p.bossVeil=null;p.bossAlert='unaware';p.bossSuspicion=0;p.targetId=null;
+ if(p.health===0&&!p.bossDefeated){p.bossDefeated=true;p.spectating=true;p.flight='out';p.reloadEnd=0;p.bossWindup=null;p.bossAlert='unaware';p.bossSuspicion=0;p.targetId=null;
   if(p.henchman){sim.dropLoot(p,{id:'sprinter',weapon:true,rarity:1,count:1,ammo:gun(p).magazine});sim.dropAmmo(p,'medium',18);sim.emit('henchman-defeated',{player:attacker?.id,target:p.id,name:attacker?.name||source,targetName:p.name,weapon:source,x:p.x,y:p.y,z:p.z});return;}
   sim.dropLoot(p,{id:def.weapon,bossId:def.id,weapon:true,rarity:5,count:1,ammo:gun(p).magazine});
-  if(def.ability==='rig'){sim.dropLoot(p,{id:'jumpRig',rarity:5,count:1,charges:SEASON.rig.charges,rechargeAt:0,readyAt:0});sim.dropAmmo(p,'medium',60);sim.dropLoot(p,{id:'asterKeycard',count:1,rarity:4});}
-  if(def.ability==='winch'){sim.dropLoot(p,{id:'anchorWinch',rarity:5,count:1,readyAt:0});sim.dropLoot(p,{id:'rookKeycard',count:1,rarity:4});sim.dropAmmo(p,'shells',12);sim.dropLoot(p,{id:'metal',resource:'metal',count:60,rarity:0});}
-  if(def.ability==='shadowstep'){sim.dropLoot(p,{id:'shadowstep',rarity:5,count:1,charges:6,rechargeAt:0,readyAt:0});sim.dropLoot(p,{id:'nyxKeycard',count:1,rarity:4});sim.dropAmmo(p,'heavy',12);sim.dropLoot(p,{id:'mini',count:3,rarity:1});sim.dropLoot(p,{id:'wood',resource:'wood',count:60,rarity:0});}
+  sim.dropLoot(p,{id:def.utility,rarity:ITEMS[def.utility].rarity??2,count:def.utilityCount});
+  sim.dropLoot(p,{id:def.key,count:1,rarity:4});
+  sim.dropAmmo(p,weapon(def.weapon).ammoType,def.ammo);
   sim.emit('boss-defeated',{player:attacker?.id,target:p.id,name:def.name,x:p.x,y:p.y,z:p.z});
  }
 }

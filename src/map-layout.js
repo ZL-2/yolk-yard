@@ -104,6 +104,7 @@ export function compileLayout(base,input){
  const removed=new Set(),replacements=new Map(),explicit=new Set(layout.objects.filter(o=>o.source&&o.id===o.source).map(o=>o.source));
  // Door leaves are separate authored objects. Keep those stable source IDs,
  // while moving their interaction, rendering and collision with the building.
+ map.editorReplacements=explicit;
  const doorSources=new Map();for(const source of sources.values())for(const b of source.boxes)if(b.doorId)doorSources.set(b.doorId,source.id);
  const moveDoors=(doors,r,origin,copy=false)=>{
   for(const d of doors){

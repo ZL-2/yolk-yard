@@ -375,6 +375,53 @@ export function makeBlaster(id,wrap='') {
       box(g,side*.138,-.095,-.27,.006,.046,.23,black,.007,false,'rubber');
     }
     box(g,0,.157,.4,.20,.027,.27,black,.013,false,'rubber');
+  }else if(id==='bastionburst'){
+    // Aster issue. Broad ceramic receiver, folded brace and forward-mounted rail.
+    const bronze=0xb18b50, ceramic=0xc0b59b, body=0x3a474b;
+    plate(g,[[.35,-.11],[-.47,-.11],[-.60,.05],[-.44,.16],[.27,.16],[.37,.07]],.295,body);
+    grip(g,.15);magazine(-.13,.31,true);
+    plate(g,[[.30,-.08],[.66,-.13],[.74,.05],[.69,.16],[.34,.126]],.16,bronze);
+    box(g,0,.01,.73,.22,.28,.068,black,.025,false,'rubber');
+    tube(g,0,.02,-.72,.049,.56,steel);muzzleModel(-1,.076);
+    for(const side of [-1,1]){
+      plate(g,[[-.24,-.04],[-.65,-.08],[-.75,.048],[-.58,.112],[-.27,.125]],.032,ceramic,side*.145);
+      for(const z of [-.35,-.43,-.51,-.59,-.67])box(g,side*.164,.022,z,.011,.035,.044,body,.005);
+      screw(g,side*.167,.085,-.28,.014);
+    }
+    rail(-.08,.46);optic(g,'reflex');bolt(.18,.14);
+  }else if(id==='breakwaterrepeater'){
+    // Riveted marine receiver, drum feed and oversized cage muzzle.
+    const oxide=0xa55035, gunmetal=0x35454c, copper=0xc19a62;
+    plate(g,[[.26,-.12],[-.31,-.15],[-.44,.04],[-.31,.156],[.26,.156],[.33,.035]],.35,gunmetal);
+    grip(g,.13);stock(g,0x5e453b,.29);
+    tube(g,0,.028,-.52,.074,.70,steel);muzzleModel(-.86,.109);
+    box(g,0,.04,-.62,.28,.19,.33,oxide,.029);
+    for(const side of [-1,1])for(const z of [-.51,-.60,-.69])box(g,side*.145,.07,z,.015,.07,.051,black,.006);
+    const drum=new THREE.Group();drum.position.set(0,-.24,-.15);g.add(drum);g.userData.reloadPart=drum;
+    const caseBody=tube(drum,0,0,0,.183,.178,gunmetal);caseBody.rotation.set(0,0,Math.PI/2);
+    for(const side of [-1,1]){
+      const cap=ring(drum,side*.096,0,0,.132,.013,copper);cap.rotation.y=Math.PI/2;
+      for(let n=0;n<6;n++)screw(drum,side*.101,Math.cos(n*Math.PI/3)*.111,Math.sin(n*Math.PI/3)*.111,.014);
+      box(g,side*.184,.094,.055,.012,.072,.28,oxide,.008);
+    }
+    bolt(.185,.11);optic(g,'iron',-.71);
+  }else if(id==='rimeglass'){
+    // Nightglass winter issue. An insulated suppressor, ice-blue chassis
+    // and open stock are visible from the side as well as the player camera.
+    const frost=0x91b6c2, shadow=0x343e58, nickel=0xaab8bf;
+    plate(g,[[.36,-.09],[-.55,-.10],[-.69,.03],[-.55,.14],[.30,.15],[.40,.05]],.242,shadow);
+    grip(g,.18);magazine(-.11,.23);
+    plate(g,[[.29,.10],[.71,.12],[.73,.07],[.36,.015]],.16,frost);
+    plate(g,[[.36,-.04],[.70,-.13],[.75,-.067],[.47,.025]],.12,shadow);
+    box(g,0,-.01,.742,.184,.29,.05,black,.014,false,'rubber');
+    tube(g,0,.017,-.70,.036,.67,nickel);
+    tube(g,0,.017,-1.055,.078,.36,shadow);muzzleModel(-1.26,.087);
+    for(const z of [-.94,-1.07,-1.21])ring(g,0,.017,z,.079,.011,nickel);
+    for(const side of [-1,1]){
+      plate(g,[[-.15,-.036],[-.59,-.06],[-.72,.026],[-.53,.087],[-.15,.092]],.015,frost,side*.126);
+      for(const z of [-.18,-.38,-.57])screw(g,side*.139,.021,z,.014);
+    }
+    rail(-.06,.45);optic(g,'scope');bolt(.147,.14);
   }else if(id==='stormspike'){
     // Shared exact geometry for the reveal, inventory, pickup and held gun.
     const shell=0x293849,edge=0x98a9b4,copper=0xb78250,cyan=0x6ce6ff;

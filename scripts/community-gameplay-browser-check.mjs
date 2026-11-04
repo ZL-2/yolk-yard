@@ -8,12 +8,25 @@ const f=await fixture({serverOptions:{origins:[origin,'https://zl-2.github.io']}
 const recipient=await f.user('Gift Receiver'),creator=await f.user('ballz');
 const code=f.app.relay.parties.store.identities.get(recipient.id).code;
 const vite=await createServer({server:{host:'127.0.0.1',port:5297,strictPort:true,proxy:{'^/(game|social|health|leaderboards|tournament|icon-voting)(/|$|\\?)':{target,ws:true}}}});await vite.listen();await vite.watcher.close();
-const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
+const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:.6});page.setDefaultTimeout(90000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.YOLK_NETWORK={relay:"ws://127.0.0.1:5297/game"};'}));
 await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Gift Sender'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,musicVolume:0,fpsLimit:30}));});
 try{
- await page.goto(origin+'/?qa=1');await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
+ await page.goto(origin+'/?qa=1');
+ const briefing=page.locator('.blackout-briefing[open]');
+ await briefing.waitFor();
+ await page.waitForFunction(()=>document.querySelector('.blackout-art img')?.naturalWidth>1000);
+ await page.screenshot({path:out+'/blackout-promo.png'});
+ await briefing.getByLabel('Don’t show again on startup').check();
+ await briefing.getByRole('button',{name:'RETURN TO LOBBY'}).click();
+ await page.reload();
+ await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
+ assert.equal(await briefing.count(),0);
+ await page.getByRole('button',{name:'THE BLACKOUT',exact:true}).click();
+ await page.getByRole('button',{name:'Read THE BLACKOUT',exact:true}).click();
+ await briefing.waitFor();
+ await briefing.getByRole('button',{name:'Close Blackout briefing'}).click();
  const sender=await page.evaluate(()=>window.__yolkTest.party().id);f.app.relay.economy.credit(sender,'browser-gift-funds',5000,'grant',Date.now());f.app.relay.economy.publish(sender);
  await page.locator('.yard-nav nav [data-action=item-shop]').click();await page.locator('[data-shop-item=bundle-jim-icon]').first().click();await page.locator('[data-shop-gift-start]').click();await page.locator('.shop-gift-code').fill(code);await page.locator('[data-shop-gift-quote]').click();await page.locator('[data-shop-gift-send]').waitFor();assert.match(await page.locator('.shop-gift').innerText(),/Gift Receiver/);await page.screenshot({path:out+'/gift-confirm.png'});await page.locator('[data-shop-gift-send]').click();await page.waitForFunction(()=>document.querySelector('.shop-detail-notice')?.textContent.includes('Gift delivered'));
  assert.ok(f.app.relay.economy.view(recipient.id).owned.includes('outfit-jim-normal'));assert.equal(f.app.relay.economy.view(creator.id).balance,450);assert.equal(f.app.relay.economy.view(sender).balance,2300);await page.screenshot({path:out+'/gift-delivered.png'});

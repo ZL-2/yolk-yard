@@ -359,6 +359,7 @@ export class View {
     if(pending.group.userData.details)pending.group.userData.details.attach(this.world);
     if(pending.group.userData.groundCover)pending.group.userData.groundCover.attach(this.world);
     this.world.userData.terrainEnvironment=pending.group.userData.terrainEnvironment;
+    this.world.userData.blackoutLights=pending.group.userData.blackoutLights;
     this.mapBuild=null;this.needsMapCompile=true;
   }
   loadMap(id) {
@@ -371,7 +372,7 @@ export class View {
     this.mapPreparation.cancel();
     this.needsMapCompile=true;
     const map = getMap(id);
-    this.disposeGroup(this.world);delete this.world.userData.details;delete this.world.userData.geometryRevision;delete this.world.userData.groundCover;delete this.world.userData.terrainEnvironment;delete this.world.userData.blacktide;delete this.world.userData.boxfight;delete this.world.userData.zoneWars;
+    this.disposeGroup(this.world);delete this.world.userData.blackoutLights;delete this.world.userData.details;delete this.world.userData.geometryRevision;delete this.world.userData.groundCover;delete this.world.userData.terrainEnvironment;delete this.world.userData.blacktide;delete this.world.userData.boxfight;delete this.world.userData.zoneWars;
     this.scene.background = new THREE.Color(map.sky);
     this.scene.fog = new THREE.Fog(map.theme==='royale'?0xc1e6f0:map.sky, map.theme==='royale'?280:72, map.theme==='royale'?1050:175);
     this.camera.far=this.scopeCamera.far=map.theme==='royale'?1400:260;

@@ -1,12 +1,13 @@
 import * as T from 'three';
+import {winterCover} from './season-two-landscape.js';
 import {groundAt} from './terrain.js';
 import {modelEnvironment} from './model-surfaces.js';
 
-// Update 159: visual-only terrain. Collision samples, triangle diagonals, sea
-// level and map dimensions are deliberately unchanged. One indexed mesh per
+// Render the authoritative heightfield, including the seasonal relief and
+// snow coverage. One indexed mesh per
 // 32x32-cell chunk replaces six duplicated vertices per cell. Every chunk uses
 // the same globally computed normals, material and road control map.
-export const TERRAIN_DETAIL_REVISION=159;
+export const TERRAIN_DETAIL_REVISION=160;
 export const TERRAIN_DETAIL_BUDGET=Object.freeze({chunkCells:32,controlSize:2048,atlasSize:[768,512],coastSize:256,oceanTriangles:2});
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a));return t*t*(3-2*t);};
@@ -122,7 +123,7 @@ export function createTerrainSurfaceSampler(map){
   const sand=1-smooth(.8,3.2,height),quarry=map.id==='sunnybreak'?1-smooth(.9,1.25,Math.hypot((x+164)/44,(z-67)/40)):0;
   const rock=Math.max(smooth(.13,.47,slope),quarry*.83,smooth(25,35,height)*.42)*(1-sand);
   const soil=smooth(.48,.76,noise(x*.055,z*.055))*.40,land=(1-roads.road)*(1-roads.path);
-  return {height,slope,grass:land*(1-sand)*(1-rock)*(1-soil),sand,rock,soil,road:roads.road,path:roads.path};
+  return {height,slope,grass:land*(1-sand)*(1-rock)*(1-soil)*(1-winterCover(map,x,z,height)),sand,rock,soil,road:roads.road,path:roads.path};
  };
 }
 
@@ -144,9 +145,9 @@ function* createRoadControl(map){
  return dataTexture(data,size,size,{mipmaps:true,type:T.UnsignedShort4444Type});
 }
 
-const TERRAIN_VERTEX_DECL=`varying vec3 vTerrainWorld;varying vec3 vTerrainNormal;`;
+const TERRAIN_VERTEX_DECL=`attribute float snowCover;varying float vSnowCover;varying vec3 vTerrainWorld;varying vec3 vTerrainNormal;`;
 const TERRAIN_FRAGMENT_DECL=`
- varying vec3 vTerrainWorld;varying vec3 vTerrainNormal;
+ varying float vSnowCover;varying vec3 vTerrainWorld;varying vec3 vTerrainNormal;
  uniform sampler2D terrainAtlas;uniform sampler2D terrainControl;
  uniform float terrainSize;uniform float terrainQuality;uniform float terrainQuarry;
  vec4 terrainTile(vec2 coordinate,float tile){
@@ -183,7 +184,9 @@ const TERRAIN_SURFACE=`
  float paint=smoothstep(.18,.42,paintCoverage);
  vec3 paintColor=mix(vec3(.77,.78,.69),vec3(.65,.47,.13),roadInfo.a/max(.001,paintCoverage));
  surface.rgb=mix(surface.rgb,paintColor,paint*.88);
- diffuseColor.rgb*=surface.rgb;
+ float snow=smoothstep(.10,.91,vSnowCover+(macro.a-.5)*vSnowCover*.32)*(1.0-roadInfo.r*.91);
+ surface.rgb=mix(surface.rgb,mix(vec3(.58,.72,.76),vec3(.91,.95,.96),macro.a),snow);
+ diffuseColor.rgb=mix(diffuseColor.rgb,vec3(1.0),snow)*surface.rgb;
  float terrainRelief=surface.a*mix(.026,.013,roadInfo.r)*terrainQuality*(1.0-paint*.65);
 `;
 
@@ -193,7 +196,7 @@ function terrainMaterial(map,control){
  material.name='Ravel Coast layered earth';material.userData={terrainDetail:true,revision:TERRAIN_DETAIL_REVISION,uniforms};
  material.onBeforeCompile=shader=>{
   Object.assign(shader.uniforms,uniforms);
-  shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\n'+TERRAIN_VERTEX_DECL).replace('#include <begin_vertex>','#include <begin_vertex>\nvTerrainWorld=(modelMatrix*vec4(transformed,1.0)).xyz;vTerrainNormal=mat3(modelMatrix)*objectNormal;');
+  shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\n'+TERRAIN_VERTEX_DECL).replace('#include <begin_vertex>','#include <begin_vertex>\nvTerrainWorld=(modelMatrix*vec4(transformed,1.0)).xyz;vTerrainNormal=mat3(modelMatrix)*objectNormal;vSnowCover=snowCover;');
   shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\n'+TERRAIN_FRAGMENT_DECL).replace('#include <color_fragment>','#include <color_fragment>\n'+TERRAIN_SURFACE).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(.96,.74,roadInfo.r);roughnessFactor=mix(roughnessFactor,.49,wetShore);roughnessFactor=mix(roughnessFactor,.66,paint);').replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\nnormal=terrainReliefNormal(-vViewPosition,normal,terrainRelief);');
  };
  material.customProgramCacheKey=()=>`ravel-terrain-${TERRAIN_DETAIL_REVISION}`;
@@ -228,20 +231,21 @@ export function* buildDetailedTerrain(world,map){
  const control=yield* createRoadControl(map),normals=yield* sharedNormals(t),material=terrainMaterial(map,control),chunk=TERRAIN_DETAIL_BUDGET.chunkCells;
  let chunks=0,vertices=0,triangles=0,geometryBytes=0;
  for(let cz=0;cz<t.n-1;cz+=chunk)for(let cx=0;cx<t.n-1;cx+=chunk){
-  const width=Math.min(chunk,t.n-1-cx),depth=Math.min(chunk,t.n-1-cz),stride=width+1,count=stride*(depth+1),positions=new Float32Array(count*3),ns=new Float32Array(count*3),colors=new Float32Array(count*3),uv=new Float32Array(count*2),indices=new Uint16Array(width*depth*6);
+  const width=Math.min(chunk,t.n-1-cx),depth=Math.min(chunk,t.n-1-cz),stride=width+1,count=stride*(depth+1),positions=new Float32Array(count*3),ns=new Float32Array(count*3),colors=new Float32Array(count*3),snow=new Uint8Array(count),uv=new Float32Array(count*2),indices=new Uint16Array(width*depth*6);
   for(let z=0;z<=depth;z++)for(let x=0;x<=width;x++){
    const index=z*stride+x,source=(cz+z)*t.n+cx+x,wx=(cx+x)*t.cell-t.size,wz=(cz+z)*t.cell-t.size;
    positions.set([wx,t.heights[source],wz],index*3);ns.set(normals.subarray(source*3,source*3+3),index*3);uv.set([(wx+t.size)/(t.size*2),(wz+t.size)/(t.size*2)],index*2);
    const forest=map.id==='sunnybreak'?(1-smooth(-38,-12,wx))*smooth(75,115,wz):0,farm=map.id==='sunnybreak'?(1-smooth(-105,-70,wx))*(1-smooth(-100,-65,wz)):0;
+   snow[index]=Math.round(winterCover(map,wx,wz,t.heights[source])*255);
    colors.set([1-forest*.13+farm*.07,1-forest*.04+farm*.02,1-forest*.08-farm*.1],index*3);
   }
   let at=0;for(let z=0;z<depth;z++)for(let x=0;x<width;x++){const a=z*stride+x,b=a+stride,c=a+1,d=b+1;indices.set([a,b,c,c,b,d],at);at+=6;}
-  const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.BufferAttribute(positions,3));geometry.setAttribute('normal',new T.BufferAttribute(ns,3));geometry.setAttribute('color',new T.BufferAttribute(colors,3));geometry.setAttribute('uv',new T.BufferAttribute(uv,2));geometry.setIndex(new T.BufferAttribute(indices,1));geometry.computeBoundingBox();geometry.computeBoundingSphere();
+  const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.BufferAttribute(positions,3));geometry.setAttribute('normal',new T.BufferAttribute(ns,3));geometry.setAttribute('color',new T.BufferAttribute(colors,3));geometry.setAttribute('uv',new T.BufferAttribute(uv,2));geometry.setAttribute('snowCover',new T.BufferAttribute(snow,1,true));geometry.setIndex(new T.BufferAttribute(indices,1));geometry.computeBoundingBox();geometry.computeBoundingSphere();
   const mesh=new T.Mesh(geometry,material);mesh.name=`Terrain ${cx/chunk}:${cz/chunk}`;mesh.receiveShadow=true;mesh.updateMatrix();mesh.matrixAutoUpdate=false;mesh.userData={keepDynamic:true,terrainChunk:true,ownedMaterial:chunks===0,revision:TERRAIN_DETAIL_REVISION};world.add(mesh);
-  chunks++;vertices+=count;triangles+=indices.length/3;geometryBytes+=positions.byteLength+ns.byteLength+colors.byteLength+uv.byteLength+indices.byteLength;yield;
+  chunks++;vertices+=count;triangles+=indices.length/3;geometryBytes+=positions.byteLength+ns.byteLength+colors.byteLength+snow.byteLength+uv.byteLength+indices.byteLength;yield;
  }
  const ocean=world.children.find(o=>o.userData.terrainOcean);
- world.userData.terrainEnvironment={material,ocean,uniforms:material.userData.uniforms,diagnostics:{revision:TERRAIN_DETAIL_REVISION,chunks,vertices,triangles,geometryBytes,controlBytes:control.image.data.byteLength,atlasBytes:terrainAtlas().image.data.byteLength,normalContinuity:'global triangle-weighted',collision:'exact original triangle grid'}};
+ world.userData.terrainEnvironment={material,ocean,uniforms:material.userData.uniforms,diagnostics:{revision:TERRAIN_DETAIL_REVISION,chunks,vertices,triangles,geometryBytes,controlBytes:control.image.data.byteLength,atlasBytes:terrainAtlas().image.data.byteLength,normalContinuity:'global triangle-weighted',collision:'shared authoritative triangle grid'}};
 }
 
 function* coastTexture(map){

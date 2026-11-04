@@ -1,0 +1,31 @@
+.blackout-briefing {
+ width:min(1000px,94vw); max-height:94dvh; padding:0; overflow:auto;
+ border:1px solid #71949e; border-radius:14px; background:#101d25; color:#f7f0e0;
+ box-shadow:0 25px 100px #02070bcf;
+}
+.blackout-briefing::backdrop { background:#061017df; backdrop-filter:blur(5px); }
+.blackout-art { position:relative; aspect-ratio: 16/8; background:#183746; }
+.blackout-art img { width:100%; height:100%; object-fit:cover; display:block; }
+.blackout-art::after { content:''; position:absolute; inset:0; background:linear-gradient(0deg,#07151dec,transparent 68%); }
+.blackout-headline { position:absolute; z-index:1; bottom:22px; left:clamp(16px,4vw,38px); right:16px; }
+.blackout-headline span,.blackout-steps b { color:#ffc475; letter-spacing:.12em; font-size:11px; font-weight:900; }
+.blackout-headline p { color:#e0ebeb; font-size:clamp(11px,2vw,17px); letter-spacing:.16em; font-weight:900; margin:8px 0 0; }
+.blackout-headline h1 { color:#fff7e5; font-size:clamp(29px,7vw,76px); letter-spacing:-.045em; line-height:1; margin:2px 0 0; font-weight:1000; }
+.blackout-close { position:absolute; z-index:2; top:12px; right:12px; width:40px; height:40px; border-radius:50%; background:#0c1c27e8; border:1px solid #9fb6bd; color:white; font-size:25px; }
+.blackout-body { padding:20px clamp(16px,4vw,38px) 25px; }
+.blackout-lead { margin:0 0 18px; font-size:16px; }
+.blackout-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.blackout-steps article { padding:12px; border:1px solid #45616b; border-radius:7px; background:#182b35; }
+.blackout-steps p,.blackout-log p { margin:7px 0 0; color:#d7e1e1; font-size:13px; line-height:1.48; }
+.blackout-body details { margin-top:18px; font-size:13px; color:#bde2e6; }
+.blackout-log { margin:10px 0; }
+.blackout-log audio { width:min(290px,100%); height:38px; margin-top:6px; }
+.blackout-body footer { display:flex; justify-content:space-between; align-items:center; gap:14px; padding-top:16px; margin-top:15px; border-top:1px solid #45616b; }
+.blackout-body footer label { display:flex; align-items:center; gap:7px; font-size:13px; }
+.blackout-body footer button { background:#ffc575; color:#14232a; }
+@media(max-width:650px) {
+ .blackout-steps { grid-template-columns:1fr; gap:7px; }
+ .blackout-art { aspect-ratio:16/10; }
+ .blackout-headline { bottom:12px; }
+ .blackout-body footer { align-items:stretch; flex-direction:column; }
+}

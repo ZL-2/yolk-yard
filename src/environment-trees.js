@@ -10,6 +10,7 @@ const palette={
  autumn:[0x92502e,0xbc733b,0xc79950],
  orchard:[0x365735,0x507140,0x73904d],
  pine:[0x244d3c,0x37644a,0x557956],
+ 'snow-pine':[0x476269,0xc8dbe0,0xf0f5f4],
  palm:[0x365d35,0x547b3c,0x7b9149],
 };
 const colors=new Map();
@@ -107,8 +108,8 @@ function broadleaf(bark,foliage,kind,variant,detail){
  }
 }
 
-function pine(bark,foliage,variant,detail){
- const rng=random(4537+variant*9349),tints=palette.pine,trunkTint=0x655548,lean=(rng()-.5)*.2;
+function pine(bark,foliage,variant,detail,kind){
+ const rng=random(4537+variant*9349),tints=palette[kind],trunkTint=0x655548,lean=(rng()-.5)*.2;
  const points=detail?[point(0,0,0),point(0,.55,0),point(lean,3,0),point(lean*.7,5.9,.02),point(0,9.8,0)]:[point(0,0,0),point(lean,4.8,0),point(0,9.8,0)];
  tube(bark,points,detail?[.37,.29,.22,.13,.025]:[.37,.16,.025],trunkTint,detail?7:5,variant);roots(bark,rng,trunkTint,detail);
  for(let tier=0;tier<6;tier++)for(let arm=0;arm<6;arm++){
@@ -158,7 +159,7 @@ function palm(bark,foliage,variant,detail){
 function assembly(kind,variant,detail){
  const key=`${kind}:${variant}:${detail?1:0}`;if(assemblies.has(key))return assemblies.get(key);
  const bark=new Surface('bark'),foliage=new Surface('leaf');
- if(kind==='palm')palm(bark,foliage,variant,detail);else if(kind==='pine')pine(bark,foliage,variant,detail);else broadleaf(bark,foliage,kind,variant,detail);
+ if(kind==='palm')palm(bark,foliage,variant,detail);else if(kind==='pine'||kind==='snow-pine')pine(bark,foliage,variant,detail,kind);else broadleaf(bark,foliage,kind,variant,detail);
  const result={bark:bark.geometry(),foliage:foliage.geometry()};assemblies.set(key,result);return result;
 }
 

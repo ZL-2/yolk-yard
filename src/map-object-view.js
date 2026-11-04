@@ -31,7 +31,7 @@ export function bakeObject(group){
  }
  for(const b of batches.values()){const geometry=mergeGeometries(b.parts);for(const p of b.parts)p.dispose();geometry.userData.environmentAtlas=!!b.material?.userData.environmentAtlas;geometry.userData.architectureAtlas=!!b.material?.userData.architectureAtlas;packEnvironmentGeometry(geometry);geometry.computeBoundingSphere();const material=b.material||new THREE.MeshLambertMaterial({vertexColors:true}),mesh=new THREE.Mesh(geometry,material);mesh.userData.ownedMaterial=!b.material;mesh.userData.objectRanges=b.ranges;mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);}
 }
-export function makeMapObject(record,kit,{base,markers=false,loadModels=true,editorPreview=false,previewDoorIds=null}={}){
+export function makeMapObject(record,kit,{base,markers=false,loadModels=true,editorPreview=false,previewDoorIds=null,bake=true}={}){
  const architecture=architectureKit(kit),root=new THREE.Group(),content=new THREE.Group();root.add(content);root.name=record.name||record.kind||record.source;root.userData.editorId=record.id;
  const src=record.sourceObject,origin=record.origin||src?.position||[0,0,0],color=record.color?Number.parseInt(record.color.slice(1),16):null;
  if(src?.type==='building'){
@@ -57,19 +57,29 @@ export function makeMapObject(record,kit,{base,markers=false,loadModels=true,edi
  if(!['chest','spawn'].includes(src?.type))content.position.set(-origin[0],-origin[1],-origin[2]);
  content.traverse(m=>{if(m.isMesh){m.castShadow=m.receiveShadow=true;if(!m.userData.objectId)m.userData.objectId=src?.boxes?.[0]?.objectId||'editor-'+record.id+'-0';if(color!=null&&m.material?.color){m.material=m.material.clone();m.material.color.setHex(color);m.userData.ownedMaterial=true;}}});
  if(src&&record.id!==record.source)content.traverse(m=>{if(!m.isMesh)return;const index=src.boxes.findIndex(b=>b.objectId===m.userData.objectId);m.userData.objectId='editor-'+record.id+'-'+Math.max(0,index);});
- if(record.kind!=='model')bakeObject(content);
+ if(bake&&record.kind!=='model')bakeObject(content);
  root.position.fromArray(record.position);root.rotation.y=record.rotation*Math.PI/180;root.scale.fromArray(record.scale);return root;
 }
 export function buildMapObjects(world,map,kit){
- const drawnDoors=new Set();
- for(const record of map.editorObjects||[]){
+ const drawnDoors=new Set(),seasonChunks=new Map();
+ const draw=(record,base,bake)=>{
   const door=record.sourceObject?.spec?.doorId;
-  // Functional leaves are drawn by FrontierView during matches. Baking a
-  // second closed leaf here used to leave a visible door after it was opened.
-  if(door&&record.collision&&!map.editorPreview)continue;
+  // Functional leaves are drawn by FrontierView during matches.
+  if(door&&record.collision&&!map.editorPreview)return null;
   const previewDoorIds=map.editorPreview?new Set():null;
   if(map.editorPreview)for(const d of map.doors||[])if(d.editorObject===record.id){drawnDoors.add(d.id);previewDoorIds.add(d.id);}
-  world.add(makeMapObject(record,kit,{base:map.editorBase,editorPreview:!!map.editorPreview,previewDoorIds}));
+  return makeMapObject(record,kit,{base,editorPreview:!!map.editorPreview,previewDoorIds,bake});
+ };
+ for(const record of map.seasonObjects||[]){
+  if(map.editorReplacements?.has(record.id))continue;
+  const group=draw(record,map.seasonObjectBase,false);if(!group)continue;
+  const [x,,z]=record.position,key=Math.floor(x/32)+':'+Math.floor(z/32);
+  if(!seasonChunks.has(key))seasonChunks.set(key,new THREE.Group());
+  const chunk=seasonChunks.get(key),meshes=[];
+  group.traverse(m=>{if(m.isMesh)meshes.push(m);});
+  for(const mesh of meshes)chunk.attach(mesh);
  }
+ for(const chunk of seasonChunks.values()){bakeObject(chunk);world.add(chunk);}
+ for(const record of map.editorObjects||[]){const group=draw(record,map.editorBase,true);if(group)world.add(group);}
  if(map.editorPreview){const leaves=new THREE.Group();for(const d of map.doors||[])if(!drawnDoors.has(d.id)){const m=kit.block(leaves,d.x,d.y+d.h/2,d.z,d.w,d.h,d.d||.18,0x796547);m.userData.objectId='world-door-'+d.id;}bakeObject(leaves);world.add(leaves);}
 }

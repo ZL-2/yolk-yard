@@ -1,3 +1,4 @@
+import {winterCover} from './season-two-landscape.js';
 // Shared triangulated terrain: geometry, minimap, walking, landing, shots and bots.
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
 export const WATER_LEVEL=.5;
@@ -19,7 +20,10 @@ export function naturalHeight(x,z){
 }
 export function terrainColor(map,x,z){
  if(map.id==='hatchery-atoll'){const h=groundAt(map,x,z);return h<.7?0x537e89:h<2?0xb1ac91:Math.abs(x)<80&&Math.abs(z)<80?0x7c8d78:0x657b70;}
- const h=groundAt(map,x,z),edge=(Math.abs(x/254)**4+Math.abs(z/254)**4)**.25;
+ const h=groundAt(map,x,z),snow=winterCover(map,x,z,h);
+ if(snow>.74)return 0xd6e7ea;
+ if(snow>.27)return 0xa9bbbc;
+ const edge=(Math.abs(x/254)**4+Math.abs(z/254)**4)**.25;
  if(h<.7)return 0x429aa8;
  if(h<2||edge>.925)return 0xddc88e;
  if(Math.hypot((x+164)/44,(z-67)/40)<1.25)return h<6?0xb5a88d:0x9da397;

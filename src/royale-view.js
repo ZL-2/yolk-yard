@@ -1,3 +1,4 @@
+import {buildBlackoutDetails,updateBlackoutLights} from './blackout-view.js';
 import {updateIconGear} from './icon-bundle-models.js';
 import {dressHelipad} from './helipad-view.js';
 import {updateStormspikeView} from './stormspike-view.js';
@@ -66,7 +67,7 @@ export function buildIsland(world,map,kit){for(const _ of buildIslandSteps(world
 // Resumable construction lets warmup frames keep servicing input and sockets.
 export function* buildIslandSteps(world,map,kit){
  yield* prepareEnvironmentSurfaces();yield* prepareArchitectureSurfaces();
- if(map.id==='sunnybreak'){yield* streamedIslandSteps(world,map,kit);buildMapObjects(world,map,kit);return;}
+ if(map.id==='sunnybreak'){yield* streamedIslandSteps(world,map,kit);buildMapObjects(world,map,kit);yield* buildBlackoutDetails(world,map,kit,bakeSteps);return;}
  const {palette}=kit,architecture=architectureKit(kit);
  world.add(yield* createDetailedOceanSteps(map));
  yield;
@@ -187,6 +188,7 @@ export class RoyaleView{
  }
  chestModel(supply=false,epic=false){const g=chestModel(this.kit,supply,epic);bake(g.userData.lid,false,true);bake(g,false,true);return g;}
  update(state,local,dt,playing){
+  updateBlackoutLights(this.view.world,state?.royale?.blackout);
   this.root.visible=playing&&!!state?.royale;if(!this.root.visible)return;
   const r=state.royale,t=this.view.clock,kit=this.kit;updateOperationView(this,state);updateGrapplers(this,state,local);updateVehicles(this,state,local,dt);updateStormspikeView(this,state);
   this.seasonMeshes??=new Map();const activeSeason=new Set();

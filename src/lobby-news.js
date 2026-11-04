@@ -1,6 +1,7 @@
 import {RELEASE} from './releases.js';
 const base=import.meta.env?.BASE_URL||'/';
 export const LOBBY_NEWS=[
+ {title:'THE BLACKOUT',label:'SEASON 1 · NEW ROYALE LOCATION',image:'season/blackout/cover.webp',action:'blackout-briefing'},
  {title:'VOICE CHAT IS HERE',label:'NEW · SQUAD UP. SPEAK UP.',image:'season/voice-192.webp',action:'voice-briefing'},
  {title:'YOUR NEXT DEPLOYMENT',label:`QUALITY UPDATE ${RELEASE}`,image:'modes/choose.webp',action:'updates'},
  {title:'OPERATION BREAKWATER',label:'SEASON 1',image:'season/breakwater-150.webp',action:'season-guide'},

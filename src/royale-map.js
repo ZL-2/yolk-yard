@@ -1,3 +1,7 @@
+import {compileLayout} from './map-layout.js';
+import {SEASON_TWO_DRESSING} from './season-two-dressing.js';
+import {reshapeSeasonTerrain,authorSeasonLocations} from './season-two-landscape.js';
+import {authorBlackout} from './blackout-map.js';
 import {HELIPAD} from './helicopter.js';
 import {environmentCollision} from './environment-collision.js';
 import {authorWatchtowers} from './watchtowers.js';
@@ -175,8 +179,15 @@ for(let i=0;i<650;i++){
 // Breakwater: Observatory approach cover and distinct supply routes. Geometry,
 // destruction and navigation use the same authored props as the rest of the coast.
 for(const [x,z,kind] of [[116,-173,'crate'],[122,-172,'barrels'],[145,-127,'crate'],[150,-124,'barrels'],[87,-133,'crate'],[86,-129,'barrels']])if(clear(x,z,1.2))prop(kind,x,z,2.1,1.1,1.05);
+reshapeSeasonTerrain({terrain,buildings,boxes,trees,props,floorLoot,chests,landmarks,signs,groundAt});
+const blackout=authorBlackout({box,ground:yAt,frontier,chests,floorLoot,landmarks});
+authorSeasonLocations({districts:DISTRICTS,terrain,boxes,landmarks,buildings,signs,frontier,blackout,box,prop,chests,navLinks,groundAt});
 // Material assignments and stable IDs are shared by harvesting, destruction and rendering.
 for(const [i,b]of boxes.entries())b.objectId=b.doorId?'world-door-'+b.doorId:'world-'+i;
 for(const p of [...chests,...floorLoot]){p.id=(chests.includes(p)?'anchor-chest-':'anchor-loot-')+(chests.includes(p)?chests.indexOf(p):floorLoot.indexOf(p));}
 for(const b of boxes){const shape=environmentCollision(b,{props,trees});if(shape)b.collisionShape=shape;}
-export const ROYALE_MAP={id:'sunnybreak',revision:14,waterLevel:.5,helipad,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'Nine occupied districts, command vault, industrial traversal routes and a connected evacuation coast.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[80,80]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,...outposts,material:'brick'};
+const base={id:'sunnybreak',revision:16,afterTheSignal:true,blackout,waterLevel:.5,helipad,name:'Ravel Coast',tag:'RAVEL COAST • 512 × 512',description:'After the Signal. A war-torn coast, snowbound northern passes and a wreck at Breakwater.',size:256,navCell:1.5,navMax:70,sky:0xaedcea,ground:0x81b178,accent:0xf6cc66,theme:'royale',zone:[0,0,0],bases:[[-230,0],[230,0]],spawns:[[0,0],[-75,-75],[75,-75],[-75,75],[80,80]],lanes:[],boxes,props,pickups:[],districts:DISTRICTS,buildings,trees,chests,floorLoot,shelters:[],terrain,landmarks,roads,navLinks,signs,...frontier,...outposts,material:'brick'};
+
+const dressed=compileLayout(base,SEASON_TWO_DRESSING);
+// Static authored scenery survives owner layouts, which are a separate layer.
+export const ROYALE_MAP={...dressed,seasonObjects:dressed.editorObjects,seasonObjectBase:base,editorObjects:[],editorBase:undefined,editorReplacements:undefined,layoutKey:undefined,revision:base.revision};

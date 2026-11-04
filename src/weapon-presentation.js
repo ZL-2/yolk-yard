@@ -1,5 +1,6 @@
 // Visual/optic tuning only. Combat damage, magazines and projectile balance live in weapon-balance.js.
 export const OPTICS = {
+ rimeglass:{radius:.067,objective:.079,length:.56,overlay:'precision',reticle:'mil-dot'},
  needle:{radius:.065,objective:.078,length:.56,overlay:'precision',reticle:'mil-dot'},
  anchor:{radius:.054,objective:.067,length:.49,overlay:'precision',reticle:'chevron'},
  peeper:{radius:.060,objective:.072,length:.52,overlay:'precision',reticle:'mil-dot'},
@@ -10,6 +11,9 @@ export function adsFov(w,base){return w.ads?.fov??(w.ads?2*Math.atan(Math.tan(ba
 // viewmodel FOV keeps the gun readable when the world camera zooms for ADS.
 export const WEAPON_ART_REVISION=155;
 export const VIEWMODELS={
+ bastionburst:{scale:.47,x:.24,y:-.22,z:-.65,fov:70},
+ breakwaterrepeater:{scale:.50,x:.23,y:-.22,z:-.64,fov:70},
+ rimeglass:{scale:.46,x:.25,y:-.22,z:-.71,fov:70},
  hollowfire:{scale:.48,x:.23,y:-.21,z:-.61,fov:68},
  stormspike:{scale:.46,x:.24,y:-.22,z:-.66,fov:70},
  sprinter:{scale:.48,x:.23,y:-.21,z:-.61,fov:68},
@@ -26,8 +30,11 @@ export const VIEWMODELS={
 };
 VIEWMODELS.arcLoom=VIEWMODELS.comet;VIEWMODELS.riftDriver=VIEWMODELS.thumper;VIEWMODELS.cinderLance=VIEWMODELS.anchor;
 export function viewmodelProfile(id,aspect=16/9){const p=VIEWMODELS[id]||VIEWMODELS.sprinter;return {...p,z:p.z-Math.max(0,1.25/aspect-1)*.26};}
-export const RETICLES={hollowfire:'reflex-dot',stormspike:'reflex-dot',sprinter:'crosshair',scatter:'iron',needle:'mil-dot',zipper:'reflex-dot',thumper:'ring',anchor:'chevron',duet:'chevron',pip:'iron',peeper:'mil-dot',doubleyolk:'iron',comet:'reflex-dot'};
+export const RETICLES={bastionburst:'reflex-dot',breakwaterrepeater:'iron',rimeglass:'mil-dot',hollowfire:'reflex-dot',stormspike:'reflex-dot',sprinter:'crosshair',scatter:'iron',needle:'mil-dot',zipper:'reflex-dot',thumper:'ring',anchor:'chevron',duet:'chevron',pip:'iron',peeper:'mil-dot',doubleyolk:'iron',comet:'reflex-dot'};
 export const GROUND_DISPLAY = {
+ bastionburst:{scale:1,yaw:1.05,pitch:-.03,lift:.60},
+ breakwaterrepeater:{scale:1.05,yaw:1.05,pitch:-.04,lift:.58},
+ rimeglass:{scale:.94,yaw:1.05,pitch:-.05,lift:.61},
  hollowfire:{scale:1,yaw:.95,pitch:-.06,lift:.57},
  stormspike:{scale:1,yaw:1.05,pitch:-.03,lift:.61},
  sprinter:{scale:1,yaw:.95,pitch:-.06,lift:.57},scatter:{scale:1,yaw:1.1,pitch:-.04,lift:.52},

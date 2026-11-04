@@ -1,3 +1,5 @@
+import {BLACKOUT_LOGS} from './blackout-map.js';
+import {showBlackoutBriefing,rememberBlackoutRecording,playBlackoutRecording,stopBlackoutRecording} from './blackout-briefing.js';
 import {toggleTournamentCard} from './tournament-ui.js';
 import {JimStyleReward} from './jim-style-ui.js';
 import {OwnerMatchPanel} from './owner-match-panel.js';
@@ -1036,7 +1038,7 @@ function pauseMenu() {
 }
 function leave(confirm = false,notifyParty=true) {
   ownerPanel.reset();
-  lastPreferenceSync='';actionToggles.reset();stopBlacktideNarration();zombiesUI.clear();boxUI.clear();zoneUI.clear();
+  lastPreferenceSync='';actionToggles.reset();stopBlacktideNarration();stopBlackoutRecording();zombiesUI.clear();boxUI.clear();zoneUI.clear();
   const returningFromMatch=screen==='game';
   if(returningFromMatch)showLoading('RETURNING TO LOBBY','Closing the match connection and preparing your operator in the lobby.',{kind:'exit'});else hideLoading(true);
   if(notifyParty){activeLaunch=null;void partyRequest("returned");}
@@ -1160,6 +1162,14 @@ function processEvents() {
     if(e.type==='afk-removed'){if(e.player===localId){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');return;}if(net?.isHost)net.kick(e.player);}
     if(e.type==='duo-marker'&&e.player!==localId&&e.team!==state.players.find(p=>p.id===localId)?.team)continue;
     if(e.type==='box-cue'){if(e.cue==='fight')sound.cue('round-start');else if(e.cue==='storm')sound.cue('storm-closing');else if(e.cue==='series-win'||e.cue==='round-win')sound.cue(e.winner===(state.options.boxFormat==='ffa'?localId:listener?.team)?'victory':'round-start');else if(e.cue==='siphon'&&e.player===localId)sound.cue('complete-mini');}
+    if(e.type==='blackout-recording' && e.player===localId && BLACKOUT_LOGS[e.index]){
+      const log=BLACKOUT_LOGS[e.index];
+      rememberBlackoutRecording(e.index);
+      playBlackoutRecording(e.index,sound.enabled?sound.volume*sound.effectsVolume:0);
+      notice(log.speaker+' · '+log.text,14000);
+    }
+    if(e.type==='blackout-breaker' && e.player===localId)notice('BREAKER ONLINE · 1 / 2 · Restore power at the other station',3800);
+    if(e.type==='royale-cue' && e.cue==='blackout-siren' && listener && Math.hypot(listener.x-e.x,listener.z-e.z)<125)notice('BREAKWATER POWER RESTORED · Cargo hold opening',4600);
     view.event(e, localId,state);
     fieldUI.event(e,localId);
     if(e.type==='z-cue'){const text={'arrival':'BLACKTIDE · COMPLETE 3 CONTRACTS, THEN EXTRACT','wave':'ROUND '+e.round,'special-wave':'SIGNAL SURGE · ROUND '+e.round,'wave-clear':'ROUND '+e.round+' SURVIVED','power':'LATTICE POWER RESTORED','quest':'THE LAST TRANSMISSION · OBJECTIVE UPDATED','quest-complete':'THE SIGNAL IS SILENT · QUEST COMPLETE','boss':'THE BELLWETHER IS LISTENING','exfil':'TRANSPORT INBOUND · SURVIVE, THEN BOARD','contract':'CONTRACT ACCEPTED · FOLLOW THE GOLD MARKER','contract-complete':'CONTRACT COMPLETE · CLAIM YOUR REWARD','shutdown':'CONTAMINATION SPREADING · REACH FINAL EXTRACTION','transport-landed':'TRANSPORT LANDED · PRESS F TO BOARD','cache-move':'THE SIGNAL CACHE HAS RELOCATED','powerup':e.powerup?.toUpperCase()};if(text[e.cue])notice(text[e.cue],3500);}
@@ -1556,6 +1566,7 @@ const actions = {
  'social-confirm-new-identity':()=>{try{fairPlay.admission();ownerNotices.admission();}catch(error){return errorToast(error.message);}party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
  referrals:()=>showReferrals({party}),
+ 'blackout-briefing':()=>showBlackoutBriefing({force:true}),
  'voice-briefing':()=>showVoiceBriefing({force:true}),
  'perspective-briefing':()=>showPerspectiveBriefing({force:true}),
  'z-journal':openZombiesJournal,
@@ -2283,7 +2294,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>showBlackoutBriefing()).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);

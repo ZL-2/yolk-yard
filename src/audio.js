@@ -16,6 +16,7 @@ import {ITEMS} from './royale-data.js';
 const note=(f,d=.12,v=.12,w='sine',to=0,at=0)=>({f,d,v,w,to,at});
 const noise=(f,d=.15,v=.15,at=0)=>({noise:true,f,d,v,at});
 export const SOUND_CUES={...ZOMBIE_SOUNDS,
+ 'blackout-siren':Array.from({length:4},(_,i)=>note(430,.68,.13,'triangle',860,i*.76)),
  'helicopter-speaker-on':[note(660,.09,.12,'triangle'),note(880,.12,.1,'triangle',0,.1)],
  'helicopter-speaker-off':[note(660,.1,.1,'triangle',330)],
  'uplink-active':[note(392,.18,.05,'triangle'),note(587,.2,.06,'sine',0,.18),note(784,.5,.05,'sine',0,.4),noise(1600,.22,.025,.36)],
@@ -152,7 +153,7 @@ export class Sound {
   const category=id==='victory'||id==='defeat'?'music':id.startsWith('ambient')?'ambience':'effects';
   const key=id+(position?Math.round(position.x/5)+':'+Math.round(position.z/5):'');
   if((this.cooldowns.get(key)||0)>this.clock)return;this.cooldowns.set(key,this.clock+.05);
-  const radius=id.startsWith('step-')?26:id.includes('chest')?16:id.includes('impact')||id.includes('hit')||id==='ricochet'?30:(id==='supply-land'||id==='supply-cut')?110:id==='ambient-bell'?95:id.includes('glider')?24:id==='land'||id==='jump'?20:45;
+  const radius=id==='blackout-siren'?125:id.startsWith('step-')?26:id.includes('chest')?16:id.includes('impact')||id.includes('hit')||id==='ricochet'?30:(id==='supply-land'||id==='supply-cut')?110:id==='ambient-bell'?95:id.includes('glider')?24:id==='land'||id==='jump'?20:45;
   preset.forEach(p=>this.layer(p,position?{...position,radius}:null,category,scale));
  }
  tone(freq,duration=.09,type='sine',volume=.15,end=0){this.layer(note(freq,duration,volume,type,end));}
