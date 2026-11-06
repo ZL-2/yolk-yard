@@ -87,6 +87,7 @@ if(this.relay.deployment)this.send(user,{type:'deployment',deployment:this.relay
 
    case 'voice-ticket':case 'voice-context':return this.relay.voice.command(u,m,ws);
    case 'icon-voting':{this.store.available();if(!this.relay.iconVoting)throw Error('Voting is temporarily unavailable.');if(!m.body)return this.relay.iconVoting.summary(u.id);this.limit(u,'icon-voting',10,10000);return this.relay.iconVoting.mutate(u.id,m.body);}
+   case 'owner-gameplay-result':this.limit(u,'owner-gameplay-result',30,60000);return this.relay.owner.match.gameplayResult(u,m);
    case 'owner-match-status':this.limit(u,'owner-match-status',12,60000);return this.relay.owner.match.status(u.id);
    case 'owner-match-ack':this.limit(u,'owner-match-ack',20,60000);return this.relay.owner.match.acknowledge(u.id,m.ids);
    case 'fair-play-status':this.limit(u,'fair-play-status',12,60000);return this.relay.fairPlay.status(u.id);

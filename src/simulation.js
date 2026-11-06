@@ -320,6 +320,7 @@ export class Simulation {
     this.emit("player-action", {player: id, action});
   }
   spawn(p) {
+    delete p.ownerEffects;
     if(this.options.weaponPool==='precision'&&!['anchor','peeper','needle'].includes((p.nextProfile||p).weapon)){p.weapon='anchor';if(p.nextProfile)p.nextProfile.weapon='anchor';}if(this.options.weaponPool==='close'&&!['scatter','doubleyolk','zipper','pip'].includes((p.nextProfile||p).weapon)){p.weapon='zipper';if(p.nextProfile)p.nextProfile.weapon='zipper';}
     resetStance(p);
     resetBonuses(p);
@@ -543,6 +544,7 @@ export class Simulation {
     };
   }
   fire(p, burst = false) {
+    if(p.ownerEffects?.frozen)return false;
     const w=gun(p);
     if(!canFight(p)||p.sprinting||p.sprintRecovery>0||p.traversal||p.ammo[p.slot]<=0||p.reloadEnd||this.time+1e-9<(p.equipUntil||0))return false;
     if(burst){if(!w.burst||p.burstWeapon!==w.id||!p.burstLeft||this.time+1e-9<p.burstTime||this.time-(p.lastBurstShotAt??-100)+1e-9<w.burstInterval)return false;}
@@ -768,6 +770,7 @@ export class Simulation {
     }
   }
   damage(victim, attacker, amount, source, precision = false, shotId = null) {
+ if(victim.ownerEffects?.god&&source!=='Disconnected')return;
     if(!Number.isFinite(amount)||amount<=0)return;
     if (victim.health <= 0 || this.time < victim.shieldUntil) return;
     if(teammates(this.options,attacker,victim))return;
@@ -1058,7 +1061,7 @@ export class Simulation {
           equipHolster:p.equipHolster,
           equipUntil:p.equipUntil,
           poppers:p.poppers,
-          shieldUntil:p.shieldUntil,
+          shieldUntil:p.shieldUntil,ownerEffects:p.ownerEffects?{...p.ownerEffects}:undefined,
           respawnAt:p.respawnAt,
           killerId:p.killerId,
           watchingId:p.watchingId,

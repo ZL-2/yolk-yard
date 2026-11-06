@@ -1,3 +1,4 @@
+import {applyOwnerGameplay} from './owner-gameplay.js';
 import {BLACKOUT_LOGS} from './blackout-map.js';
 import {showBlackoutBriefing,rememberBlackoutRecording,playBlackoutRecording,stopBlackoutRecording} from './blackout-briefing.js';
 import {toggleTournamentCard} from './tournament-ui.js';
@@ -1490,6 +1491,8 @@ function initializeParty(){
   'lobby-chat':m=>lobbyComms.receive(m.message),
   'lobby-chat-cleared':m=>lobbyComms.clear(m.channel),
   'fair-play':m=>fairPlay.set(m.status),
+  'owner-gameplay':async m=>{if(sim&&!sim.remote&&net?.isHost){let ok=true,error='';try{applyOwnerGameplay(sim,m.command);}catch(e){ok=false;error=e.message;}try{await party.request('owner-gameplay-result',{code:m.command.code,matchId:m.command.matchId,requestId:m.command.requestId,ok,error});}catch{}}},
+  'owner-gameplay-feedback':m=>{if(m.matchId===state?.royale?.matchId||m.matchId===state?.matchId)toast(m.ok?'Owner gameplay command applied.':m.error);},
   'owner-controls':m=>ownerRuntime.set(m.controls),
   'owner-match-status':m=>ownerNotices.set(m.status),
   'owner-grants':m=>{void eggWallet.syncOwnerGrants(m.record).then(r=>{lobbyComms.setGrants(m.record.notices||[]);if(r.amount&&screen==='menu')renderMenu();}).catch(()=>toast('Your owner grant is saved online. Reconnect when browser storage is available.'));},

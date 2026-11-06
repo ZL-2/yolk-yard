@@ -190,6 +190,7 @@ export function canOccupy(map,p,height=bodyHeight(p),margin=RADIUS,phases=p.phas
 function pushAxis(p,map,axis,delta) {
  if(Math.abs(delta)<1e-10)return;
  const start=p[axis],base=p.y,other=axis==='x'?'z':'x',size=axis==='x'?'w':'d';
+ delta*=p.ownerEffects?.speed||1;
  const proposal=start+delta;let target=proposal;
  const height=bodyHeight(p),point={x:p.x,y:p.y,z:p.z,phasedBuilds:p.phasedBuilds};point[axis]=proposal;
  let hit=false,top=base;
@@ -216,6 +217,16 @@ function pushAxis(p,map,axis,delta) {
  p[axis]=target;
 }
 export function movePlayer(p, input, map, dt, time=0) {
+  if(p.ownerEffects?.frozen){p.vx=p.vy=p.vz=0;p.moving=false;return;}
+  if(p.ownerEffects?.fly&&p.health>0){
+    const distance=10*Math.min(.1,dt),yaw=input.yaw??p.yaw;
+    pushAxis(p,map,'x',(-Math.sin(yaw)*(input.forward||0)+Math.cos(yaw)*(input.strafe||0))*distance);
+    pushAxis(p,map,'z',(-Math.cos(yaw)*(input.forward||0)-Math.sin(yaw)*(input.strafe||0))*distance);
+    const vertical=(Number(!!input.jump)-Number(!!input.crouch))*distance,steps=Math.max(1,Math.ceil(Math.abs(vertical)/.1));
+    for(let i=0;i<steps;i++){const y=Math.min(170,Math.max(groundAt(map,p.x,p.z),p.y+vertical/steps));if(!canStand(map,{...p,y}))break;p.y=y;}
+    p.x=clamp(p.x,-map.size+.5,map.size-.5);p.z=clamp(p.z,-map.size+.5,map.size-.5);
+    p.yaw=yaw;p.pitch=input.pitch??p.pitch;p.vy=0;p.grounded=false;p.flight='ground';p.fall={apex:p.y,immune:true};return;
+  }
   pruneBuildPhases(p,map);
   // Bound displacement through narrow risers, including low-frame-rate clients.
   const steps=Math.max(1,Math.ceil(Math.min(dt,.1)/(1/60)));

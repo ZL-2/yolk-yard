@@ -75,6 +75,7 @@ export class BoxFightSimulation extends RoyaleSimulation {
   this.addBots();if(!this.options.recurring)return this.beginBoxRound();this.emit('box-cue',{cue:'waiting'});return true;
  }
  beginBoxRound(){
+  for(const p of this.players.values())delete p.ownerEffects;
   this.addBots();const seats=this.eligiblePlayers();
   if(new Set(seats.map(p=>boxTeam(this.options,p))).size<2)return this.waitForOpponents();
   this.boxRound++;this.round++;this.roundEventFloor=this.eventId;this.boxStage='prepare';this.boxEnd=this.time+this.rules.prepare;this.boxStarted=0;this.boxStormCue=false;this.roundWinner=null;this.roundReason='';this.queueEnds=0;this.elapsed=0;

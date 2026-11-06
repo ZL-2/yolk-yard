@@ -150,6 +150,7 @@ export class RoyaleSimulation extends Simulation {
  battleMap(){const map=getMap('sunnybreak',this.mapLayouts);return {...map,boxes:(map.authored||map.boxes).map(b=>({...b}))};}
  islandMap(){const map=getMap('hatchery-atoll',this.mapLayouts);return {...map,boxes:(map.authored||map.boxes).map(b=>({...b}))};}
  startRound(){
+  for(const p of this.players.values())delete p.ownerEffects;
   if(this.phase==='playing')return false;
   if(this.options.recurring){this.mapLayouts=captureMapLayouts();this.mapLayoutKey=mapBundleKey(this.mapLayouts);}
   for(const p of [...this.players.values()])if(p.bot||p.connected===false)this.players.delete(p.id);
@@ -350,6 +351,7 @@ export class RoyaleSimulation extends Simulation {
   const accepted=super.fire(p,burst);item.ammo=p.ammo[p.slot];if(accepted&&(p.boss||p.henchman))bossCombatVoice(this,p);return accepted;
  }
  damage(victim,attacker,amount,source,precision=false,shotId=null){
+ if(victim.ownerEffects?.god&&source!=='Disconnected')return;
   if(this.options.training){if(victim.bot){super.damage(victim,attacker,amount,source,precision,shotId);if(victim.health<=0)this.spawnWarmup(victim);}return;}
   if(victim.boss||victim.henchman){damageBoss(this,victim,attacker,amount,source,precision,shotId);return;}
   if(teammates(this.options,victim,attacker))return;

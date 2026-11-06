@@ -1,6 +1,7 @@
+import {OWNER_GAMEPLAY,validateOwnerGameplay,applyOwnerGameplay} from '../../src/owner-gameplay.js';
 import {createHash,randomUUID} from 'node:crypto';
 const clean=v=>String(v??'').replace(/[\u0000-\u001f]/g,' ').trim().slice(0,300);
-const actions=new Set(['warn','kick','ban','unban','mute','unmute','teaming','cheating','reverse-teaming','announce','end-match']);
+const actions=new Set(['warn','kick','ban','unban','mute','unmute','teaming','cheating','reverse-teaming','announce','end-match',...Object.keys(OWNER_GAMEPLAY).map(k=>'game-'+k)]);
 export class OwnerMatchService{
  constructor(owner){this.owner=owner;this.db=owner.db;if(this.db.db)this.db.db.exec(`CREATE TABLE IF NOT EXISTS owner_match_notices(id TEXT PRIMARY KEY,player TEXT NOT NULL,created INTEGER NOT NULL,data TEXT NOT NULL,read_at INTEGER);CREATE TABLE IF NOT EXISTS owner_notice_views(notice TEXT NOT NULL,player TEXT NOT NULL,shown INTEGER NOT NULL,PRIMARY KEY(notice,player));CREATE INDEX IF NOT EXISTS owner_match_notices_player ON owner_match_notices(player,created);`);}
  get relay(){return this.owner.relay;}
@@ -31,9 +32,23 @@ export class OwnerMatchService{
   return null;
  }
  chatAllowed(peer,data){const id=this.chatIdentity(peer,data.type==='chat-message'?data.message?.sender:null);return !id||!this.owner.sanction(id,'mute');}
+ gameplayResult(user,message){
+  const c=this.context(message);
+  if(c.authority||c.roster.find(p=>p.host)?.id!==user.id)throw Error('Only the current match host can acknowledge gameplay controls.');
+  const id='owner-match:'+message.requestId,row=this.db.get('SELECT data FROM events WHERE id=?',id);
+  if(!row)throw Error('Unknown owner command.');
+  const data=JSON.parse(row.data);
+  if(data.matchId!==c.matchId||data.code!==c.code||!data.action.startsWith('game-'))throw Error('The owner command belongs to another match.');
+  if(!data.result.queued)return {ok:true};
+  const ok=message.ok===true,error=ok?'':clean(message.error)||'The host could not apply this command.';
+  data.result={...data.result,queued:false,applied:ok,...(error?{error}:{})};
+  this.db.run('UPDATE events SET data=? WHERE id=?',JSON.stringify(data),id);
+  this.relay.parties.send(this.relay.parties.users.get(data.operator),{type:'owner-gameplay-feedback',matchId:c.matchId,ok,error});
+  return {ok:true};
+ }
  async action(req,body){
   if(!actions.has(body.action)||!/^[-a-f0-9]{36}$/.test(body.requestId||''))throw Error('Invalid match action');
-  const fingerprint=createHash('sha256').update(JSON.stringify([body.action,body.code,body.matchId,body.players,body.reason,body.hours,body.caseId])).digest('hex'),key='owner-match:'+body.requestId;
+  const fingerprint=createHash('sha256').update(JSON.stringify([body.action,body.code,body.matchId,body.players,body.reason,body.hours,body.caseId,body.operator,body.weapon,body.rarity])).digest('hex'),key='owner-match:'+body.requestId;
   const previous=this.db.get('SELECT data FROM events WHERE id=?',key);if(previous){const old=JSON.parse(previous.data);if(old.fingerprint!==fingerprint)throw Object.assign(Error('This request was already used for a different action.'),{status:409});return old.result;}
   const c=this.context(body),reason=clean(body.reason);if(reason.length<5)throw Error('Give the player a clear reason (at least five characters).');
   const view=this.overview(body),ids=Array.isArray(body.players)?[...new Set(body.players)]:[];
@@ -42,8 +57,18 @@ export class OwnerMatchService{
   const now=this.owner.now(),hours=Number(body.hours??1),r=this.relay,result={ok:true,action:body.action,at:now};
   if(['ban','mute'].includes(body.action)&&![1,24,168].includes(hours))throw Error('Choose 1 hour, 24 hours, or 7 days.');
   if(body.action==='end-match'&&c.authority?.sim.phase==='results')throw Error('This match has already completed.');
-  const record=()=>this.db.event('owner-match',reason,c.code,{code:c.code,matchId:c.matchId,action:body.action,targets:targets.map(p=>({id:p.id,name:p.name})),actor:this.owner.actor(req,body),fingerprint,result},key);
-  if(['teaming','cheating'].includes(body.action)){
+  const record=()=>this.db.event('owner-match',reason,c.code,{code:c.code,matchId:c.matchId,action:body.action,operator:body.operator,targets:targets.map(p=>({id:p.id,name:p.name})),actor:this.owner.actor(req,body),fingerprint,result},key);
+  if(body.action.startsWith('game-')){
+   const operator=view.roster.find(p=>p.id===body.operator&&p.present);
+   const command={action:body.action.slice(5),players:targets.map(p=>p.playerId),operator:operator?.playerId,matchId:c.matchId,weapon:body.weapon,rarity:body.rarity};
+   validateOwnerGameplay(command);
+   if(c.authority){applyOwnerGameplay(c.authority.sim,command);record();}
+   else{
+    const hostUser=r.parties.users.get(c.roster.find(p=>p.host)?.id);
+    if(!hostUser||!r.parties.connected(hostUser))throw Error('The host is unavailable. Try again after the host reconnects.');
+    result.queued=true;record();r.parties.send(hostUser,{type:'owner-gameplay',command:{...command,code:c.code,requestId:body.requestId}});
+   }
+  }else if(['teaming','cheating'].includes(body.action)){
    const id='owner-'+body.action+':'+body.requestId,data={kind:body.action,players:targets.map(p=>({id:p.id,name:p.name})),room:c.code,matchId:c.matchId,eventId:c.authority?.eventId||null,evidence:{source:'owner observation',note:reason,actor:this.owner.actor(req,body)},notes:[]};
    r.fairPlay.enforce(id,data,{automatic:false,reason:'Owner observed '+body.action+': '+reason,audit:record});
   }else if(body.action==='reverse-teaming'){
