@@ -39,7 +39,7 @@ if(!this.store.meta('legacy-referral-awards-seeded-v1')){const legacy=this.store
  this.store.run('UPDATE marks_wallets SET balance=?,owned=?,migrated=1,revision=revision+1 WHERE player=?',balance,JSON.stringify([...new Set(owned)]),id);
  this.store.event('economy-migration','Reconciled legacy collection against server-recorded earnings',id,{claimed:claimed.length,accepted:owned.length-1});});return this.publish(id);}
  buy(id,{offer,price,requestId}){if(!/^[a-f0-9-]{36}$/.test(requestId||''))throw Error('Invalid purchase request');this.sync(id);this.store.transaction(()=>{const old=this.store.get('SELECT * FROM marks_purchases WHERE id=?',requestId);if(old){if(old.player!==id||old.offer!==offer||old.price!==price)throw Error('Purchase request conflict');return;}
- const r=this.row(id);if(!r.migrated)throw Error('Restore your wallet before buying.');const q=quoteOffer({owned:JSON.parse(r.owned)},offer);if(!q||q.offer.reviewOnly||q.offer.rankReward||q.offer.tournamentReward||q.offer.winReward||q.owned)throw Error('This item cannot be purchased.');if(!Number.isSafeInteger(price)||price!==q.price)throw Error('Price changed. Review the purchase again.');if(r.balance<q.price)throw Error('Not enough Marks.');
+ const r=this.row(id);if(!r.migrated)throw Error('Restore your wallet before buying.');const q=quoteOffer({owned:JSON.parse(r.owned)},offer);if(!q||q.offer.retired||q.offer.reviewOnly||q.offer.rankReward||q.offer.tournamentReward||q.offer.winReward||q.owned)throw Error('This item cannot be purchased.');if(!Number.isSafeInteger(price)||price!==q.price)throw Error('Price changed. Review the purchase again.');if(r.balance<q.price)throw Error('Not enough Marks.');
  const at=this.now();this.store.run('INSERT INTO marks_purchases VALUES(?,?,?,?,?,?)',requestId,id,at,offer,q.price,JSON.stringify(q.grants));this.store.run('UPDATE marks_wallets SET balance=balance-?,owned=?,revision=revision+1 WHERE player=?',q.price,JSON.stringify([...new Set([...JSON.parse(r.owned),...q.grants])]),id);this.store.run('INSERT INTO marks_ledger VALUES(?,?,?,?,?,?)','purchase:'+requestId,id,at,'purchase',-q.price,JSON.stringify({offer}));const beneficiary=payIconPurchase(this,{id:requestId,offer,price:q.price,at});if(beneficiary)queueMicrotask(()=>this.publish(beneficiary));});return this.publish(id);}
  giftQuote(id,{recipient,offer}){
  const code=String(recipient||'').replace(/[^a-z0-9]/gi,'').toUpperCase();
@@ -49,7 +49,7 @@ if(!this.store.meta('legacy-referral-awards-seeded-v1')){const legacy=this.store
  if(this.relay.parties.store.blocked?.(id,person.id))throw Error('Gifting is unavailable for this player.');
  this.relay.owner.assertPlayer?.(person.id);this.sync(id);this.sync(person.id);
  const item=shopOffer(offer),q=quoteOffer({owned:JSON.parse(this.row(person.id).owned)},offer);
- if(!item||item.default||item.reviewOnly||item.rankReward||item.winReward||item.tournamentReward||!q||q.owned||q.price<=0)throw Error('This item is unavailable or already owned by that player.');
+ if(!item||item.default||item.retired||item.reviewOnly||item.rankReward||item.winReward||item.tournamentReward||!q||q.owned||q.price<=0)throw Error('This item is unavailable or already owned by that player.');
  return {recipient:person.id,name:person.profile?.name||'Player',code:person.code,offer,price:q.price,grants:q.grants};
  }
  gift(id,{recipient,offer,price,requestId}){
@@ -62,7 +62,7 @@ if(!this.store.meta('legacy-referral-awards-seeded-v1')){const legacy=this.store
  const person=this.relay.parties.store.identities.get(recipient);if(!person)throw Error('Recipient is unavailable.');
  // Revalidate the recipient, entitlement, and current discounted price at commit time.
  const item=shopOffer(offer),recipientRow=this.row(recipient),q=quoteOffer({owned:JSON.parse(recipientRow.owned)},offer),sender=this.row(id);
- if(recipient===id||!item||item.default||item.reviewOnly||item.rankReward||item.winReward||item.tournamentReward||!q||q.owned||q.price<=0)throw Error('This gift is no longer available.');
+ if(recipient===id||!item||item.default||item.retired||item.reviewOnly||item.rankReward||item.winReward||item.tournamentReward||!q||q.owned||q.price<=0)throw Error('This gift is no longer available.');
  if(this.relay.parties.store.blocked?.(id,recipient))throw Error('Gifting is unavailable for this player.');
  this.relay.owner.assertPlayer?.(recipient);
  if(!sender.migrated)throw Error('Restore your wallet before gifting.');

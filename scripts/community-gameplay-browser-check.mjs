@@ -34,7 +34,19 @@ try{
   await opening.getByRole('button',{name:close}).click();
  }
  const sender=await page.evaluate(()=>window.__yolkTest.party().id);f.app.relay.economy.credit(sender,'browser-gift-funds',5000,'grant',Date.now());f.app.relay.economy.publish(sender);
- await page.locator('.yard-nav nav [data-action=item-shop]').click();await page.locator('[data-shop-item=bundle-jim-icon]').first().click();await page.locator('[data-shop-gift-start]').click();await page.locator('.shop-gift-code').fill(code);await page.locator('[data-shop-gift-quote]').click();await page.locator('[data-shop-gift-send]').waitFor();assert.match(await page.locator('.shop-gift').innerText(),/Gift Receiver/);await page.screenshot({path:out+'/gift-confirm.png'});await page.locator('[data-shop-gift-send]').click();await page.waitForFunction(()=>document.querySelector('.shop-detail-notice')?.textContent.includes('Gift delivered'));
+ await page.locator('.yard-nav nav [data-action=item-shop]').click();await page.getByRole('button',{name:'View Christmas bundle'}).click();
+ await page.getByRole('heading',{name:'Northstar Courier Bundle',exact:true}).waitFor();
+ assert.equal(await page.locator('[data-shop-preview]').count(),6);
+ for(const slot of ['pickaxe','backbling','glider','wrap','trail']){
+  await page.locator(`[data-shop-preview="${slot}-northstar-courier"]`).click();
+  await page.waitForFunction(()=>document.querySelector('.shop-model-view img')?.naturalWidth>0);
+ }
+ await page.screenshot({path:out+'/northstar-courier.png'});
+ await page.locator('[data-shop-back]').click();
+ await page.locator('[data-shop-category=bundles]').click();
+ assert.equal(await page.locator('[data-shop-item=bundle-hollow-jack]').count(),0);
+ await page.locator('[data-shop-category=all]').click();
+ await page.locator('[data-shop-item=bundle-jim-icon]').first().click();await page.locator('[data-shop-gift-start]').click();await page.locator('.shop-gift-code').fill(code);await page.locator('[data-shop-gift-quote]').click();await page.locator('[data-shop-gift-send]').waitFor();assert.match(await page.locator('.shop-gift').innerText(),/Gift Receiver/);await page.screenshot({path:out+'/gift-confirm.png'});await page.locator('[data-shop-gift-send]').click();await page.waitForFunction(()=>document.querySelector('.shop-detail-notice')?.textContent.includes('Gift delivered'));
  assert.ok(f.app.relay.economy.view(recipient.id).owned.includes('outfit-jim-normal'));assert.equal(f.app.relay.economy.view(creator.id).balance,450);assert.equal(f.app.relay.economy.view(sender).balance,2300);await page.screenshot({path:out+'/gift-delivered.png'});
  const record=f.app.relay.economy.view(recipient.id);assert.match(record.notifications[0].data.reason,/Gift Sender/);
  assert.deepEqual(errors,[]);console.log('PASS real gift UI, recipient confirmation, atomic debit, delivery and creator earnings');

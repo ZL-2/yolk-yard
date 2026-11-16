@@ -1,0 +1,46 @@
+#menu {
+ --home-gold:#ffe09a;
+ --home-line:#779da96b;
+ --home-panel:#142c38ee;
+}
+#menu .yard-nav {
+ background:linear-gradient(100deg,#233c42,#122631 61%,#2d2834);
+ box-shadow:inset 0 -2px #aec4c5, inset 0 -4px #742e3a;
+}
+#menu .yard-logo span {color:#c9eef3}
+#menu .yard-nav nav button.active {
+ background:#922d4277; color:#fff1d9; border-color:#d4777f;
+}
+#menu .yard-lobby-backdrop {
+ background:linear-gradient(0deg,#071a307d,transparent 40%,#12293c6b);
+}
+#menu .lobby-deployment-rail .lobby-deploy {
+ background:linear-gradient(152deg,#163631f5,#132939f5 70%);
+ border-top:2px solid #a9deda;
+}
+#menu .lobby-deploy .lobby-mode-kicker {color:#b8ede4;letter-spacing:.16em}
+#menu .lobby-deploy .lobby-play {
+ background:linear-gradient(115deg,#a42642,#78253b)!important;
+ color:#fff6e6!important; border-color:#e29b96;
+}
+#menu .lobby-deploy .lobby-play:hover:not(:disabled) {background:#b03749!important}
+#menu .lobby-news-controls {background:#173834}
+#menu .lobby-news-controls .news-dot[aria-pressed=true] {color:#ffe09a}
+.shop-rebuilt .winter-shop-intro {
+ border-color:#afd8d778;
+ background:linear-gradient(100deg,#183d3e,#1b353f 55%,#662737);
+}
+.shop-rebuilt .winter-shop-intro .eyebrow {color:#f4d184}
+.shop-rebuilt .winter-shop-intro em {color:#f6e2b6}
+.winter-airlift-label,.in-spawn-island .airlift-label {display:none}
+.in-spawn-island .winter-airlift-label {display:inline}
+body.in-spawn-island #royale-flight {
+ background:linear-gradient(120deg,#16403be8,#1a3048f0);
+ border-color:#b3dbd9;
+ box-shadow:0 8px 28px #00162366,inset 0 3px #ad3c50;
+}
+body.in-spawn-island #royale-flight .eyebrow {color:#ffdda1}
+
+#egg-shop.shop-rebuilt .shop-card-hero.shop-card-rendered .shop-card-art img {
+ object-fit:contain;object-position:center;filter:drop-shadow(0 10px 12px #0a14168c);
+}

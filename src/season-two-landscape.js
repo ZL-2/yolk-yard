@@ -3,6 +3,7 @@ const clamp=value=>Math.max(0,Math.min(1,value));
 const fade=value=>{const t=clamp(value);return t*t*(3-2*t);};
 const ellipse=(x,z,cx,cz,rx,rz)=>Math.hypot((x-cx)/rx,(z-cz)/rz);
 export function winterCover(map,x,z,y){
+ if(map.id==='hatchery-atoll'&&map.winterSignal)return fade((y-.55)/2.5);
  if(!map.afterTheSignal)return 0;
  const edge=Math.sin(x*.16+z*.09)*.062+Math.cos(z*.24-x*.08)*.044;
  const north=1-fade((ellipse(x,z,-14,-188,91,64)+edge-.64)/.45);

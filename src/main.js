@@ -139,6 +139,7 @@ import './experience-200.css';
 import './tournament.css';
 import './compete.css';
 import './lobby-home.css';
+import './christmas-ui.css';
 import {refreshPublishedMaps} from './map-service.js';
 import {useMatchLayouts} from './maps.js';
 import {OwnerConsole,startAnonymousVisits} from './owner-console.js';

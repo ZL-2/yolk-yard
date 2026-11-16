@@ -19,3 +19,22 @@ test('bot-only public rounds cannot qualify referral awards',()=>{const {economy
 import {EggWallet,WALLET_KEY} from '../src/egg-wallet.js';
 test('server synchronization preserves legacy review data and ignores stale balance replies',()=>{const data=new Map([[WALLET_KEY,JSON.stringify({version:1,balance:999999,earned:999999,owned:['outfit-scout','outfit-jim-normal']})]]);const w=new EggWallet({getItem:k=>data.get(k),setItem:(k,v)=>data.set(k,v)});w.syncServer({identity:'alice',economyRevision:1,revision:2,balance:2000,earned:2000,owned:['outfit-scout']});w.syncServer({identity:'alice',economyRevision:1,revision:1,balance:10000,earned:10000,owned:['outfit-scout']});assert.equal(w.read().balance,2000);assert.ok(JSON.parse(data.get('ravelfront-legacy-wallet-review-v1')).owned.includes('outfit-jim-normal'));});
 test('historically credited referrals cannot qualify for a second payout after migration',()=>{const f=fixture(),{store,relay,now}=f;relay.parties.store.identities.get('bob').referredBy='alice';relay.parties.store.identities.get('bob').referredAt=now()-86400001;store.setMeta('legacy-referral-grants-v1',{at:now(),records:{alice:1000}});store.run('DELETE FROM meta WHERE key=?','legacy-referral-awards-seeded-v1');const e=new Economy(relay);e.sync('alice');for(let i=0;i<3;i++)store.receipt({socialId:'bob'},{id:'prior'+i,time:(now()-3600000+i*700000)/1000,amount:100,mode:'royale',eligible:true,humanOpponents:2});e.qualifyReferral('bob');assert.equal(e.view('alice').balance,1300);assert.equal(store.get('SELECT count(*) n FROM referral_awards').n,1);new Economy(relay);assert.equal(store.get('SELECT count(*) n FROM referral_awards').n,1);});
+
+test('Christmas checkout grants all six pieces and retiring Halloween preserves owned cosmetics',()=>{
+ const {economy,relay,now}=fixture();
+ const halloween=['outfit','pickaxe','wrap','backbling','glider','trail'].map(slot=>slot+'-hollow-jack');
+ for(const id of ['alice','bob'])economy.credit(id,'test-budget:'+id,5000,'grant',now());
+ relay.parties.store.identities.get('bob').code='BOB12345';
+ relay.owner.assertPlayer=()=>{};
+ economy.migrate('alice',{});
+ const oldOwner=economy.migrate('bob',{owned:halloween});
+ assert.ok(halloween.every(id=>oldOwner.owned.includes(id)));
+ assert.equal(oldOwner.balance,2300,'Legacy ownership keeps the original bundle price');
+ assert.equal(economy.sanitize({outfit:halloween[0]},'bob').outfit,halloween[0]);
+ assert.throws(()=>economy.buy('alice',{offer:'bundle-hollow-jack',price:3000,requestId}),/cannot be purchased/);
+ assert.throws(()=>economy.buy('alice',{offer:halloween[0],price:1600,requestId}),/cannot be purchased/);
+ assert.throws(()=>economy.giftQuote('alice',{recipient:'BOB12345',offer:'bundle-hollow-jack'}),/unavailable/);
+ const holiday=economy.buy('alice',{offer:'bundle-northstar-courier',price:3000,requestId});
+ assert.equal(holiday.balance,2300);
+ assert.ok(['outfit','pickaxe','wrap','backbling','glider','trail'].every(slot=>holiday.owned.includes(slot+'-northstar-courier')));
+});

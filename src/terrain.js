@@ -19,7 +19,7 @@ export function naturalHeight(x,z){
  return deepenWaterBed(Math.max(0,h*smooth((1-edge)/.13)));
 }
 export function terrainColor(map,x,z){
- if(map.id==='hatchery-atoll'){const h=groundAt(map,x,z);return h<.7?0x537e89:h<2?0xb1ac91:Math.abs(x)<80&&Math.abs(z)<80?0x7c8d78:0x657b70;}
+ if(map.id==='hatchery-atoll'){const h=groundAt(map,x,z);return h<.7?0x537e89:h<2?0xb5c6cb:map.winterSignal?0xd6e7ea:0x7c8d78;}
  const h=groundAt(map,x,z),snow=winterCover(map,x,z,h);
  if(snow>.74)return 0xd6e7ea;
  if(snow>.27)return 0xa9bbbc;

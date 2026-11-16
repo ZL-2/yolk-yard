@@ -87,7 +87,7 @@ export class FrontierArt{
  radar(x,z,y=0){this.box(x,y+.8,z,4,1.6,4,'equipment');this.cylinder(x,y+4,z,.16,6.5);for(const side of [-1,1])this.beam([x+side*2,y,z],[x,y+6,z],.12);this.box(x,y+6.3,z,6.5,2.3,.2,'light',[.35,.3,0]);for(let i=-2;i<=2;i++)this.box(x+i,y+6.3,z+.17,.07,2.2,.06,'steel',[.35,.3,0]);this.box(x,y+6.3,z+.22,6.4,.06,.06,'steel');this.box(x,y+8,z,.06,1,.06,'amber');for(const side of [-1,1]){this.box(x+side*1.3,y+.9,z+2.03,.8,.8,.04,'dark');for(let j=0;j<5;j++)this.box(x+side*1.3,y+.62+j*.14,z+2.06,.73,.04,.05,'steel');}this.cylinder(x,y+5.9,z,.48,.28,'steel');}
  crane(x,z){for(const side of [-1,1]){this.box(x+side*3.3,7,z,.5,14,.8,'amber');this.beam([x+side*3.3,0,z],[x,13,z],.2,'steel');}this.box(x,14,z,22,.7,1.2,'amber');for(let t=-10;t<10;t+=3)this.beam([x+t,14,z],[x+t+2,16,z],.14,'steel');this.box(x,16,z,22,.2,.7,'steel');this.cylinder(x+7,10,z,.06,10);this.box(x+7,5,z,.8,.6,.8,'dark');this.box(x-5,14.7,z,3.4,2.2,2,'slate');this.box(x-5,14.8,z+1.04,2.5,1.2,.04,'light');}
  lamp(x,z){this.sceneryProp('lamp',{x,z,w:.6,d:.6,h:5.8});}
- pine(x,z,height=7){const start=this.scenery.children.length;environmentTree(this.scenery,{x,y:0,z,h:height,kind:'pine',seed:Math.abs(Math.round(x*31+z*17))},true);for(const m of this.scenery.children.slice(start))m.scale.x=m.scale.z=height/10;this.features+=2;}
+ pine(x,z,height=7,kind='pine'){const start=this.scenery.children.length;environmentTree(this.scenery,{x,y:0,z,h:height,kind,seed:Math.abs(Math.round(x*31+z*17))},true);for(const m of this.scenery.children.slice(start))m.scale.x=m.scale.z=height/10;this.features+=2;}
  truck(x,z){this.sceneryProp('truck',{x,z,w:2.8,h:2.8,d:6.4},Math.PI);}
  bake(parent){
   let primary;

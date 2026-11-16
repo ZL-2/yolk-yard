@@ -36,7 +36,7 @@ function template(profile){
  colors.cloth=new T.Color(colors.cloth).lerp(new T.Color('#43504b'),item?.model?0:item?.12:.58).getStyle();colors.trim=new T.Color(colors.trim).lerp(new T.Color('#b7b099'),item?.model?0:.25).getStyle();
  const key=JSON.stringify([colors,style,item?.model,profile.infectedType]);if(geometries.has(key))return geometries.get(key);
  let harvestHead=false;
- const parts=[],finishes=new Set(),light=['wren','pulse'].includes(item?.model),signature=item?.rankReward||['hollow-jack','voss','rook','nyx','wren','pulse','morrow'].includes(item?.model),leather=item?.model==='wren'?'#604331':colors.dark;
+ const parts=[],finishes=new Set(),light=['wren','pulse'].includes(item?.model),signature=item?.rankReward||['hollow-jack','northstar-courier','voss','rook','nyx','wren','pulse','morrow'].includes(item?.model),leather=item?.model==='wren'?'#604331':colors.dark;
  function finishFor(color,bone){const value=color?.isColor?color.getHexString():new T.Color(color).getHexString();if(value===new T.Color(colors.dark).getHexString())return bone.startsWith('hand')||bone.startsWith('finger')||bone.startsWith('foot')?'leather':'polymer';if(value===new T.Color(skin).getHexString())return 'skin';if(value===new T.Color(colors.hair).getHexString())return 'cloth';if(value===new T.Color(colors.sole).getHexString())return 'rubber';if(value===new T.Color(colors.armor).getHexString())return 'polymer';return 'cloth';}
  function add(g,color,bone,next=null,blend=null,finish=null){
   if(item?.model==='hollow-jack'&&bone==='head'&&!harvestHead){g.dispose();return;}
@@ -171,6 +171,35 @@ function template(profile){
   if(type==='elite'){panel(0,1.72,-.13,.25,.2,.06,'#6d4041','head','metal');panel(0,1.46,.18,.32,.45,.1,'#743d43','chest','cloth');}
   if(type==='mimic'){ellipsoid(0,1.36,.19,.21,.24,.13,'#866866','chest',10,'skin');for(const side of [-1,1])panel(side*.44,.88,-.06,.1,.2,.09,'#6f655b','hand'+(side<0?'L':'R'),'skin');}
   if(type==='boss'){for(const side of [-1,1])panel(side*.32,1.48,0,.2,.25,.3,'#3e5960','arm'+(side<0?'L':'R'),'metal');panel(0,1.76,.01,.25,.1,.24,'#a2aa86','head','metal');}
+ }
+ if(item?.model==='northstar-courier'){
+  const wool='#e8e0d1',cranberry='#ac2b3c',pine='#274f43',brass='#d6ad62';
+  // A belted shearling coat, visor and a peaked winter hood over the
+  // existing skinned rig. The segmented skirt follows the hip/knee motion.
+  rings([[.99,.186,.129],[1.08,.199,.139],[1.26,.226,.16],[1.40,.252,.148],[1.46,.18,.104]],cranberry,'spine','chest','cloth');
+  for(const side of [-1,1]){
+   const arm='arm'+(side<0?'L':'R'),forearm='forearm'+(side<0?'L':'R'),thigh='thigh'+(side<0?'L':'R');
+   ellipsoid(side*.278,1.415,0,.111,.111,.143,cranberry,arm,14,'cloth');
+   panel(side*.416,1.005,0,.12,.07,.144,wool,forearm,'cloth');
+   panel(side*.133,.852,-.105,.133,.246,.08,cranberry,thigh,'cloth');
+   panel(side*.133,.744,-.107,.133,.032,.084,wool,thigh,'cloth');
+   panel(side*.132,.528,-.089,.105,.111,.035,pine,'shin'+(side<0?'L':'R'),'polymer');
+   ellipsoid(side*.049,1.650,-.119,.040,.031,.019,wool,'head',12,'cloth');
+   ellipsoid(side*.048,1.715,-.129,.045,.024,.025,'#f0ab52','head',14,'glass');
+   panel(side*.105,1.175,-.149,.083,.093,.025,pine,'chest','cloth');
+   for(const z of [-.1,.034])ellipsoid(side*.104,1.766,z,.042,.048,.048,wool,'head',12,'cloth');
+  }
+  rings([[1.014,.196,.136],[1.064,.192,.132]],'#24282b','hips','spine','leather');
+  panel(0,1.041,-.142,.091,.064,.024,brass,'spine','metal');
+  panel(0,1.041,-.157,.049,.030,.011,'#2a2d27','spine','metal');
+  panel(0,1.25,-.159,.038,.32,.031,wool,'chest','cloth');
+  rings([[1.418,.147,.103],[1.48,.112,.098],[1.51,.096,.089]],wool,'neck',null,'cloth');
+  ellipsoid(0,1.610,-.103,.088,.079,.059,wool,'head',16,'cloth');
+  ellipsoid(0,1.765,.002,.134,.038,.123,wool,'head',16,'cloth');
+  rings([[1.775,.131,.117],[1.845,.113,.096,-.012,.011],[1.91,.074,.055,-.045,.05],[1.95,.037,.028,-.091,.075]],cranberry,'head',null,'cloth');
+  ellipsoid(-.10,1.947,.08,.047,.046,.046,wool,'head',12,'cloth');
+  panel(0,1.715,-.128,.034,.015,.022,pine,'head','polymer');
+  for(let i=0;i<3;i++)panel(.145,1.27+i*.019,-.158,.024,.005,.011,brass,'chest','metal');
  }
  if(item?.model==='hollow-jack'){
   harvestHead=true;

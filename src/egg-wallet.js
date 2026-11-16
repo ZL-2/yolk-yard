@@ -9,7 +9,7 @@ export function normalizeWallet(value,legacyEggs=0){
  return {...value,rosterRevision:215,retiredOwned:[...new Set([...(Array.isArray(value.retiredOwned)?value.retiredOwned:[]),...(Array.isArray(value.owned)?value.owned:[]).filter(id=>typeof id==='string'&&id.startsWith('outfit-')&&!shopItem(id))])],identityVersion:2,migration:value.migration||{from:'legacy-v1',rate:1,ownership:'one-to-one replacement'},legacyOwned:value.legacyOwned||[...(Array.isArray(value.owned)?value.owned:[])],balance:integer(value.balance),earned:integer(value.earned),owned,favorites:[...new Set((Array.isArray(value.favorites)?value.favorites:[]).filter(id=>shopItem(id)))],presets:(Array.isArray(value.presets)?value.presets:[]).slice(0,3),receipts:(Array.isArray(value.receipts)?value.receipts:[]).filter(id=>typeof id==='string').slice(-200)};
 }
 export function purchase(wallet,id,expectedPrice){
- const quote=quoteOffer(wallet,id);if(!quote)throw Error('That item is unavailable.');
+ const quote=quoteOffer(wallet,id);if(!quote||quote.offer.retired)throw Error('That item is unavailable.');
  if(quote.offer.tournamentReward)throw Error('This exclusive pickaxe is awarded only to the Frontier Cup winner.');
  if(quote.offer.winReward)throw Error('Win an online match wearing Jim to unlock Golf.');
  if(quote.offer.rankReward)throw Error('Earn and claim this item through the live Royale rankings.');

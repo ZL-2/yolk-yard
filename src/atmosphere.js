@@ -35,10 +35,10 @@ export class FrontierAtmosphere{
   this.snow.frustumCulled=false;this.root.add(this.snow);
   this.root.visible=false;
  }
- update(camera,map,playing,clock){
-  this.root.visible=!!playing&&map?.theme==='royale';
+ update(camera,map,playing,clock,lobbyWinter=false){
+  this.root.visible=lobbyWinter||!!playing&&map?.theme==='royale';
   if(!this.root.visible)return;
-  const winter=!!map.winterSignal,sky=this.dome.material.uniforms;
+  const winter=lobbyWinter||!!map.winterSignal,sky=this.dome.material.uniforms;
   sky.top.value.setHex(winter?0x426493:0x3b80db);
   sky.horizon.value.setHex(winter?0xc4d5e8:0xc1e6f0);
   this.dome.position.copy(camera.position);
