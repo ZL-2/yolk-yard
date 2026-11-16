@@ -1,3 +1,4 @@
+import {winterProp} from './winter-props.js';
 import * as T from 'three';
 import {environmentKit,environmentMaterial} from './environment-surfaces.js';
 
@@ -8,6 +9,7 @@ export const ENVIRONMENT_PROP_KINDS=Object.freeze([
  'car','truck','wreck','bench','fence','lamp','bollard','solar','container','generator','pump',
  'tank','silo','incubator','console','shelf','bed','sofa','counter','target','checkpoint',
  'excavator','drill','waterwheel','telescope','radio','crane','gantry','headframe','vault-rack',
+ 'winter-lantern','winter-parcel','winter-spruce','winter-transmitter','winter-board',
  'tent','medical-tent','dome','bio-dome','beacon','clock','watchtower','water-tower',
 ]);
 const kinds=new Set(ENVIRONMENT_PROP_KINDS),cache=new Map();
@@ -308,7 +310,7 @@ function landmarkEquipment(g,p,k,detail){
 export function detailEnvironmentProp(g,input,raw,detail=true){
  if(!kinds.has(input.kind))return false;
  const p={...input,x:Number(input.x)||0,y:Number(input.y)||0,z:Number(input.z)||0,w:Math.max(.05,Number(input.w)||2),h:Math.max(.05,Number(input.h)||1.4),d:Math.max(.05,Number(input.d)||1.5),seed:Number(input.seed)||0},k=environmentKit(raw),start=g.children.length;
- if(!foliageProp(g,p,k,detail)){
+ if(!winterProp(g,p,k,detail)&&!foliageProp(g,p,k,detail)){
   if(p.kind==='crate')crate(g,p,k,detail);
   else if(p.kind==='barrels'||p.kind==='shield-barrel')barrel(g,p,k,detail,p.kind==='shield-barrel');
   else if(p.kind==='car'||p.kind==='truck')vehicle(g,p,k,detail);

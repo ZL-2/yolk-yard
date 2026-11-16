@@ -405,6 +405,29 @@ export function makeBlaster(id,wrap='') {
       box(g,side*.184,.094,.055,.012,.072,.28,oxide,.008);
     }
     bolt(.185,.11);optic(g,'iron',-.71);
+  }else if(id==='hollyburst'){
+    const cranberry=0xb42436, spruce=0x235745, ivory=0xf4e5cf, brass=0xe0b869;
+    plate(g,[[.30,-.10],[-.42,-.12],[-.64,-.01],[-.49,.14],[.27,.15],[.37,.04]],.276,cranberry);
+    plate(g,[[.27,.105],[.64,.12],[.67,.047],[.40,-.045],[.27,-.025]],.14,spruce);
+    box(g,0,-.01,.66,.17,.25,.052,black,.012,false,'rubber');
+    grip(g,.12);magazine(-.15,.235);
+    tube(g,0,.025,-.72,.059,.55,ivory);
+    for(const z of [-.53,-.64,-.75,-.86,-.96]){
+      const ribbon=ring(g,0,.025,z,.057,.013,cranberry);
+      ribbon.rotateX(.28);
+    }
+    muzzleModel(-1.02,.074);
+    for(const side of [-1,1]){
+      const x=side*.145;
+      plate(g,[[.26,.007],[-.43,-.035],[-.52,.021],[-.39,.095],[.24,.092]],.021,spruce,x);
+      for(const z of [-.41,-.32,-.23])box(g,x+side*.011,.04,z,.016,.031,.044,ivory,.006);
+      screw(g,x+side*.016,.069,.22,.014);
+      box(g,x+side*.013,.046,.067,.013,.017,.13,brass,.004);
+    }
+    const bell=new THREE.Mesh(new THREE.SphereGeometry(.043,10,8),color(brass,true));
+    bell.position.set(.167,-.102,-.34);bell.scale.y=.8;g.add(bell);
+    box(g,.167,-.065,-.34,.025,.063,.023,brass,.007);
+    rail(-.08,.44);optic(g,'reflex');bolt(.146,.108);
   }else if(id==='rimeglass'){
     // Nightglass winter issue. An insulated suppressor, ice-blue chassis
     // and open stock are visible from the side as well as the player camera.

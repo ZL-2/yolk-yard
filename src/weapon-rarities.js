@@ -6,6 +6,7 @@
 // retaining Ravelfront's existing Rare recoil and standard firing cadence.
 const row=(reference,damage,reload,magazine,recoil,fireRateScale=1)=>Object.freeze({reference,damage:Object.freeze(damage),reload:Object.freeze(reload),magazine:Object.freeze(Array.isArray(magazine)?magazine:damage.map(()=>magazine)),recoil:Object.freeze(recoil),fireRateScale:Object.freeze(Array.isArray(fireRateScale)?fireRateScale:damage.map(()=>fireRateScale))});
 export const WEAPON_RARITIES=Object.freeze({
+ hollyburst:row('Winter Signal',[31,31,31,33,35],[2.65,2.65,2.65,2.48,2.31],22,[3.7,3.7,3.7,3.55,3.4]),
  bastionburst:row('After the Signal', [32,32,32,34,36,38],[2.65,2.65,2.65,2.55,2.45,2.30],24,[3.5,3.5,3.5,3.4,3.3,3.2]),
  breakwaterrepeater:row('After the Signal', [66,70,73,76,79,84],[3.5,3.4,3.3,3.2,3.1,2.9],6,[5,4.9,4.8,4.7,4.6,4.5]),
  rimeglass:row('After the Signal', [52,52,52,54,56,60],[2.8,2.8,2.8,2.7,2.6,2.48],8,[3.4,3.4,3.4,3.3,3.2,3.05]),

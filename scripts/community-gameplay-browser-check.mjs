@@ -14,19 +14,25 @@ await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/j
 await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Gift Sender'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,musicVolume:0,fpsLimit:30}));});
 try{
  await page.goto(origin+'/?qa=1');
- const briefing=page.locator('.blackout-briefing[open]');
- await briefing.waitFor();
- await page.waitForFunction(()=>document.querySelector('.blackout-art img')?.naturalWidth>1000);
- await page.screenshot({path:out+'/blackout-promo.png'});
- await briefing.getByLabel('Don’t show again on startup').check();
- await briefing.getByRole('button',{name:'RETURN TO LOBBY'}).click();
+ const opening=page.locator('.blackout-briefing[open]');
+ await opening.getByRole('heading',{name:'WINTER SIGNAL',exact:true}).waitFor();
+ await page.waitForFunction(()=>document.querySelector('.winter-poster img')?.naturalWidth>1000);
+ await page.screenshot({path:out+'/winter-promo.png'});
+ await opening.getByLabel('Don’t show again on startup').check();
+ await opening.getByRole('button',{name:'RETURN TO LOBBY'}).click();
  await page.reload();
  await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
- assert.equal(await briefing.count(),0);
- await page.getByRole('button',{name:'THE BLACKOUT',exact:true}).click();
- await page.getByRole('button',{name:'Read THE BLACKOUT',exact:true}).click();
- await briefing.waitFor();
- await briefing.getByRole('button',{name:'Close Blackout briefing'}).click();
+ await page.waitForFunction(()=>!document.querySelector('.blackout-briefing[open]'));
+ for(const [title,close] of [
+  ['AFTER THE SIGNAL','Close Season 2 briefing'],
+  ['WINTER SIGNAL','Close Winter Signal briefing'],
+  ['THE BLACKOUT','Close Blackout briefing'],
+ ]){
+  await page.getByRole('button',{name:title,exact:true}).click();
+  await page.getByRole('button',{name:'Read '+title,exact:true}).click();
+  await opening.getByRole('heading',{name:title,exact:true}).waitFor();
+  await opening.getByRole('button',{name:close}).click();
+ }
  const sender=await page.evaluate(()=>window.__yolkTest.party().id);f.app.relay.economy.credit(sender,'browser-gift-funds',5000,'grant',Date.now());f.app.relay.economy.publish(sender);
  await page.locator('.yard-nav nav [data-action=item-shop]').click();await page.locator('[data-shop-item=bundle-jim-icon]').first().click();await page.locator('[data-shop-gift-start]').click();await page.locator('.shop-gift-code').fill(code);await page.locator('[data-shop-gift-quote]').click();await page.locator('[data-shop-gift-send]').waitFor();assert.match(await page.locator('.shop-gift').innerText(),/Gift Receiver/);await page.screenshot({path:out+'/gift-confirm.png'});await page.locator('[data-shop-gift-send]').click();await page.waitForFunction(()=>document.querySelector('.shop-detail-notice')?.textContent.includes('Gift delivered'));
  assert.ok(f.app.relay.economy.view(recipient.id).owned.includes('outfit-jim-normal'));assert.equal(f.app.relay.economy.view(creator.id).balance,450);assert.equal(f.app.relay.economy.view(sender).balance,2300);await page.screenshot({path:out+'/gift-delivered.png'});

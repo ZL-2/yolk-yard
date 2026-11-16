@@ -11,6 +11,7 @@ export function adsFov(w,base){return w.ads?.fov??(w.ads?2*Math.atan(Math.tan(ba
 // viewmodel FOV keeps the gun readable when the world camera zooms for ADS.
 export const WEAPON_ART_REVISION=155;
 export const VIEWMODELS={
+ hollyburst:{scale:.48,x:.23,y:-.22,z:-.64,fov:70},
  bastionburst:{scale:.47,x:.24,y:-.22,z:-.65,fov:70},
  breakwaterrepeater:{scale:.50,x:.23,y:-.22,z:-.64,fov:70},
  rimeglass:{scale:.46,x:.25,y:-.22,z:-.71,fov:70},
@@ -30,8 +31,9 @@ export const VIEWMODELS={
 };
 VIEWMODELS.arcLoom=VIEWMODELS.comet;VIEWMODELS.riftDriver=VIEWMODELS.thumper;VIEWMODELS.cinderLance=VIEWMODELS.anchor;
 export function viewmodelProfile(id,aspect=16/9){const p=VIEWMODELS[id]||VIEWMODELS.sprinter;return {...p,z:p.z-Math.max(0,1.25/aspect-1)*.26};}
-export const RETICLES={bastionburst:'reflex-dot',breakwaterrepeater:'iron',rimeglass:'mil-dot',hollowfire:'reflex-dot',stormspike:'reflex-dot',sprinter:'crosshair',scatter:'iron',needle:'mil-dot',zipper:'reflex-dot',thumper:'ring',anchor:'chevron',duet:'chevron',pip:'iron',peeper:'mil-dot',doubleyolk:'iron',comet:'reflex-dot'};
+export const RETICLES={hollyburst:'reflex-dot',bastionburst:'reflex-dot',breakwaterrepeater:'iron',rimeglass:'mil-dot',hollowfire:'reflex-dot',stormspike:'reflex-dot',sprinter:'crosshair',scatter:'iron',needle:'mil-dot',zipper:'reflex-dot',thumper:'ring',anchor:'chevron',duet:'chevron',pip:'iron',peeper:'mil-dot',doubleyolk:'iron',comet:'reflex-dot'};
 export const GROUND_DISPLAY = {
+ hollyburst:{scale:1.05,yaw:1.03,pitch:-.035,lift:.59},
  bastionburst:{scale:1,yaw:1.05,pitch:-.03,lift:.60},
  breakwaterrepeater:{scale:1.05,yaw:1.05,pitch:-.04,lift:.58},
  rimeglass:{scale:.94,yaw:1.05,pitch:-.05,lift:.61},

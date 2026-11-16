@@ -10,7 +10,7 @@ import {canStand,wallDistance,candidates,boxTop} from './physics.js';
 const sources=['ground','chest','high','supply','epic'];
 export const AMMO_DROPS=AMMO_RULES;
 export const LOOT_TABLE=[
- ...[['sprinter',28,'assault'],['pip',18,'sidearm'],['zipper',23,'smg'],['scatter',20,'shotgun'],['doubleyolk',16,'shotgun'],['duet',13,'assault'],['anchor',8,'marksman'],['peeper',8,'marksman'],['needle',4,'sniper'],['comet',9,'energy'],['thumper',4,'launcher'],['stormspike',7,'spike'],['bastionburst',13,'assault'],['rimeglass',10,'marksman']].map(([id,weight,category])=>({id,weight,category,weapon:true,ammoType:ammoType(id),sources,rarities:id==='thumper'?[0,0,65,30,5]:[53,30,13,3.5,.5]})),
+ ...[['sprinter',28,'assault'],['pip',18,'sidearm'],['zipper',23,'smg'],['scatter',20,'shotgun'],['doubleyolk',16,'shotgun'],['duet',13,'assault'],['anchor',8,'marksman'],['peeper',8,'marksman'],['needle',4,'sniper'],['comet',9,'energy'],['thumper',4,'launcher'],['stormspike',7,'spike'],['bastionburst',13,'assault'],['rimeglass',10,'marksman'],['hollyburst',8,'assault']].map(([id,weight,category])=>({id,weight,category,weapon:true,ammoType:ammoType(id),sources,rarities:id==='thumper'?[0,0,65,30,5]:[53,30,13,3.5,.5]})),
  ...[['bandage',18,0],['medkit',10,1],['mini',30,1],['flask',16,2],['splash',9,2],['popper',8,1],['impulse',6,2],['launchpad',3,3],['smoke',7,1],['scanner',4,2]].map(([id,weight,rarity])=>({id,weight,rarity,category:['bandage','medkit'].includes(id)?'health':['mini','flask','splash'].includes(id)?'shield':'utility',sources:id==='launchpad'?['chest','high','supply','epic']:sources,counts:id==='mini'?[3,3]:id==='medkit'||id==='flask'?[1,1]:id==='splash'?[2,2]:id==='bandage'?[2,3]:[1,2]})),
  ...Object.entries(AMMO_DROPS).map(([id,v])=>({id,...v,category:'ammo',ammoType:id,sources:['ground']})),
 ];
@@ -77,4 +77,13 @@ export function* seedIslandLootSteps(sim){
  sim.lootVersion++;
 }
 
-function makeChest(p,random){const epic=p.source==='epic'||!p.vaultId&&random()<WORLD_RULES.epicChestChance,source=epic?'epic':p.source;return {id:p.id,x:p.x,y:p.y,z:p.z,poi:p.poi,vaultId:p.vaultId,source,epic,opened:false,supply:false,contents:rollChest(random,source)};}
+function makeChest(p,random){
+ const epic=p.source==='epic'||!p.vaultId&&random()<WORLD_RULES.epicChestChance;
+ const source=epic?'epic':p.source,contents=rollChest(random,source);
+ if(p.winterGift){
+  const tier=epic?4:2,id='hollyburst';
+  const carbine={id,weapon:true,count:1,rarity:tier,ammo:rarityVariant(weapon(id),tier).magazine};
+  contents.splice(0,2,carbine,matchingAmmo(carbine,random));
+ }
+ return {id:p.id,x:p.x,y:p.y,z:p.z,poi:p.poi,vaultId:p.vaultId,source,epic,opened:false,supply:false,contents};
+}

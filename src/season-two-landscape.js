@@ -9,7 +9,11 @@ export function winterCover(map,x,z,y){
  const aster=1-fade((ellipse(x,z,111,-161,55,53)+edge-.51)/.56);
  const pass=1-fade((ellipse(x,z,60,-178,53,30)+edge-.55)/.56);
  const frost=1-fade((ellipse(x,z,-136,-158,39,33)+edge-.4)/.67);
- return Math.max(north,aster*.92,pass*.94,frost*.43)*fade((y-2.1)/4.5);
+ const original=Math.max(north,aster*.92,pass*.94,frost*.43)*fade((y-2.1)/4.5);
+ if(!map.winterSignal)return original;
+ const coastalSnow=fade((y-.58)/2.3);
+ const wind=fade(.52+(Math.sin(x*.074+z*.043)+Math.cos(z*.092-x*.027))*.21);
+ return Math.max(original,coastalSnow*(.79+wind*.21));
 }
 const DISTRICT_NAMES={
  docks:'Battered Breakwater',works:'Ruptured Relay',observatory:'Armored Aster',
@@ -30,7 +34,10 @@ function relief(x,z){
  const scar=-5.8*bulge(x,z,-164,-48,26,37)+4.7*bulge(x,z,-143,-46,15,28)
   +3.4*bulge(x,z,-183,-43,13,24);
  const spillway=4.4*bulge(x,z,149,-3,17,16)-2.6*bulge(x,z,166,-2,16,12);
- return pass+ridge+scar+spillway;
+ // Open snow banks and a shallow lee on the western approach.
+ const banks=3.4*bulge(x,z,-209,64,16,28)+2.6*bulge(x,z,111,87,24,15)
+  +2.2*bulge(x,z,7,-89,20,19)-1.9*bulge(x,z,-187,81,14,23);
+ return pass+ridge+scar+spillway+banks;
 }
 export function reshapeSeasonTerrain({terrain,buildings,boxes,trees,props,floorLoot,chests,landmarks,signs,groundAt}){
  const previous={terrain:{...terrain,heights:terrain.heights.slice()}};
@@ -47,13 +54,13 @@ export function reshapeSeasonTerrain({terrain,buildings,boxes,trees,props,floorL
   terrain.heights[i]+=weight*delta;
  }
  terrain.max=terrain.heights.reduce((max,y)=>Math.max(max,y),0);
- const sample={terrain,afterTheSignal:true};
+ const sample={terrain,afterTheSignal:true,winterSignal:true};
  const deltaAt=p=>groundAt(sample,p.x,p.z)-groundAt(previous,p.x,p.z);
  for(const b of boxes)if(b.tree!==undefined||b.prop!==undefined&&props[b.prop].building===undefined)b.y+=deltaAt(b);
  for(const p of [...trees,...props,...floorLoot,...chests,...signs]){
   if(p.building===undefined&&Number.isFinite(p.y))p.y+=deltaAt(p);
  }
- for(const t of trees)if(winterCover(sample,t.x,t.z,t.y)>.55)t.kind='snow-pine';
+ for(const t of trees)if(winterCover(sample,t.x,t.z,t.y)>.52)t.kind='snow-pine';
  for(const l of landmarks)if(l.id==='landmark-5')l.name='Cracked Convoy';
 }
 export function authorSeasonLocations({districts,terrain,landmarks,buildings,signs,frontier,blackout,box,prop,chests,navLinks,groundAt}){

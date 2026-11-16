@@ -1,0 +1,5 @@
+.winter-briefing { width:min(960px,94vw); border-color:#7dabc2; background:#102334; }
+.winter-poster { position:relative; aspect-ratio:16/9; background:#132f48; }
+.winter-poster img { width:100%; height:100%; display:block; object-fit:cover; }
+.winter-previous-title { position:absolute; inset:auto 0 0; margin:0; padding:45px clamp(16px,4vw,38px) 20px; background:linear-gradient(transparent,#07151dee); font-size:clamp(24px,6vw,64px); }
+.winter-briefing .blackout-steps article { background:#162e40; border-color:#527188; }

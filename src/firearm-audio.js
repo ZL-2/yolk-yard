@@ -2,6 +2,7 @@
 // Each design has different envelopes, action timing and spectral structure;
 // none uses a sampled commercial game sound or a pitch-shifted shared recording.
 export const FIREARM_SOUNDS={
+ hollyburst:{duration:.24,body:158,crack:.67,bass:.34,tail:.13,decay:23,action:.06,metal:.38,bands:[.24,.56,.20],seed:416},
  bastionburst:{duration:.27,body:139,crack:.82,bass:.36,tail:.13,decay:24,action:.057,metal:.31,bands:[.21,.60,.19],seed:353},
  breakwaterrepeater:{duration:.40,body:65,crack:.89,bass:.68,tail:.22,decay:13,action:.152,metal:.37,bands:[.46,.42,.12],pellets:4,seed:359},
  rimeglass:{duration:.31,body:81,crack:.55,bass:.46,tail:.075,decay:21,action:.115,metal:.29,bands:[.47,.37,.16],seed:367},

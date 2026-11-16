@@ -118,7 +118,7 @@ function* streamedIslandSteps(world,map,kit){
   for(const t of cell.trees){const start=group.children.length;treeModel(group,t,kit,detail);
    const id=treeIds.get(t);for(const m of group.children.slice(start))m.userData.objectId=id;yield;
   }
-  for(const p of cell.props){const start=group.children.length;if(detail)repeatedProp(group,p,kit);else if(['dome','bio-dome','beacon','crane','drill','waterwheel','telescope','radar','dish','antenna'].includes(p.kind))propModel(group,p,kit);else{const b=cell.boxes.find(b=>b.prop!==undefined&&map.props[b.prop]===p);if(b&&Math.max(b.w,b.d,b.h)>2)kit.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b));}
+  for(const p of cell.props){const start=group.children.length;if(detail)repeatedProp(group,p,kit);else if(p.kind.startsWith('winter-')||['dome','bio-dome','beacon','crane','drill','waterwheel','telescope','radar','dish','antenna'].includes(p.kind))propModel(group,p,kit);else{const b=cell.boxes.find(b=>b.prop!==undefined&&map.props[b.prop]===p);if(b&&Math.max(b.w,b.d,b.h)>2)kit.block(group,b.x,b.y+b.h/2,b.z,b.w,b.h,b.d,color(b));}
    const id=propIds.get(p);for(const m of group.children.slice(start))m.userData.objectId=id;yield;
   }
   yield* bakeSteps(group,false,true);

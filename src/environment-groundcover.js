@@ -1,3 +1,4 @@
+import {winterCover} from './season-two-landscape.js';
 import * as T from 'three';
 import {groundAt} from './terrain.js';
 import {createTerrainSurfaceSampler} from './terrain-detail.js';
@@ -36,12 +37,12 @@ export class EnvironmentGroundCover {
   for(let attempt=0;attempt<384&&(grass.length<128||stones.length<24);attempt++){
    const x=(ix+rng())*size,z=(iz+rng())*size;if(Math.abs(x)>this.map.terrain.size-2||Math.abs(z)>this.map.terrain.size-2||this.blocked(x,z))continue;
    const s=this.sample(x,z);if(s.height<.85||s.road>.08||s.path>.12||s.slope>.62)continue;
-   if(grass.length<128&&s.grass>.42&&rng()<s.grass){grass.push({x:x-ix*size,y:s.height-.025,z:z-iz*size,rotation:rng()*Math.PI*2,scale:.55+rng()*.5,tint:rng()});}
+   if(grass.length<128&&s.grass>.42&&winterCover(this.map,x,z,s.height)<.62&&rng()<s.grass){grass.push({x:x-ix*size,y:s.height-.025,z:z-iz*size,rotation:rng()*Math.PI*2,scale:.55+rng()*.5,tint:rng()});}
    else if(stones.length<24&&rng()<.25+(s.rock||0)*.55){stones.push({x:x-ix*size,y:s.height+.015,z:z-iz*size,rotation:rng()*Math.PI*2,scale:.035+rng()*.07,tint:rng()});}
   }
   this.blockers=this.buildings=null;
   const matrix=new T.Matrix4(),q=new T.Quaternion(),scale=new T.Vector3(),position=new T.Vector3(),axis=new T.Vector3(0,1,0),color=new T.Color();
-  for(const [name,list,g,kind,tint]of [['grass',grass,blades,'leaf',0x6e7d49],['stones',stones,pebble,'stone',0x969588]]){
+  for(const [name,list,g,kind,tint]of [['grass',grass,blades,'leaf',0x6e7d49],['stones',stones,pebble,'stone',this.map.winterSignal?0xb5cad5:0x969588]]){
    if(!list.length)continue;const mesh=new T.InstancedMesh(g,environmentMaterial(tint,kind),list.length);mesh.name=name;mesh.castShadow=false;mesh.receiveShadow=true;mesh.userData.keepDynamic=true;mesh.userData.decorative=true;mesh.userData.fullCount=list.length;
    for(let i=0;i<list.length;i++){const a=list[i];position.set(a.x,a.y,a.z);q.setFromAxisAngle(axis,a.rotation);scale.set(a.scale,name==='grass'?a.scale:a.scale*.55,a.scale);matrix.compose(position,q,scale);mesh.setMatrixAt(i,matrix);color.setRGB(.76+a.tint*.24,.8+a.tint*.2,.71+a.tint*.24);mesh.setColorAt(i,color);}
    mesh.instanceMatrix.needsUpdate=true;mesh.instanceColor.needsUpdate=true;mesh.computeBoundingSphere();mesh.computeBoundingBox();group.add(mesh);

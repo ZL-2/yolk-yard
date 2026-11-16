@@ -1,7 +1,7 @@
 {
   "revision": 155,
   "renderer": "WebGL PBR gameplay models",
-  "source": "b686140f97d831c11ea64a17e7279da2f2ef3ef3a2ef21c39068b2f0a2fb4199",
+  "source": "214b1f457e4fabb33a6caeac5d4ef7b137c3b35e3f7c42e7a1394d884baadd57",
   "weapons": {
     "sprinter": {
       "name": "R-41 Service Rifle",
@@ -66,6 +66,10 @@
     "hollowfire": {
       "name": "Hollowfire Rifle",
       "sha256": "fb1dbef74212ad7ba6215eee419f0288a8cd7f2f81a4a5d26a2299c274a5405b"
+    },
+    "hollyburst": {
+      "name": "Hollyburst Carbine",
+      "sha256": "a479de47fc493089b9d1367ef7b56bb1779a1035f2dfec8728f53d723d209bf6"
     }
   },
   "items": {
@@ -78,7 +82,7 @@
       "sha256": "29d70549e06b91c98fba13d5383f45d221ce4536f27276ae05732293777a8204"
     },
     "anchorWinch": {
-      "name": "Rook’s Mythic Grappler",
+      "name": "Rook\u2019s Mythic Grappler",
       "sha256": "00e22f09e6ebcf84c28f0272d74deca6d6ca4363fd072f8351786ccf6aaf4a0c"
     },
     "veilProjector": {
@@ -86,7 +90,7 @@
       "sha256": "31c041a227f1ba562281055cb8723dfc53c4e29bbe2e9f9642f888666af2c4f4"
     },
     "shadowstep": {
-      "name": "Nyx’s Mythic Shadowstep",
+      "name": "Nyx\u2019s Mythic Shadowstep",
       "sha256": "fc1f1e6d171940837aa6e491cd93ae64cbfff535a577725ba1b5161dd1792ce4"
     },
     "victoryCrown": {

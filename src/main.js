@@ -1,3 +1,4 @@
+import {showWinterBriefing} from './winter-briefing.js';
 import {applyOwnerGameplay} from './owner-gameplay.js';
 import {BLACKOUT_LOGS} from './blackout-map.js';
 import {showBlackoutBriefing,rememberBlackoutRecording,playBlackoutRecording,stopBlackoutRecording} from './blackout-briefing.js';
@@ -1569,6 +1570,8 @@ const actions = {
  'social-confirm-new-identity':()=>{try{fairPlay.admission();ownerNotices.admission();}catch(error){return errorToast(error.message);}party.newIdentity();closeDialog();},
  'season-guide':()=>showWelcomeBack({force:true}),
  referrals:()=>showReferrals({party}),
+ 'winter-briefing':()=>showWinterBriefing({force:true}),
+ 'season-two-briefing':()=>showWinterBriefing({force:true,previousSeason:true}),
  'blackout-briefing':()=>showBlackoutBriefing({force:true}),
  'voice-briefing':()=>showVoiceBriefing({force:true}),
  'perspective-briefing':()=>showPerspectiveBriefing({force:true}),
@@ -2297,7 +2300,7 @@ try {
   setInterval(pumpNetworkInput,1000/60);
   requestAnimationFrame(loop);
   const invite = new URL(location.href).searchParams.get("room");
-  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>showBlackoutBriefing()).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
+  void waitUntilLoadingHidden().then(async()=>{if(needsPlayerName(profile.name)){await new Promise(resolve=>{nameChosen=resolve;requiredNamePrompt();});}return;}).then(()=>showWinterBriefing()).then(()=>{briefingsComplete=true;if (invite) joinMenu(formatCode(cleanCode(invite)));});
 } catch (e) {
   hideLoading(true);
   console.error(e);

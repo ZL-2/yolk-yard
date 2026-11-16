@@ -5,7 +5,7 @@ import {OPTICS,RETICLES} from './weapon-presentation.js';
 import {combatProfile,rarityVariant} from './combat.js';
 import {cosmeticProfile,SHOP_ITEMS} from './shop-catalog.js';
 // Shared camera targeting and remote commands require matching host/client releases.
-export const VERSION = 94;
+export const VERSION = 95;
 export const WEAPONS = [
   {
     "id": "sprinter",
@@ -98,6 +98,7 @@ export const WEAPONS = [
   }
 ];
 export const ROYALE_WEAPONS = [
+ {id:'hollyburst',muzzle:1.02,sightY:.285,optic:'reflex',name:'Hollyburst Carbine',role:'BURST',desc:'A festive compact carbine that fires two rounds in quick succession.',color:0xd43d4d,size:1.12},
  {id:'bastionburst',muzzle:1.0,sightY:.285,optic:'reflex',name:'Bastion Burst Rifle',role:'BURST',color:0xd9bd74,size:1.12},
  {id:'breakwaterrepeater',muzzle:.86,sightY:.22,optic:'iron',name:'Breakwater Repeater',role:'BREACH',color:0xd48a55,size:1.1},
  {id:'rimeglass',muzzle:1.26,sightY:.317,optic:'scope',name:'Rimeglass DMR',role:'MARKSMAN',color:0x90cad7,size:1.33},
