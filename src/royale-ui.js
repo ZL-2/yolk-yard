@@ -1,3 +1,4 @@
+import {displayPlayerName} from './display-player-name.js';
 import {blackoutPrompt} from './blackout.js';
 import {mapViewport} from './tactical-map.js';
 import {WorldMarkers} from './world-markers.js';
@@ -139,7 +140,7 @@ export class RoyaleUI{
   for(const m of visibleMarkers(state,local)){
    if(r.practice&&m.planning)continue;const pos=this.project?.(m);if(!pos)continue;
    const owner=state.players.find(o=>o.id===m.player),style=owner?teamStyle(state.players,owner):{slot:1,color:'#7dddf4'};
-   markers.push({id:'marker:'+m.id,kind:m.kind,...pos,color:style.color,icon:pos.offscreen?'➤':m.kind==='danger'?'!':'◆',label:`${style.slot} · ${m.kind==='danger'?'DANGER':m.label||'MARKER'} · ${Math.round(dist(local,m))} m`,name:m.name});
+   markers.push({id:'marker:'+m.id,kind:m.kind,...pos,color:style.color,icon:pos.offscreen?'➤':m.kind==='danger'?'!':'◆',label:`${style.slot} · ${m.kind==='danger'?'DANGER':m.label||'MARKER'} · ${Math.round(dist(local,m))} m`,name:displayPlayerName(m.name)});
   }
   for(const m of mates){if(m.health<=0||m.spectating)continue;const pos=this.project?.({...m,y:m.y+2.4});if(!pos)continue;const style=teamStyle(state.players,m);markers.push({id:'teammate:'+m.id,kind:'teammate',...pos,color:style.color,icon:pos.offscreen?'➤':m.downed?'＋':style.slot,label:`${m.name} · ${Math.round(dist(local,m))} m`});}
   this.worldMarkers.update(markers);
@@ -156,7 +157,7 @@ export class RoyaleUI{
   }
   $('downed-status').hidden=!local.downed;setText($('downed-status'),local.downed?`${local.reviverId?'TEAMMATE REVIVING':'DOWNED · CRAWL TO COVER'} · ${Math.ceil(local.health)} VITALITY`:'');
   const mate=mates.filter(m=>m.downed&&m.health>0&&reviveAccessible(getMap(state.options.map),local,m)).sort((a,b)=>dist(local,a)-dist(local,b))[0],duo=$('duo-hud');duo.hidden=!isTeamRoyale(state.options);
-  if(!duo.hidden){const markup=mates.length?mates.map(m=>{const style=teamStyle(state.players,m),status=m.connected===false&&!m.bot?'DISCONNECTED':m.downed?'DOWNED':m.health>0?'ACTIVE':'ELIMINATED';return `<div class="team-hud-member" style="--team-color:${style.color}"><strong>${style.slot} · ${escape(m.name)}</strong><small>${status}${m.health>0?' · '+Math.ceil(m.health)+' H / '+Math.ceil(m.shield||0)+' S':''}</small><progress class="shield" value="${m.shield||0}" max="100" aria-label="${escape(m.name)} shield"></progress><progress value="${Math.max(0,m.health)}" max="100" aria-label="${escape(m.name)} health"></progress></div>`;}).join(''):`<small>${state.options.teamSize===4?'SQUADS':state.options.teamSize===3?'TRIOS':'DUOS'} · NO TEAMMATES</small>`;if(duo.innerHTML!==markup)duo.innerHTML=markup;}
+  if(!duo.hidden){const markup=mates.length?mates.map(m=>{const style=teamStyle(state.players,m),status=m.connected===false&&!m.bot?'DISCONNECTED':m.downed?'DOWNED':m.health>0?'ACTIVE':'ELIMINATED';return `<div class="team-hud-member" style="--team-color:${style.color}"><strong>${style.slot} · ${escape(displayPlayerName(m.name))}</strong><small>${status}${m.health>0?' · '+Math.ceil(m.health)+' H / '+Math.ceil(m.shield||0)+' S':''}</small><progress class="shield" value="${m.shield||0}" max="100" aria-label="${escape(displayPlayerName(m.name))} shield"></progress><progress value="${Math.max(0,m.health)}" max="100" aria-label="${escape(displayPlayerName(m.name))} health"></progress></div>`;}).join(''):`<small>${state.options.teamSize===4?'SQUADS':state.options.teamSize===3?'TRIOS':'DUOS'} · NO TEAMMATES</small>`;if(duo.innerHTML!==markup)duo.innerHTML=markup;}
   const matchKey=r.matchId+':'+state.round;if(this.flightMatch!==matchKey){this.flightMatch=matchKey;this.flightDismissed=false;}
   setText($('royale-flight-close'),label('dismissFlight')+' Close');
   const closest=getMap(state.options.map).districts.reduce((a,b)=>Math.hypot(b.x-p.x,b.z-p.z)<Math.hypot(a.x-p.x,a.z-p.z)?b:a);
@@ -182,7 +183,7 @@ export class RoyaleUI{
   if(warmup){
    const players=realMatchPlayers(state),countdown=r.countdownStarted===false?'WAITING FOR PLAYERS':Math.max(0,Math.ceil(r.queueEnds-state.time))+'s TO DEPARTURE';
    setText($('royale-flight-title'),'KESTREL RELIEF AIRLIFT');setText($('royale-flight-help'),countdown+' · Practice equipment resets at departure');$('royale-flight-button').hidden=true;
-   const rosterKey=state.options.session+':'+local.id+':'+players.map(o=>o.id+':'+o.name).join('|');if(rosterKey!==this.rosterKey){this.rosterKey=rosterKey;roster.innerHTML=`<div class="island-roster-heading"><b>${players.length}</b><span>REAL ${players.length===1?'PLAYER':'PLAYERS'} ON THE ISLAND</span><small>${state.options.session==='offline'?'OFFLINE PRACTICE':'LIVE ROSTER'}</small></div><div class="island-roster-names">${players.map(o=>`<span class="${o.id===local.id?'you':''}">${escape(o.name)}${o.id===local.id?' <b>YOU</b>':''}</span>`).join('')||'<span>Waiting for connected players</span>'}</div>`;}
+   const rosterKey=state.options.session+':'+local.id+':'+players.map(o=>o.id+':'+o.name).join('|');if(rosterKey!==this.rosterKey){this.rosterKey=rosterKey;roster.innerHTML=`<div class="island-roster-heading"><b>${players.length}</b><span>REAL ${players.length===1?'PLAYER':'PLAYERS'} ON THE ISLAND</span><small>${state.options.session==='offline'?'OFFLINE PRACTICE':'LIVE ROSTER'}</small></div><div class="island-roster-names">${players.map(o=>`<span class="${o.id===local.id?'you':''}">${escape(displayPlayerName(o.name))}${o.id===local.id?' <b>YOU</b>':''}</span>`).join('')||'<span>Waiting for connected players</span>'}</div>`;}
   }
 
   const outside=r.storm.active&&Math.hypot(p.x-r.storm.x,p.z-r.storm.z)>r.storm.radius;
@@ -192,7 +193,7 @@ export class RoyaleUI{
   setText($('royale-use-label'),use?`Using ${ITEMS[use.id].name} · ${Math.max(0,use.end-state.time).toFixed(1)}s${['heal','shield','splash'].includes(ITEMS[use.id]?.kind)?' · WALK OK / NO SPRINT':''}`:'Searching chest…');
   $('royale-use-fill').style.width=(use?Math.min(1,(state.time-use.start)/(use.end-use.start)):Math.min(1,p.chestProgress/.8))*100+'%';
   const rescue=local.reviving?state.players.find(o=>o.id===local.reviving):local.downed&&local.reviverId?local:null;
-  if(rescue){$('royale-use').hidden=false;setText($('royale-use-label'),`${local.downed?'Being revived':'Reviving '+rescue.name} · ${Math.max(0,REVIVE_RULES.seconds-rescue.reviveProgress).toFixed(1)}s`);$('royale-use-fill').style.width=(rescue.reviveProgress/REVIVE_RULES.seconds*100)+'%';}
+  if(rescue){$('royale-use').hidden=false;setText($('royale-use-label'),`${local.downed?'Being revived':'Reviving '+displayPlayerName(rescue.name)} · ${Math.max(0,REVIVE_RULES.seconds-rescue.reviveProgress).toFixed(1)}s`);$('royale-use-fill').style.width=(rescue.reviveProgress/REVIVE_RULES.seconds*100)+'%';}
   let prompt='';if(canFight(local)&&local.flight==='ground'&&!local.vehicleId&&!paused){
    const accessible=(source,range=3)=>{const item=source.motion?{...source,y:lootHeight(source,state.time)}:source;if(dist(local,item)>range||item.landAt>state.time)return false;const from={x:local.x,y:local.y+.9,z:local.z},dx=item.x-from.x,dy=item.y+.6-from.y,dz=item.z-from.z,len=Math.hypot(dx,dy,dz)||1;return wallDistance(getMap(state.options.map),from,{x:dx/len,y:dy/len,z:dz/len},len)>=len-.15;};
    const blackout=blackoutPrompt(getMap(state.options.map),r,local,accessible);
@@ -214,7 +215,7 @@ export class RoyaleUI{
   $('royale-stamina').closest('.stamina').classList.toggle('exhausted',!!local.exhausted);
   if(state.options.training){setText($('royale-flight-title'),'FIELD TRAINING · '+Object.values(local.tutorial||{}).filter(Boolean).length+'/6');setText($('royale-flight-help'),['move','fire','slide','build','edit','boost'].map(k=>(local.tutorial?.[k]?'✓ ':'◇ ')+k.toUpperCase()).join(' · ')+' · Inventory: all weapons & supplies. Esc: leave.');}
   if(local.recap&&local.health<=0){const recap=local.recap;prompt=`<strong>ELIMINATED · ${escape(recap.weapon)}</strong><small>${recap.distance} m · ${recap.damage} final-hit damage · ${recap.critical?'Critical hit':'Body / environment'}</small>${recap.totalDamage!=null?`<small>${recap.totalDamage} damage in the last ${recap.window}s · ${recap.attackers} ${recap.attackers===1?'enemy':'enemies'}</small><span class="combat-recap-sources">${(recap.sources||[]).slice(0,3).map(row=>`${escape(row.name)} · ${escape(row.weapon)}: ${row.damage}`).join('<br>')}</span>`:''}`;}
-  if(mate?.downed&&local.health>0&&!local.downed&&reviveAccessible(getMap(state.options.map),local,mate))prompt=`<kbd>${escape(label('interact'))}</kbd> HOLD TO REVIVE ${escape(mate.name)}<small>Stay close · Taking damage interrupts</small>`;
+  if(mate?.downed&&local.health>0&&!local.downed&&reviveAccessible(getMap(state.options.map),local,mate))prompt=`<kbd>${escape(label('interact'))}</kbd> HOLD TO REVIVE ${escape(displayPlayerName(mate.name))}<small>Stay close · Taking damage interrupts</small>`;
   if(this.prompt!==prompt){$('royale-prompt').innerHTML=prompt;this.prompt=prompt;}$('royale-prompt').hidden=!prompt;
  }
 }

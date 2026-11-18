@@ -1,3 +1,4 @@
+import {displayPlayerName} from './display-player-name.js';
 import './voice.css';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const titles={party:'Party channel',team:'Team channel',game:'Game channel'};
@@ -30,7 +31,7 @@ export class VoiceUI {
  update(){
   const v=this.voice,now=performance.now(),active=v.members(),speakers=active.filter(p=>(v.speaking.get(p.self?'self':p.wire)||0)>now&&!v.settings.muted.includes(p.id));
   const buttonText=`${v.enabled?'●':'○'} VOICE${v.enabled?' · '+(v.deafened?'DEAFENED':v.micMuted?'MIC OFF':v.settings.method==='ptt'?v.settings.key.replace('Key',''):'OPEN MIC'):''}`;if(this.button.textContent!==buttonText)this.button.textContent=buttonText;
-  const hud=v.settings.indicators&&v.enabled?speakers.map(p=>`<div><i>▂▅▃</i><span>${esc(p.name)}${p.self?' (you)':''}</span></div>`).join(''):'';if(this.hud.innerHTML!==hud)this.hud.innerHTML=hud;
+  const hud=v.settings.indicators&&v.enabled?speakers.map(p=>`<div><i>▂▅▃</i><span>${esc(displayPlayerName(p.name))}${p.self?' (you)':''}</span></div>`).join(''):'';if(this.hud.innerHTML!==hud)this.hud.innerHTML=hud;
   if(this.panel.hidden)return;
   this.panel.querySelector('.voice-status').textContent=v.status+(v.enabled&&v.channel?' · '+titles[v.channel]:'');this.panel.querySelector('.voice-error').textContent=v.error||'';
   this.panel.querySelector('.voice-start').hidden=v.enabled;this.panel.querySelector('.voice-controls').hidden=!v.enabled;
@@ -38,7 +39,7 @@ export class VoiceUI {
   if(!this.binding)this.panel.querySelector('[data-voice=bind]').textContent=v.settings.key.replace('Key','').replace('Digit','');
   this.panel.querySelector('.voice-level span').style.width=Math.min(100,(v.level||0)*700)+'%';
   for(const b of this.panel.querySelectorAll('[data-channel]')){const c=v.channels.find(c=>c.id===b.dataset.channel);b.disabled=!v.enabled||!c?.available;b.setAttribute('aria-pressed',v.channel===b.dataset.channel?'true':'false');b.querySelector('span').textContent=!v.enabled?'Enable voice to join':!c?.available?b.dataset.channel==='game'?'Unavailable in this mode':b.dataset.channel==='team'?'No assigned team':'Unavailable':`${c.members.length} ${c.members.length===1?'player':'players'} · ${v.channel===c.id?'JOINED':'JOIN'}`;}
-  const key=JSON.stringify([v.channel,active,v.settings.muted]);if(key!==this.rosterKey){this.rosterKey=key;this.panel.querySelector('.voice-roster').innerHTML=active.length?active.map(p=>`<article data-voice-player="${esc(p.id)}"><div><i class="voice-person-icon">◉</i><strong>${esc(p.name)}${p.self?' · YOU':''}</strong><small>${p.channel!==v.channel?'In another channel':p.deafened?'Deafened':p.muted?'Microphone off':'Connected'}</small></div>${!p.self?`<div class="voice-person-actions"><button data-mute="${esc(p.id)}">${v.settings.muted.includes(p.id)?'UNMUTE':'MUTE'}</button><button data-report="${esc(p.id)}">REPORT</button><input aria-label="Volume for ${esc(p.name)}" data-volume="${esc(p.id)}" type="range" min="0" max="2" step=".1" value="${v.settings.volumes[p.id]??1}"></div>`:''}</article>`).join(''):'<p class="voice-empty">Join a channel to see its players.</p>';}
+  const key=JSON.stringify([v.channel,active,v.settings.muted]);if(key!==this.rosterKey){this.rosterKey=key;this.panel.querySelector('.voice-roster').innerHTML=active.length?active.map(p=>`<article data-voice-player="${esc(p.id)}"><div><i class="voice-person-icon">◉</i><strong>${esc(displayPlayerName(p.name))}${p.self?' · YOU':''}</strong><small>${p.channel!==v.channel?'In another channel':p.deafened?'Deafened':p.muted?'Microphone off':'Connected'}</small></div>${!p.self?`<div class="voice-person-actions"><button data-mute="${esc(p.id)}">${v.settings.muted.includes(p.id)?'UNMUTE':'MUTE'}</button><button data-report="${esc(p.id)}">REPORT</button><input aria-label="Volume for ${esc(displayPlayerName(p.name))}" data-volume="${esc(p.id)}" type="range" min="0" max="2" step=".1" value="${v.settings.volumes[p.id]??1}"></div>`:''}</article>`).join(''):'<p class="voice-empty">Join a channel to see its players.</p>';}
   for(const row of this.panel.querySelectorAll('[data-voice-player]'))row.classList.toggle('speaking',speakers.some(p=>p.id===row.dataset.voicePlayer));
  }
 }

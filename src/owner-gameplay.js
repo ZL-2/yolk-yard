@@ -31,9 +31,17 @@ export function applyOwnerGameplay(sim,command){
  let destination;
  if(command.action==='ground')destination=targets.map(p=>({p,point:landing(sim,{...p,y:groundAt(sim.map,p.x,p.z)})}));
  if(['bring','goto'].includes(command.action)){
-  if(!operator||operator.health<=0||operator.spectating||operator.vehicleId||operator.flight==='transport')throw Error('Your player must be alive and outside a vehicle.');
+  if(!operator||operator.vehicleId||operator.flight==='transport')throw Error('Your player must be outside a vehicle.');
+  const watching=operator.health<=0||operator.spectating||operator.zExtracted;
+  if(watching&&command.action==='goto')throw Error('Use the spectator camera to move to another player.');
+  let origin=operator;
+  if(watching&&command.camera){
+   const {x,z}=command.camera,edge=sim.map.size||256;
+   if(!Number.isFinite(x)||!Number.isFinite(z)||Math.abs(x)>edge||Math.abs(z)>edge)throw Error('Move the camera inside the map first.');
+   origin={x,z,y:groundAt(sim.map,x,z)};
+  }
   if(command.action==='goto'&&targets.length!==1)throw Error('Select one destination player.');
-  destination=command.action==='goto'?[{p:operator,point:landing(sim,targets[0])}]:targets.map(p=>({p,point:landing(sim,operator)}));
+  destination=command.action==='goto'?[{p:operator,point:landing(sim,targets[0])}]:targets.map(p=>({p,point:landing(sim,origin)}));
  }
  if(command.action in ITEMS&&targets.some(p=>!p.inventory||!p.inventory.slice(1).some(i=>!i)))throw Error('A selected inventory is full.');
  if(command.action==='weapon'&&targets.some(p=>p.inventory&&!p.inventory.slice(1).some(i=>!i)))throw Error('A selected inventory is full.');

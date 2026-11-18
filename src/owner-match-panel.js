@@ -1,17 +1,25 @@
+import {displayPlayerName} from './display-player-name.js';
+import {OWNER_CAMERA_ACTIONS} from './owner-free-camera.js';
 import {OWNER_GAMEPLAY} from './owner-gameplay.js';
 import {ROYALE_GUN_IDS} from './royale-data.js';
 import {weapon} from './data.js';
 import './owner-match.css';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const labels={warn:'Warn',kick:'Kick',ban:'Suspend',mute:'Mute text',teaming:'Teaming penalty',cheating:'Cheating penalty',unmute:'Unmute',unban:'Lift suspension',announce:'Announce', 'end-match':'End match','reverse-teaming':'Reverse teaming penalty'};
+for(const [id,[label]] of Object.entries(OWNER_CAMERA_ACTIONS))labels[id]=label;
 Object.assign(labels,Object.fromEntries(Object.entries(OWNER_GAMEPLAY).map(([id,[,label]])=>['game-'+id,label])));
 const descriptions={cheating:'Remove players now, suspend all modes for 1 hour and deny match rewards. Only a Cup violation also prohibits the next scheduled Cup.',warn:'Privately notify the selected players.',kick:'Remove the selected players from this match.',ban:'Remove players and suspend every mode for the selected duration.',mute:'Restrict match and lobby text chat. Voice is unchanged.',teaming:'Remove players now, suspend every mode for 1 hour and deny final rewards from this match. Cup removals also prohibit the next scheduled Cup.',unmute:'Lift this owner text-chat restriction.',unban:'Lift this owner suspension. Separate teaming penalties remain.',announce:'Show this announcement privately in the match HUD to everyone in this room.', 'end-match':'End this room for everyone. An active Cup is cancelled without Cup rewards.', 'reverse-teaming':'Lift this case’s one-hour suspension and Cup exclusion. This does not restore players to an ongoing match.'};
 Object.assign(descriptions,Object.fromEntries(Object.entries(OWNER_GAMEPLAY).map(([id,[group,label]])=>['game-'+id,group+' · '+label+'. Temporary powers apply to this round.'])));
+for(const [id,[,help]] of Object.entries(OWNER_CAMERA_ACTIONS))descriptions[id]=help;
 export class OwnerMatchPanel{
- constructor({api,context,onFocus=()=>{},onPlay=()=>{},notify=()=>{}}){
-  Object.assign(this,{api,context,onFocus,onPlay,notify,selected:new Set(),interacting:false,busy:false,serial:0});
+ constructor({api,context,canCamera=()=>false,cameraPosition=()=>null,onCamera=()=>{},onFocus=()=>{},onPlay=()=>{},notify=()=>{}}){
+  Object.assign(this,{api,context,canCamera,cameraPosition,onCamera,onFocus,onPlay,notify,selected:new Set(),interacting:false,busy:false,serial:0});
   this.root=document.createElement('section');this.root.className='owner-match';this.root.hidden=true;this.root.setAttribute('role','dialog');this.root.setAttribute('aria-modal','false');this.root.setAttribute('aria-label','Owner match operations');
   this.root.innerHTML=`<header class="om-head" tabindex="0" aria-label="Move owner window with arrow keys"><div><span class="om-eyebrow">RAVELFRONT / OWNER</span><b>Match operations</b></div><span class="om-live">LIVE</span><button data-om-min title="Minimize and return to play" aria-label="Minimize owner panel">−</button><button data-om-lock title="Lock owner access" aria-label="Lock owner access">×</button></header><div class="om-body"><div class="om-context"></div><p class="om-status" role="status" aria-live="polite"></p><div class="om-roster-head"><label>Find a player<input class="om-search" type="search" placeholder="Name or player ID" autocomplete="off"></label><button data-om-refresh title="Refresh roster">↻</button></div><div class="om-roster" role="group" aria-label="Match players"></div><div class="om-quick"><button data-om-self>Select myself</button><button data-om-everyone>Select room (up to 8)</button><button data-om-clear>Clear selection</button></div><div class="om-selection">Choose players below their names.</div><div class="om-actions">${Object.entries(labels).filter(([k])=>k!=='reverse-teaming'&&!k.startsWith('game-')).map(([k,v])=>`<button data-om-action="${k}" title="${esc(descriptions[k])}" ${['teaming','cheating','end-match'].includes(k)?'class="om-danger"':''}>${v}</button>`).join('')}</div><section class="om-gameplay"><h3>Gameplay controls</h3><label>Weapon<select class="om-weapon">${ROYALE_GUN_IDS.map(id=>`<option value="${id}">${esc(weapon(id).name)}</option>`).join('')}</select></label><label>Rarity<select class="om-rarity"><option value="2">Rare</option><option value="3">Epic</option><option value="4">Legendary</option><option value="5">Mythic</option></select></label>${['Health','Powers','Equipment','Travel'].map(group=>`<details open><summary>${group}</summary><div class="om-actions">${Object.entries(OWNER_GAMEPLAY).filter(([,v])=>v[0]===group).map(([id,[,label]])=>`<button data-om-action="game-${id}">${esc(label)}</button>`).join('')}</div></details>`).join('')}</section><label class="om-reason-label">Reason / message<textarea class="om-reason" rows="2" maxlength="300" placeholder="Explain what happened. Affected players receive this message."></textarea></label><label class="om-duration-label">Restriction duration<select class="om-duration"><option value="1">1 hour</option><option value="24">24 hours</option><option value="168">7 days</option></select></label><div class="om-confirm" hidden></div><details class="om-cases"><summary>Active teaming penalties</summary><div></div></details><details class="om-history"><summary>Action history</summary><div></div></details><footer>Private, authenticated, and audited. Fly uses Jump to rise and Crouch to descend.<button data-om-play>RETURN TO PLAY</button></footer></div>`;
+  const camera=document.createElement('fieldset');
+  camera.className='om-gameplay-group om-camera';
+  camera.innerHTML='<legend>Spectator camera</legend>'+Object.entries(OWNER_CAMERA_ACTIONS).map(([id,[label]])=>`<button data-om-action="${id}">${label}</button>`).join('');
+  this.root.querySelector('.om-actions').append(camera);
   this.root.querySelector('.om-duration-label').after(this.root.querySelector('.om-actions'));
   document.body.append(this.root);this.header=this.root.querySelector('.om-head');this.status=this.root.querySelector('.om-status');
   for(const event of ['pointerdown','mousedown','wheel','keyup'])this.root.addEventListener(event,e=>e.stopPropagation());
@@ -61,26 +69,36 @@ export class OwnerMatchPanel{
  }
  renderRoster(){
   const query=this.root.querySelector('.om-search').value.toLowerCase(),list=this.root.querySelector('.om-roster'),focus=document.activeElement?.dataset.player,scroll=list.scrollTop;
-  const rows=(this.data?.roster||[]).filter(p=>(p.name+' '+p.id).toLowerCase().includes(query));const html=rows.map(p=>`<button data-player="${esc(p.id)}" aria-pressed="${this.selected.has(p.id)}" ${this.busy?'disabled':''}><span class="om-check">${this.selected.has(p.id)?'✓':'○'}</span><span><b>${esc(p.name)}</b><small>${p.host?'HOST · ':''}${p.present?p.spectating?'Spectating':'In match':'Left match'}${p.mute?' · Text muted':''}${p.ban?' · Suspended':''}</small></span><code>${esc(p.id.slice(-6))}</code></button>`).join('')||'<p class="om-empty">No matching players.</p>';
+  const rows=(this.data?.roster||[]).filter(p=>(p.name+' '+p.id).toLowerCase().includes(query));const html=rows.map(p=>`<button data-player="${esc(p.id)}" aria-pressed="${this.selected.has(p.id)}" ${this.busy?'disabled':''}><span class="om-check">${this.selected.has(p.id)?'✓':'○'}</span><span><b>${esc(displayPlayerName(p.name))}</b><small>${p.host?'HOST · ':''}${p.present?p.spectating?'Spectating':'In match':'Left match'}${p.mute?' · Text muted':''}${p.ban?' · Suspended':''}</small></span><code>${esc(p.id.slice(-6))}</code></button>`).join('')||'<p class="om-empty">No matching players.</p>';
   if(list.innerHTML!==html){list.innerHTML=html;list.scrollTop=scroll;if(focus)list.querySelector(`[data-player="${CSS.escape(focus)}"]`)?.focus({preventScroll:true});}
-  this.root.querySelector('.om-selection').textContent=this.selected.size?`${this.selected.size} selected · ${[...this.selected].map(id=>this.data?.roster.find(p=>p.id===id)?.name||'Player left').join(', ')}`:'Select one or more players. Up to 8 per action.';
+  this.root.querySelector('.om-selection').textContent=this.selected.size?`${this.selected.size} selected · ${[...this.selected].map(id=>displayPlayerName(this.data?.roster.find(p=>p.id===id)?.name||'Player left')).join(', ')}`:'Select one or more players. Up to 8 per action.';
  }
  renderHistory(){
-  this.root.querySelector('.om-history div').innerHTML=(this.data?.history||[]).map(h=>`<p><b>${esc(labels[h.action]||h.action)}</b> · ${esc(new Date(h.at).toLocaleTimeString())}<br>${esc(h.targets.map(p=>p.name).join(', '))}<br>${esc(h.reason)}</p>`).join('')||'<p>No owner actions in this match.</p>';
-  this.root.querySelector('.om-cases div').innerHTML=(this.data?.cases||[]).map(c=>`<p><b>${esc(c.players.map(p=>p.name).join(', '))}</b><br>${esc(c.evidence.note)}${c.replay?`<button data-match-replay="${esc(c.replay.id)}">WATCH MATCH REPLAY</button>`:''}<button data-case="${esc(c.id)}">REVERSE THIS PENALTY</button></p>`).join('')||'<p>No active teaming penalties.</p>';
+  this.root.querySelector('.om-history div').innerHTML=(this.data?.history||[]).map(h=>`<p><b>${esc(labels[h.action]||h.action)}</b> · ${esc(new Date(h.at).toLocaleTimeString())}<br>${esc(h.targets.map(p=>displayPlayerName(p.name)).join(', '))}<br>${esc(h.reason)}</p>`).join('')||'<p>No owner actions in this match.</p>';
+  this.root.querySelector('.om-cases div').innerHTML=(this.data?.cases||[]).map(c=>`<p><b>${esc(c.players.map(p=>displayPlayerName(p.name)).join(', '))}</b><br>${esc(c.evidence.note)}${c.replay?`<button data-match-replay="${esc(c.replay.id)}">WATCH MATCH REPLAY</button>`:''}<button data-case="${esc(c.id)}">REVERSE THIS PENALTY</button></p>`).join('')||'<p>No active teaming penalties.</p>';
  }
  prepare(action,caseId){
+  if(this.canCamera()){
+   const self=this.selected.size===1&&this.selected.has(this.api.identity());
+   if(action==='game-fly'&&self)action='game-freecam';
+   if(action==='game-unfly'&&self)action='game-freecam-exit';
+   if(action==='game-goto')action='game-freecam-goto';
+  }
   if(!this.data||this.locked)return this.setStatus('Unlock owner access and refresh the match first.',true);
   const reason=this.root.querySelector('.om-reason').value.trim()||(action.startsWith('game-')?'Owner gameplay control: '+labels[action]:'');if(reason.length<5){this.setStatus('Enter a clear reason or message first.',true);this.root.querySelector('.om-reason').focus();return;}
-  const players=[...this.selected];if(!['announce','end-match','reverse-teaming'].includes(action)&&!players.length)return this.setStatus('Select at least one player.',true);
-  this.pending={...this.match,action,players,reason,hours:Number(this.root.querySelector('.om-duration').value),caseId,operator:this.api.identity(),weapon:this.root.querySelector('.om-weapon').value,rarity:Number(this.root.querySelector('.om-rarity').value),requestId:crypto.randomUUID()};
-  const region=this.root.querySelector('.om-confirm');region.hidden=false;const names=['announce','end-match'].includes(action)?'Everyone in this match':action==='reverse-teaming'?this.data.cases.find(c=>c.id===caseId)?.players.map(p=>p.name).join(', '):players.map(id=>this.data.roster.find(p=>p.id===id)?.name||'Player left').join(', ');
+  const soloCamera=['game-freecam','game-freecam-exit'].includes(action);
+  const players=soloCamera?[]:[...this.selected];
+  if((soloCamera||action==='game-freecam-goto')&&!this.canCamera())return this.setStatus('Free camera is available after elimination or while spectating.',true);
+  if(!soloCamera&&!['announce','end-match','reverse-teaming'].includes(action)&&!players.length)return this.setStatus('Select at least one player.',true);
+  const camera=action==='game-bring'?this.cameraPosition():null;
+  this.pending={...this.match,action,players,reason,...(camera?{camera}:{}),hours:Number(this.root.querySelector('.om-duration').value),caseId,operator:this.api.identity(),weapon:this.root.querySelector('.om-weapon').value,rarity:Number(this.root.querySelector('.om-rarity').value),requestId:crypto.randomUUID()};
+  const region=this.root.querySelector('.om-confirm');region.hidden=false;const names=soloCamera?'Your spectator camera':['announce','end-match'].includes(action)?'Everyone in this match':action==='reverse-teaming'?this.data.cases.find(c=>c.id===caseId)?.players.map(p=>displayPlayerName(p.name)).join(', '):players.map(id=>displayPlayerName(this.data.roster.find(p=>p.id===id)?.name||'Player left')).join(', ');
   region.innerHTML=`<b>${esc(labels[action])} · ${esc(names)}</b><p>${esc(descriptions[action])}</p><blockquote>${esc(reason)}</blockquote><button class="om-apply">CONFIRM ${esc(labels[action].toUpperCase())}</button><button class="om-cancel">Cancel</button>`;
   region.querySelector('.om-apply').onclick=()=>void this.apply();region.querySelector('.om-cancel').onclick=()=>this.cancel();region.scrollIntoView({block:'nearest'});region.querySelector('.om-apply').focus({preventScroll:true});
  }
  async apply(){
   if(this.busy||!this.pending)return;const request={...this.pending},serial=this.serial;this.setBusy(true);this.setStatus('Applying action and notifying affected players…');
-  try{const result=await this.api.post('/match',request);if(result.error)throw Error(result.error);if(serial!==this.serial)return;this.cancel();this.setStatus(result.queued?'Command sent to the match host.':labels[request.action]+' applied.');await this.refresh(true);}
+  try{const result=await this.api.post('/match',request);if(result.error)throw Error(result.error);if(serial!==this.serial)return;this.cancel();if(result.camera){this.onCamera(result.camera,request.matchId);this.minimize();}this.setStatus(result.queued?'Command sent to the match host.':labels[request.action]+' applied.');await this.refresh(true);}
   catch(error){if(serial!==this.serial)return;this.setStatus(error.message+(error.connectionError?' The result is uncertain; retry this same request safely.':''),true);if(error.status===401){this.api.token=null;this.cancel();this.locked=true;}else if(error.status===409)this.cancel();}
   finally{if(serial===this.serial)this.setBusy(false);}
  }

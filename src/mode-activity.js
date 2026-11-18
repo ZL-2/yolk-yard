@@ -1,5 +1,4 @@
-// Counts are unique connected public players (plus connected training), never
-// private matches, bots, match capacity or spectators.
+// Counts are unique active players across public and private matches, plus connected training.
 export function modePopulation(id,counts){
  if(id==='zone-wars')id='zonewars';if(id==='box-fights')id='boxfight';
  const n=counts?.[id];return Number.isFinite(n)&&n>=0?Math.floor(n):null;

@@ -1,4 +1,5 @@
 export const RELEASE_NOTES = [
+ {number:'243',title:'Live player counts',changes:['Mode cards count active players across public and private matches and connected Training. Watching a match, waiting to join, and bots do not add to the count.']},
  {number:'242',title:'Winter Signal: Northstar Courier',changes:['The lobby and Spawn Island are dressed for Christmas, with lit evergreens, relief parcels and snowfall.','The six-piece Northstar Courier Bundle arrives in the Item Shop for 3,000 Marks. Each item is also sold separately.','Hollow Jack has left the Item Shop. Previously purchased pieces stay in your Locker.']},
  {number:'241',title:'Winter Signal',changes:['Ravel Coast is covered in snow, with new relief stations, holiday lights and signal towers. Breakwater’s freighter now relays the distress call to Aster.','Find the Hollyburst Carbine, a festive two-shot burst rifle, at relief stations and in Royale loot.','Voss drops the Kestrel Jump Rig, Rook drops the Mythic Grappler, and Nyx drops Mythic Shadowstep.']},
  {number:'240',title:'Game improvements',changes:['Game improvements.']},

@@ -55,10 +55,11 @@ test('infinite private Zone Wars survives many draws; finite private rules and B
  }
 });
 
-test('game populations count only public admitted humans while preserving private friend presence',()=>{
- const service=Object.create(PartyService.prototype),publicUser={id:'pub'},privateUser={id:'priv'},legacy={id:'legacy'},training={id:'train'};
- service.users=new Map([publicUser,privateUser,legacy,training].map(u=>[u.id,u]));service.playingMode=u=>u===training?'training':'zonewars';service.matchLocation=u=>u===publicUser?{listing:{public:true}}:u===privateUser?{listing:{public:false}}:null;
- assert.deepEqual(service.modeCounts(),{royale:0,ffa:0,zonewars:1,boxfight:0,zombies:0,training:1});assert.equal(service.playingMode(privateUser),'zonewars');
+test('mode populations combine private and public participants once per identity',()=>{
+ const service=Object.create(PartyService.prototype);
+ service.users=new Map([['public','zonewars'],['private','zonewars'],['lobby',null],['training','training']]);
+ service.playingMode=mode=>mode;
+ assert.deepEqual(service.modeCounts(),{royale:0,ffa:0,zonewars:2,boxfight:0,zombies:0,training:1});
 });
 test('join notices identify each supported team format and invite URLs carry only the exact room',()=>{
  for(const [mode,teamSize,label]of [['royale',1,'Solos'],['royale',2,'Duos'],['royale',3,'Trios'],['royale',4,'Squads'],['boxfight',3,'3v3'],['zonewars',1,'Solos'],['zombies',3,'Trios'],['ffa',1,'Solo']])assert.ok(publicJoinMode({mode,teamSize}).endsWith(label));
@@ -71,11 +72,12 @@ test('capture recovery detects lost input without covering intentional menus or 
  assert.equal(needsMouseCapture({...options,phase:'results'}),false);assert.equal(needsMouseCapture({...options,player:{health:0,spectating:true}}),false);
 });
 
-test('private match codes join the exact room and neither private player enters the public population',async()=>{
+test('private match codes join the exact room and active private players enter the mode population',async()=>{
  const f=await fixture();try{
   const a=await f.user('Private Host'),b=await f.user('Private Guest');await a.ask('select',{mode:'zonewars',access:'private',options:{scoreLimit:0}});await a.ask('queue');const host=await f.game(a);
   const url=matchInviteURL('https://zl-2.github.io/yolk-yard/?build=old#play',host.net.code),code=new URL(url).searchParams.get('room');await b.ask('queue',{code});const guest=await f.game(b);assert.equal(guest.net.code,host.net.code);
-  host.net.publishRoom();await pause(100);const service=f.app.relay.parties;assert.equal(service.playingMode(service.users.get(a.id)),'zonewars');assert.equal(service.playingMode(service.users.get(b.id)),'zonewars');assert.equal(service.modeCounts().zonewars,0);assert.equal(guest.state.options.scoreLimit,0);
+  for(const p of host.sim.players.values())if(!p.bot)Object.assign(p,{health:100,contestant:true,spectating:false,lateSpectator:false});
+  host.net.snapshot=host.sim.snapshot();host.net.publishRoom();await pause(100);const service=f.app.relay.parties;assert.equal(service.playingMode(service.users.get(a.id)),'zonewars');assert.equal(service.playingMode(service.users.get(b.id)),'zonewars');assert.equal(service.modeCounts().zonewars,2);assert.equal(guest.state.options.scoreLimit,0);
   await b.ask('profile',{profile:{...b.profile,name:'Renamed Guest'}});guest.net.profile({...b.profile,name:'Renamed Guest'});await until(()=>host.sim.players.get(guest.net.id)?.name==='Renamed Guest','Updated name reaches live roster');assert.equal(service.store.identities.get(b.id).profile.name,'Renamed Guest');
  }finally{await f.close();}
 });

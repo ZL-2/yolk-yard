@@ -36,8 +36,8 @@ test('owner HTTP authorization, matched target resolution, audit and replay are 
   const post=async(path,body)=>{const r=await fetch(base+'/owner/'+path,{method:'POST',headers:{Origin:'https://zl-2.github.io','Content-Type':'text/plain'},body:JSON.stringify(body)});return {status:r.status,data:await r.json()};};
   const token=(await post('login',{code})).data.token,sim=new Simulation(),p=sim.addPlayer('actor',{name:'Target'});
   sim.startRound();Object.assign(p,{health:12,spectating:false,flight:'ground'});sim.matchId='api-match';
-  const service=f.app.owner.match,roster=[{id:'identity',playerId:p.id,name:p.name,present:true}];
-  service.context=body=>{if(body.matchId!==sim.matchId)throw Error('Match changed');return {code:'TEST',matchId:sim.matchId,roster,authority:{sim}};};
+  const service=f.app.owner.match,roster=[{id:'identity',playerId:p.id,name:p.name,present:true,connected:true}];
+  service.context=body=>{if(body.matchId!==sim.matchId)throw Error('Match changed');return {code:'TEST',matchId:sim.matchId,roster,authority:{sim},host:{id:'room',listing:{phase:'playing'}}};};
   service.overview=()=>({roster,cases:[]});
   const body={token,action:'game-heal',players:['identity'],matchId:sim.matchId,code:'TEST',reason:'Owner requested full health',requestId:randomUUID()};
   assert.equal((await post('match',{...body,token:null})).status,401);assert.equal(p.health,12);
@@ -45,6 +45,12 @@ test('owner HTTP authorization, matched target resolution, audit and replay are 
   p.health=20;assert.equal((await post('match',body)).status,200);assert.equal(p.health,20,'retry does not reapply the command');
   assert.equal((await post('match',{...body,action:'game-god'})).status,409);
   assert.equal(service.history('TEST',sim.matchId)[0].action,'game-heal');
+  const camera={...body,action:'game-freecam',operator:'identity',players:[],requestId:randomUUID()};
+  assert.equal((await post('match',{...camera,token:null})).status,401);
+  assert.match((await post('match',camera)).data.error,/after elimination/);
+  p.health=0;p.spectating=true;
+  assert.equal((await post('match',camera)).data.camera.action,'game-freecam');
+  assert.equal(p.health,0);assert.equal(p.spectating,true);
   const eventId='owner-match:'+body.requestId,row=service.db.get('SELECT data FROM events WHERE id=?',eventId),data=JSON.parse(row.data);
   data.result.queued=true;service.db.run('UPDATE events SET data=? WHERE id=?',JSON.stringify(data),eventId);
   service.context=()=>({code:'TEST',matchId:sim.matchId,roster:[{id:'host',host:true}]});

@@ -1,3 +1,4 @@
+import {displayPlayerName} from './display-player-name.js';
 // Host-owned spectator intent; names come only from the accepted player roster.
 export const canSpectate=(p,viewerId)=>!!p&&p.id!==viewerId&&p.health>0&&!p.spectating&&!p.boss&&!p.henchman;
 export function watcherAction(sim,p,action){
@@ -8,7 +9,7 @@ export function watcherAction(sim,p,action){
  return true;
 }
 export function watchersFor(state,id){const target=state?.players?.find(p=>p.id===id);if(!target||target.health<=0||target.spectating)return [];return state.players.filter(p=>p.id!==id&&!p.bot&&p.connected!==false&&(p.spectating||p.health<=0)&&p.watchingId===id);}
-export function spectatorMessage(previous,current){const known=new Set(previous),joined=current.filter(p=>!known.has(p.id));return joined.length?joined.map(p=>p.name).join(', ')+(joined.length===1?' is':' are')+' spectating you.':null;}
+export function spectatorMessage(previous,current){const known=new Set(previous),joined=current.filter(p=>!known.has(p.id));return joined.length?joined.map(p=>displayPlayerName(p.name)).join(', ')+(joined.length===1?' is':' are')+' spectating you.':null;}
 
 export function spectatorTargets(state,localId){
  const me=state?.players?.find(p=>p.id===localId),alive=(state?.players||[]).filter(p=>canSpectate(p,localId));

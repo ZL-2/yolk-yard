@@ -9,6 +9,11 @@ export class HostWatchdog{
   const now=Date.now(),matchId=room.watch.matchId.slice(0,80),owner=peer.hostOwner||peer.publicHostOwner||peer.id;let watch=this.rooms.get(peer.id);
   if(!watch||watch.peer!==peer||watch.owner!==owner||watch.matchId!==matchId){if(watch)this.owners.delete(watch.owner);watch={peer,address:peer.id,owner,hostId:String(room.hostId||'host').slice(0,80),matchId,time:room.watch.time,advancedAt:now};this.rooms.set(peer.id,watch);this.owners.set(watch.owner,watch);}
   else if(room.watch.time>watch.time){watch.time=room.watch.time;watch.advancedAt=now;}
+  watch.phase=room.watch.phase;
+  if(Array.isArray(room.watch.activePlayers)&&room.watch.activePlayers.length<=64){
+   watch.activePlayers=new Set(room.watch.activePlayers.filter(id=>typeof id==='string'&&id.length<=100));
+  }
+
  }
  observe(peer,data){
   // Read only constant-size metadata; never decode world state in the relay.

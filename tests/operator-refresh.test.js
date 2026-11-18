@@ -4,7 +4,7 @@ import {Vector3} from 'three';
 import {PartyService} from '../server/realtime/parties.js';
 import {presenceLabel,presenceMarkup} from '../src/presence-ui.js';
 import {modePopulation,modePopulationMarkup} from '../src/mode-activity.js';
-import {lobbyMarkup,modeMarkup} from '../src/lobby-ui.js';
+import {EXPERIENCES,lobbyMarkup,modeMarkup} from '../src/lobby-ui.js';
 import {strideProfile,strideFoot,pelvisTurn} from '../src/operator-motion.js';
 import {makeHumanoid,animateHumanoid} from '../src/humanoid.js';
 import {itemDrawProfile,equipPose,drawTransform} from '../src/equip.js';
@@ -13,20 +13,25 @@ import {VERSION} from '../src/data.js';
 test('presence names the current mode and every discovery artwork has an honest population',()=>{
  assert.equal(presenceLabel('in-match','royale'),'Playing Battle Royale');assert.equal(presenceLabel('in-match','ffa'),'Playing Free For All');assert.equal(presenceLabel('in-match','training'),'Playing Training');
  assert.equal(presenceLabel('in-match','<script>'),'Playing');assert.match(presenceMarkup('in-match','','royale'),/Playing Battle Royale/);
- assert.equal(modePopulation('ffa',{ffa:NaN}),null);assert.equal(modePopulation('ffa',{ffa:-1}),null);assert.equal(modePopulation('box-fights',null),0);
+ assert.equal(modePopulation('ffa',{ffa:NaN}),null);assert.equal(modePopulation('ffa',{ffa:-1}),null);assert.equal(modePopulation('box-fights',null),null);
  assert.match(modePopulationMarkup('royale',{royale:16}),/16 players playing/);assert.match(modePopulationMarkup('training',null),/unavailable/);
- const mode=modeMarkup({mode:'ffa'},false,1,{ffa:6,royale:12,training:1});assert.equal((mode.match(/data-mode-population=/g)||[]).length,6);assert.match(mode,/6 players playing/);assert.match(mode,/0 players playing/);
- for(const access of ['public','private']){const html=lobbyMarkup({profile:{name:'Operator'},party:{leader:'a',state:'idle',selection:{mode:'royale',teamSize:2,access},members:[{id:'a',profile:{name:'Operator'},presence:'in-match',playingMode:'royale'}]},id:'a',online:true,balance:0});assert.match(html,new RegExp('Build, Duos, '+(access==='public'?'Public':'Private')));assert.match(html,/Playing Battle Royale/);}
+ const mode=modeMarkup({mode:'ffa'},false,1,{ffa:6,royale:12,training:1,boxfight:0,zonewars:0,zombies:0});assert.equal((mode.match(/data-mode-population=/g)||[]).length,EXPERIENCES.filter(e=>!e.paused).length);assert.match(mode,/6 players playing/);assert.match(mode,/0 players playing/);
+ for(const access of ['public','private']){const html=lobbyMarkup({profile:{name:'Operator'},party:{leader:'a',state:'idle',selection:{mode:'royale',teamSize:2,access},members:[{id:'a',profile:{name:'Operator'},presence:'in-match',playingMode:'royale'}]},id:'a',online:true,balance:0});assert.match(html,new RegExp('Match privacy: '+(access==='public'?'Public':'Private')));assert.match(html,/Playing Battle Royale/);}
 });
 
 test('mode counts deduplicate tabs, combine rooms, exclude bots/spectators/disconnects and clear returns',async()=>{
- const peers=new Map(),service=new PartyService({peers},{store:{flush:async()=>{}}}),messages=[];
+ const peers=new Map(),watchRooms=new Map(),service=new PartyService({peers,hostWatchdog:{rooms:watchRooms}},{store:{flush:async()=>{}}}),messages=[];
  const add=(id,mode,room=id)=>{const ws={readyState:1,bufferedAmount:0,send:s=>messages.push(JSON.parse(s)),close(){}},u={id,profile:{name:id},sessions:new Map([[ws,{visible:true,activity:'in-match',mode}]]),ws,inMatch:mode!=='training',matchPeer:id,matchCode:room,matchSession:ws};service.users.set(id,u);service.create(u);if(u.inMatch){const host={id:`yolk-yard-v${VERSION}-${room}`,ws,listing:{mode,phase:'playing',public:room!=='private'},links:new Map()};peers.set(host.id,host);peers.set(id,{id,ws,links:new Map([[host.id,host]])});}return u;};
  try{
   const a=add('alpha','royale','public'),b=add('bravo','royale','private'),c=add('charlie','ffa'),d=add('delta','training');
   a.sessions.set({readyState:1,bufferedAmount:0,send(){},close(){}},{visible:true,activity:'in-match',mode:'royale'});
-  assert.deepEqual(service.modeCounts(),{royale:1,ffa:1,training:1,zonewars:0,boxfight:0,zombies:0});
+  assert.deepEqual(service.modeCounts(),{royale:2,ffa:1,training:1,zonewars:0,boxfight:0,zombies:0});
   service.publishModeCounts();const first=messages.filter(m=>m.type==='mode-counts').length;service.publishModeCounts();assert.equal(messages.filter(m=>m.type==='mode-counts').length,first,'unchanged counts do not fan out again');
+  const host=peers.get(`yolk-yard-v${VERSION}-private`);
+  watchRooms.set(host.id,{phase:'playing',activePlayers:new Set()});
+  assert.equal(service.modeCounts().royale,1,'the host roster overrules stale activity');
+  watchRooms.get(host.id).activePlayers.add('bravo');
+  assert.equal(service.modeCounts().royale,2,'an active private contestant counts');
   b.spectateLaunch={};c.sessions.get(c.ws).activity='spectating';d.ws.readyState=3;
   assert.deepEqual(service.modeCounts(),{royale:1,ffa:0,training:0,zonewars:0,boxfight:0,zombies:0});
   peers.delete(a.matchPeer);assert.equal(service.modeCounts().royale,0,'stale in-match reports cannot resurrect disconnected admitted players');

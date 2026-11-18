@@ -1,7 +1,8 @@
 import {OWNER_GAMEPLAY,validateOwnerGameplay,applyOwnerGameplay} from '../../src/owner-gameplay.js';
 import {createHash,randomUUID} from 'node:crypto';
+const cameraActions=new Set(['game-freecam','game-freecam-goto','game-freecam-exit']);
 const clean=v=>String(v??'').replace(/[\u0000-\u001f]/g,' ').trim().slice(0,300);
-const actions=new Set(['warn','kick','ban','unban','mute','unmute','teaming','cheating','reverse-teaming','announce','end-match',...Object.keys(OWNER_GAMEPLAY).map(k=>'game-'+k)]);
+const actions=new Set(['warn','kick','ban','unban','mute','unmute','teaming','cheating','reverse-teaming','announce','end-match',...cameraActions,...Object.keys(OWNER_GAMEPLAY).map(k=>'game-'+k)]);
 export class OwnerMatchService{
  constructor(owner){this.owner=owner;this.db=owner.db;if(this.db.db)this.db.db.exec(`CREATE TABLE IF NOT EXISTS owner_match_notices(id TEXT PRIMARY KEY,player TEXT NOT NULL,created INTEGER NOT NULL,data TEXT NOT NULL,read_at INTEGER);CREATE TABLE IF NOT EXISTS owner_notice_views(notice TEXT NOT NULL,player TEXT NOT NULL,shown INTEGER NOT NULL,PRIMARY KEY(notice,player));CREATE INDEX IF NOT EXISTS owner_match_notices_player ON owner_match_notices(player,created);`);}
  get relay(){return this.owner.relay;}
@@ -48,19 +49,28 @@ export class OwnerMatchService{
  }
  async action(req,body){
   if(!actions.has(body.action)||!/^[-a-f0-9]{36}$/.test(body.requestId||''))throw Error('Invalid match action');
-  const fingerprint=createHash('sha256').update(JSON.stringify([body.action,body.code,body.matchId,body.players,body.reason,body.hours,body.caseId,body.operator,body.weapon,body.rarity])).digest('hex'),key='owner-match:'+body.requestId;
+  const fingerprint=createHash('sha256').update(JSON.stringify([body.action,body.code,body.matchId,body.players,body.reason,body.hours,body.caseId,body.operator,body.weapon,body.rarity,body.camera])).digest('hex'),key='owner-match:'+body.requestId;
   const previous=this.db.get('SELECT data FROM events WHERE id=?',key);if(previous){const old=JSON.parse(previous.data);if(old.fingerprint!==fingerprint)throw Object.assign(Error('This request was already used for a different action.'),{status:409});return old.result;}
   const c=this.context(body),reason=clean(body.reason);if(reason.length<5)throw Error('Give the player a clear reason (at least five characters).');
   const view=this.overview(body),ids=Array.isArray(body.players)?[...new Set(body.players)]:[];
-  if(!['announce','end-match','reverse-teaming'].includes(body.action)&&(!ids.length||ids.length>8))throw Error('Select one to eight players.');
+  if(!['announce','end-match','reverse-teaming','game-freecam','game-freecam-exit'].includes(body.action)&&(!ids.length||ids.length>8))throw Error('Select one to eight players.');
   const targets=ids.map(id=>view.roster.find(p=>p.id===id));if(targets.some(p=>!p||!p.present&&!['unmute','unban'].includes(body.action)))throw Error('A selected player left this match. Refresh the roster.');
   const now=this.owner.now(),hours=Number(body.hours??1),r=this.relay,result={ok:true,action:body.action,at:now};
   if(['ban','mute'].includes(body.action)&&![1,24,168].includes(hours))throw Error('Choose 1 hour, 24 hours, or 7 days.');
   if(body.action==='end-match'&&c.authority?.sim.phase==='results')throw Error('This match has already completed.');
   const record=()=>this.db.event('owner-match',reason,c.code,{code:c.code,matchId:c.matchId,action:body.action,operator:body.operator,targets:targets.map(p=>({id:p.id,name:p.name})),actor:this.owner.actor(req,body),fingerprint,result},key);
-  if(body.action.startsWith('game-')){
+  if(cameraActions.has(body.action)){
+   const operator=c.roster.find(p=>p.id===body.operator&&p.connected);
+   if(!operator||c.host.listing.phase==='results')throw Error('Join the active match before using its camera.');
+   const actor=c.authority?.sim.players.get(operator.playerId);
+   const watch=r.hostWatchdog?.rooms.get(c.host.id);
+   if(body.action!=='game-freecam-exit'&&(actor?actor.health>0&&!actor.spectating&&!actor.zExtracted:watch?.activePlayers?.has(operator.playerId)))throw Error('The free camera is available after elimination or while spectating.');
+   if(body.action==='game-freecam-goto'&&targets.length!==1)throw Error('Select one destination player.');
+   result.camera={action:body.action,playerId:body.action==='game-freecam-goto'?targets[0].playerId:null};
+   record();
+  }else if(body.action.startsWith('game-')){
    const operator=view.roster.find(p=>p.id===body.operator&&p.present);
-   const command={action:body.action.slice(5),players:targets.map(p=>p.playerId),operator:operator?.playerId,matchId:c.matchId,weapon:body.weapon,rarity:body.rarity};
+   const command={action:body.action.slice(5),players:targets.map(p=>p.playerId),operator:operator?.playerId,matchId:c.matchId,weapon:body.weapon,rarity:body.rarity,...(body.action==='game-bring'&&body.camera?{camera:{x:body.camera.x,z:body.camera.z}}:{})};
    validateOwnerGameplay(command);
    if(c.authority){applyOwnerGameplay(c.authority.sim,command);record();}
    else{

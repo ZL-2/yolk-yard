@@ -1,3 +1,5 @@
+import {displayPlayerName,displayWinner} from './display-player-name.js';
+import {OwnerFreeCamera} from './owner-free-camera.js';
 import {showWinterBriefing} from './winter-briefing.js';
 import {applyOwnerGameplay} from './owner-gameplay.js';
 import {BLACKOUT_LOGS} from './blackout-map.js';
@@ -331,7 +333,51 @@ const fairPlay=new FairPlayRuntime({poll:()=>party?.ready?party.request('fair-pl
 const ownerNotices=new OwnerMatchNotices({poll:()=>party?.ready?party.request('owner-match-status'):null,ack:ids=>party.request('owner-match-ack',{ids})});ownerRuntime.ownerNotices=ownerNotices;
 const ownerConsole=new OwnerConsole({identity:()=>party?.id,onMapEditor:openOwnerMapEditor,onCampaign:openOwnerCampaign,wallet:eggWallet,onWalletChange:()=>{if(screen==='menu')renderMenu();},modal:(...args)=>modal(...args),screen:()=>screen,dialog});
 document.addEventListener('icon-owner-access',()=>ownerConsole.open());
-const ownerPanel=new OwnerMatchPanel({api:ownerConsole,context:()=>screen==='game'&&net?.ready?{code:net.code,matchId:state?.royale?.matchId||state?.matchId}:null,notify:message=>toast(message),onFocus:()=>{keys.clear();queuedActions.clear();scoreHeld=false;input.fire=false;input.aim=false;Object.assign(touch,{x:0,y:0,jump:false,fire:false,aim:false,reload:false,popper:false,sprint:false,interact:false});if(document.pointerLockElement)document.exitPointerLock();},onPlay:()=>{if(screen==='game'&&!dialog.open)void resume();}});
+const ownerCamera=new OwnerFreeCamera();
+const cameraHud=document.createElement('aside');
+cameraHud.id='owner-camera-hud';cameraHud.hidden=true;
+cameraHud.innerHTML=`<strong>OWNER FREE CAMERA</strong><span data-camera-help></span>
+ <div><button data-action="owner-camera-look">Capture mouse</button><button data-action="owner-camera-exit">Exit camera</button></div>
+ <div class="owner-camera-touch"><button data-touch="cameraUp">Rise</button><button data-touch="cameraDown">Descend</button></div>`;
+document.querySelector('#hud').append(cameraHud);
+function canUseOwnerCamera(p=state?.players.find(p=>p.id===localId)){
+ return screen==='game'&&state?.phase==='playing'&&!!p&&(p.health<=0||p.spectating||p.zExtracted);
+}
+function setOwnerCamera(command,matchId){
+ if(command.action==='game-freecam-exit'){stopOwnerCamera();return;}
+ if(!canUseOwnerCamera()||matchId!==(state?.royale?.matchId||state?.matchId))return;
+ const target=state.players.find(p=>p.id===command.playerId);
+ if(command.playerId&&!target){toast('That player left the match.');return;}
+ const camera=view.camera,pos=camera.position;
+ if(!ownerCamera.state||target)ownerCamera.start(target||pos,
+  ownerCamera.state||{yaw:camera.rotation.y,pitch:camera.rotation.x},getMap(state.options.map),matchId);
+ cameraHud.querySelector('[data-camera-help]').textContent=matchMedia('(pointer:coarse)').matches?
+  'Move with the stick. Drag to look.':'Move · '+['forward','left','back','right'].map(controlLabel).join(' / ')+
+   ' · Rise '+controlLabel('jump')+' · Descend '+controlLabel('crouch');
+ matchEndUI.watch();
+}
+function stopOwnerCamera(){
+ if(!ownerCamera.state)return;
+ ownerCamera.stop();keys.clear();touch.cameraUp=touch.cameraDown=false;
+ if(document.pointerLockElement===document.querySelector('#world'))document.exitPointerLock();
+}
+function updateOwnerCamera(me,dt){
+ if(ownerCamera.state&&(!canUseOwnerCamera(me)||!net?.ready||!ownerConsole.token||ownerConsole.expires<=Date.now()||
+   ownerCamera.state.matchId!==(state?.royale?.matchId||state?.matchId)))stopOwnerCamera();
+ const visible=!!ownerCamera.state&&!ownerPanel.interacting&&!chat.opened&&!dialog.open;
+ cameraHud.hidden=!visible;
+ document.body.classList.toggle('owner-free-camera',!!ownerCamera.state);
+ if(!visible)return;
+ cameraHud.querySelector('[data-action=owner-camera-look]').hidden=!!document.pointerLockElement||matchMedia('(pointer:coarse)').matches;
+ if(paused||document.hidden)return;
+ ownerCamera.move({
+  forward:Number(actionDown('forward'))-Number(actionDown('back'))+touch.y,
+  right:Number(actionDown('right'))-Number(actionDown('left'))+touch.x,
+  up:Number(actionDown('jump')||!!touch.cameraUp)-Number(actionDown('crouch')||!!touch.cameraDown),
+  fast:actionDown('sprint'),
+ },getMap(state.options.map),dt);
+}
+const ownerPanel=new OwnerMatchPanel({api:ownerConsole,context:()=>screen==='game'&&net?.ready?{code:net.code,matchId:state?.royale?.matchId||state?.matchId}:null,notify:message=>toast(message),canCamera:canUseOwnerCamera,cameraPosition:()=>ownerCamera.state?{x:ownerCamera.state.x,z:ownerCamera.state.z}:null,onCamera:setOwnerCamera,onFocus:()=>{keys.clear();queuedActions.clear();scoreHeld=false;input.fire=false;input.aim=false;Object.assign(touch,{x:0,y:0,jump:false,fire:false,aim:false,reload:false,popper:false,sprint:false,interact:false});if(document.pointerLockElement)document.exitPointerLock();},onPlay:()=>{if(screen==='game'&&!dialog.open)void resume();}});
 startAnonymousVisits(()=>screen==='game'?(state?.options?.training?'training':state?.options?.mode||options.mode||'royale'):screen==='lobby'?'lobby':screen==='editor'?'editor':'menu');
 eggWallet.subscribe(wallet=>{for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(wallet.balance);});
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();for(const node of document.querySelectorAll('[data-eggs-balance]'))node.textContent=formatEggs(eggWallet.value.balance);if(eggShop?.root?.isConnected)eggShop.render();if(screen==='menu'&&menuSection==='career')renderMenu(true);}});
@@ -383,7 +429,19 @@ async function refreshCompetitiveCareer(force=false){
  const identity=party.id;competitivePending=true;
  try{const record=await party.request('competitive-career');if(party.id!==identity)return;competitiveCareer=record;competitiveError='';competitiveAt=performance.now();}catch(error){competitiveError=error.message;}finally{competitivePending=false;const section=$('#competitive-career');if(section){section.outerHTML=competitiveCareerMarkup(competitiveCareer,!!party?.ready,competitiveError);if(competitiveScroll)$('#competitive-career')?.scrollIntoView({block:'start'});}competitiveScroll=false;}
 }
-function syncSocialActivity(me){if(!party?.ready)return;const activity=screen==='game'&&state?.phase==='playing'?(me?.spectating||me?.health<=0?'spectating':'in-match'):'lobby',mode=activity!=='lobby'?(state?.options.training?'training':state?.options.mode):null,key=activity+':'+mode+':'+party.id;if(key===socialActivityKey)return;socialActivityKey=key;party.request('presence',{activity,mode,visible:!document.hidden&&document.hasFocus()}).catch(()=>{socialActivityKey='';});}
+function syncSocialActivity(me){
+ if(!party?.ready)return;
+ const playing=screen==='game'&&state?.phase==='playing'&&!!me;
+ const activity=playing?(me.spectating||me.health<=0||me.zExtracted?'spectating':'in-match'):'lobby';
+ const mode=playing?(state.options.training?'training':state.options.mode):null;
+ const peerId=playing&&net?.ready?net.peer?.id:null;
+ const key=[activity,mode,party.id,peerId,state?.matchId,state?.royale?.matchId].join(':');
+ if(key===socialActivityKey)return;
+ socialActivityKey=key;
+ let progressToken;
+ if(peerId)try{progressToken=localStorage.getItem('ravelfront-progress-token');}catch{}
+ party.request('presence',{activity,mode,peerId,progressToken,visible:!document.hidden&&document.hasFocus()}).catch(()=>{socialActivityKey='';});
+}
 window.addEventListener('storage',e=>{if(e.key==='yolk-egg-shop-v1'){eggWallet.value=eggWallet.read();if(screen==='menu')renderMenu();}});
 function currentLeaderboardMode(){leaderboardSelection=syncRankingSelection(leaderboardSelection,party?.party?.selection?.mode);return leaderboardSelection.mode;}
 function trainingBoard(){const p={rank:1,name:profile.name,kills:stats.training?.kills||0,wins:stats.training?.wins||0,you:true};return {mode:'training',...Object.fromEntries(['kills','wins'].map(k=>[k,{total:1,offset:0,rows:[p],self:p,hasMore:false}]))};}
@@ -495,7 +553,7 @@ function notice(text,duration=2600) {
 function settingsMenu() {
   modal(
     "Settings",
-    `<p>Settings are saved on this browser.</p><div class="setting-row"><label for="playerName" class="setting-label">Display name <small>${esc(profile.name)}</small></label><button id="playerName" data-settings-row="playerName" data-action="profile">CHANGE NAME</button></div><button class="slider-reset-all" data-reset-slider="all">Reset all sliders</button>${SLIDERS
+    `<p>Settings are saved on this browser.</p><div class="setting-row"><label for="playerName" class="setting-label">Display name <small>${esc(displayPlayerName(profile.name))}</small></label><button id="playerName" data-settings-row="playerName" data-action="profile">CHANGE NAME</button></div><button class="slider-reset-all" data-reset-slider="all">Reset all sliders</button>${SLIDERS
       .map(
         ([id, label, min, max, step]) =>
           `<div class="setting-row"><label class="setting-label" for="${id}">${label} <output id="out-${id}">${settings[id]}</output></label><div class="slider-controls"><input type="range" id="${id}" data-setting="${id}" min="${min}" max="${max}" step="${step}" value="${settings[id]}"><button class="slider-reset" data-reset-slider="${id}" aria-label="Reset ${label}">Reset</button></div></div>`,
@@ -646,7 +704,7 @@ async function publicRooms() {
   try {
     const result = await directory.list();
     if (dialogType !== "public-rooms" || request !== roomListRequest) return;
-    modal("Public matches", `<p>Open to everyone. Private rooms are only reachable by invite code.</p>${connectionButton}<button class="icon-btn" data-action="refresh-rooms" aria-label="Refresh public matches">↻</button><div class="public-room-list">${result.rooms.map(r => `<article class="public-room"><div><strong>${esc(r.host)}’s room</strong><p>${esc(getMap(r.map).name)} · ${esc(mode(r.mode).name)}</p><span class="hint">${r.players}/${r.capacity} players · ${r.phase === "playing" ? "In progress" : r.phase === "results" ? "Between rounds" : "In lobby"}</span></div><button class="secondary" data-join-room="${esc(r.code)}" ${r.players >= r.capacity && !(r.mode==='royale'&&r.phase!=='lobby') ? "disabled" : ""}>${r.mode==='royale'&&r.phase!=='lobby'?"Spectate":r.players >= r.capacity ? "Full" : "Join"}</button></article>`).join('') || '<p class="empty-rooms">No public matches yet. Create a room and set it to public.</p>'}</div><button class="primary" data-action="setup">CREATE A ROOM</button>`, "public-rooms");
+    modal("Public matches", `<p>Open to everyone. Private rooms are only reachable by invite code.</p>${connectionButton}<button class="icon-btn" data-action="refresh-rooms" aria-label="Refresh public matches">↻</button><div class="public-room-list">${result.rooms.map(r => `<article class="public-room"><div><strong>${esc(displayPlayerName(r.host))}’s room</strong><p>${esc(getMap(r.map).name)} · ${esc(mode(r.mode).name)}</p><span class="hint">${r.players}/${r.capacity} players · ${r.phase === "playing" ? "In progress" : r.phase === "results" ? "Between rounds" : "In lobby"}</span></div><button class="secondary" data-join-room="${esc(r.code)}" ${r.players >= r.capacity && !(r.mode==='royale'&&r.phase!=='lobby') ? "disabled" : ""}>${r.mode==='royale'&&r.phase!=='lobby'?"Spectate":r.players >= r.capacity ? "Full" : "Join"}</button></article>`).join('') || '<p class="empty-rooms">No public matches yet. Create a room and set it to public.</p>'}</div><button class="primary" data-action="setup">CREATE A ROOM</button>`, "public-rooms");
   } catch(e) {
     if (dialogType === "public-rooms" && request === roomListRequest) modal("Public matches", `<p class="error-box">${esc(e.message)}</p>${connectionButton}<button class="primary" data-action="refresh-rooms">Try again</button>`, "public-rooms");
   }
@@ -915,12 +973,12 @@ function renderLobby() {
   if(o.mode==='zonewars'){lobbyRenderKey=key;$('#lobby').innerHTML=titleBar()+zoneRoomMarkup(state,localId,net?.isHost,formatCode(net?.code||'--------'));return;}
   if(o.mode==='boxfight'){lobbyRenderKey=key;$('#lobby').innerHTML=titleBar()+boxRoomMarkup(state,localId,net?.isHost,formatCode(net?.code||'--------'));return;}
   if(o.mode==='zombies'){
-   lobbyRenderKey=key;$('#lobby').innerHTML=`${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility==='public'?'PUBLIC':'PRIVATE'} ZOMBIES</div><h2>BLACKTIDE EXTRACTION</h2><img class="z-room-art" src="./modes/blacktide-173.webp" alt="Blacktide Exclusion Coast"><p>Complete 3 contracts. Recover better gear. Call transport and extract.</p><div class="room-code">${formatCode(net?.code||'--------')}</div><div class="split-actions"><button data-action="copy-code">COPY CODE</button><button data-action="copy-link">COPY INVITE LINK</button></div><div class="roster">${roster.map(p=>`<div class="roster-row"><b>${esc(p.name)}${p.id===localId?' · YOU':''}</b><span>OPERATOR READY</span></div>`).join('')}</div><p>${roster.length} / ${o.capacity} operators · ${net?.visibility==='public'?'Deployment starts automatically.':'Your room leader starts the run.'}</p><p class="hint">25 minutes to explore, then 5 minutes to evacuate. Gold markers are contracts; green markers are extraction. Your squad can leave independently.</p>${zombiesLoadout(roster.find(p=>p.id===localId))}${net?.isHost?'<button class="primary" data-action="start-match">DEPLOY TO BLACKTIDE</button>':''}<button data-action="leave">BACK TO LOBBY</button></section>`;return;
+   lobbyRenderKey=key;$('#lobby').innerHTML=`${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility==='public'?'PUBLIC':'PRIVATE'} ZOMBIES</div><h2>BLACKTIDE EXTRACTION</h2><img class="z-room-art" src="./modes/blacktide-173.webp" alt="Blacktide Exclusion Coast"><p>Complete 3 contracts. Recover better gear. Call transport and extract.</p><div class="room-code">${formatCode(net?.code||'--------')}</div><div class="split-actions"><button data-action="copy-code">COPY CODE</button><button data-action="copy-link">COPY INVITE LINK</button></div><div class="roster">${roster.map(p=>`<div class="roster-row"><b>${esc(displayPlayerName(p.name))}${p.id===localId?' · YOU':''}</b><span>OPERATOR READY</span></div>`).join('')}</div><p>${roster.length} / ${o.capacity} operators · ${net?.visibility==='public'?'Deployment starts automatically.':'Your room leader starts the run.'}</p><p class="hint">25 minutes to explore, then 5 minutes to evacuate. Gold markers are contracts; green markers are extraction. Your squad can leave independently.</p>${zombiesLoadout(roster.find(p=>p.id===localId))}${net?.isHost?'<button class="primary" data-action="start-match">DEPLOY TO BLACKTIDE</button>':''}<button data-action="leave">BACK TO LOBBY</button></section>`;return;
   }
   const scrollTop = $("#lobby .lobby-panel")?.scrollTop || 0;
   lobbyRenderKey = key;
   $("#lobby").innerHTML =
-    `${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility === "public" ? "PUBLIC" : "PRIVATE"} ROOM</div><h2 style="margin-top:8px">${o.mode==='royale'?'Next stop: Ravel Coast.':'SQUAD ASSEMBLED.'}</h2>${o.mode==='royale'?`<p class="royale-queue" id="royale-queue">${queueText}</p>`:''}<div class="room-code">${formatCode(net?.code || "--------")}</div><div class="split-actions"><button class="plain" data-action="copy-code">Copy code</button><button class="plain" data-action="copy-link">Copy invite link</button></div><div class="lobby-meta"><strong>${getMap(o.map).name}</strong><span>·</span><span>${mode(o.mode).name}</span></div><div class="roster">${roster.map((p) => `<div class="roster-row"><b><span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>${esc(p.name)}${p.id === localId ? " (you)" : ""}</b><span>${p.bot ? "BOT" : weapon(p.weapon).name}</span>${net?.isHost && p.id !== localId && !p.bot ? `<button data-kick="${esc(p.id)}">Remove</button>` : ""}</div>`).join("")}</div><p class="hint" style="margin-bottom:18px">${net?.isHost ? `${o.bots} bots will fill available spots. The next player takes over if the host disconnects.` : "Waiting for the host to start. You can choose your loadout while you wait."}</p><p class="hint">${ruleSummary(o)}</p>${net?.isHost ? '<button class="secondary" data-action="match-settings">EDIT MATCH SETTINGS</button>' : ""}${visibilityButton()}<button class="plain" data-action="chat-controls">Player controls & quick chat</button><button class="plain" data-action="report-teaming">Report teaming</button><div class="room-bottom">${net?.isHost ? '<button class="primary" data-action="start-match">START MATCH</button>' : '<button class="primary" data-action="loadout">Choose loadout</button>'}<button class="plain" data-action="leave">Leave</button></div></section>`;
+    `${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility === "public" ? "PUBLIC" : "PRIVATE"} ROOM</div><h2 style="margin-top:8px">${o.mode==='royale'?'Next stop: Ravel Coast.':'SQUAD ASSEMBLED.'}</h2>${o.mode==='royale'?`<p class="royale-queue" id="royale-queue">${queueText}</p>`:''}<div class="room-code">${formatCode(net?.code || "--------")}</div><div class="split-actions"><button class="plain" data-action="copy-code">Copy code</button><button class="plain" data-action="copy-link">Copy invite link</button></div><div class="lobby-meta"><strong>${getMap(o.map).name}</strong><span>·</span><span>${mode(o.mode).name}</span></div><div class="roster">${roster.map((p) => `<div class="roster-row"><b><span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>${esc(displayPlayerName(p.name))}${p.id === localId ? " (you)" : ""}</b><span>${p.bot ? "BOT" : weapon(p.weapon).name}</span>${net?.isHost && p.id !== localId && !p.bot ? `<button data-kick="${esc(p.id)}">Remove</button>` : ""}</div>`).join("")}</div><p class="hint" style="margin-bottom:18px">${net?.isHost ? `${o.bots} bots will fill available spots. The next player takes over if the host disconnects.` : "Waiting for the host to start. You can choose your loadout while you wait."}</p><p class="hint">${ruleSummary(o)}</p>${net?.isHost ? '<button class="secondary" data-action="match-settings">EDIT MATCH SETTINGS</button>' : ""}${visibilityButton()}<button class="plain" data-action="chat-controls">Player controls & quick chat</button><button class="plain" data-action="report-teaming">Report teaming</button><div class="room-bottom">${net?.isHost ? '<button class="primary" data-action="start-match">START MATCH</button>' : '<button class="primary" data-action="loadout">Choose loadout</button>'}<button class="plain" data-action="leave">Leave</button></div></section>`;
   $("#lobby .lobby-panel").scrollTop = scrollTop;
 }
 function launchRound(){
@@ -988,14 +1046,14 @@ async function resume(capture = true) {
 }
 let spectateTarget = null,watchSent=null,watchSentAt=0,watcherIds=[],watcherRound=null;
 function updateSpectatorStatus(me,now){
- const requested=me?.spectating?spectateTarget:me?.health<=0?me.killerId:null;
+ const requested=ownerCamera.state?null:me?.spectating?spectateTarget:me?.health<=0?me.killerId:null;
  const target=state?.players?.some(p=>p.id===requested&&canSpectate(p,localId))?requested:null;
  if(me&&(target!==watchSent||now-watchSentAt>1500)){const action='watch:'+(target||'');if(sim&&!sim.remote)sim.playerAction(localId,action);else net?.send({type:'player-action',action});watchSent=target;watchSentAt=now;}
  let node=document.getElementById('spectator-status');if(!node){node=document.createElement('div');node.id='spectator-status';node.setAttribute('role','status');document.getElementById('hud').append(node);}
  const round=(state?.royale?.matchId||'')+':'+state?.round;if(watcherRound!==round){watcherRound=round;watcherIds=[];}
  const people=screen==='game'&&me?.health>0&&!me.spectating?watchersFor(state,localId):[];
  const message=spectatorMessage(watcherIds,people);if(message)notice(message);watcherIds=people.map(p=>p.id);
- const text=people.length?'◉ '+people.length+' WATCHING · '+people.map(p=>p.name).join(', '):'';if(node.textContent!==text)node.textContent=text;node.hidden=!text;
+ const text=people.length?'◉ '+people.length+' WATCHING · '+people.map(p=>displayPlayerName(p.name)).join(', '):'';if(node.textContent!==text)node.textContent=text;node.hidden=!text;
  const eye=document.getElementById('royale-watch-count');if(eye){eye.textContent=String(people.length);eye.parentElement.hidden=!people.length;eye.parentElement.setAttribute('aria-label',people.length+' spectators watching you');}
 }
 
@@ -1040,7 +1098,7 @@ function pauseMenu() {
   );
 }
 function leave(confirm = false,notifyParty=true) {
-  ownerPanel.reset();
+  stopOwnerCamera();ownerPanel.reset();
   lastPreferenceSync='';actionToggles.reset();stopBlacktideNarration();stopBlackoutRecording();zombiesUI.clear();boxUI.clear();zoneUI.clear();
   const returningFromMatch=screen==='game';
   if(returningFromMatch)showLoading('RETURNING TO LOBBY','Closing the match connection and preparing your operator in the lobby.',{kind:'exit'});else hideLoading(true);
@@ -1081,7 +1139,7 @@ function leave(confirm = false,notifyParty=true) {
 }
 function scoresHTML(s = state) {
   if(s?.boxfight)return boxScoresMarkup(s,localId);
-  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Operator</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isTeamRoyale(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
+  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Operator</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(displayPlayerName(p.name))}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isTeamRoyale(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
 
   return `<table class="scores"><thead><tr><th>Operator</th><th>Elims</th><th>Downs</th><th>Score</th></tr></thead><tbody>${[
     ...(s?.players || []),
@@ -1089,7 +1147,7 @@ function scoresHTML(s = state) {
     .sort((a, b) => b.points - a.points || b.kills - a.kills)
     .map(
       (p) =>
-        `<tr class="${p.id === localId ? "local" : ""}"><td>${mode(s.options.mode).teams ? `<span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>` : ""}${esc(p.name)}${p.bot ? " · BOT" : ""}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${Math.floor(p.points)}</td></tr>`,
+        `<tr class="${p.id === localId ? "local" : ""}"><td>${mode(s.options.mode).teams ? `<span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>` : ""}${esc(displayPlayerName(p.name))}${p.bot ? " · BOT" : ""}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${Math.floor(p.points)}</td></tr>`,
     )
     .join("")}</tbody></table>`;
 }
@@ -1116,7 +1174,7 @@ function resultsMenu() {
 
   modal(
     state.royale ? wonRoyale(state,localId) ? p?.crownedVictory?"CROWNED VICTORY!":"FRONTIER SECURED!" : "Round complete" : "That’s a wrap.",
-    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(state.winner)}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${p?.crown&&wonRoyale(state,localId)?`<div class="crown-result">${CROWN_ICON}<strong>${p.crownedVictory?'CROWNED VICTORY · '+p.crownWins+' THIS SEASON':'VICTORY CROWN EARNED · CARRY IT INTO YOUR NEXT PUBLIC MATCH'}</strong></div><button data-action="emotes">CELEBRATE</button>`:''}${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${state.options.recurring?'<p>Next public round starts automatically in 10 seconds.</p>':sim&&!sim.remote || net?.isHost ? '<button class="primary" data-action="quick-rematch">REMATCH · SAME RULES</button><button data-action="rematch">CHANGE RULES</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">BACK TO LOBBY</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
+    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(displayWinner(state.winner))}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${p?.crown&&wonRoyale(state,localId)?`<div class="crown-result">${CROWN_ICON}<strong>${p.crownedVictory?'CROWNED VICTORY · '+p.crownWins+' THIS SEASON':'VICTORY CROWN EARNED · CARRY IT INTO YOUR NEXT PUBLIC MATCH'}</strong></div><button data-action="emotes">CELEBRATE</button>`:''}${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${state.options.recurring?'<p>Next public round starts automatically in 10 seconds.</p>':sim&&!sim.remote || net?.isHost ? '<button class="primary" data-action="quick-rematch">REMATCH · SAME RULES</button><button data-action="rematch">CHANGE RULES</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">BACK TO LOBBY</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
     "results",
   );
 }
@@ -1161,7 +1219,7 @@ function processEvents() {
     if (state.time - e.time > 1.6) continue;
     const echoed=(!sim||sim.remote)&&e.player===localId&&guestFire.confirm(e,performance.now()/1000);
     if(echoed)e.echoed=true;
-    const departed=departureFeed(e);if(departed){const row=document.createElement('div');row.className='kill-line checkout';row.innerHTML=esc(departed.name)+' <span>'+departed.text+'</span>';row.dataset.expire=String(performance.now()+5500);$('#feed').prepend(row);while($('#feed').children.length>4)$('#feed').lastChild.remove();}
+    const departed=departureFeed(e);if(departed){const row=document.createElement('div');row.className='kill-line checkout';row.innerHTML=esc(displayPlayerName(departed.name))+' <span>'+departed.text+'</span>';row.dataset.expire=String(performance.now()+5500);$('#feed').prepend(row);while($('#feed').children.length>4)$('#feed').lastChild.remove();}
     if(e.type==='afk-removed'){if(e.player===localId){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');return;}if(net?.isHost)net.kick(e.player);}
     if(e.type==='duo-marker'&&e.player!==localId&&e.team!==state.players.find(p=>p.id===localId)?.team)continue;
     if(e.type==='box-cue'){if(e.cue==='fight')sound.cue('round-start');else if(e.cue==='storm')sound.cue('storm-closing');else if(e.cue==='series-win'||e.cue==='round-win')sound.cue(e.winner===(state.options.boxFormat==='ffa'?localId:listener?.team)?'victory':'round-start');else if(e.cue==='siphon'&&e.player===localId)sound.cue('complete-mini');}
@@ -1179,7 +1237,7 @@ function processEvents() {
     if(!state.zombies)recordSeasonEvent(e,state,localId);if(['boss-defeated','relay-captured','rig-used','elimination','hit'].includes(e.type)&&e.player===localId){const earned=masteryRewards().filter(id=>!eggWallet.value.owned.includes(id));if(earned.length)eggWallet.change(w=>({...w,owned:[...new Set([...w.owned,...earned])]})).then(()=>toast('Season 1 cosmetic reward unlocked · Locker')).catch(()=>{});}
     if(e.type==='uplink-active')notice('UPLINK LIVE · '+e.name+' · Hold the marked area for bonus supplies',4000);
     if(e.type==='uplink-secured')notice((e.players?.includes(localId)?'SIGNAL SECURED · Open your supply cache':'UPLINK CLAIMED · '+e.name),3500);
-    if(e.type==='crown-picked-up'||e.type==='crown-dropped')notice(e.name+(e.type==='crown-picked-up'?' picked up a Victory Crown':' dropped a Victory Crown'));
+    if(e.type==='crown-picked-up'||e.type==='crown-dropped')notice(displayPlayerName(e.name)+(e.type==='crown-picked-up'?' picked up a Victory Crown':' dropped a Victory Crown'));
     if(e.type==='crown-victory'&&e.player===localId)notice(e.crowned?'CROWNED VICTORY · '+e.wins+' this season':'VICTORY CROWN EARNED');
     if(e.type==='boss-cache-open')notice(e.name.toUpperCase()+' UNLOCKED');
     if(e.type==='boss-interrupted'&&e.player===localId)notice('ROOK’S WINCH INTERRUPTED');
@@ -1227,7 +1285,7 @@ function processEvents() {
       const row = document.createElement("div");
       row.className = "kill-line" + (e.player === localId ? " me" : "");
       const ally=id=>teammates(state.options,me,state.players.find(p=>p.id===id))?"◆ ":"";
-      row.innerHTML = `${ally(e.player)}${esc(e.name)} <span>${esc(e.weapon)}</span> ${ally(e.target)}${esc(e.targetName)}`;
+      row.innerHTML = `${ally(e.player)}${esc(displayPlayerName(e.name))} <span>${esc(e.weapon)}</span> ${ally(e.target)}${esc(displayPlayerName(e.targetName))}`;
       row.dataset.expire = String(performance.now() + 5500);
       $("#feed").prepend(row);
       while ($("#feed").children.length > 4) $("#feed").lastChild.remove();
@@ -1236,7 +1294,7 @@ function processEvents() {
         showFrontMessage($('#elimination-notice'),eliminationNotice(e,!!state.royale));eliminationUntil=performance.now()+2600;
       }
       if (e.target === localId)
-        $("#respawn-by").textContent = `Tagged by ${e.name} · ${e.weapon}`;
+        $("#respawn-by").textContent = `Tagged by ${displayPlayerName(e.name)} · ${e.weapon}`;
     }
     if (e.type === "player-action" && e.player === localId) {
       $("#respawn-by").textContent = e.action === "respawn" ? "Returning to a fresh spawn" : "";
@@ -1320,7 +1378,7 @@ function hud() {
     p.health <= 0 && !p.spectating && state.phase === "playing" ? "block" : "none";
   const killer = p.health <= 0 && state.players.find(k => k.id === p.killerId);
   hudText($("#spectator-stats"), killer
-    ? `${killer.health > 0 ? "Spectating" : "Eliminated"} ${killer.name} · Health ${Math.ceil(killer.health)} · ${gun(killer).name} · ${killer.kills} K / ${killer.deaths} D · ${Math.floor(killer.points)} pts`
+    ? `${killer.health > 0 ? "Spectating" : "Eliminated"} ${displayPlayerName(killer.name)} · Health ${Math.ceil(killer.health)} · ${gun(killer).name} · ${killer.kills} K / ${killer.deaths} D · ${Math.floor(killer.points)} pts`
     : "");
   const watching = !!p.spectating && state.phase === "playing";
   $("#spectate-panel").hidden = !watching;
@@ -1328,7 +1386,7 @@ function hud() {
   $('#spectate-panel [data-action=rejoin]').hidden=!!p.friendSpectator||!!state.royale||!!state.zombies;
   const target = state.players.find(k => k.id === spectateTarget);
   hudText($("#spectate-info"), target && watching
-    ? `${target.name} · Health ${Math.ceil(target.health)} · ${state.royale?itemInfo(target.inventory?.[target.slot]).name:gun(target).name} · ${target.kills} K / ${target.deaths} D`
+    ? `${displayPlayerName(target.name)} · Health ${Math.ceil(target.health)} · ${state.royale?itemInfo(target.inventory?.[target.slot]).name:gun(target).name} · ${target.kills} K / ${target.deaths} D`
     : "Waiting for a player to spawn…");
   const delay = Math.max(0, Math.ceil(p.respawnAt - state.time));
   hudText($("#spawn-heading"), p.awaitingEntry ? "OPERATOR READY" : "OPERATOR ELIMINATED");
@@ -1435,7 +1493,7 @@ async function socialMenu(){
 }
 function friendNicknameMenu(id){
  const friend=socialModel?.friends.find(p=>p.id===id);if(!friend)return;
- modal('FRIEND NICKNAME',`<p>A private nickname for <strong>${esc(friend.name)}</strong>. Only you see it.</p><form id="friend-nickname-form"><label for="friend-nickname">NICKNAME</label><input id="friend-nickname" class="field" maxlength="128" value="${esc(friend.nickname||'')}" aria-describedby="friend-nickname-error" autocomplete="off"><p id="friend-nickname-error" role="alert"></p><div class="split-actions"><button class="primary" type="submit">SAVE NICKNAME</button><button type="button" id="friend-nickname-clear">REMOVE NICKNAME</button><button type="button" data-action="social">BACK</button></div></form>`,'friend-nickname');
+ modal('FRIEND NICKNAME',`<p>A private nickname for <strong>${esc(displayPlayerName(friend.name))}</strong>. Only you see it.</p><form id="friend-nickname-form"><label for="friend-nickname">NICKNAME</label><input id="friend-nickname" class="field" maxlength="128" value="${esc(friend.nickname||'')}" aria-describedby="friend-nickname-error" autocomplete="off"><p id="friend-nickname-error" role="alert"></p><div class="split-actions"><button class="primary" type="submit">SAVE NICKNAME</button><button type="button" id="friend-nickname-clear">REMOVE NICKNAME</button><button type="button" data-action="social">BACK</button></div></form>`,'friend-nickname');
  const field=$('#friend-nickname'),form=$('#friend-nickname-form');
  form.onsubmit=async e=>{e.preventDefault();const raw=field.value.trim(),checked=raw?validatePlayerName(raw,{nickname:true}):{ok:true,name:''};if(!checked.ok){$('#friend-nickname-error').textContent=checked.message;field.setAttribute('aria-invalid','true');field.focus();return;}const button=form.querySelector('[type=submit]');button.disabled=true;try{await party.request('friend-nickname',{id,nickname:checked.name});if(form.isConnected)await socialMenu();}catch(error){if(form.isConnected){$('#friend-nickname-error').textContent=error.message;button.disabled=false;}}};
  $('#friend-nickname-clear').onclick=()=>{field.value='';form.requestSubmit();};field.focus();field.select();
@@ -1446,7 +1504,7 @@ function receiveInvite(invite){
  if(document.querySelector(`[data-invitation-id="${invite.id}"]`))return;
  let tray=document.querySelector('.social-notifications');if(!tray){tray=document.createElement('div');tray.className='social-notifications';document.body.append(tray);}
  const node=document.createElement('aside');node.className='party-invitation';node.dataset.invitationId=invite.id;node.setAttribute('role','status');
- node.innerHTML=`<small>PARTY INVITATION · ${invite.size} / 4</small><strong>${esc(invite.name)} invited you</strong><button data-party-accept="${invite.id}">ACCEPT</button><button data-party-decline="${invite.id}">DECLINE</button>`;
+ node.innerHTML=`<small>PARTY INVITATION · ${invite.size} / 4</small><strong>${esc(displayPlayerName(invite.name))} invited you</strong><button data-party-accept="${invite.id}">ACCEPT</button><button data-party-decline="${invite.id}">DECLINE</button>`;
  tray.append(node);while(tray.children.length>3)tray.firstChild.remove();setTimeout(()=>node.remove(),Math.max(0,invite.expires-Date.now()));sound.cue('queue-found');
 }
 async function queueParty(custom=false,code=null){
@@ -1503,7 +1561,7 @@ function initializeParty(){
   'social-changed':scheduleSocialRefresh,
   'mode-counts':counts=>{for(const badge of document.querySelectorAll('[data-mode-population]')){const template=document.createElement('template');template.innerHTML=modePopulationMarkup(badge.dataset.modePopulation,counts);badge.replaceWith(template.content.firstElementChild);}},
   'party-notice':m=>/unavailable|interrupted|expired|failed|restricted|restor|reconnect/i.test(m.message)?errorToast(m.message):toast(m.message),
-  'friend-request':m=>{toast(m.name+' sent a friend request. Open Social to accept or decline.');sound.cue('queue-found');scheduleSocialRefresh();},
+  'friend-request':m=>{toast(displayPlayerName(m.name)+' sent a friend request. Open Social to accept or decline.');sound.cue('queue-found');scheduleSocialRefresh();},
   cancel:m=>{const wasJoining=busy||party?.party?.state==='queueing'||activeLaunch&&m.launchId===activeLaunch;activeLaunch=null;if(wasJoining&&(screen!=='menu'||net))leave(false,false);errorToast(m.message);if(screen==='menu')renderMenu();}
  });
 }
@@ -1535,10 +1593,12 @@ const actions = {
  },
  'report-teaming':async()=>{
   if(!party?.ready)return errorToast('Connect to report teaming.');
-  try{const roster=await party.request('teaming-roster');modal('Report teaming',`<p>Select the players cooperating against the rules and describe what you saw. Reports cannot cause an automatic ban; live enforcement uses server gameplay evidence.</p><form id="teaming-report-form"><div class="teaming-report-players">${roster.map(p=>`<label><input name="player" type="checkbox" value="${esc(p.id)}">${esc(p.name)}</label>`).join('')}</div><textarea class="field" name="notes" rows="4" minlength="15" maxlength="1000" required placeholder="What did these players do together?"></textarea><button type="submit">SEND REPORT</button><p role="status"></p></form>`,'teaming-report');$('#teaming-report-form').onsubmit=async e=>{e.preventDefault();const form=e.target,values=new FormData(form),button=form.querySelector('button'),status=form.querySelector('[role=status]');button.disabled=true;try{await party.request('teaming-report',{players:values.getAll('player'),notes:values.get('notes')});status.textContent='Report saved. Automatic fair-play checks continue during the match.';}catch(error){status.textContent=error.message;button.disabled=false;}};}catch(error){errorToast(error.message);}
+  try{const roster=await party.request('teaming-roster');modal('Report teaming',`<p>Select the players cooperating against the rules and describe what you saw. Reports cannot cause an automatic ban; live enforcement uses server gameplay evidence.</p><form id="teaming-report-form"><div class="teaming-report-players">${roster.map(p=>`<label><input name="player" type="checkbox" value="${esc(p.id)}">${esc(displayPlayerName(p.name))}</label>`).join('')}</div><textarea class="field" name="notes" rows="4" minlength="15" maxlength="1000" required placeholder="What did these players do together?"></textarea><button type="submit">SEND REPORT</button><p role="status"></p></form>`,'teaming-report');$('#teaming-report-form').onsubmit=async e=>{e.preventDefault();const form=e.target,values=new FormData(form),button=form.querySelector('button'),status=form.querySelector('[role=status]');button.disabled=true;try{await party.request('teaming-report',{players:values.getAll('player'),notes:values.get('notes')});status.textContent='Report saved. Automatic fair-play checks continue during the match.';}catch(error){status.textContent=error.message;button.disabled=false;}};}catch(error){errorToast(error.message);}
  },
  'feature-request':()=>{modal('Request a feature',`<p>Tell us what you would like to see in Ravelfront. Your request goes to the administrator’s private inbox.</p><form id="feature-request-form"><label for="feature-request-text">YOUR IDEA</label><textarea id="feature-request-text" class="field" rows="5" minlength="5" maxlength="1000" required placeholder="What would make the frontier better?"></textarea><button class="primary" type="submit">SEND REQUEST</button></form><p id="feature-request-status" role="status"></p>`,'feature-request');$('#feature-request-text').focus();$('#feature-request-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button'),status=$('#feature-request-status');button.disabled=true;status.textContent='Sending…';try{await party.request('feature-request',{text:$('#feature-request-text').value});if(form.isConnected){form.hidden=true;status.textContent='Request sent. Thank you for helping shape the frontier.';}}catch(error){if(form.isConnected){status.textContent=error.message;button.disabled=false;}}};},
  'owner-inbox':()=>{ownerConsole.inboxShowCleared=false;void ownerConsole.inbox();},
+ 'owner-camera-look':()=>{if(ownerCamera.state)Promise.resolve($('#world').requestPointerLock()).catch(()=>toast('Mouse capture is unavailable.'));},
+ 'owner-camera-exit':()=>stopOwnerCamera(),
  'end-spectate':()=>{matchEndUI.watch();paused=false;},
  'field-orders':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('FIELD OPERATIONS',fieldOrdersHTML(p,state.royale.operations)+fieldStatsHTML(p)+'<button class="primary" data-action="resume">RETURN TO GAME</button>','field-orders');},
  'match-stats':()=>{if(!state?.royale)return;const p=state.players.find(p=>p.id===localId);modal('MATCH STATS',`<p>${p?.place?'PLACEMENT #'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS</p><p>${esc(matchEarnings.status)} · ${matchEarnings.total||0} Marks</p>${fieldStatsHTML(p)}${scoresHTML()}<button class="primary" data-action="close">BACK TO MATCH</button>`,'royale-stats');},
@@ -1884,6 +1944,13 @@ document.addEventListener("keydown", (e) => {
   if(e.target.closest?.('[data-leaderboard-tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();menuModel();const metrics=rankingMetrics(currentLeaderboardMode());leaderboardTab=metrics[e.key==='Home'?0:e.key==='End'?metrics.length-1:(metrics.indexOf(leaderboardTab)+(e.key==='ArrowLeft'?-1:1)+metrics.length)%metrics.length];renderLeaderboard(true);void refreshLeaderboards(true);return;}
   if(screen==='game'&&!dialog.open&&!chat.opened&&!ownerPanel.interacting&&e.code==='Slash'&&!e.target.matches('input,select,textarea,[contenteditable=true]')){e.preventDefault();chat.open();chat.input.value='/';chat.input.oninput();return;}
   if (ownerPanel.interacting || chat.opened || e.target.matches("input,select,textarea,[contenteditable=true]")) return;
+  if(ownerCamera.state&&screen==='game'&&!paused&&!dialog.open){
+   if(e.code==='Escape'){e.preventDefault();if(!e.repeat){if(document.pointerLockElement)document.exitPointerLock();else stopOwnerCamera();}return;}
+   if(['forward','back','left','right','jump','crouch','sprint'].some(action=>settings.keybinds[action].includes(e.code))){
+    e.preventDefault();keys.add(e.code);return;
+   }
+   if(!settings.keybinds.chat.includes(e.code))return;
+  }
   if(screen==='game'&&!paused&&!dialog.open&&helicopterActions(state?.players.find(p=>p.id===localId),settings.keybinds,e.code).length){e.preventDefault();if(!e.repeat)pressControl(e.code);return;}
   const panel = screen==='game' && state?.royale && (!paused || ['royale-map','royale-inventory'].includes(dialogType))
     ? royalePanelAction(e.code, settings.keybinds, dialog.open ? dialogType : '') : null;
@@ -1935,7 +2002,7 @@ document.addEventListener("visibilitychange", () => {
 $("#world").addEventListener("mousedown", (e) => {
   if (screen !== "game" || paused || dialog.open || chat.opened || ownerPanel.interacting) return;
   e.preventDefault();
-  pressControl(`Mouse${e.button}`);
+  if(!ownerCamera.state)pressControl(`Mouse${e.button}`);
 });
 document.addEventListener("mouseup", (e) => {
   keys.delete(`Mouse${e.button}`);vehicleControlCodes.delete(`Mouse${e.button}`);
@@ -1953,6 +2020,10 @@ document.addEventListener("mousemove", (e) => {
     !document.pointerLockElement || chat.opened || ownerPanel.interacting
   )
     return;
+  if(ownerCamera.state){
+   ownerCamera.look(e.movementX*.002*settings.sensitivity,e.movementY*.002*settings.sensitivity*(settings.invert?-1:1));
+   return;
+  }
   if(e.movementX||e.movementY)lastEarnAction=performance.now();
   input.yaw -=
     e.movementX * 0.002 * settings.sensitivity * aimSensitivity();
@@ -2031,6 +2102,10 @@ look.addEventListener("pointerdown", (e) => {
 });
 look.addEventListener("pointermove", (e) => {
   if (!lookPosition) return;
+  if(ownerCamera.state){
+   ownerCamera.look((e.clientX-lookPosition.x)*.006*settings.sensitivity,(e.clientY-lookPosition.y)*.006*settings.sensitivity);
+   lookPosition={x:e.clientX,y:e.clientY};return;
+  }
   input.yaw -= (e.clientX - lookPosition.x) * 0.006 * settings.sensitivity * aimSensitivity();
   input.pitch = clamp(
     input.pitch - (e.clientY - lookPosition.y) * 0.006 * settings.sensitivity * aimSensitivity(),
@@ -2046,7 +2121,7 @@ document.addEventListener('pointerdown',e=>{
     e.preventDefault();
     button.setPointerCapture(e.pointerId);
     touch[button.dataset.touch] = true;
-    if (!paused && !dialog.open) queuedActions.add(button.dataset.touch);
+    if (!ownerCamera.state && !paused && !dialog.open) queuedActions.add(button.dataset.touch);
 });
 for(const event of ['pointerup','pointercancel','lostpointercapture'])document.addEventListener(event,e=>{const button=e.target.closest('[data-touch]');if(button)touch[button.dataset.touch]=false;});
 document.addEventListener("graphics-lost", () => {
@@ -2219,7 +2294,9 @@ function loop(now) {
   if(screen==='game'&&!document.hidden)connectionReport.performance.frame(framePacer.elapsedMs,net?.isHost?'host':net?'guest':'local',state?.options.mode||'unknown');
   processEvents();if(screen!=='game'){const afk=document.querySelector('#afk-warning');if(afk)afk.hidden=true;}
   const me = state?.players.find((p) => p.id === localId);
-  view.cinematic=matchEndUI.update(state,localId,screen==='game',now);
+  updateOwnerCamera(me,renderDt);
+  view.ownerCamera=ownerCamera.state;
+  view.cinematic=matchEndUI.update(state,localId,screen==='game'&&!ownerCamera.state,now);
   const startNow=document.getElementById('royale-start-now');if(startNow)startNow.textContent=controlLabel('startNow')+' · START NOW';if(startNow)startNow.hidden=!(screen==='game'&&state?.royale?.practice&&net?.isHost&&net?.visibility==='private'&&!net?.officialPublic);
   syncSocialActivity(me);
   document.body.classList.toggle('is-emoting',screen==='game'&&!!me?.emote);

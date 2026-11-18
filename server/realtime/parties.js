@@ -1,3 +1,4 @@
+import {activeContestant} from '../../src/player-population.js';
 import {syncJimStyle,acknowledgeJimStyle} from './jim-style.js';
 import {matchOptions} from '../../src/match-options.js';
 import {assertModeAvailable} from '../../src/mode-availability.js';
@@ -22,18 +23,57 @@ export class PartyService{
  publishPublicMatch(match){for(const u of this.users.values())this.send(u,{type:'public-match',match});}
  changed(){if(this.changeTimer)return;this.changeTimer=setTimeout(()=>{this.changeTimer=null;this.publishModeCounts();for(const u of this.users.values())this.send(u,{type:'social-changed'});},100);this.changeTimer.unref?.();}
  playingMode(u){
-  if(!this.connected(u))return null;
-  const session=(u.inMatch?u.sessions.get(u.matchSession):null)||u.sessions.get(u.ws);
-  if(session?.activity==='spectating'||u.spectateLaunch)return null;
-  if(u.inMatch){const peer=this.relay.peers.get(u.matchPeer),location=this.matchLocation(u);if(!peer?.ws||peer.ws.readyState!==1||!location)return null;if(location.room?.sim.players.get(location.watchId)?.spectating)return null;return ['royale','ffa','zonewars','boxfight','zombies'].includes(location.listing.mode)&&(location.listing.phase==='playing'||session?.activity==='in-match')?location.listing.mode:null;}
-  // Offline training and legacy code-joined rooms report activity over their
-  // authenticated social session. Never infer activity from a lobby selection.
-  return session?.activity==='in-match'&&['royale','ffa','zonewars','boxfight','zombies','training'].includes(session.mode)?session.mode:null;
+  if(!u)return null;
+  const location=this.matchLocation(u);
+  if(location){
+   if(location.peer.ws?.readyState!==1||u.spectateLaunch)return null;
+   const {room,watch,watchId,listing,session}=location;
+   if(room)return room.sim.phase==='playing'&&activeContestant(room.sim.players.get(watchId))?listing.mode:null;
+   if(watch?.activePlayers)return watch.phase==='playing'&&watch.activePlayers.has(watchId)?listing.mode:null;
+   return session?.activity==='in-match'&&(listing.phase==='playing'||listing.phase==='lobby')?listing.mode:null;
+  }
+  if(u.inMatch)return null;
+  // Training is local, so its authenticated, still-open game tab is the source.
+  return [...u.sessions].some(([ws,s])=>ws.readyState===1&&s.activity==='in-match'&&s.mode==='training')?'training':null;
  }
- modeCounts(){const counts={royale:0,ffa:0,zonewars:0,boxfight:0,zombies:0,training:0};for(const u of this.users.values()){const mode=this.playingMode(u),location=this.matchLocation(u);if(mode&&(location?.listing.public===true||mode==='training'&&!u.inMatch))counts[mode]++;}return counts;}
+ modeCounts(){
+  const counts={royale:0,ffa:0,zonewars:0,boxfight:0,zombies:0,training:0};
+  for(const user of this.users.values()){
+   const mode=this.playingMode(user);
+   if(Object.hasOwn(counts,mode))counts[mode]++;
+  }
+  return counts;
+ }
  publishModeCounts(){const counts=this.modeCounts(),key=JSON.stringify(counts);if(key===this.modeCountsKey)return;this.modeCountsKey=key;for(const u of this.users.values())this.send(u,{type:'mode-counts',counts});}
- matchLocation(u){if(!u?.inMatch)return null;const peer=this.relay.peers.get(u.matchPeer);if(!peer)return null;const room=this.relay.authority?.roomFor(peer),host=room?.hostPeer||this.relay.peers.get(`yolk-yard-v${VERSION}-${u.matchCode}`)||[peer,...peer.links.values()].find(p=>p.listing);if(!host?.listing||!['lobby','playing'].includes(host.listing.phase)||!(host.ws||host.virtualRoom))return null;return {key:host.id,listing:host.listing,room,watchId:room?peer.authorityId:peer.hostRecovery?.playerId||(peer.id===host.id?'host':peer.id)};}
- presence(id){const u=this.users.get(id);if(!this.connected(u))return 'offline';if(![...u.sessions].some(([ws,s])=>ws.readyState===1&&s.visible!==false))return 'away';const p=this.parties.get(u.party);if(p?.state==='queueing')return 'matchmaking';const selected=u.sessions.get(u.ws),reported=selected?.visible?selected.activity:null;if(reported==='spectating')return 'spectating';if(reported==='in-match')return 'in-match';if(u.inMatch){const location=this.matchLocation(u);if(u.spectateLaunch||location?.room?.sim.players.get(location.watchId)?.spectating)return 'spectating';if(!location||location.listing.phase==='lobby')return 'lobby';return 'in-match';}return p?.members.length>1?'in-party':'lobby';}
+ matchLocation(u){
+  if(!u)return null;
+  let peer=this.relay.peers.get(u.inMatch?u.matchPeer:null),session=u.sessions.get(u.matchSession);
+  if(!u.inMatch){
+   const entry=[...u.sessions].find(([ws,s])=>ws.readyState===1&&s.activity!=='lobby'&&s.gamePeer&&this.relay.peers.get(s.gamePeer)?.ws?.readyState===1);
+   session=entry?.[1];
+   peer=this.relay.peers.get(session?.gamePeer);
+  }
+  if(!peer)return null;
+  const room=this.relay.authority?.roomFor(peer);
+  const host=room?.hostPeer||(u.inMatch&&this.relay.peers.get(`yolk-yard-v${VERSION}-${u.matchCode}`))||
+   this.relay.peers.get(peer.hostReady?.address)||[peer,...peer.links.values()].find(p=>p.listing);
+  if(!host?.listing||!['lobby','playing','results'].includes(host.listing.phase)||!(host.ws||host.virtualRoom))return null;
+  const watch=this.relay.hostWatchdog?.rooms.get(host.id);
+  const watchId=room?peer.authorityId:peer.hostRecovery?.playerId||(peer.id===host.id?(watch?.hostId||'host'):peer.id);
+  return {key:host.id,listing:host.listing,room,watchId,watch,peer,session};
+ }
+ presence(id){
+  const u=this.users.get(id);
+  if(!this.connected(u))return 'offline';
+  const party=this.parties.get(u.party);
+  if(party?.state==='queueing')return 'matchmaking';
+  if(this.playingMode(u))return 'in-match';
+  const location=this.matchLocation(u);
+  if(location?.peer.ws?.readyState===1&&location.listing.phase!=='results'&&
+    (u.spectateLaunch||location.session?.activity==='spectating'||location.room?.sim.players.get(location.watchId)?.spectating||
+     location.watch?.phase==='playing'&&location.watch.activePlayers&&!location.watch.activePlayers.has(location.watchId)))return 'spectating';
+  return [...u.sessions].some(([ws,s])=>ws.readyState===1&&s.visible!==false)?'lobby':'away';
+ }
  card(viewer,id){const identity=this.store.identities.get(id);if(!identity)return null;const u=this.users.get(id),p=this.parties.get(u?.party),available=this.connected(u)&&p?.state==='idle'&&!this.store.blocked(viewer,id);return {id,name:identity.profile.name,nickname:this.store.nickname(viewer,id),code:displayCode(identity.code),presence:this.presence(id),playingMode:this.playingMode(u),lastOnline:identity.lastOnline||identity.created,relationship:this.store.status(viewer,id),partySize:p?.members.length||0,spectatable:this.store.friends.get(viewer)?.has(id)&&!this.store.blocked(viewer,id)&&!!this.matchLocation(u),inviteable:available,joinable:available&&p.privacy==='open'&&p.members.length<PARTY_LIMIT,party:available&&p.privacy==='open'?p.id:undefined};}
  social(u,m={}){const friends=[...(this.store.friends.get(u.id)||[])].map(id=>this.card(u.id,id)).filter(Boolean),requests=[...this.store.requests.values()].filter(r=>r.from===u.id||r.to===u.id).map(r=>({...r,player:this.card(u.id,r.from===u.id?r.to:r.from),direction:r.to===u.id?'incoming':'outgoing'}));const offset=Math.max(0,Math.min(100000,Math.floor(Number(m.offset)||0))),eligible=[...this.users.values()].filter(v=>v.id!==u.id&&this.connected(v)&&!this.store.blocked(u.id,v.id)).sort((a,b)=>a.id.localeCompare(b.id));return {self:this.card(u.id,u.id),friends,requests,blocked:[...(this.store.blocks.get(u.id)||[])].map(id=>this.card(u.id,id)).filter(Boolean),online:eligible.slice(offset,offset+25).map(v=>this.card(u.id,v.id)),offset,total:eligible.length,invitations:[...this.invites.values()].filter(i=>i.to===u.id&&i.expires>Date.now()).map(i=>this.inviteView(i))};}
  limit(u,key,count,window){u.limits??=new Map();const now=Date.now(),times=(u.limits.get(key)||[]).filter(t=>now-t<window);if(times.length>=count)throw Error('Please wait before trying that again.');times.push(now);u.limits.set(key,times);}
@@ -95,7 +135,10 @@ if(this.relay.deployment)this.send(user,{type:'deployment',deployment:this.relay
    case 'death-report':this.limit(u,'death-report',5,10*60000);return this.relay.fairPlay.reports.death(u,m);
    case 'teaming-report':this.limit(u,'teaming-report',3,15*60000);return this.relay.fairPlay.report(u,m);
    case 'ping':return {presence:this.presence(u.id)};
-   case 'presence':{const session=u.sessions.get(ws);if(session){if(typeof m.visible==='boolean')session.visible=m.visible;if(session.visible){session.activeAt=Date.now();u.ws=ws;}if(['lobby','in-match','spectating'].includes(m.activity)){session.activity=m.activity;session.mode=['royale','ffa','zonewars','boxfight','zombies','training'].includes(m.mode)?m.mode:null;}}if(!session?.visible&&u.ws===ws){const active=[...u.sessions].filter(([w,s])=>w.readyState===1&&s.visible).sort((a,b)=>(b[1].activeAt||0)-(a[1].activeAt||0))[0];if(active)u.ws=active[0];}this.sync(p);return {presence:this.presence(u.id)};}
+   case 'presence':{const session=u.sessions.get(ws);if(session){if(typeof m.visible==='boolean')session.visible=m.visible;if(session.visible){session.activeAt=Date.now();u.ws=ws;}if(['lobby','in-match','spectating'].includes(m.activity)){session.activity=m.activity;session.mode=['royale','ffa','zonewars','boxfight','zombies','training'].includes(m.mode)?m.mode:null;
+     const peer=m.activity==='lobby'||typeof m.peerId!=='string'?null:this.relay.peers.get(m.peerId);
+     const progressId=peer&&this.relay.progression?.identity?.(m.progressToken);
+     session.gamePeer=progressId&&progressId===peer.progressId?peer.id:null;}}if(!session?.visible&&u.ws===ws){const active=[...u.sessions].filter(([w,s])=>w.readyState===1&&s.visible).sort((a,b)=>(b[1].activeAt||0)-(a[1].activeAt||0))[0];if(active)u.ws=active[0];}this.sync(p);return {presence:this.presence(u.id)};}
    case 'problem-report':{const reportKey=typeof m.reportId==='string'&&/^[a-zA-Z0-9-]{8,64}$/.test(m.reportId)?m.reportId:null;const previous=reportKey&&this.store.featureRequests.find(r=>r.player===u.id&&r.reportKey===reportKey);if(previous)return {id:previous.id,created:previous.created};this.limit(u,'problems',4,15*60000);if(typeof m.text!=='string'||!m.text.startsWith('[PROBLEM REPORT]'))throw Error('Invalid problem report.');const result=this.store.featureRequest(u.id,m.text,reportKey);this.relay.owner?.recordTicket(this.store.featureRequests.find(r=>r.id===result.id));return result;}
    case 'feature-request':{this.limit(u,'features',3,15*60000);const result=this.store.featureRequest(u.id,m.text);this.relay.owner?.recordTicket(this.store.featureRequests.find(r=>r.id===result.id));return result;}
    case 'feature-updates':this.limit(u,'feature-read',30,60000);return this.store.featureUpdates(u.id);
@@ -122,7 +165,7 @@ if(this.relay.deployment)this.send(user,{type:'deployment',deployment:this.relay
    case 'join':{const dest=this.parties.get(m.id);if(dest?.privacy!=='open')throw Error('This party is invite-only.');return this.join(u,m.id);}
    case 'leave':if(p.members.length<=1)throw Error('You are already in your own party.');this.leave(u);return;
    case 'kick':{leader();if(p.state==='playing')throw Error('Return to the lobby first.');const v=this.users.get(m.id);if(!v||v.party!==p.id||v.id===u.id)throw Error('Invalid member.');this.leave(v,'removed');return;}
-   case 'returned':delete u.tournamentLaunch;if(u.inMatch&&u.matchSession!==ws&&u.sessions.has(u.matchSession)&&this.relay.peers.get(u.matchPeer)?.ws)throw Error('This player is in a match in another tab.');this.relay.authority?.capacity?.release(p.id);if(u.spectateLaunch){this.relay.authority?.capacity?.release(u.spectateLaunch.id);this.tickets.delete(u.ticket);delete u.spectateLaunch;}this.tickets.delete(u.ticket);delete u.ticket;const session=u.sessions.get(ws);if(session){session.activity='lobby';session.mode=null;}u.ready=false;u.inMatch=false;delete u.matchPeer;delete u.joined;if(p.state==='queueing')this.cancel(p,'Party returned to the lobby.');else{if(!p.members.some(id=>this.users.get(id).inMatch)){p.state='idle';delete p.launch;}this.sync(p);}return;
+   case 'returned':delete u.tournamentLaunch;if(u.inMatch&&u.matchSession!==ws&&u.sessions.has(u.matchSession)&&this.relay.peers.get(u.matchPeer)?.ws)throw Error('This player is in a match in another tab.');this.relay.authority?.capacity?.release(p.id);if(u.spectateLaunch){this.relay.authority?.capacity?.release(u.spectateLaunch.id);this.tickets.delete(u.ticket);delete u.spectateLaunch;}this.tickets.delete(u.ticket);delete u.ticket;const session=u.sessions.get(ws);if(session){session.activity='lobby';session.mode=null;session.gamePeer=null;}u.ready=false;u.inMatch=false;delete u.matchPeer;delete u.joined;if(p.state==='queueing')this.cancel(p,'Party returned to the lobby.');else{if(!p.members.some(id=>this.users.get(id).inMatch)){p.state='idle';delete p.launch;}this.sync(p);}return;
    case 'cancel':leader();if(p.state==='playing')throw Error('Return to the lobby before finding another match.');this.cancel(p);return;
    case 'tournament-join':this.limit(u,'tournament',12,60000);if(u.sessions.get(ws)?.visible!==false)u.ws=ws;return this.relay.tournament.queue(u,m);
    case 'queue':leader();idle();for(const id of p.members)this.relay.iconVoting?.assertCanPlay(id);if(u.sessions.get(ws)?.visible!==false)u.ws=ws;return queueMatch(this,u,m);
@@ -145,6 +188,6 @@ if(this.relay.deployment)this.send(user,{type:'deployment',deployment:this.relay
  dispatch(p,skipHost=false){if(!p.launch)return;for(const id of p.members){if(skipHost&&id===p.leader)continue;const u=this.users.get(id),ticket=this.tickets.get(u.ticket);if(!ticket||ticket.dispatched||u.joined===p.launch.id)continue;ticket.dispatched=true;this.send(u,{type:'launch',launch:{...p.launch,host:false,ticket:u.ticket}});}}
  publicAdmission(t){if(!t)return null;return {...(t.tournament?{tournament:true,eventId:t.eventId,reconnect:t.reconnect}:{}),code:t.code,partyId:t.reservationId||t.party,memberId:t.member,partySize:t.partySize,teamFill:t.teamFill,duoFill:t.teamFill,teamSize:t.teamSize,...(t.spectator?{spectator:true,publicSpectator:!!t.publicSpectator,watchId:t.watchId}:{}),...(t.exactMatch?{exactMatch:t.exactMatch}:{}),...(t.recurring?{recurring:true}:{}),...(t.hostRun?{hostRun:true}:{}),...(t.friend?{friendSpectator:true}:{})};}
  claim(token,peer,room){const t=this.tickets.get(token);if(t?.friend){const viewer=this.users.get(t.member),friend=this.users.get(t.friend);if(!this.store.friends.get(t.member)?.has(t.friend)||this.store.blocked(t.member,t.friend)||this.matchLocation(friend)?.key!==room||!viewer)return null;}if(!t||t.expires<(t.tournament?this.relay.tournament.now():Date.now())||room!==`yolk-yard-v${VERSION}-${t.code}`||t.peer&&t.peer!==peer)return null;if(!t.peer){try{this.relay.iconVoting?.assertCanPlay(t.member);}catch{return null;}}if(t.tournament&&!this.relay.tournament.claim(t,this.relay.peers.get(peer)))return null;if(t.exactMatch&&!t.peer){const target=this.relay.publicHost?.roomByAddress(room),server=this.relay.authority?.rooms.get(room);if(target?target.state?.matchId!==t.exactMatch||!target.summary().joinable||!target.summary().hostReady:!server||server.visibility!=='public'||server.sim.matchId!==t.exactMatch||!server.sim.acceptsJoining?.())return null;}if(!t.tournament){try{this.relay.tournament?.assertNormal(room);}catch{return null;}}const listing=this.relay.peers.get(room)?.listing,selection=this.parties.get(t.party)?.selection;try{this.relay.owner?.assertAdmission(t.member,listing?.mode||selection?.mode,listing?listing.public===false?'private':'public':selection?.access||'private');}catch{return null;}t.peer=peer;t.claimedAt=Date.now();return this.publicAdmission(t);}
- sweep(){const now=Date.now();for(const [id,i]of this.invites)if(i.expires<now){this.invites.delete(id);this.changed();}for(const [id,t]of this.tickets)if(t.expires<(t.tournament?this.relay.tournament.now():now))this.tickets.delete(id);for(const u of [...this.users.values()]){for(const [ws,s]of u.sessions){if(now-s.seen>HEARTBEAT_TIMEOUT)ws.terminate();else if(ws.readyState===1&&now-(s.lastPing||0)>15000){s.lastPing=now;ws.ping();}}if(!this.connected(u)&&u.disconnectedAt&&now-u.disconnectedAt>RECONNECT_GRACE){this.detachMember(u,{solo:false,reason:'timeout'});this.users.delete(u.id);continue;}const current=this.presence(u.id);if(current!==u.lastPresence){u.lastPresence=current;this.changed();}if(u.inMatch&&!this.relay.peers.has(u.matchPeer)){u.inMatch=false;const p=this.parties.get(u.party);if(p&&!p.members.some(id=>this.users.get(id)?.inMatch)){p.state='idle';delete p.launch;}this.sync(p);}}for(const p of this.parties.values())if(p.state==='queueing'&&now-p.launch?.created>(p.launch?.serverAuthority?90000:35000))this.cancel(p,'Matchmaking timed out. Try again.');this.publishModeCounts();}
+ sweep(){const now=Date.now();for(const [id,i]of this.invites)if(i.expires<now){this.invites.delete(id);this.changed();}for(const [id,t]of this.tickets)if(t.expires<(t.tournament?this.relay.tournament.now():now))this.tickets.delete(id);for(const u of [...this.users.values()]){for(const [ws,s]of u.sessions){if(now-s.seen>HEARTBEAT_TIMEOUT)ws.terminate();else if(ws.readyState===1&&now-(s.lastPing||0)>15000){s.lastPing=now;ws.ping();}}if(!this.connected(u)&&u.disconnectedAt&&now-u.disconnectedAt>RECONNECT_GRACE&&!this.playingMode(u)){this.detachMember(u,{solo:false,reason:'timeout'});this.users.delete(u.id);continue;}const current=this.presence(u.id);if(current!==u.lastPresence){u.lastPresence=current;this.changed();}if(u.inMatch&&!this.relay.peers.has(u.matchPeer)){u.inMatch=false;const p=this.parties.get(u.party);if(p&&!p.members.some(id=>this.users.get(id)?.inMatch)){p.state='idle';delete p.launch;}this.sync(p);}}for(const p of this.parties.values())if(p.state==='queueing'&&now-p.launch?.created>(p.launch?.serverAuthority?90000:35000))this.cancel(p,'Matchmaking timed out. Try again.');this.publishModeCounts();}
  close(){clearInterval(this.timer);clearTimeout(this.changeTimer);for(const u of this.users.values())for(const ws of u.sessions.keys())ws.close(1001,'Server restarting');return this.store.flush();}
 }

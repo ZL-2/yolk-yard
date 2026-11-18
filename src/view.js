@@ -1,3 +1,4 @@
+import {displayPlayerName} from './display-player-name.js';
 import {updateIconGear} from './icon-bundle-models.js';
 import {GpuFrameTimer} from './gpu-frame-timer.js';
 import {DamageNumbers} from './damage-numbers.js';
@@ -750,7 +751,7 @@ export class View {
     if(playing&&state?.royale?.practice&&!state.options.training)this.prepareBattleMap();
     this.world.visible=playing;const dark=playing&&!!state?.zombies;this.hemi.intensity=dark?1.65:2.25;this.hemi.color.setHex(dark?0x9ecbd3:0xe5f4ff);this.hemi.groundColor.setHex(dark?0x304c54:0x88a16a);this.sun.intensity=dark?1.5:2.2;this.sun.color.setHex(dark?0xaacbd8:0xfff3de);
     updateEnvironmentSurfaces(this.clock);
-    if(playing){const detailQuality=this.detailPressure?'low':this.settings.quality;updateTerrainEnvironment(this.world,this.clock,detailQuality);this.world.userData.groundCover?.update(predicted||local,{quality:detailQuality,time:this.clock});}
+    if(playing){const detailQuality=this.detailPressure?'low':this.settings.quality;updateTerrainEnvironment(this.world,this.clock,detailQuality);this.world.userData.groundCover?.update(this.ownerCamera||predicted||local,{quality:detailQuality,time:this.clock});}
     if(this.lobbyVisible!==!playing){this.lobbyVisible=!playing;const map=getMap(state?.options.map||'yard'),sky=playing?map.sky:0xaac1df;this.scene.background=new THREE.Color(sky);this.scene.fog=new THREE.Fog(playing&&map.theme==='royale'?0xc1e6f0:sky,playing?(map.theme==='royale'?280:72):35,playing?(map.theme==='royale'?1050:175):125);}
     if (this.menuEgg) this.menuEgg.visible = !playing;
     if(this.lobbyStage)this.lobbyStage.visible=!playing;
@@ -900,6 +901,13 @@ export class View {
       if(this.camera.near!==near){this.camera.near=near;this.camera.updateProjectionMatrix();}
       if(!cameraBoom)this.cameraBoom=null;
     }
+    if(playing&&this.ownerCamera){
+      const {x,y,z,yaw,pitch}=this.ownerCamera;
+      this.camera.position.set(x,y,z);
+      this.camera.rotation.set(pitch,yaw,0,'YXZ');
+      this.camera.fov=75;this.camera.near=.15;this.camera.updateProjectionMatrix();
+      this.scopeActive=false;this.gunGroup.visible=false;this.cameraBoom=null;
+    }
     if (state) {
       const seen = new Set();
       this.camera.updateMatrixWorld();
@@ -940,7 +948,7 @@ export class View {
           aura.position.y=.95;model.add(aura);model.userData.bonusAura=aura;
           model.userData.signature = sig;if(p.boss)decorateBoss(model,p);
           const name = label(
-            p.name,
+            displayPlayerName(p.name),
             teammates(state.options,p,local)
               ? teamStyle(state.players,p).color
               : p.boss?"#ffda82":"#ffffff",

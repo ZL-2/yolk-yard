@@ -1,3 +1,4 @@
+import {displayPlayerName} from './display-player-name.js';
 import {isPrivateCommand} from './private-commands.js';
 import { ChatInbox, QUICK_MESSAGES, REPORT_REASONS } from './chat.js';
 import { CHAT_LIMIT, safeName, SAFETY_MESSAGES } from './moderation.js';
@@ -99,7 +100,7 @@ export class ChatPanel {
 
   messageNode(row) {
     const node=el('div',undefined,'chat-message');node.dataset.chatId=String(row.id);
-    const head=el('div',undefined,'chat-message-head');head.append(el('b',safeName(row.name)),el('span',row.channel==='team'?'TEAM':row.channel==='spectators'?'SPECTATORS':'ROOM'));
+    const head=el('div',undefined,'chat-message-head');head.append(el('b',displayPlayerName(safeName(row.name))),el('span',row.channel==='team'?'TEAM':row.channel==='spectators'?'SPECTATORS':'ROOM'));
     node.append(head,el('p',row.text));return node;
   }
   renderLog() {
@@ -138,7 +139,7 @@ export class ChatPanel {
     const list=this.panel.querySelector('.chat-players');list.replaceChildren();
     for(const p of ctx.state?.players||[]) {
       if(p.bot||p.id===ctx.localId)continue;
-      const row=el('div',undefined,'chat-player');row.append(el('b',safeName(p.name)));
+      const row=el('div',undefined,'chat-player');row.append(el('b',displayPlayerName(safeName(p.name))));
       const buttons=el('div',undefined,'chat-player-actions');
       const muted=this.inbox.muted.has(p.id),mute=el('button',muted?'Unmute':'Mute');mute.type='button';mute.dataset.mute=p.id;
       mute.onclick=()=>{this.inbox.mute(p.id,!muted);this.peek.replaceChildren();this.peek.hidden=true;this.renderLog();this.update();};buttons.append(mute);

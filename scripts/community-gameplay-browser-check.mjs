@@ -11,7 +11,7 @@ const vite=await createServer({server:{host:'127.0.0.1',port:5297,strictPort:tru
 const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:.6});page.setDefaultTimeout(90000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.route('**/network-config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.YOLK_NETWORK={relay:"ws://127.0.0.1:5297/game"};'}));
-await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Gift Sender'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,musicVolume:0,fpsLimit:30}));});
+await page.addInitScript(()=>{localStorage.setItem('yolk-profile',JSON.stringify({name:'Zach'}));localStorage.setItem('yolk-settings',JSON.stringify({quality:'low',volume:0,musicVolume:0,fpsLimit:30}));});
 try{
  await page.goto(origin+'/?qa=1');
  const opening=page.locator('.blackout-briefing[open]');
@@ -22,6 +22,7 @@ try{
  await opening.getByRole('button',{name:'RETURN TO LOBBY'}).click();
  await page.reload();
  await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
+ await page.locator('.yard-character-label strong').filter({hasText:'Zach ⟨/⟩'}).waitFor();
  await page.waitForFunction(()=>!document.querySelector('.blackout-briefing[open]'));
  for(const [title,close] of [
   ['AFTER THE SIGNAL','Close Season 2 briefing'],
@@ -48,6 +49,6 @@ try{
  await page.locator('[data-shop-category=all]').click();
  await page.locator('[data-shop-item=bundle-jim-icon]').first().click();await page.locator('[data-shop-gift-start]').click();await page.locator('.shop-gift-code').fill(code);await page.locator('[data-shop-gift-quote]').click();await page.locator('[data-shop-gift-send]').waitFor();assert.match(await page.locator('.shop-gift').innerText(),/Gift Receiver/);await page.screenshot({path:out+'/gift-confirm.png'});await page.locator('[data-shop-gift-send]').click();await page.waitForFunction(()=>document.querySelector('.shop-detail-notice')?.textContent.includes('Gift delivered'));
  assert.ok(f.app.relay.economy.view(recipient.id).owned.includes('outfit-jim-normal'));assert.equal(f.app.relay.economy.view(creator.id).balance,450);assert.equal(f.app.relay.economy.view(sender).balance,2300);await page.screenshot({path:out+'/gift-delivered.png'});
- const record=f.app.relay.economy.view(recipient.id);assert.match(record.notifications[0].data.reason,/Gift Sender/);
+ const record=f.app.relay.economy.view(recipient.id);assert.match(record.notifications[0].data.reason,/Zach/);
  assert.deepEqual(errors,[]);console.log('PASS real gift UI, recipient confirmation, atomic debit, delivery and creator earnings');
 }catch(e){await page.screenshot({path:out+'/failure.png'}).catch(()=>{});throw e;}finally{await browser.close();await vite.close();await f.close();}
