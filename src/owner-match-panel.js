@@ -1,4 +1,4 @@
-import {displayPlayerName} from './display-player-name.js';
+import {displayPlayerName,playerNameMarkup} from './display-player-name.js';
 import {OWNER_CAMERA_ACTIONS} from './owner-free-camera.js';
 import {OWNER_GAMEPLAY} from './owner-gameplay.js';
 import {ROYALE_GUN_IDS} from './royale-data.js';
@@ -69,7 +69,7 @@ export class OwnerMatchPanel{
  }
  renderRoster(){
   const query=this.root.querySelector('.om-search').value.toLowerCase(),list=this.root.querySelector('.om-roster'),focus=document.activeElement?.dataset.player,scroll=list.scrollTop;
-  const rows=(this.data?.roster||[]).filter(p=>(p.name+' '+p.id).toLowerCase().includes(query));const html=rows.map(p=>`<button data-player="${esc(p.id)}" aria-pressed="${this.selected.has(p.id)}" ${this.busy?'disabled':''}><span class="om-check">${this.selected.has(p.id)?'✓':'○'}</span><span><b>${esc(displayPlayerName(p.name))}</b><small>${p.host?'HOST · ':''}${p.present?p.spectating?'Spectating':'In match':'Left match'}${p.mute?' · Text muted':''}${p.ban?' · Suspended':''}</small></span><code>${esc(p.id.slice(-6))}</code></button>`).join('')||'<p class="om-empty">No matching players.</p>';
+  const rows=(this.data?.roster||[]).filter(p=>(p.name+' '+p.id).toLowerCase().includes(query));const html=rows.map(p=>`<button data-player="${esc(p.id)}" aria-pressed="${this.selected.has(p.id)}" ${this.busy?'disabled':''}><span class="om-check">${this.selected.has(p.id)?'✓':'○'}</span><span><b>${playerNameMarkup(p.name)}</b><small>${p.host?'HOST · ':''}${p.present?p.spectating?'Spectating':'In match':'Left match'}${p.mute?' · Text muted':''}${p.ban?' · Suspended':''}</small></span><code>${esc(p.id.slice(-6))}</code></button>`).join('')||'<p class="om-empty">No matching players.</p>';
   if(list.innerHTML!==html){list.innerHTML=html;list.scrollTop=scroll;if(focus)list.querySelector(`[data-player="${CSS.escape(focus)}"]`)?.focus({preventScroll:true});}
   this.root.querySelector('.om-selection').textContent=this.selected.size?`${this.selected.size} selected · ${[...this.selected].map(id=>displayPlayerName(this.data?.roster.find(p=>p.id===id)?.name||'Player left')).join(', ')}`:'Select one or more players. Up to 8 per action.';
  }

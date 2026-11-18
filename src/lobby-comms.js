@@ -1,10 +1,10 @@
-import {displayPlayerName} from './display-player-name.js';
+import {displayPlayerName,playerNameNode} from './display-player-name.js';
 import {isPrivateCommand} from './private-commands.js';
 import './lobby-comms.css';
 const node=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el;};
 export class LobbyComms {
- constructor({party,ready}){
-  this.party=party;this.ready=ready;this.messages=[];this.updates=[];this.featureUpdates=[];this.grants=[];this.scopeKey='';this.partyKey='';this.readIds=new Set();this.unread=new Map();this.seenChat=new Set();
+ constructor({party,ready,ownerToken}){
+  this.party=party;this.ready=ready;this.ownerToken=ownerToken;this.messages=[];this.updates=[];this.featureUpdates=[];this.grants=[];this.scopeKey='';this.partyKey='';this.readIds=new Set();this.unread=new Map();this.seenChat=new Set();
   this.root=node('section','lobby-comms');this.root.hidden=true;this.root.setAttribute('aria-label','Lobby chat');
   this.toggle=node('button','lobby-chat-toggle','CHAT');this.toggle.setAttribute('aria-expanded','false');this.badge=node('span','lobby-chat-unread','0');this.badge.hidden=true;this.toggle.append(this.badge);this.controls=node('div','lobby-comms-actions');this.controls.append(this.toggle);this.root.append(this.controls);
   this.panel=node('div','lobby-chat-panel');this.panel.hidden=true;this.root.append(this.panel);
@@ -17,7 +17,7 @@ export class LobbyComms {
   this.toggle.onclick=()=>{this.panel.hidden=!this.panel.hidden;this.toggle.setAttribute('aria-expanded',String(!this.panel.hidden));if(!this.panel.hidden){this.markRead();void this.history();this.input.focus();}};
   this.select.onchange=()=>{this.scopeKey=this.select.value;this.markRead();void this.history();};
   this.input.autocomplete='off';this.input.oninput=()=>{this.input.type=isPrivateCommand(this.input.value)?'password':'text';this.input.spellcheck=!isPrivateCommand(this.input.value);};
-  this.form.onsubmit=async e=>{e.preventDefault();const text=this.input.value.trim();if(!text)return;if(isPrivateCommand(text)){this.input.value='';this.input.oninput();this.status.textContent='Private commands are not sent to chat. Owner match commands are available while playing.';return;}this.send.disabled=true;this.status.textContent='';try{const m=await this.party().request('lobby-chat',{...this.scope(),text});this.receive(m);this.input.value='';}catch(e){this.status.textContent=e.message;}finally{this.send.disabled=false;}};
+  this.form.onsubmit=async e=>{e.preventDefault();const text=this.input.value.trim();if(!text)return;if(isPrivateCommand(text)){this.input.value='';this.input.oninput();this.status.textContent='Private commands are not sent to chat. Owner match commands are available while playing.';return;}this.send.disabled=true;this.status.textContent='';try{const m=await this.party().request('lobby-chat',{...this.scope(),text,ownerToken:this.ownerToken?.()});this.receive(m);this.input.value='';}catch(e){this.status.textContent=e.message;}finally{this.send.disabled=false;}};
   this.dismiss.onclick=async()=>{const update=this.updates[0];if(!update)return;this.dismiss.disabled=true;try{const grant=update.kind==='marks-grant',next=await this.party().request(grant?'grant-ack':'feature-ack',{ids:[update.id]});this.readIds.add(update.id);if(grant)this.setGrants(next);else this.setUpdates(next);}catch(e){this.bannerBody.textContent=e.message;}finally{this.dismiss.disabled=false;}};
  }
  attachVoice(button){this.voiceButton=button;this.controls.append(button);}
@@ -30,7 +30,7 @@ export class LobbyComms {
  updateBadge(){const n=this.unread.size;this.badge.textContent=n>99?'99+':String(n);this.badge.hidden=!n;this.toggle.setAttribute('aria-label',n?'Chat, '+n+' unread messages':'Chat, no unread messages');for(const option of this.select.options){const key=option.value,count=[...this.unread.values()].filter(m=>key===m.channel||key==='private:'+(m.sender===this.party()?.id?m.to:m.sender)).length;option.textContent=(option.dataset.label||option.textContent)+(count?' ('+count+')':'');}}
  receive(m,render=true){if(!m?.id||isPrivateCommand(m.text))return;const fresh=!this.seenChat.has(m.id);this.seenChat.add(m.id);if(this.seenChat.size>500)this.seenChat.delete(this.seenChat.values().next().value);if(render&&fresh&&m.sender!==this.party()?.id&&!(this.visible()&&this.accepts(m)))this.unread.set(m.id,m);if(this.unread.size>500)this.unread.delete(this.unread.keys().next().value);if(this.accepts(m)&&!this.messages.some(x=>x.id===m.id)){this.messages.push(m);this.messages=this.messages.slice(-50);if(render)this.renderMessages();}if(this.visible())this.markRead();else this.updateBadge();}
  clear(channel){this.messages=this.messages.filter(m=>m.channel!==channel);for(const [id,m]of this.unread)if(m.channel===channel)this.unread.delete(id);this.renderMessages();this.updateBadge();}
- renderMessages(){this.log.replaceChildren();for(const m of this.messages){const row=node('div','lobby-chat-row');row.append(node('b',null,displayPlayerName(m.name)),node('span',null,m.text));this.log.append(row);}if(!this.messages.length)this.log.append(node('p','lobby-chat-empty','Start a conversation. Keep it friendly.'));this.log.scrollTop=this.log.scrollHeight;}
+ renderMessages(){this.log.replaceChildren();for(const m of this.messages){const row=node('div','lobby-chat-row');row.append(playerNameNode(m.name),node('span',null,m.text));this.log.append(row);}if(!this.messages.length)this.log.append(node('p','lobby-chat-empty','Start a conversation. Keep it friendly.'));this.log.scrollTop=this.log.scrollHeight;}
  setGrants(grants){this.grants=grants||[];this.setUpdates(this.featureUpdates);}
  setUpdates(updates){this.featureUpdates=updates||[];this.updates=[...this.featureUpdates,...this.grants].filter(x=>!this.readIds.has(x.id));const u=this.updates[0];if(u){this.bannerTitle.textContent=u.kind==='marks-grant'?'MARKS RECEIVED':u.kind==='completed'?'YOUR REQUEST IS COMPLETE':'A RESPONSE TO YOUR REQUEST';this.bannerRequest.textContent=u.request;this.bannerBody.textContent=u.body;this.dismiss.textContent=this.updates.length>1?'GOT IT · NEXT':'GOT IT';}}
  async connected(){try{this.setUpdates(await this.party().request('feature-updates'));if(!this.panel.hidden)await this.history();}catch{}}

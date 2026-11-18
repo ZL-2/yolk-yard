@@ -60,7 +60,7 @@ export class PartyService{
   if(!host?.listing||!['lobby','playing','results'].includes(host.listing.phase)||!(host.ws||host.virtualRoom))return null;
   const watch=this.relay.hostWatchdog?.rooms.get(host.id);
   const watchId=room?peer.authorityId:peer.hostRecovery?.playerId||(peer.id===host.id?(watch?.hostId||'host'):peer.id);
-  return {key:host.id,listing:host.listing,room,watchId,watch,peer,session};
+  return {key:host.id,listing:host.listing,room,watchId,watch,peer,session,roomChat:host.roomChat};
  }
  presence(id){
   const u=this.users.get(id);
@@ -145,6 +145,7 @@ if(this.relay.deployment)this.send(user,{type:'deployment',deployment:this.relay
    case 'feature-ack':this.limit(u,'feature-read',30,60000);return this.store.acknowledgeFeatures(u.id,m.ids);
    case 'grant-ack':this.limit(u,'grant-read',60,60000);return this.relay.owner.acknowledgeGrants(u.id,m.ids);
    case 'competitive-career':this.limit(u,'career-read',30,60000);return this.relay.tournament.career(u.id);
+   case 'developer-match-chat':return this.lobbyChat.matchDeveloper(u,m);
    case 'lobby-chat':return this.lobbyChat.submit(u,m);
    case 'lobby-history':this.limit(u,'chat-history',30,60000);return this.lobbyChat.history(u,m);
    case 'profile':{const checked=validatePlayerName(m.profile?.name);if(!checked.ok)throw Error(checked.message);const profile=this.relay.progression.rankRewards.sanitize(safeProfile({...m.profile,name:checked.name}),u.id);u.profile=this.relay.economy?this.relay.economy.sanitize(profile,u.id):profile;this.store.identities.get(u.id).profile=u.profile;this.store.save();this.relay.progression.leaderboardCache=null;this.sync(p);return;}

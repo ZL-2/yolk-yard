@@ -145,3 +145,37 @@ test('reports have fixed reasons, verified participants and duplicate limits',()
   assert.equal(room.report('absent','host','behavior',state),null);
   assert.equal(room.report('a','b','made-up',state),null);
 });
+
+test('only verified developer chat bypasses the text filter and stays scoped to its channel',async()=>{
+ const {LobbyChat}=await import('../server/realtime/lobby-chat.js');
+ const {playerNameMarkup}=await import('../src/display-player-name.js');
+ const owner={id:'dev',profile:{name:'Zach'}},ally={id:'ally'},enemy={id:'enemy'},outside={id:'outside'};
+ const players=[{id:'a',name:'Zach',team:0},{id:'b',name:'Allied',team:0},{id:'c',name:'Enemy',team:1}];
+ const listing={code:'ROOM',mode:'teams'},roomChat={matchId:'m1',enabled:true,players,muted:new Set()},peer={ws:{readyState:1}};
+ const messages=[];
+ const service={
+  users:new Map([owner,ally,enemy,outside].map(u=>[u.id,u])),
+  relay:{owner:{authorized:(_req,{token})=>token==='verified',assertChat:()=>{},controls:{}}},
+  presence:()=> 'lobby',parties:new Map(),
+  store:{blocked:()=>false},
+  limit:()=>{},send:(user,message)=>messages.push({user:user.id,...message}),
+  matchLocation:u=>({key:u===outside?'other':'room',listing,roomChat,watchId:{dev:'a',ally:'b',enemy:'c',outside:'b'}[u.id],peer})
+ };
+ const chat=new LobbyChat(service),text='fuck';
+ assert.throws(()=>chat.submit(owner,{channel:'universal',text}),/friendly/);
+ assert.equal(chat.submit(owner,{channel:'universal',text,ownerToken:'verified'}).text,text);
+ const request={code:'ROOM',matchId:'m1',channel:'team',text};
+ assert.throws(()=>chat.matchDeveloper(owner,{...request,developer:true}),/Unlock developer/);
+ assert.throws(()=>chat.matchDeveloper(owner,{...request,ownerToken:'verified',text:'/owner 123456789012'}),/enter a message/);
+ messages.length=0;
+ chat.matchDeveloper(owner,{...request,ownerToken:'verified'});
+ assert.deepEqual(messages.map(m=>m.user),['dev','ally']);
+ const inbox=new ChatInbox(),state={options:{mode:'teams'},players};
+ assert.equal(inbox.accept({id:1,sender:'a',channel:'team',text,version:FILTER_VERSION},state,'b'),null);
+ assert.equal(inbox.acceptDeveloper(messages[0].message,state,'c'),null);
+ assert.equal(inbox.acceptDeveloper(messages[0].message,state,'b','quick'),null);
+ assert.equal(inbox.acceptDeveloper(messages[0].message,state,'b').text,text);
+ inbox.mute('a');assert.equal(inbox.acceptDeveloper({...messages[0].message,id:'dev:next'},state,'b'),null);
+ assert.match(playerNameMarkup('Zach'),/<svg.+Developer/);
+ assert.equal(playerNameMarkup('<Zach>'),'&lt;Zach&gt;');
+});

@@ -1,4 +1,4 @@
-import {displayPlayerName} from './display-player-name.js';
+import {playerNameNode} from './display-player-name.js';
 import {isPrivateCommand} from './private-commands.js';
 import { ChatInbox, QUICK_MESSAGES, REPORT_REASONS } from './chat.js';
 import { CHAT_LIMIT, safeName, SAFETY_MESSAGES } from './moderation.js';
@@ -76,23 +76,30 @@ export class ChatPanel {
   feedback(result) {
     if(result?.ok)return;
     const seconds=Math.min(120,Number(result?.retryAfter)||0);
-    this.status.textContent=(SAFETY_MESSAGES[result?.reason]||'Message could not be sent.')+(seconds?` Try again in ${seconds}s.`:'');
+    this.status.textContent=(result?.message||SAFETY_MESSAGES[result?.reason]||'Message could not be sent.')+(seconds?` Try again in ${seconds}s.`:'');
     if(seconds)this.nextSend=Math.max(this.nextSend,Date.now()+seconds*1000);
   }
-  send(quick) {
+  async send(quick) {
     if(!quick&&isPrivateCommand(this.input.value)){const command=this.input.value;this.input.value='';this.input.oninput();this.callbacks.privateCommand?.(command);this.close();return;}
     const ctx=this.context();
     if(ctx.preference==='off'||(ctx.preference==='quick'&&!quick))return;
+    if(this.pendingSend)return;
     if(Date.now()<this.nextSend){this.feedback({reason:'slow',retryAfter:Math.ceil((this.nextSend-Date.now())/1000)});return;}
-    const result=this.callbacks.send({channel:this.channel.value,text:this.input.value,...(quick?{quick}:{})});
+    const original=this.input.value,inbox=this.inbox;
+    this.pendingSend=true;
+    let result;
+    try{result=await this.callbacks.send({channel:this.channel.value,text:original,...(quick?{quick}:{})});}
+    catch{result={ok:false,reason:'disconnected'};}
+    finally{this.pendingSend=false;}
+    if(this.inbox!==inbox)return;
     if(result?.ok){
       this.nextSend=Date.now()+1100; this.status.textContent='';
-      this.input.value='';this.input.oninput();if(!quick)this.close();
+      if(this.input.value===original){this.input.value='';this.input.oninput();if(!quick)this.close();}
     } else this.feedback(result);
   }
-  receive(message) {
+  receive(message,developer=false) {
     const ctx=this.context();
-    const row=this.inbox.accept(message,ctx.state,ctx.localId,ctx.preference);
+    const row=developer?this.inbox.acceptDeveloper(message,ctx.state,ctx.localId,ctx.preference):this.inbox.accept(message,ctx.state,ctx.localId,ctx.preference);
     if(!row)return;
     this.renderLog();
     this.log.scrollTop=this.log.scrollHeight;
@@ -100,7 +107,7 @@ export class ChatPanel {
 
   messageNode(row) {
     const node=el('div',undefined,'chat-message');node.dataset.chatId=String(row.id);
-    const head=el('div',undefined,'chat-message-head');head.append(el('b',displayPlayerName(safeName(row.name))),el('span',row.channel==='team'?'TEAM':row.channel==='spectators'?'SPECTATORS':'ROOM'));
+    const head=el('div',undefined,'chat-message-head');head.append(playerNameNode(safeName(row.name)),el('span',row.channel==='team'?'TEAM':row.channel==='spectators'?'SPECTATORS':'ROOM'));
     node.append(head,el('p',row.text));return node;
   }
   renderLog() {
@@ -139,7 +146,7 @@ export class ChatPanel {
     const list=this.panel.querySelector('.chat-players');list.replaceChildren();
     for(const p of ctx.state?.players||[]) {
       if(p.bot||p.id===ctx.localId)continue;
-      const row=el('div',undefined,'chat-player');row.append(el('b',displayPlayerName(safeName(p.name))));
+      const row=el('div',undefined,'chat-player');row.append(playerNameNode(safeName(p.name)));
       const buttons=el('div',undefined,'chat-player-actions');
       const muted=this.inbox.muted.has(p.id),mute=el('button',muted?'Unmute':'Mute');mute.type='button';mute.dataset.mute=p.id;
       mute.onclick=()=>{this.inbox.mute(p.id,!muted);this.peek.replaceChildren();this.peek.hidden=true;this.renderLog();this.update();};buttons.append(mute);

@@ -1,10 +1,12 @@
 import {isPrivateCommand} from '../../src/private-commands.js';
 import {randomUUID} from 'node:crypto';
+import {audienceFor,chatChannel,developerChatText} from '../../src/chat.js';
 import {moderateText,CHAT_LIMIT} from '../../src/moderation.js';
 // Ephemeral, bounded histories. Party membership and authenticated identity,
 // never a caller-provided recipient list, authorize both reads and sends.
 export class LobbyChat {
  constructor(service){this.service=service;this.rooms=new Map();}
+ developerAuthorized(token){return !!this.service.relay.owner?.authorized({headers:{}},{token});}
  scope(u,m){
   const s=this.service,p=s.parties.get(u.party),channel=m.channel;
   if(channel==='universal')return {key:'universal',channel,ids:null};
@@ -12,6 +14,36 @@ export class LobbyChat {
   if(channel==='party')return {key:p.id,channel,ids:p.members};
   if(channel==='private'&&m.to!==u.id&&p.members.includes(m.to)&&!s.store.blocked(u.id,m.to))return {key:p.id+':'+[u.id,m.to].sort().join(':'),channel,ids:[u.id,m.to],to:m.to};
   throw Error('Choose someone in your current party.');
+ }
+ matchDeveloper(u,m){
+  const s=this.service,owner=s.relay.owner;
+  if(!this.developerAuthorized(m.ownerToken))throw Error('Unlock developer access to send this message.');
+  owner.assertChat(u.id);
+  const location=s.matchLocation(u);
+  if(!location||location.peer.ws?.readyState!==1)throw Error('Connect to a match to send this message.');
+  const {listing,room,roomChat,watchId,key}=location;
+  const matchId=room?.sim.matchId||roomChat?.matchId;
+  const settings=room?.chat||roomChat;
+  const players=room?[...room.sim.players.values()]:settings?.players||[];
+  const sender=players.find(p=>p.id===watchId&&!p.bot);
+  const state={players,options:room?.sim.options||listing};
+  if(listing.code!==m.code||matchId!==m.matchId||!sender)throw Error('Your match is still connecting.');
+  if(settings.enabled===false||settings.muted?.has(watchId))throw Error('Chat is unavailable in this room.');
+  const channel=chatChannel(sender,m.channel,state),text=developerChatText(m.text);
+  if(!channel||!text||(channel==='team'&&sender.team==null))throw Error('Choose a chat channel and enter a message.');
+  const at=Date.now(),last=u.lastDeveloperChat,slow=Math.max(1,owner.controls.chatSlowSeconds||0);
+  if(last&&at-last.at<slow*1000)throw Error('Wait before sending another chat message.');
+  if(last?.text===text&&at-last.at<20000)throw Error('Please avoid repeating messages.');
+  s.limit(u,'developer-match-chat',5,10000);
+  u.lastDeveloperChat={at,text};
+  const recipients=new Set(audienceFor(sender,channel,state));
+  const message={id:'dev:'+randomUUID(),sender:watchId,channel,text};
+  for(const v of s.users.values()){
+   const target=s.matchLocation(v);
+   if(target?.key===key&&target.peer.ws?.readyState===1&&recipients.has(target.watchId)&&!s.store.blocked(u.id,v.id))
+    s.send(v,{type:'developer-match-chat',code:listing.code,matchId,message});
+  }
+  return {ok:true};
  }
  history(u,m){const scope=this.scope(u,m),now=Date.now();return {channel:scope.channel,to:scope.to,messages:(this.rooms.get(scope.key)||[]).filter(x=>now-x.at<30*60000&&!isPrivateCommand(x.text)&&!this.service.store.blocked(u.id,x.sender))};}
  submit(u,m){
@@ -21,7 +53,8 @@ export class LobbyChat {
   const slow=s.relay.owner?.controls.chatSlowSeconds||0;if(slow&&u.lastLobbyChat&&Date.now()-u.lastLobbyChat.at<slow*1000)throw Error('Chat slow mode: wait '+Math.ceil(slow-(Date.now()-u.lastLobbyChat.at)/1000)+' seconds.');
   s.limit(u,'lobby-chat',5,10000);const scope=this.scope(u,m);
   if(typeof m.text!=='string'||m.text.length>CHAT_LIMIT)throw Error('Write a shorter message.');
-  const result=moderateText(m.text);if(!result.ok)throw Error('Please keep chat friendly and avoid personal information.');
+  const devText=this.developerAuthorized(m.ownerToken)?developerChatText(m.text):null;
+  const result=devText?{ok:true,text:devText}:moderateText(m.text);if(!result.ok)throw Error('Please keep chat friendly and avoid personal information.');
   if(u.lastLobbyChat?.text===result.text&&Date.now()-u.lastLobbyChat.at<20000)throw Error('Please avoid repeating messages.');
   const message={id:randomUUID(),sender:u.id,name:u.profile.name,channel:scope.channel,to:scope.to,text:result.text,at:Date.now(),party:scope.channel==='universal'?null:u.party};
   u.lastLobbyChat=message;

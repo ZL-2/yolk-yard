@@ -18,6 +18,11 @@ export function audienceFor(sender, channel, state) {
   return playersOf(state).filter(p => !p.bot && (channel === 'spectators' ? p.spectating :
     channel === 'team' ? !p.spectating && p.team === sender.team : true)).map(p => p.id);
 }
+export function developerChatText(text) {
+  if(typeof text!=='string'||text.length>CHAT_LIMIT||isPrivateCommand(text))return null;
+  return text.replace(/[\u0000-\u001f\u007f]/g,' ').trim()||null;
+}
+
 export function chatPayload(payload) {
   if (isPrivateCommand(payload?.text))return null;
   if (!payload || typeof payload !== 'object' || payload.version !== FILTER_VERSION ||
@@ -98,6 +103,17 @@ export class ChatInbox {
     this.recent.set(sender.id,recent);
     const row={id:message.id,sender:sender.id,name:safeName(sender.name),channel:message.channel,text:result.text,quick};
     this.rows.push(row); if(this.rows.length>60)this.rows.shift();
+    return row;
+  }
+  // Called exclusively for messages on the authenticated relay's social socket.
+  acceptDeveloper(message,state,localId,preference='all') {
+    if(preference!=='all'||!message||typeof message.id!=='string'||this.rows.some(row=>row.id===message.id))return null;
+    const sender=playersOf(state).find(p=>p.id===message.sender&&!p.bot);
+    const text=developerChatText(message.text);
+    if(!sender||!text||this.muted.has(sender.id)||!chatChannel(sender,message.channel,state)||
+       !audienceFor(sender,message.channel,state).includes(localId))return null;
+    const row={id:message.id,sender:sender.id,name:safeName(sender.name),channel:message.channel,text};
+    this.rows.push(row);if(this.rows.length>60)this.rows.shift();
     return row;
   }
   mute(id, muted=true) {

@@ -1,4 +1,4 @@
-import {displayPlayerName} from './display-player-name.js';
+import {displayPlayerName,playerNameMarkup} from './display-player-name.js';
 import {rankingMetrics} from './royale-ranking.js';
 import {RANKING_MODES} from './ranking-modes.js';
 const html=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -6,7 +6,7 @@ const count=n=>Math.max(0,Math.floor(Number(n)||0)).toLocaleString('en-US');
 export function leaderboardMarkup({leaderboards,leaderboardTab='kills',leaderboardMode='royale',leaderboardError='',leaderboardPending=false,profile,expanded=false}){
  const royale=leaderboardMode==='royale',metrics=rankingMetrics(leaderboardMode),metric=metrics.includes(leaderboardTab)?leaderboardTab:metrics[0],board=leaderboards?.[metric],rows=board?.rows||[];
  const suffix=expanded?'-full':'',ranksId='leaderboard-ranks'+suffix,total=board?.total??rows.length,offset=board?.offset||0;
- const row=p=>`<li class="frontier-rank ${royale?'royale-rank-row':''} ${p.rank<=3?'podium podium-'+p.rank:''} ${p.you?'is-you':''}"><span class="frontier-rank-number">${p.rank?'#'+p.rank:'—'}</span><strong title="${html(displayPlayerName(p.name))}">${html(displayPlayerName(p.name))}${p.you?'<small>YOU</small>':''}</strong><b class="${royale?'royale-score-value':''}">${count(p[royale?'rating':metric])}</b>${royale?`<b>${count(p.wins)}</b><b>${count(p.kills)}</b>`:''}</li>`;
+ const row=p=>`<li class="frontier-rank ${royale?'royale-rank-row':''} ${p.rank<=3?'podium podium-'+p.rank:''} ${p.you?'is-you':''}"><span class="frontier-rank-number">${p.rank?'#'+p.rank:'—'}</span><strong title="${html(displayPlayerName(p.name))}">${playerNameMarkup(p.name)}${p.you?'<small>YOU</small>':''}</strong><b class="${royale?'royale-score-value':''}">${count(p[royale?'rating':metric])}</b>${royale?`<b>${count(p.wins)}</b><b>${count(p.kills)}</b>`:''}</li>`;
  const self=board?.self||{name:profile.name,rank:0,kills:0,wins:0,you:true};
  const showSelf=!self.rank||!rows.some(p=>p.rank===self.rank);
  return `<div class="frontier-board-heading"><span class="frontier-trophy" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10v7a5 5 0 0 1-10 0V3ZM7 5H3v3a4 4 0 0 0 4 4m10-7h4v3a4 4 0 0 1-4 4M12 15v5m-4 1h8"/></svg></span><div><span class="eyebrow">${leaderboardMode==='training'?'PERSONAL PRACTICE':'PUBLIC MATCHES'}</span><h2>FRONTIER LEADERS</h2></div><div class="frontier-board-filter"><span class="frontier-board-live">${expanded?'RANKINGS':'TOP 25'}</span><select data-leaderboard-mode aria-label="Game mode for ${metric} rankings">${Object.entries(RANKING_MODES).map(([id,name])=>`<option value="${id}" ${id===leaderboardMode?'selected':''}>${name}</option>`).join('')}</select></div></div>

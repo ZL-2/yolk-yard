@@ -38,7 +38,7 @@ export class ZoneWarsSimulation extends BoxFightSimulation {
  interact(p,input,dt){
   // Only the authored spawn kit uses run-over pickup. Never auto-swap a full
   // inventory or re-collect equipment deliberately dropped by a player.
-  if(p.health>0&&!p.spectating)for(const item of nearbyItems(this,'loot',p,.72))if(item.zoneSlot&&Math.abs(item.y-p.y)<.5&&p.inventory.slice(1).some(i=>!i))this.takeLoot(p,item);
+  if(p.health>0&&!p.spectating&&p.inventory.includes(null,1))for(const item of nearbyItems(this,'loot',p,.72))if(item.zoneSlot&&Math.abs(item.y-p.y)<.5&&p.inventory.includes(null,1))this.takeLoot(p,item);
   super.interact(p,input,dt);
  }
  moveWithCommands(p,input,dt,commands){Simulation.prototype.moveWithCommands.call(this,p,input,dt,commands);const prepared=['prepare','waiting'].includes(this.boxStage);constrainZoneMovement(p,this.map,prepared);if(bounceZonePad(p,this.map,prepared))this.emit('royale-cue',{player:p.id,cue:'launch',x:p.x,y:p.y,z:p.z});const damage=fallDamage(p.landing);if(damage)this.damage(p,null,damage,'Fall');}

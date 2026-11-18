@@ -466,9 +466,9 @@ export class Network {
     if(this.serverAuthority){if(this.isHost)this.authorityCommand({type:'chat-muted',id,muted});return;}
     if(!this.isHost || id===this.id || !this.connections.has(id))return;
     if(muted)this.chatRoom.muted.add(id); else this.chatRoom.muted.delete(id);
-    this.chatMuted=[...this.chatRoom.muted];
+    this.chatMuted=[...this.chatRoom.muted];this.publishRoom();
   }
-  setChatEnabled(enabled) { if(this.serverAuthority){if(this.isHost)this.authorityCommand({type:'chat-enabled',enabled});return;} if(this.isHost)this.chatEnabled=this.chatRoom.enabled=!!enabled; }
+  setChatEnabled(enabled) { if(this.serverAuthority){if(this.isHost)this.authorityCommand({type:'chat-enabled',enabled});return;} if(this.isHost){this.chatEnabled=this.chatRoom.enabled=!!enabled;this.publishRoom();} }
   reportChat(target,reason) {
     if(this.serverAuthority){this.authorityCommand({type:'chat-report',target,reason});return;}
     if(this.isHost) {
@@ -492,7 +492,7 @@ export class Network {
     const humans=s?.players.filter(p=>!p.bot&&!p.lateSpectator)||[];
     const activePlayers=s?.phase==='playing'?s.players.filter(activeContestant).map(p=>p.id):[];
     const capacity=s?.royale?Math.min(s.options.capacity,MAX_HUMANS):(s?.options.capacity||8);
-    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,boxFormat:s.options.boxFormat,public:this.visibility==='public',players:humans.length,capacity,phase:s.boxfight?s.phase:s.royale?.accepting?"lobby":s.phase,hostId:this.id,watch:{phase:s.phase,time:s.time,matchId:s.royale?.matchId||s.matchId,activePlayers},...(this.officialPublic?{recurring:true,hostId:this.id,publicState:{stage:s.boxfight?(s.phase==='results'?'finished':'box-'+s.boxfight.stage):s.royale?.stage||(s.phase==='results'?'finished':'arena'),phase:s.phase,time:s.time,queueEnds:s.royale?.queueEnds||0,elapsed:s.royale?.elapsed||0,round:s.round,matchId:s.royale?.matchId||s.matchId,alive:s.royale?.alive||humans.length,botPlayers:s.players.filter(p=>p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).length,contestants:s.players.filter(p=>!p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).map(p=>p.id),estimatedSeconds:s.phase==='results'?Math.max(0,Math.ceil((s.publicRestartAt||s.time+10)-s.time)):Math.max(0,Math.ceil(s.royale?(s.royale.matchEnd||600)+20-s.royale.elapsed:s.remaining))}}:{})} : null;
+    const listing=s ? {version:VERSION,code:this.code,host:s.players.find(p=>p.id === this.id)?.name || "Operator",map:s.options.map,mode:s.options.mode,teamSize:s.options.teamSize||1,contestantCapacity:s.options.capacity,boxFormat:s.options.boxFormat,public:this.visibility==='public',players:humans.length,capacity,phase:s.boxfight?s.phase:s.royale?.accepting?"lobby":s.phase,hostId:this.id,watch:{phase:s.phase,time:s.time,matchId:s.royale?.matchId||s.matchId,activePlayers,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,chatPlayers:s.players.filter(p=>!p.bot).map(p=>[p.id,p.team,!!p.spectating])},...(this.officialPublic?{recurring:true,hostId:this.id,publicState:{stage:s.boxfight?(s.phase==='results'?'finished':'box-'+s.boxfight.stage):s.royale?.stage||(s.phase==='results'?'finished':'arena'),phase:s.phase,time:s.time,queueEnds:s.royale?.queueEnds||0,elapsed:s.royale?.elapsed||0,round:s.round,matchId:s.royale?.matchId||s.matchId,alive:s.royale?.alive||humans.length,botPlayers:s.players.filter(p=>p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).length,contestants:s.players.filter(p=>!p.bot&&(p.contestant||!s.royale&&!p.lateSpectator)).map(p=>p.id),estimatedSeconds:s.phase==='results'?Math.max(0,Math.ceil((s.publicRestartAt||s.time+10)-s.time)):Math.max(0,Math.ceil(s.royale?(s.royale.matchEnd||600)+20-s.royale.elapsed:s.remaining))}}:{})} : null;
     if(relayURL()){const relay=this.aliasPeer?.id===PREFIX+this.code?this.aliasPeer:this.peer;relay?.publish?.(this.visibility==='public'||relay.protocol===2?listing:null);}
     else directory.publish(this.visibility==='public'?listing:null);
   }
@@ -509,23 +509,27 @@ export class Network {
     }
     this.maxConnections=(state.royale?Math.min(state.options.capacity,MAX_HUMANS):8)-1+MAX_SPECTATORS;
     state = {...state, visibility:this.visibility,chatEnabled:this.chatEnabled,chatMuted:this.chatMuted,network:{hostId:this.id,members:this.members,chatSequence:this.chatRoom.sequence}};
-    const worldVersion=checkpointWorldKey(state);
+    const zoneWars=state.options.mode==='zonewars',now=performance.now();
+    const worldVersion=checkpointWorldKey(state,{builds:!zoneWars});
+    const pendingBuilds=zoneWars&&state.royale?.buildVersion!==this.checkpointBuildVersion;
     // Commit ownership changes with their recovery state: host departure must
     // never restore a chest or pickup from before its last accepted transaction.
-    const checkpointDue=performance.now()-(this.lastCheckpointSent||0)>3000||worldVersion!==this.checkpointWorldVersion;
+    const checkpointAge=now-(this.lastCheckpointSent||0);
+    const checkpointDue=checkpointAge>3000||worldVersion!==this.checkpointWorldVersion||pendingBuilds&&checkpointAge>=250;
     let checkpoint;
-    if(checkpointDue){this.lastCheckpointSent=performance.now();this.checkpointWorldVersion=worldVersion;checkpoint={simulation:this.callbacks.getCheckpoint?.(),chat:{sequence:this.chatRoom.sequence,enabled:this.chatEnabled,muted:this.chatMuted,members:[...this.chatRoom.members],reports:[...this.chatRoom.reports]},kicked:[...this.kicked]};}
+    if(checkpointDue){this.lastCheckpointSent=now;this.checkpointWorldVersion=worldVersion;this.checkpointBuildVersion=state.royale?.buildVersion;checkpoint={simulation:this.callbacks.getCheckpoint?.(),chat:{sequence:this.chatRoom.sequence,enabled:this.chatEnabled,muted:this.chatMuted,members:[...this.chatRoom.members],reports:[...this.chatRoom.reports]},kicked:[...this.kicked]};}
     const recipients=[...this.connections.values()];
     // A congested recipient gets this checkpoint on its next accepted frame.
     // Keep one shared reference instead of duplicating the world in the queue.
     if(checkpoint)for(const conn of recipients)conn.pendingCheckpoint=checkpoint;
+    const playersById=new Map(state.players.map(p=>[p.id,p]));
     const offset=(this.broadcastCursor||0)%Math.max(1,recipients.length);
     this.broadcastCursor=offset+1;
     // Shared-socket backpressure must not repeatedly favor the first seats.
     for (let i=0;i<recipients.length;i++) {
       const conn=recipients[(i+offset)%recipients.length];
       if (!conn.open || (conn.dataChannel?.bufferedAmount || 0) >= 131072) continue;
-      const recipient=state.players.find(p=>p.id===conn.peer);
+      const recipient=playersById.get(conn.peer);
       let outgoing=state;
       const cursor={};
       if(state.royale){

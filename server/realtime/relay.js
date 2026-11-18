@@ -139,6 +139,12 @@ export class RealtimeRelay {
         this.send(peer,{type:'publish-rejected'});return;
       }
       peer.listing=r?{code:r.code,version:r.version,host:String(r.host||'Operator').slice(0,32),map:String(r.map||'').slice(0,24),mode:r.mode,players:r.players,capacity:Math.max(2,Math.min(MAX_HUMANS,Number(r.capacity)||8)),contestantCapacity:Math.max(2,Math.min(MAX_CONTESTANTS,Number(r.contestantCapacity)||8)),teamSize:[2,3,4].includes(r.teamSize)?r.teamSize:1,boxFormat:r.mode==='boxfight'&&r.boxFormat==='ffa'?'ffa':'teams',public:!!this.publicHost.roomByAddress(peer.id),hostRun:true,recurring:!!this.publicHost.roomByAddress(peer.id),phase:r.phase}:null;
+      const chat=r?.watch;
+      peer.roomChat=typeof chat?.matchId==='string'&&Array.isArray(chat.chatPlayers)&&chat.chatPlayers.length<=MAX_HUMANS+MAX_SPECTATORS
+       ?{matchId:chat.matchId.slice(0,80),enabled:chat.chatEnabled!==false,
+         muted:new Set((Array.isArray(chat.chatMuted)?chat.chatMuted:[]).slice(0,MAX_HUMANS+MAX_SPECTATORS)),
+         players:chat.chatPlayers.filter(row=>Array.isArray(row)&&typeof row[0]==='string'&&row[0].length<=100)
+          .map(([id,team,spectating])=>({id,team:Number.isInteger(team)?team:null,spectating:spectating===true}))}:null;
       this.hostWatchdog?.publish(peer,r);peer.listedAt=Date.now();return;
     }
     if(m.type==='connect'){

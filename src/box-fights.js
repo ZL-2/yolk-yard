@@ -4,6 +4,7 @@ import {BOX_RULES as R,BOX_ARENAS,BOX_LOADOUTS,boxSpawn,boxTeam,constrainBoxMove
 import {boxMap} from './box-fight-map.js';
 import {matchOptions} from './match-options.js';
 import {weapon,gun,clamp,nameKey} from './data.js';
+import {placeLoot,supportBelow,validLootPoint} from './royale-loot.js';
 import {inventory,resetBuilding,rebuildMap,buildingTick,constructionTick} from './building.js';
 import {resetStance} from './stance.js';
 import {resetAirborne} from './airborne.js';
@@ -109,7 +110,23 @@ export class BoxFightSimulation extends RoyaleSimulation {
   const hp=victim.health,total=hp+(victim.shield||0);super.damage(victim,attacker,amount,source,precision,shotId);
   if(attacker&&attacker!==victim){attacker.boxDamage=(attacker.boxDamage||0)+Math.max(0,total-victim.health-(victim.shield||0));if(hp>0&&victim.health<=0&&attacker.health>0){attacker.boxRoundKills++;const heal=Math.min(this.rules.siphon,100-attacker.health);attacker.health+=heal;attacker.shield=Math.min(100,attacker.shield+this.rules.siphon-heal);attacker.materials.wood=Math.min(this.rules.woodCap,attacker.materials.wood+this.rules.woodReward);this.emit('box-cue',{cue:'siphon',player:attacker.id});}}
  }
- eliminate(p){if(p.eliminated)return;p.eliminated=true;p.spectating=true;p.eliminatedAt=this.time;p.flight='out';p.building=false;p.editing=false;p.use=null;p.reloadEnd=0;p.burstLeft=0;this.inputs.delete(p.id);this.remoteInputs.delete(p.id);this.alive=Math.max(0,this.alive-1);this.emit('box-eliminated',{player:p.id,round:this.boxRound});}
+ dropEliminationLoot(p){
+  const point={x:p.x,y:supportBelow(this.map,p.x,p.z,p.y),z:p.z};
+  // A landing area can fill up before a crowded fight ends. Preserve the
+  // remaining items together on reachable ground near the eliminated player.
+  const anchor=validLootPoint(this.map,point,.25)?point:placeLoot(this.map,point);
+  const fallback=p.boxSpawn||point;
+  const spot=anchor||{...fallback,y:supportBelow(this.map,fallback.x,fallback.z,fallback.y)};
+  const drop=item=>this.dropLoot(point,item)||this.spawnDroppedLoot(spot,item,spot);
+  for(let i=1;i<p.inventory.length;i++){
+   if(p.inventory[i])drop(p.inventory[i]);
+   p.inventory[i]=null;
+  }
+  for(const [id,count] of Object.entries(p.bank)){if(count>0)drop({id,ammoType:id,count,rarity:0});p.bank[id]=0;}
+  for(const [id,count] of Object.entries(p.materials)){if(count>0)drop({id,resource:id,count,rarity:0});p.materials[id]=0;}
+  this.syncInventory(p);
+ }
+ eliminate(p){if(p.eliminated)return;this.dropEliminationLoot(p);p.eliminated=true;p.lifeState='ELIMINATED';p.spectating=true;p.eliminatedAt=this.time;p.flight='out';p.building=false;p.editing=false;p.use=null;p.reloadEnd=0;p.burstLeft=0;this.inputs.delete(p.id);this.remoteInputs.delete(p.id);this.alive=Math.max(0,this.alive-1);this.emit('box-eliminated',{player:p.id,round:this.boxRound});}
  takeLoot(p,item,options){const ok=super.takeLoot(p,item,options);p.materials.wood=Math.min(this.rules.woodCap,p.materials.wood);return ok;}
  damageWorld(box,amount){if(this.boxStage==='fight')super.damageWorld(box,amount);}
  fire(p,burst=false){return this.boxStage==='fight'&&super.fire(p,burst);}

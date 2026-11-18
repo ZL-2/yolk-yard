@@ -1,4 +1,4 @@
-import {displayPlayerName,displayWinner} from './display-player-name.js';
+import {displayPlayerName,playerNameMarkup,winnerMarkup} from './display-player-name.js';
 import {OwnerFreeCamera} from './owner-free-camera.js';
 import {showWinterBriefing} from './winter-briefing.js';
 import {applyOwnerGameplay} from './owner-gameplay.js';
@@ -327,7 +327,7 @@ const legacyEconomyClaim={owned:[...eggWallet.value.owned]};
 eggWallet.configureServer((type,data)=>party?.ready?party.request(type,data):Promise.reject(Error('Connect to your online Marks wallet.')));
 const economyNotices=new EconomyNotices(eggWallet,()=>briefingsComplete&&screen==='menu'&&!busy);
 const referralRewards=new ReferralRewards({wallet:eggWallet,identity:()=>party?.id,ready:()=>briefingsComplete&&screen==='menu'&&!busy&&!document.querySelector('dialog[open]')});
-const lobbyComms=new LobbyComms({party:()=>party,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
+const lobbyComms=new LobbyComms({party:()=>party,ownerToken:developerChatToken,ready:()=>briefingsComplete&&screen==='menu'&&menuSection==='play'&&!busy&&!document.querySelector('dialog[open]')});
 const ownerRuntime=new OwnerRuntime();
 const fairPlay=new FairPlayRuntime({poll:()=>party?.ready?party.request('fair-play-status'):null,onRemoval:status=>{if(net||screen==='game')leave(false,false);modal('Removed for '+(status.kind||'teaming'),'<p>You have been removed from the match. All game modes are suspended for one hour.'+(status.cups?.length?' Because this violation occurred during a Cup, you also cannot enter the next scheduled Cup.':'')+'</p><p>Your restriction and remaining time stay visible in the lobby. Use Report a problem if you believe this was a mistake.</p><button data-action="close">RETURN TO LOBBY</button>','fair-play');}});ownerRuntime.fairPlay=fairPlay;
 const ownerNotices=new OwnerMatchNotices({poll:()=>party?.ready?party.request('owner-match-status'):null,ack:ids=>party.request('owner-match-ack',{ids})});ownerRuntime.ownerNotices=ownerNotices;
@@ -392,11 +392,22 @@ const buildUI=new BuildingUI(royaleUI.root,buildControls,action=>{if(sim)sim.pla
 let resultAt=0;const combatConfirmation=new CombatConfirmation(),damageDirections=new DamageDirections($('#damage-directions'));
 $('#hit-marker').insertAdjacentHTML('afterend','<span id="hit-confirm-label" hidden></span>');
 let matchRequest=0, autoQueue=false, swapSlot=-1;
+function developerChatToken(){return ownerConsole.token&&ownerConsole.expires>Date.now()?ownerConsole.token:undefined;}
+function sendMatchChat(payload){
+  if(ownerNotices.active('mute')||net?.chatMuted?.includes(localId))return {ok:false,reason:'muted'};
+  if(net?.chatEnabled===false)return {ok:false,reason:'disabled'};
+  const ownerToken=developerChatToken(),matchId=state?.royale?.matchId||state?.matchId;
+  if(ownerToken&&!payload.quick&&party?.id&&net?.ready&&matchId){
+    return party.request('developer-match-chat',{...payload,ownerToken,code:net.code,matchId})
+      .catch(error=>({ok:false,message:error.message}));
+  }
+  return net?.chat(payload)||{ok:false,reason:'disconnected'};
+}
 const chat = new ChatPanel($("#app"), {
   context: () => ({state, localId, preference:settings.chatMode, connected:!!net?.ready && !net.closed && screen!=="menu", host:!!net?.isHost, enabled:net?.chatEnabled, roomMuted:ownerNotices.active('mute')?[...(net?.chatMuted||[]),localId]:net?.chatMuted||[]}),
   setPreference: value => {settings.chatMode=value;save("yolk-settings",settings);},
   privateCommand:command=>void ownerPanel.command(command),
-  send: payload => ownerNotices.active('mute')?{ok:false,reason:'muted'}:net?.chat(payload) || {ok:false,reason:"disconnected"},
+  send: sendMatchChat,
   report: (id,reason) => net?.reportChat(id,reason),
   silence: (id,value) => net?.setChatMuted(id,value),
   enable: value => net?.setChatEnabled(value),
@@ -553,7 +564,7 @@ function notice(text,duration=2600) {
 function settingsMenu() {
   modal(
     "Settings",
-    `<p>Settings are saved on this browser.</p><div class="setting-row"><label for="playerName" class="setting-label">Display name <small>${esc(displayPlayerName(profile.name))}</small></label><button id="playerName" data-settings-row="playerName" data-action="profile">CHANGE NAME</button></div><button class="slider-reset-all" data-reset-slider="all">Reset all sliders</button>${SLIDERS
+    `<p>Settings are saved on this browser.</p><div class="setting-row"><label for="playerName" class="setting-label">Display name <small>${playerNameMarkup(profile.name)}</small></label><button id="playerName" data-settings-row="playerName" data-action="profile">CHANGE NAME</button></div><button class="slider-reset-all" data-reset-slider="all">Reset all sliders</button>${SLIDERS
       .map(
         ([id, label, min, max, step]) =>
           `<div class="setting-row"><label class="setting-label" for="${id}">${label} <output id="out-${id}">${settings[id]}</output></label><div class="slider-controls"><input type="range" id="${id}" data-setting="${id}" min="${min}" max="${max}" step="${step}" value="${settings[id]}"><button class="slider-reset" data-reset-slider="${id}" aria-label="Reset ${label}">Reset</button></div></div>`,
@@ -704,7 +715,7 @@ async function publicRooms() {
   try {
     const result = await directory.list();
     if (dialogType !== "public-rooms" || request !== roomListRequest) return;
-    modal("Public matches", `<p>Open to everyone. Private rooms are only reachable by invite code.</p>${connectionButton}<button class="icon-btn" data-action="refresh-rooms" aria-label="Refresh public matches">↻</button><div class="public-room-list">${result.rooms.map(r => `<article class="public-room"><div><strong>${esc(displayPlayerName(r.host))}’s room</strong><p>${esc(getMap(r.map).name)} · ${esc(mode(r.mode).name)}</p><span class="hint">${r.players}/${r.capacity} players · ${r.phase === "playing" ? "In progress" : r.phase === "results" ? "Between rounds" : "In lobby"}</span></div><button class="secondary" data-join-room="${esc(r.code)}" ${r.players >= r.capacity && !(r.mode==='royale'&&r.phase!=='lobby') ? "disabled" : ""}>${r.mode==='royale'&&r.phase!=='lobby'?"Spectate":r.players >= r.capacity ? "Full" : "Join"}</button></article>`).join('') || '<p class="empty-rooms">No public matches yet. Create a room and set it to public.</p>'}</div><button class="primary" data-action="setup">CREATE A ROOM</button>`, "public-rooms");
+    modal("Public matches", `<p>Open to everyone. Private rooms are only reachable by invite code.</p>${connectionButton}<button class="icon-btn" data-action="refresh-rooms" aria-label="Refresh public matches">↻</button><div class="public-room-list">${result.rooms.map(r => `<article class="public-room"><div><strong>${playerNameMarkup(r.host)}’s room</strong><p>${esc(getMap(r.map).name)} · ${esc(mode(r.mode).name)}</p><span class="hint">${r.players}/${r.capacity} players · ${r.phase === "playing" ? "In progress" : r.phase === "results" ? "Between rounds" : "In lobby"}</span></div><button class="secondary" data-join-room="${esc(r.code)}" ${r.players >= r.capacity && !(r.mode==='royale'&&r.phase!=='lobby') ? "disabled" : ""}>${r.mode==='royale'&&r.phase!=='lobby'?"Spectate":r.players >= r.capacity ? "Full" : "Join"}</button></article>`).join('') || '<p class="empty-rooms">No public matches yet. Create a room and set it to public.</p>'}</div><button class="primary" data-action="setup">CREATE A ROOM</button>`, "public-rooms");
   } catch(e) {
     if (dialogType === "public-rooms" && request === roomListRequest) modal("Public matches", `<p class="error-box">${esc(e.message)}</p>${connectionButton}<button class="primary" data-action="refresh-rooms">Try again</button>`, "public-rooms");
   }
@@ -973,12 +984,12 @@ function renderLobby() {
   if(o.mode==='zonewars'){lobbyRenderKey=key;$('#lobby').innerHTML=titleBar()+zoneRoomMarkup(state,localId,net?.isHost,formatCode(net?.code||'--------'));return;}
   if(o.mode==='boxfight'){lobbyRenderKey=key;$('#lobby').innerHTML=titleBar()+boxRoomMarkup(state,localId,net?.isHost,formatCode(net?.code||'--------'));return;}
   if(o.mode==='zombies'){
-   lobbyRenderKey=key;$('#lobby').innerHTML=`${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility==='public'?'PUBLIC':'PRIVATE'} ZOMBIES</div><h2>BLACKTIDE EXTRACTION</h2><img class="z-room-art" src="./modes/blacktide-173.webp" alt="Blacktide Exclusion Coast"><p>Complete 3 contracts. Recover better gear. Call transport and extract.</p><div class="room-code">${formatCode(net?.code||'--------')}</div><div class="split-actions"><button data-action="copy-code">COPY CODE</button><button data-action="copy-link">COPY INVITE LINK</button></div><div class="roster">${roster.map(p=>`<div class="roster-row"><b>${esc(displayPlayerName(p.name))}${p.id===localId?' · YOU':''}</b><span>OPERATOR READY</span></div>`).join('')}</div><p>${roster.length} / ${o.capacity} operators · ${net?.visibility==='public'?'Deployment starts automatically.':'Your room leader starts the run.'}</p><p class="hint">25 minutes to explore, then 5 minutes to evacuate. Gold markers are contracts; green markers are extraction. Your squad can leave independently.</p>${zombiesLoadout(roster.find(p=>p.id===localId))}${net?.isHost?'<button class="primary" data-action="start-match">DEPLOY TO BLACKTIDE</button>':''}<button data-action="leave">BACK TO LOBBY</button></section>`;return;
+   lobbyRenderKey=key;$('#lobby').innerHTML=`${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility==='public'?'PUBLIC':'PRIVATE'} ZOMBIES</div><h2>BLACKTIDE EXTRACTION</h2><img class="z-room-art" src="./modes/blacktide-173.webp" alt="Blacktide Exclusion Coast"><p>Complete 3 contracts. Recover better gear. Call transport and extract.</p><div class="room-code">${formatCode(net?.code||'--------')}</div><div class="split-actions"><button data-action="copy-code">COPY CODE</button><button data-action="copy-link">COPY INVITE LINK</button></div><div class="roster">${roster.map(p=>`<div class="roster-row"><b>${playerNameMarkup(p.name)}${p.id===localId?' · YOU':''}</b><span>OPERATOR READY</span></div>`).join('')}</div><p>${roster.length} / ${o.capacity} operators · ${net?.visibility==='public'?'Deployment starts automatically.':'Your room leader starts the run.'}</p><p class="hint">25 minutes to explore, then 5 minutes to evacuate. Gold markers are contracts; green markers are extraction. Your squad can leave independently.</p>${zombiesLoadout(roster.find(p=>p.id===localId))}${net?.isHost?'<button class="primary" data-action="start-match">DEPLOY TO BLACKTIDE</button>':''}<button data-action="leave">BACK TO LOBBY</button></section>`;return;
   }
   const scrollTop = $("#lobby .lobby-panel")?.scrollTop || 0;
   lobbyRenderKey = key;
   $("#lobby").innerHTML =
-    `${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility === "public" ? "PUBLIC" : "PRIVATE"} ROOM</div><h2 style="margin-top:8px">${o.mode==='royale'?'Next stop: Ravel Coast.':'SQUAD ASSEMBLED.'}</h2>${o.mode==='royale'?`<p class="royale-queue" id="royale-queue">${queueText}</p>`:''}<div class="room-code">${formatCode(net?.code || "--------")}</div><div class="split-actions"><button class="plain" data-action="copy-code">Copy code</button><button class="plain" data-action="copy-link">Copy invite link</button></div><div class="lobby-meta"><strong>${getMap(o.map).name}</strong><span>·</span><span>${mode(o.mode).name}</span></div><div class="roster">${roster.map((p) => `<div class="roster-row"><b><span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>${esc(displayPlayerName(p.name))}${p.id === localId ? " (you)" : ""}</b><span>${p.bot ? "BOT" : weapon(p.weapon).name}</span>${net?.isHost && p.id !== localId && !p.bot ? `<button data-kick="${esc(p.id)}">Remove</button>` : ""}</div>`).join("")}</div><p class="hint" style="margin-bottom:18px">${net?.isHost ? `${o.bots} bots will fill available spots. The next player takes over if the host disconnects.` : "Waiting for the host to start. You can choose your loadout while you wait."}</p><p class="hint">${ruleSummary(o)}</p>${net?.isHost ? '<button class="secondary" data-action="match-settings">EDIT MATCH SETTINGS</button>' : ""}${visibilityButton()}<button class="plain" data-action="chat-controls">Player controls & quick chat</button><button class="plain" data-action="report-teaming">Report teaming</button><div class="room-bottom">${net?.isHost ? '<button class="primary" data-action="start-match">START MATCH</button>' : '<button class="primary" data-action="loadout">Choose loadout</button>'}<button class="plain" data-action="leave">Leave</button></div></section>`;
+    `${titleBar()}<section class="panel lobby-panel"><div class="eyebrow">${net?.visibility === "public" ? "PUBLIC" : "PRIVATE"} ROOM</div><h2 style="margin-top:8px">${o.mode==='royale'?'Next stop: Ravel Coast.':'SQUAD ASSEMBLED.'}</h2>${o.mode==='royale'?`<p class="royale-queue" id="royale-queue">${queueText}</p>`:''}<div class="room-code">${formatCode(net?.code || "--------")}</div><div class="split-actions"><button class="plain" data-action="copy-code">Copy code</button><button class="plain" data-action="copy-link">Copy invite link</button></div><div class="lobby-meta"><strong>${getMap(o.map).name}</strong><span>·</span><span>${mode(o.mode).name}</span></div><div class="roster">${roster.map((p) => `<div class="roster-row"><b><span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>${playerNameMarkup(p.name)}${p.id === localId ? " (you)" : ""}</b><span>${p.bot ? "BOT" : weapon(p.weapon).name}</span>${net?.isHost && p.id !== localId && !p.bot ? `<button data-kick="${esc(p.id)}">Remove</button>` : ""}</div>`).join("")}</div><p class="hint" style="margin-bottom:18px">${net?.isHost ? `${o.bots} bots will fill available spots. The next player takes over if the host disconnects.` : "Waiting for the host to start. You can choose your loadout while you wait."}</p><p class="hint">${ruleSummary(o)}</p>${net?.isHost ? '<button class="secondary" data-action="match-settings">EDIT MATCH SETTINGS</button>' : ""}${visibilityButton()}<button class="plain" data-action="chat-controls">Player controls & quick chat</button><button class="plain" data-action="report-teaming">Report teaming</button><div class="room-bottom">${net?.isHost ? '<button class="primary" data-action="start-match">START MATCH</button>' : '<button class="primary" data-action="loadout">Choose loadout</button>'}<button class="plain" data-action="leave">Leave</button></div></section>`;
   $("#lobby .lobby-panel").scrollTop = scrollTop;
 }
 function launchRound(){
@@ -1139,7 +1150,7 @@ function leave(confirm = false,notifyParty=true) {
 }
 function scoresHTML(s = state) {
   if(s?.boxfight)return boxScoresMarkup(s,localId);
-  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Operator</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${esc(displayPlayerName(p.name))}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isTeamRoyale(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
+  if(s?.royale)return `<table class="scores"><thead><tr><th>Place</th><th>Operator</th><th>Eliminations</th><th>Status</th></tr></thead><tbody>${[...s.players].sort((a,b)=>(a.place||999)-(b.place||999)).map(p=>`<tr class="${p.id===localId?'local':''}"><td>${p.place?'#'+p.place:'—'}</td><td>${playerNameMarkup(p.name)}${p.bot?' · BOT':''}</td><td>${p.kills}</td><td>${p.lateSpectator?'Spectator':p.health>0?'Alive':isTeamRoyale(s.options)&&!p.place?'Watching teammate':'Eliminated'}</td></tr>`).join('')}</tbody></table>`;
 
   return `<table class="scores"><thead><tr><th>Operator</th><th>Elims</th><th>Downs</th><th>Score</th></tr></thead><tbody>${[
     ...(s?.players || []),
@@ -1147,7 +1158,7 @@ function scoresHTML(s = state) {
     .sort((a, b) => b.points - a.points || b.kills - a.kills)
     .map(
       (p) =>
-        `<tr class="${p.id === localId ? "local" : ""}"><td>${mode(s.options.mode).teams ? `<span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>` : ""}${esc(displayPlayerName(p.name))}${p.bot ? " · BOT" : ""}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${Math.floor(p.points)}</td></tr>`,
+        `<tr class="${p.id === localId ? "local" : ""}"><td>${mode(s.options.mode).teams ? `<span class="team-dot ${p.team === 1 ? "coral" : ""}"></span>` : ""}${playerNameMarkup(p.name)}${p.bot ? " · BOT" : ""}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${Math.floor(p.points)}</td></tr>`,
     )
     .join("")}</tbody></table>`;
 }
@@ -1174,7 +1185,7 @@ function resultsMenu() {
 
   modal(
     state.royale ? wonRoyale(state,localId) ? p?.crownedVictory?"CROWNED VICTORY!":"FRONTIER SECURED!" : "Round complete" : "That’s a wrap.",
-    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${esc(displayWinner(state.winner))}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${p?.crown&&wonRoyale(state,localId)?`<div class="crown-result">${CROWN_ICON}<strong>${p.crownedVictory?'CROWNED VICTORY · '+p.crownWins+' THIS SEASON':'VICTORY CROWN EARNED · CARRY IT INTO YOUR NEXT PUBLIC MATCH'}</strong></div><button data-action="emotes">CELEBRATE</button>`:''}${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${state.options.recurring?'<p>Next public round starts automatically in 10 seconds.</p>':sim&&!sim.remote || net?.isHost ? '<button class="primary" data-action="quick-rematch">REMATCH · SAME RULES</button><button data-action="rematch">CHANGE RULES</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">BACK TO LOBBY</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
+    `<div class="results"><div class="eyebrow">${state.royale?`YOUR PLACEMENT ${p?.place?'#'+p.place:'SPECTATOR'} · ${p?.kills||0} ELIMINATIONS`:`ROUND ${state.round} COMPLETE`}</div><h2 style="margin:12px 0">${winnerMarkup(state.winner)}</h2><p class="hint">${net?`${matchEarnings.total||0} Marks · ${esc(matchEarnings.status)}`:'Practice · No currency rewards'} · Wallet: ${eggWallet.value.balance} Marks</p>${p?.crown&&wonRoyale(state,localId)?`<div class="crown-result">${CROWN_ICON}<strong>${p.crownedVictory?'CROWNED VICTORY · '+p.crownWins+' THIS SEASON':'VICTORY CROWN EARNED · CARRY IT INTO YOUR NEXT PUBLIC MATCH'}</strong></div><button data-action="emotes">CELEBRATE</button>`:''}${scoresHTML()}${net ? '<button class="plain" data-action="chat-controls">Player controls & quick chat</button>' : ""}<p class="hint">${ruleSummary(state.options)}</p>${state.options.recurring?'<p>Next public round starts automatically in 10 seconds.</p>':sim&&!sim.remote || net?.isHost ? '<button class="primary" data-action="quick-rematch">REMATCH · SAME RULES</button><button data-action="rematch">CHANGE RULES</button>' : "<p>Waiting for the host to start another round.</p>"}<div class="split-actions">${state.royale?'<button class="plain" data-action="royale-queue">BACK TO LOBBY</button>':'<button class="plain" data-action="loadout">Change loadout</button>'}<button class="plain" data-action="leave-confirm">Leave match</button></div></div>`,
     "results",
   );
 }
@@ -1219,7 +1230,7 @@ function processEvents() {
     if (state.time - e.time > 1.6) continue;
     const echoed=(!sim||sim.remote)&&e.player===localId&&guestFire.confirm(e,performance.now()/1000);
     if(echoed)e.echoed=true;
-    const departed=departureFeed(e);if(departed){const row=document.createElement('div');row.className='kill-line checkout';row.innerHTML=esc(displayPlayerName(departed.name))+' <span>'+departed.text+'</span>';row.dataset.expire=String(performance.now()+5500);$('#feed').prepend(row);while($('#feed').children.length>4)$('#feed').lastChild.remove();}
+    const departed=departureFeed(e);if(departed){const row=document.createElement('div');row.className='kill-line checkout';row.innerHTML=playerNameMarkup(departed.name)+' <span>'+departed.text+'</span>';row.dataset.expire=String(performance.now()+5500);$('#feed').prepend(row);while($('#feed').children.length>4)$('#feed').lastChild.remove();}
     if(e.type==='afk-removed'){if(e.player===localId){leave(false,false);modal('Removed for inactivity','<p>No meaningful input was detected for 59 seconds. This match awards no Marks.</p><button class="primary" data-action="close">BACK TO LOBBY</button>','afk');return;}if(net?.isHost)net.kick(e.player);}
     if(e.type==='duo-marker'&&e.player!==localId&&e.team!==state.players.find(p=>p.id===localId)?.team)continue;
     if(e.type==='box-cue'){if(e.cue==='fight')sound.cue('round-start');else if(e.cue==='storm')sound.cue('storm-closing');else if(e.cue==='series-win'||e.cue==='round-win')sound.cue(e.winner===(state.options.boxFormat==='ffa'?localId:listener?.team)?'victory':'round-start');else if(e.cue==='siphon'&&e.player===localId)sound.cue('complete-mini');}
@@ -1285,7 +1296,7 @@ function processEvents() {
       const row = document.createElement("div");
       row.className = "kill-line" + (e.player === localId ? " me" : "");
       const ally=id=>teammates(state.options,me,state.players.find(p=>p.id===id))?"◆ ":"";
-      row.innerHTML = `${ally(e.player)}${esc(displayPlayerName(e.name))} <span>${esc(e.weapon)}</span> ${ally(e.target)}${esc(displayPlayerName(e.targetName))}`;
+      row.innerHTML = `${ally(e.player)}${playerNameMarkup(e.name)} <span>${esc(e.weapon)}</span> ${ally(e.target)}${playerNameMarkup(e.targetName)}`;
       row.dataset.expire = String(performance.now() + 5500);
       $("#feed").prepend(row);
       while ($("#feed").children.length > 4) $("#feed").lastChild.remove();
@@ -1493,7 +1504,7 @@ async function socialMenu(){
 }
 function friendNicknameMenu(id){
  const friend=socialModel?.friends.find(p=>p.id===id);if(!friend)return;
- modal('FRIEND NICKNAME',`<p>A private nickname for <strong>${esc(displayPlayerName(friend.name))}</strong>. Only you see it.</p><form id="friend-nickname-form"><label for="friend-nickname">NICKNAME</label><input id="friend-nickname" class="field" maxlength="128" value="${esc(friend.nickname||'')}" aria-describedby="friend-nickname-error" autocomplete="off"><p id="friend-nickname-error" role="alert"></p><div class="split-actions"><button class="primary" type="submit">SAVE NICKNAME</button><button type="button" id="friend-nickname-clear">REMOVE NICKNAME</button><button type="button" data-action="social">BACK</button></div></form>`,'friend-nickname');
+ modal('FRIEND NICKNAME',`<p>A private nickname for <strong>${playerNameMarkup(friend.name)}</strong>. Only you see it.</p><form id="friend-nickname-form"><label for="friend-nickname">NICKNAME</label><input id="friend-nickname" class="field" maxlength="128" value="${esc(friend.nickname||'')}" aria-describedby="friend-nickname-error" autocomplete="off"><p id="friend-nickname-error" role="alert"></p><div class="split-actions"><button class="primary" type="submit">SAVE NICKNAME</button><button type="button" id="friend-nickname-clear">REMOVE NICKNAME</button><button type="button" data-action="social">BACK</button></div></form>`,'friend-nickname');
  const field=$('#friend-nickname'),form=$('#friend-nickname-form');
  form.onsubmit=async e=>{e.preventDefault();const raw=field.value.trim(),checked=raw?validatePlayerName(raw,{nickname:true}):{ok:true,name:''};if(!checked.ok){$('#friend-nickname-error').textContent=checked.message;field.setAttribute('aria-invalid','true');field.focus();return;}const button=form.querySelector('[type=submit]');button.disabled=true;try{await party.request('friend-nickname',{id,nickname:checked.name});if(form.isConnected)await socialMenu();}catch(error){if(form.isConnected){$('#friend-nickname-error').textContent=error.message;button.disabled=false;}}};
  $('#friend-nickname-clear').onclick=()=>{field.value='';form.requestSubmit();};field.focus();field.select();
@@ -1504,7 +1515,7 @@ function receiveInvite(invite){
  if(document.querySelector(`[data-invitation-id="${invite.id}"]`))return;
  let tray=document.querySelector('.social-notifications');if(!tray){tray=document.createElement('div');tray.className='social-notifications';document.body.append(tray);}
  const node=document.createElement('aside');node.className='party-invitation';node.dataset.invitationId=invite.id;node.setAttribute('role','status');
- node.innerHTML=`<small>PARTY INVITATION · ${invite.size} / 4</small><strong>${esc(displayPlayerName(invite.name))} invited you</strong><button data-party-accept="${invite.id}">ACCEPT</button><button data-party-decline="${invite.id}">DECLINE</button>`;
+ node.innerHTML=`<small>PARTY INVITATION · ${invite.size} / 4</small><strong>${playerNameMarkup(invite.name)} invited you</strong><button data-party-accept="${invite.id}">ACCEPT</button><button data-party-decline="${invite.id}">DECLINE</button>`;
  tray.append(node);while(tray.children.length>3)tray.firstChild.remove();setTimeout(()=>node.remove(),Math.max(0,invite.expires-Date.now()));sound.cue('queue-found');
 }
 async function queueParty(custom=false,code=null){
@@ -1548,6 +1559,9 @@ function initializeParty(){
   change:p=>{if(screen==='menu')renderMenu();scheduleSocialRefresh();if(p.state==='playing'&&autoQueue&&sim&&sim.options.mode!=='royale'&&sim.phase==='lobby')launchRound();},
   invite:receiveInvite,launch:launchParty,
   'public-join':event=>publicJoinNotice.receive(event,party?.id),
+  'developer-match-chat':m=>{
+    if(net?.ready&&m.code===net.code&&m.matchId===(state?.royale?.matchId||state?.matchId))chat.receive(m.message,true);
+  },
   'lobby-chat':m=>lobbyComms.receive(m.message),
   'lobby-chat-cleared':m=>lobbyComms.clear(m.channel),
   'fair-play':m=>fairPlay.set(m.status),
@@ -1593,7 +1607,7 @@ const actions = {
  },
  'report-teaming':async()=>{
   if(!party?.ready)return errorToast('Connect to report teaming.');
-  try{const roster=await party.request('teaming-roster');modal('Report teaming',`<p>Select the players cooperating against the rules and describe what you saw. Reports cannot cause an automatic ban; live enforcement uses server gameplay evidence.</p><form id="teaming-report-form"><div class="teaming-report-players">${roster.map(p=>`<label><input name="player" type="checkbox" value="${esc(p.id)}">${esc(displayPlayerName(p.name))}</label>`).join('')}</div><textarea class="field" name="notes" rows="4" minlength="15" maxlength="1000" required placeholder="What did these players do together?"></textarea><button type="submit">SEND REPORT</button><p role="status"></p></form>`,'teaming-report');$('#teaming-report-form').onsubmit=async e=>{e.preventDefault();const form=e.target,values=new FormData(form),button=form.querySelector('button'),status=form.querySelector('[role=status]');button.disabled=true;try{await party.request('teaming-report',{players:values.getAll('player'),notes:values.get('notes')});status.textContent='Report saved. Automatic fair-play checks continue during the match.';}catch(error){status.textContent=error.message;button.disabled=false;}};}catch(error){errorToast(error.message);}
+  try{const roster=await party.request('teaming-roster');modal('Report teaming',`<p>Select the players cooperating against the rules and describe what you saw. Reports cannot cause an automatic ban; live enforcement uses server gameplay evidence.</p><form id="teaming-report-form"><div class="teaming-report-players">${roster.map(p=>`<label><input name="player" type="checkbox" value="${esc(p.id)}">${playerNameMarkup(p.name)}</label>`).join('')}</div><textarea class="field" name="notes" rows="4" minlength="15" maxlength="1000" required placeholder="What did these players do together?"></textarea><button type="submit">SEND REPORT</button><p role="status"></p></form>`,'teaming-report');$('#teaming-report-form').onsubmit=async e=>{e.preventDefault();const form=e.target,values=new FormData(form),button=form.querySelector('button'),status=form.querySelector('[role=status]');button.disabled=true;try{await party.request('teaming-report',{players:values.getAll('player'),notes:values.get('notes')});status.textContent='Report saved. Automatic fair-play checks continue during the match.';}catch(error){status.textContent=error.message;button.disabled=false;}};}catch(error){errorToast(error.message);}
  },
  'feature-request':()=>{modal('Request a feature',`<p>Tell us what you would like to see in Ravelfront. Your request goes to the administrator’s private inbox.</p><form id="feature-request-form"><label for="feature-request-text">YOUR IDEA</label><textarea id="feature-request-text" class="field" rows="5" minlength="5" maxlength="1000" required placeholder="What would make the frontier better?"></textarea><button class="primary" type="submit">SEND REQUEST</button></form><p id="feature-request-status" role="status"></p>`,'feature-request');$('#feature-request-text').focus();$('#feature-request-form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button'),status=$('#feature-request-status');button.disabled=true;status.textContent='Sending…';try{await party.request('feature-request',{text:$('#feature-request-text').value});if(form.isConnected){form.hidden=true;status.textContent='Request sent. Thank you for helping shape the frontier.';}}catch(error){if(form.isConnected){status.textContent=error.message;button.disabled=false;}}};},
  'owner-inbox':()=>{ownerConsole.inboxShowCleared=false;void ownerConsole.inbox();},

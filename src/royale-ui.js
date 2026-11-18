@@ -1,4 +1,4 @@
-import {displayPlayerName} from './display-player-name.js';
+import {displayPlayerName,playerNameMarkup} from './display-player-name.js';
 import {blackoutPrompt} from './blackout.js';
 import {mapViewport} from './tactical-map.js';
 import {WorldMarkers} from './world-markers.js';
@@ -157,7 +157,7 @@ export class RoyaleUI{
   }
   $('downed-status').hidden=!local.downed;setText($('downed-status'),local.downed?`${local.reviverId?'TEAMMATE REVIVING':'DOWNED · CRAWL TO COVER'} · ${Math.ceil(local.health)} VITALITY`:'');
   const mate=mates.filter(m=>m.downed&&m.health>0&&reviveAccessible(getMap(state.options.map),local,m)).sort((a,b)=>dist(local,a)-dist(local,b))[0],duo=$('duo-hud');duo.hidden=!isTeamRoyale(state.options);
-  if(!duo.hidden){const markup=mates.length?mates.map(m=>{const style=teamStyle(state.players,m),status=m.connected===false&&!m.bot?'DISCONNECTED':m.downed?'DOWNED':m.health>0?'ACTIVE':'ELIMINATED';return `<div class="team-hud-member" style="--team-color:${style.color}"><strong>${style.slot} · ${escape(displayPlayerName(m.name))}</strong><small>${status}${m.health>0?' · '+Math.ceil(m.health)+' H / '+Math.ceil(m.shield||0)+' S':''}</small><progress class="shield" value="${m.shield||0}" max="100" aria-label="${escape(displayPlayerName(m.name))} shield"></progress><progress value="${Math.max(0,m.health)}" max="100" aria-label="${escape(displayPlayerName(m.name))} health"></progress></div>`;}).join(''):`<small>${state.options.teamSize===4?'SQUADS':state.options.teamSize===3?'TRIOS':'DUOS'} · NO TEAMMATES</small>`;if(duo.innerHTML!==markup)duo.innerHTML=markup;}
+  if(!duo.hidden){const markup=mates.length?mates.map(m=>{const style=teamStyle(state.players,m),status=m.connected===false&&!m.bot?'DISCONNECTED':m.downed?'DOWNED':m.health>0?'ACTIVE':'ELIMINATED';return `<div class="team-hud-member" style="--team-color:${style.color}"><strong>${style.slot} · ${playerNameMarkup(m.name)}</strong><small>${status}${m.health>0?' · '+Math.ceil(m.health)+' H / '+Math.ceil(m.shield||0)+' S':''}</small><progress class="shield" value="${m.shield||0}" max="100" aria-label="${escape(m.name)} shield"></progress><progress value="${Math.max(0,m.health)}" max="100" aria-label="${escape(m.name)} health"></progress></div>`;}).join(''):`<small>${state.options.teamSize===4?'SQUADS':state.options.teamSize===3?'TRIOS':'DUOS'} · NO TEAMMATES</small>`;if(duo.innerHTML!==markup)duo.innerHTML=markup;}
   const matchKey=r.matchId+':'+state.round;if(this.flightMatch!==matchKey){this.flightMatch=matchKey;this.flightDismissed=false;}
   setText($('royale-flight-close'),label('dismissFlight')+' Close');
   const closest=getMap(state.options.map).districts.reduce((a,b)=>Math.hypot(b.x-p.x,b.z-p.z)<Math.hypot(a.x-p.x,a.z-p.z)?b:a);
@@ -183,7 +183,7 @@ export class RoyaleUI{
   if(warmup){
    const players=realMatchPlayers(state),countdown=r.countdownStarted===false?'WAITING FOR PLAYERS':Math.max(0,Math.ceil(r.queueEnds-state.time))+'s TO DEPARTURE';
    setText($('royale-flight-title'),'KESTREL RELIEF AIRLIFT');setText($('royale-flight-help'),countdown+' · Practice equipment resets at departure');$('royale-flight-button').hidden=true;
-   const rosterKey=state.options.session+':'+local.id+':'+players.map(o=>o.id+':'+o.name).join('|');if(rosterKey!==this.rosterKey){this.rosterKey=rosterKey;roster.innerHTML=`<div class="island-roster-heading"><b>${players.length}</b><span>REAL ${players.length===1?'PLAYER':'PLAYERS'} ON THE ISLAND</span><small>${state.options.session==='offline'?'OFFLINE PRACTICE':'LIVE ROSTER'}</small></div><div class="island-roster-names">${players.map(o=>`<span class="${o.id===local.id?'you':''}">${escape(displayPlayerName(o.name))}${o.id===local.id?' <b>YOU</b>':''}</span>`).join('')||'<span>Waiting for connected players</span>'}</div>`;}
+   const rosterKey=state.options.session+':'+local.id+':'+players.map(o=>o.id+':'+o.name).join('|');if(rosterKey!==this.rosterKey){this.rosterKey=rosterKey;roster.innerHTML=`<div class="island-roster-heading"><b>${players.length}</b><span>REAL ${players.length===1?'PLAYER':'PLAYERS'} ON THE ISLAND</span><small>${state.options.session==='offline'?'OFFLINE PRACTICE':'LIVE ROSTER'}</small></div><div class="island-roster-names">${players.map(o=>`<span class="${o.id===local.id?'you':''}">${playerNameMarkup(o.name)}${o.id===local.id?' <b>YOU</b>':''}</span>`).join('')||'<span>Waiting for connected players</span>'}</div>`;}
   }
 
   const outside=r.storm.active&&Math.hypot(p.x-r.storm.x,p.z-r.storm.z)>r.storm.radius;
@@ -215,7 +215,7 @@ export class RoyaleUI{
   $('royale-stamina').closest('.stamina').classList.toggle('exhausted',!!local.exhausted);
   if(state.options.training){setText($('royale-flight-title'),'FIELD TRAINING · '+Object.values(local.tutorial||{}).filter(Boolean).length+'/6');setText($('royale-flight-help'),['move','fire','slide','build','edit','boost'].map(k=>(local.tutorial?.[k]?'✓ ':'◇ ')+k.toUpperCase()).join(' · ')+' · Inventory: all weapons & supplies. Esc: leave.');}
   if(local.recap&&local.health<=0){const recap=local.recap;prompt=`<strong>ELIMINATED · ${escape(recap.weapon)}</strong><small>${recap.distance} m · ${recap.damage} final-hit damage · ${recap.critical?'Critical hit':'Body / environment'}</small>${recap.totalDamage!=null?`<small>${recap.totalDamage} damage in the last ${recap.window}s · ${recap.attackers} ${recap.attackers===1?'enemy':'enemies'}</small><span class="combat-recap-sources">${(recap.sources||[]).slice(0,3).map(row=>`${escape(row.name)} · ${escape(row.weapon)}: ${row.damage}`).join('<br>')}</span>`:''}`;}
-  if(mate?.downed&&local.health>0&&!local.downed&&reviveAccessible(getMap(state.options.map),local,mate))prompt=`<kbd>${escape(label('interact'))}</kbd> HOLD TO REVIVE ${escape(displayPlayerName(mate.name))}<small>Stay close · Taking damage interrupts</small>`;
+  if(mate?.downed&&local.health>0&&!local.downed&&reviveAccessible(getMap(state.options.map),local,mate))prompt=`<kbd>${escape(label('interact'))}</kbd> HOLD TO REVIVE ${playerNameMarkup(mate.name)}<small>Stay close · Taking damage interrupts</small>`;
   if(this.prompt!==prompt){$('royale-prompt').innerHTML=prompt;this.prompt=prompt;}$('royale-prompt').hidden=!prompt;
  }
 }

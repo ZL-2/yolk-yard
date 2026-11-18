@@ -22,7 +22,7 @@ try{
  await opening.getByRole('button',{name:'RETURN TO LOBBY'}).click();
  await page.reload();
  await page.waitForFunction(()=>window.__yolkTest?.party()?.ready);
- await page.locator('.yard-character-label strong').filter({hasText:'Zach ⟨/⟩'}).waitFor();
+ await page.locator('.yard-character-label strong').filter({hasText:'Zach'}).getByRole('img',{name:'Developer'}).waitFor();
  await page.waitForFunction(()=>!document.querySelector('.blackout-briefing[open]'));
  for(const [title,close] of [
   ['AFTER THE SIGNAL','Close Season 2 briefing'],

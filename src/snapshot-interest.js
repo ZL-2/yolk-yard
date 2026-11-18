@@ -22,7 +22,7 @@ export class SnapshotInterest {
   const radius=observer.aim?750:observer.flight&&observer.flight!=='ground'?350:180,living=new Set();
   let selection='';const result=state.players.map(p=>{
    living.add(p.id);if(privatePlayers&&(p.id===recipient.id||p.id===observer.id)){selection+='2';return p;}
-   let remote=this.remoteRows.get(p.id);if(!remote){remote=remotePlayerRow(p,{compactInventory:!privatePlayers});this.remoteRows.set(p.id,remote);}
+   let remote=this.remoteRows.get(p.id);if(!remote){remote=remotePlayerRow(p,{compactInventory:!privatePlayers||state.options.mode==='zonewars'});this.remoteRows.set(p.id,remote);}
    if(teammates(state.options,p,recipient)||p.health<=0||p.spectating||p.boss||(p.x-observer.x)**2+(p.z-observer.z)**2<radius*radius){selection+='1';return remote;}selection+='0';
    let sample=this.poses.get(p.id);
    if(!sample||state.time-sample.time>=.1||(p.x-sample.pose.x)**2+(p.y-sample.pose.y)**2+(p.z-sample.pose.z)**2>144||p.flight!==sample.flight||p.shotSerial!==sample.shot){const pose={};for(const k of POSE)pose[k]=p[k];sample={pose,time:state.time,flight:p.flight,shot:p.shotSerial};this.poses.set(p.id,sample);this.arrays.clear();}

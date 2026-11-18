@@ -1,4 +1,4 @@
-import {displayPlayerName} from './display-player-name.js';
+import {isDeveloperName} from './display-player-name.js';
 import {updateIconGear} from './icon-bundle-models.js';
 import {GpuFrameTimer} from './gpu-frame-timer.js';
 import {DamageNumbers} from './damage-numbers.js';
@@ -119,7 +119,7 @@ export function makeEgg(profile, team = -1, withWeapon = true) {
   animateHumanoid(group,{health:100,grounded:true},1/60,0,{menu:true});
   return group;
 }
-function label(text, color = "#ffffff", compact = false, critical = false, runs = null) {
+function label(text, color = "#ffffff", compact = false, critical = false, runs = null, developer = false) {
   const c = document.createElement("canvas");
   c.width = 512;
   c.height = 96;
@@ -131,17 +131,27 @@ function label(text, color = "#ffffff", compact = false, critical = false, runs 
   ctx.beginPath();
   ctx.roundRect(10, 7, 492, 80, 24);
   if (!compact) ctx.fill();
+  const textWidth=developer?390:460,textCenter=developer?230:256;
+  if(developer){
+    const x=textCenter+Math.min(textWidth,ctx.measureText(text.slice(0,22)).width)/2+32;
+    ctx.fillStyle='#f9cb62';ctx.strokeStyle='#87501c';ctx.lineWidth=3;ctx.beginPath();
+    ctx.moveTo(x,22);ctx.lineTo(x+21,30);ctx.lineTo(x+21,48);ctx.quadraticCurveTo(x+21,61,x,75);
+    ctx.quadraticCurveTo(x-21,61,x-21,48);ctx.lineTo(x-21,30);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.strokeStyle='#5d350c';ctx.lineWidth=3.5;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
+    ctx.moveTo(x-7,39);ctx.lineTo(x-14,47);ctx.lineTo(x-7,55);ctx.moveTo(x+7,39);ctx.lineTo(x+14,47);ctx.lineTo(x+7,55);
+    ctx.moveTo(x+2.5,37);ctx.lineTo(x-2.5,57);ctx.stroke();
+  }
   ctx.fillStyle = color;
   if (compact) {
     ctx.lineJoin = "round";
     ctx.strokeStyle = "#172b39";
     ctx.lineWidth = critical ? 7 : 6;
-    ctx.strokeText(text.slice(0, 22), 256, 49, 460);
+    ctx.strokeText(text.slice(0, 22), textCenter, 49, textWidth);
   }
   if(runs){
     ctx.textAlign='left';const width=runs.reduce((n,r)=>n+ctx.measureText(r.text).width,0),scale=Math.min(1,460/Math.max(1,width));ctx.translate(256-width*scale/2,0);ctx.scale(scale,1);let x=0;
     for(const r of runs){ctx.fillStyle=r.color;ctx.strokeText(r.text,x,49);ctx.fillText(r.text,x,49);x+=ctx.measureText(r.text).width;}
-  }else ctx.fillText(text.slice(0, 22), 256, 49, 460);
+  }else ctx.fillText(text.slice(0, 22), textCenter, 49, textWidth);
   const texture = new THREE.CanvasTexture(c);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(
@@ -948,11 +958,11 @@ export class View {
           aura.position.y=.95;model.add(aura);model.userData.bonusAura=aura;
           model.userData.signature = sig;if(p.boss)decorateBoss(model,p);
           const name = label(
-            displayPlayerName(p.name),
+            p.name,
             teammates(state.options,p,local)
               ? teamStyle(state.players,p).color
               : p.boss?"#ffda82":"#ffffff",
-            !!state.zonewars,
+            !!state.zonewars,false,null,isDeveloperName(p.name),
           );
           name.position.y = 2.15;model.userData.nameplate=name;
           name.visible = p.id!==local?.id&&(!!p.boss||!!state.zonewars||!state.royale||teammates(state.options,p,local));

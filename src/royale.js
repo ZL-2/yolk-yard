@@ -224,8 +224,14 @@ export class RoyaleSimulation extends Simulation {
  dropLoot(point,item,avoid=[]){
   if(this.loot.length>=2400)return null;
   const supported={...point,y:supportBelow(this.map,point.x,point.z,point.y??groundAt(this.map,point.x,point.z))};
-  const spot=placeLoot(this.map,supported,avoid.length?[...this.loot,...avoid]:this.loot,this.relays?.length?this.relays:this.map.relays||[]);if(!spot)return null;
-  const drop={...item,...(point.vaultId?{vaultId:point.vaultId}:{}),uid:++this.lootId,...spot};delete drop.motion;delete drop.spawnFrom;drop.y=(Number.isInteger(point.floor)||point.role!==undefined)?spot.y:Math.max(spot.y,point.y??spot.y);this.loot.push(drop);itemsChanged(this,'loot',drop);startLootFall(this,drop);this.lootVersion++;return drop;
+  const spot=placeLoot(this.map,supported,[...nearbyItems(this,'loot',supported,6),...avoid],this.relays?.length?this.relays:this.map.relays||[]);
+  return spot?this.spawnDroppedLoot(point,item,spot):null;
+ }
+ spawnDroppedLoot(point,item,spot){
+  const drop={...item,...(point.vaultId?{vaultId:point.vaultId}:{}),uid:++this.lootId,...spot};
+  delete drop.motion;delete drop.spawnFrom;
+  drop.y=(Number.isInteger(point.floor)||point.role!==undefined)?spot.y:Math.max(spot.y,point.y??spot.y);
+  this.loot.push(drop);itemsChanged(this,'loot',drop);startLootFall(this,drop);this.lootVersion++;return drop;
  }
  dropWeapon(point,id,rarity=0,ammo=weapon(id).magazine){return this.dropLoot(point,{id,weapon:true,rarity,count:1,ammo});}
  dropAmmo(point,type,count){return this.dropLoot(point,{id:type,ammoType:type,count,rarity:0});}
@@ -286,9 +292,9 @@ export class RoyaleSimulation extends Simulation {
  interact(p,input,dt){
   if(!input.interact)p.swapDoneHeld=false;
   if(!canFight(p))return;
-  for(const item of nearbyItems(this,'loot',p,1.6))if(this.accessible(p,item,1.6)){
-   if(item.ammoType||item.resource||item.crown)this.takeLoot(p,item);
-   else if(canAutoStack(p,item))this.takeLoot(p,item,{stackOnly:true});
+  for(const item of nearbyItems(this,'loot',p,1.6)){
+   const supply=item.ammoType||item.resource||item.crown;
+   if((supply||canAutoStack(p,item))&&this.accessible(p,item,1.6))this.takeLoot(p,item,supply?undefined:{stackOnly:true});
   }
   if(input.editing)return;if(blackoutInteract(this,p,input))return;if(frontierInteract(this,p,input,dt))return;if(seasonInteract(this,p,input,dt))return;
   if(input.interact&&!p.interactLatch&&toggleDoor(this,p)){p.interactLatch=true;return;}
