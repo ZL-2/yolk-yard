@@ -1,3 +1,4 @@
+import {weapon} from '../src/data.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {performance} from 'node:perf_hooks';
@@ -27,10 +28,15 @@ test('prep protection confines both host and guest to their spawn and releases o
 });
 test('all sixteen spawn lanes have five reachable ordered pickups, including empty rooms',()=>{
  for(const recurring of [false,true]){
-  const s=setup({recurring});if(recurring)s.beginBoxRound();assert.equal(s.loot.length,80);
+  const s=setup({recurring});if(recurring)s.beginBoxRound();assert.equal(s.loot.length,84);
+  for(const tower of s.map.buildings.filter(b=>b.clock)){
+   const special=s.loot.find(l=>l.rarity===5&&Math.abs(l.x-tower.x)<3&&Math.abs(l.z-tower.z)<4);
+   assert.ok(special);assert.equal(special.y,tower.h);assert.ok(validLootPoint(s.map,special,.35));
+  }
   for(const [i,spawn]of s.map.spawnRooms.entries()){
    const line=s.loot.filter(l=>l.zoneSpawn===i),points=zoneSpawnLootPoints(spawn);assert.equal(line.length,5);
-   assert.ok(['sprinter','duet'].includes(line[0].id));assert.ok(['scatter','doubleyolk'].includes(line[1].id));
+   assert.ok(/assault rifle|carbine/i.test(weapon(line[0].id).category));assert.ok(weapon(line[1].id).ammoType==='shells');
+   assert.equal(weapon(line[2].id).ammoType,'light');assert.ok(line.every(item=>item.rarity>=3));
    for(const [j,item]of line.entries()){assert.equal(item.zoneSlot,j+1);assert.equal(item.x,points[j].x);assert.equal(item.z,points[j].z);assert.ok(Math.abs(item.y-spawn.y)<.15,'Loot stays on its spawn floor');assert.ok(validLootPoint(s.map,item,.35),'Clear floor at spawn '+i+' slot '+j);assert.ok(!item.weapon||item.ammo>0);}
   }
  }
@@ -38,12 +44,12 @@ test('all sixteen spawn lanes have five reachable ordered pickups, including emp
 test('walking each spawn lane collects rifle then shotgun, resets cleanly and survives host recovery',()=>{
  const s=setup({},16),original=s.loot.map(l=>l.uid);
  for(let i=0;i<40;i++){for(const p of s.players.values())s.setInput(p.id,{yaw:p.boxSpawn.yaw,forward:1,slot:p.slot,seq:i+1,round:s.round});s.tick(1/30);}
- assert.equal(s.loot.length,0,'All eighty drops collected without crossing a wall or floor');
- for(const p of s.players.values()){assert.ok(['sprinter','duet'].includes(p.inventory[1]?.id));assert.ok(['scatter','doubleyolk'].includes(p.inventory[2]?.id));assert.ok(p.inventory.slice(1).filter(Boolean).length>=4);assert.ok(p.inventory.every(i=>!i?.zoneSlot),'Pickup metadata never follows a carried item');}
- const p=s.players.get('a');s.dropSlot(p,1);const dropped=s.loot[0];assert.equal(dropped.zoneSlot,undefined);Object.assign(p,{x:dropped.x,y:dropped.y,z:dropped.z});s.time+=2;s.interact(p,{},1/30);assert.equal(p.inventory[1],null,'Dropped weapons require a deliberate pickup');
- s.beginBoxRound();assert.equal(s.loot.length,80);assert.ok(s.loot.every(l=>!original.includes(l.uid)));assert.ok(p.inventory.slice(1).every(i=>!i));
- const first=s.loot[0];Object.assign(p,{x:first.x,y:first.y,z:first.z});assert.equal(s.takeLoot(p,first),true);const restored=new ZoneWarsSimulation(s.options).restore(s.checkpoint());assert.deepEqual(restored.loot,s.loot);assert.equal(restored.loot.length,79);assert.deepEqual(restored.players.get('a').inventory,p.inventory);
- restored.beginBoxRound();assert.equal(restored.loot.length,80);
+ assert.equal(s.loot.length,4,'All eighty drops collected without crossing a wall or floor');
+ for(const p of s.players.values()){assert.ok(/assault rifle|carbine/i.test(weapon(p.inventory[1].id).category));assert.ok(weapon(p.inventory[2].id).ammoType==='shells');assert.ok(p.inventory.slice(1).filter(Boolean).length>=4);assert.ok(p.inventory.every(i=>!i?.zoneSlot),'Pickup metadata never follows a carried item');}
+ const p=s.players.get('a');s.dropSlot(p,1);const dropped=s.loot.at(-1);assert.equal(dropped.zoneSlot,undefined);Object.assign(p,{x:dropped.x,y:dropped.y,z:dropped.z});s.time+=2;s.interact(p,{},1/30);assert.equal(p.inventory[1],null,'Dropped weapons require a deliberate pickup');
+ s.beginBoxRound();assert.equal(s.loot.length,84);assert.ok(s.loot.every(l=>!original.includes(l.uid)));assert.ok(p.inventory.slice(1).every(i=>!i));
+ const first=s.loot[0];Object.assign(p,{x:first.x,y:first.y,z:first.z});assert.equal(s.takeLoot(p,first),true);const restored=new ZoneWarsSimulation(s.options).restore(s.checkpoint());assert.deepEqual(restored.loot,s.loot);assert.equal(restored.loot.length,83);assert.deepEqual(restored.players.get('a').inventory,p.inventory);
+ restored.beginBoxRound();assert.equal(restored.loot.length,84);
 });
 test('actual stair collision supports climbing from ground to the next floor',()=>{
  const s=setup(),p=s.players.get('a'),b=ZONE_BUILDINGS[0],north=b.z-b.d/2;fight(s);Object.assign(p,{x:b.x+b.w/2-2.25,y:0,z:north+.7,yaw:Math.PI,grounded:true,vy:0});for(let i=0;i<150;i++)movePlayer(p,{yaw:Math.PI,forward:.5},s.map,1/30,i/30);assert.ok(p.y>3.7,'Stair run reaches first storey: '+JSON.stringify({x:p.x,y:p.y,z:p.z}));assert.ok(p.z>north+8,'Player can leave stairwell');

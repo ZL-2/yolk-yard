@@ -33,6 +33,11 @@ function supportSamples(b){return [[b.x,b.z],[b.x-b.w/2+.04,b.z-b.d/2+.04],[b.x+
 function anchored(p,map){
  const bs=pieceBoxes(p);
  if(bs.some(b=>supportSamples(b).some(([x,z])=>Math.abs(b.y-groundAt(map,x,z))<.32)))return true;
+ if(p.type==='floor'&&candidates(map,p,null,0,5).some(wall=>{
+  if(wall.buildId||wall.part!=='wall'||!blocksBuilding(wall)||p.y<wall.y-.05||p.y>wall.y+wall.h+.05)return false;
+  const gapX=Math.abs(p.x-wall.x)-(GRID+wall.w)/2,gapZ=Math.abs(p.z-wall.z)-(GRID+wall.d)/2;
+  return Math.abs(gapX)<.08&&gapZ<-.4||Math.abs(gapZ)<.08&&gapX<-.4;
+ }))return true;
  return candidates(map,p,null,0,5).some(b=>!b.buildId&&blocksBuilding(b)&&bs.some(a=>Math.abs(a.y-(b.y+b.h))<.24&&Math.abs(a.x-b.x)<(a.w+b.w)/2&&Math.abs(a.z-b.z)<(a.d+b.d)/2));
 }
 export function validPlacement(p,map,builds,players=[],builder=null){
@@ -43,7 +48,7 @@ export function validPlacement(p,map,builds,players=[],builder=null){
  if(builds.some(b=>b.type===p.type&&b.x===p.x&&Math.abs(b.y-p.y)<.2&&b.z===p.z&&(p.type!=='wall'||b.rotation%2===p.rotation%2)))return 'Already built';
  const bs=pieceBoxes(p),near=[...candidates(map,p,null,0,4)].filter(o=>!o.buildId&&blocksBuilding(o));
  for(const b of bs){
-  if(near.some(o=>Math.abs(o.x-b.x)<(o.w+b.w)/2-.06&&Math.abs(o.z-b.z)<(o.d+b.d)/2-.06&&b.y<o.y+o.h-.06&&b.y+b.h>o.y+.06))return 'Blocked';
+  if(near.some(o=>!(o.part==='floor'&&b.y<o.y&&b.y+b.h<=o.y+o.h+.02)&&Math.abs(o.x-b.x)<(o.w+b.w)/2-.06&&Math.abs(o.z-b.z)<(o.d+b.d)/2-.06&&b.y<o.y+o.h-.06&&b.y+b.h>o.y+.06))return 'Blocked';
  }
  // Buried floor/roof surfaces are not usable. Walls and ramps can root in a slope.
  const terrain=bs.map(b=>groundAt(map,b.x,b.z)-b.y);
@@ -65,8 +70,9 @@ export function solvePlacement(p,type,rotation,material,map,builds=[],players=[]
  const nearBuilds=builds.filter(b=>Math.hypot(b.x-p.x,b.z-p.z)<12&&Math.abs(b.y-p.y)<9);
  const nearWorld=[...candidates(map,p,null,0,10)].filter(b=>!b.buildId&&blocksBuilding(b));
  const options=new Map(),offsetX=type==='wall'&&base.rotation%2?2:0,offsetZ=type==='wall'&&!(base.rotation%2)?2:0;
- const add=(x,y,z,connected=false)=>{
-  x=Math.round((x-offsetX)/GRID)*GRID+offsetX;z=Math.round((z-offsetZ)/GRID)*GRID+offsetZ;y=Math.round(Math.max(0,y)*1000)/1000;
+ const add=(x,y,z,connected=false,local=false)=>{
+  if(!local){x=Math.round((x-offsetX)/GRID)*GRID+offsetX;z=Math.round((z-offsetZ)/GRID)*GRID+offsetZ;}
+  y=Math.round(Math.max(0,y)*1000)/1000;
   const dx=x-p.x,dz=z-p.z,along=dx*forward.x+dz*forward.z,side=Math.abs(dx*forward.z-dz*forward.x);
   if(Math.hypot(dx,dz)>9||along< -2.1||Math.abs(y-p.y)>6)return;
   const piece={...base,x,y,z},key=cellKey(piece);
@@ -81,8 +87,32 @@ export function solvePlacement(p,type,rotation,material,map,builds=[],players=[]
   for(const box of nearWorld)if(Math.abs(box.x-x)<box.w/2+2&&Math.abs(box.z-z)<box.d/2+2&&Math.abs(box.y+box.h-p.y)<5)ys.push(box.y+box.h);
   for(const y of ys)add(x,y,z);
  }
+ if(type==='floor'&&hit?.box?.part==='wall'&&!hit.box.buildId){
+  const wall=hit.box,alongX=wall.w<wall.d,normal=alongX?'x':'z',across=alongX?'z':'x';
+  const face=wall[normal]+Math.sign(eye[normal]-wall[normal])*((alongX?wall.w:wall.d)+GRID)/2;
+  const center=wall[across]+Math.round((aim[across]-wall[across])/GRID)*GRID;
+  const y=wall.y+Math.round((aim.y-wall.y)/GRID)*GRID;
+  add(alongX?face:center,y,alongX?center:face,true,true);
+ }
+ // Fit a local grid inside each nearby authored slab. Its edge can fall
+ // between world-grid cells, especially in narrow towers and split interiors.
+ for(const slab of nearWorld){
+  if(slab.h>1||slab.w<GRID||slab.d<GRID)continue;
+  const top=slab.y+slab.h;
+  for(const edge of [-1,1]){
+   const originX=slab.x+edge*(slab.w-GRID)/2+offsetX;
+   const originZ=slab.z+edge*(slab.d-GRID)/2+offsetZ;
+   const x=originX+Math.round((aim.x-originX)/GRID)*GRID;
+   const z=originZ+Math.round((aim.z-originZ)/GRID)*GRID;
+   add(x,top,z,false,true);
+  }
+ }
  for(const b of nearBuilds){
   for(const y of [b.y,b.y+GRID])for(const [dx,dz]of [[0,0],[-4,0],[4,0],[0,-4],[0,4],[-2,0],[2,0],[0,-2],[0,2]])add(b.x+dx,y,b.z+dz,true);
+  for(const y of [b.y,b.y+GRID])for(const [dx,dz] of [[0,0],[-4,0],[4,0],[0,-4],[0,4]]){
+   const bx=b.type==='wall'&&b.rotation%2?2:0,bz=b.type==='wall'&&!(b.rotation%2)?2:0;
+   add(b.x-bx+offsetX+dx,y,b.z-bz+offsetZ+dz,true,true);
+  }
   // The top edge of a ramp is an explicit attachment, even while climbing it.
   if(b.type==='stairs'){
    const d=direction(b.rotation*Math.PI/2,0),top={x:b.x+d.x*GRID,y:b.y+GRID,z:b.z+d.z*GRID};

@@ -3,6 +3,7 @@ import {Simulation} from './simulation.js';
 import {zoneMap} from './zone-wars-map.js';
 import {ZONE_RULES,zoneLoadout,zoneSpawnLootPoints,zoneStormPath,zoneStormAt,constrainZoneMovement,bounceZonePad} from './zone-wars-rules.js';
 import {inventory,rebuildMap} from './building.js';
+import {BOSSES} from './bosses.js';
 import {weapon} from './data.js';
 import {launchPlayer,fallDamage} from './airborne.js';
 import {supportBelow} from './royale-loot.js';
@@ -24,6 +25,12 @@ export class ZoneWarsSimulation extends BoxFightSimulation {
    for(const [i,item]of zoneLoadout(this.random).entries()){
     const point=points[i];this.loot.push({...item,...(item.weapon?{ammo:weapon(item.id).magazine}:{}),...point,y:supportBelow(this.map,point.x,point.z,point.y),uid:++this.lootId,zoneSpawn:spawnIndex,zoneSlot:i+1});
    }
+  }
+  for(const tower of this.map.buildings.filter(b=>b.clock)){
+   const boss=BOSSES[Math.floor(this.random()*BOSSES.length)];
+   const item=this.random()<.5?{id:boss.utility,count:boss.utilityCount}:{id:boss.weapon,weapon:true,bossId:boss.id,count:1,ammo:weapon(boss.weapon).magazine};
+   const x=tower.x-1.5,z=tower.z,y=supportBelow(this.map,x,z,tower.h+.25);
+   this.loot.push({...item,rarity:5,x,y,z,uid:++this.lootId});
   }
   this.lootVersion++;this.lootSpatialVersion++;
  }

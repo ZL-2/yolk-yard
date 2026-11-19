@@ -1,3 +1,4 @@
+import {WEAPONS,ROYALE_WEAPONS} from './data.js';
 import {launchPlayer} from './airborne.js';
 // Reference notes and the explicit differences are in docs/ZONE_WARS_REFERENCE.md.
 export const ZONE_RULES=Object.freeze({prepare:8,between:5,queue:15,stormWait:12,roundLimit:210,siphon:50,wood:500,woodReward:50,woodCap:500,restart:8,buildLimit:560});
@@ -12,10 +13,17 @@ export const ZONE_PHASES=Object.freeze([
 export function zoneStormPath(random){let x=0,z=0,radius=94,time=0;return ZONE_PHASES.map((p,index)=>{const angle=random()*Math.PI*2,nextX=Math.max(-38,Math.min(38,x+Math.cos(angle)*p.move)),nextZ=Math.max(-38,Math.min(38,z+Math.sin(angle)*p.move));const phase={...p,index,x,z,startRadius:radius,nextX,nextZ,start:time};x=nextX;z=nextZ;radius=p.radius;time+=p.wait+p.duration;return phase;});}
 export function zoneStormAt(path,age){const p=path.find(p=>age<p.start+p.wait+p.duration)||path.at(-1),local=Math.max(0,age-p.start),t=Math.max(0,Math.min(1,(local-p.wait)/p.duration)),closing=local>=p.wait;return {active:age>=ZONE_RULES.stormWait,index:p.index,x:p.x+(p.nextX-p.x)*t,z:p.z+(p.nextZ-p.z)*t,radius:p.startRadius+(p.radius-p.startRadius)*t,nextX:p.nextX,nextZ:p.nextZ,nextRadius:p.radius,seconds:Math.max(0,(closing?p.duration+p.wait:p.wait)-local),closing,dps:p.dps};}
 const pick=(r,a)=>a[Math.min(a.length-1,Math.floor(r()*a.length))];
+const guns=[...WEAPONS,...ROYALE_WEAPONS];
+const rifles=guns.filter(w=>/assault rifle|carbine/i.test(w.category));
+const shotguns=guns.filter(w=>w.ammoType==='shells');
+const lightGuns=guns.filter(w=>w.ammoType==='light');
 export function zoneLoadout(random){
- const rarity=()=>pick(random,[2,2,3,3,4]),weapon=id=>({id,weapon:true,count:1,rarity:rarity()});
- // Slot roles are guaranteed; randomizing each role cannot create an unusable kit.
- return [weapon(pick(random,['sprinter','sprinter','duet'])),weapon(pick(random,['scatter','scatter','doubleyolk'])),random()<.65?weapon(pick(random,['zipper','needle','anchor','peeper'])):{id:'impulse',count:2,rarity:3},pick(random,[{id:'mini',count:6,rarity:1},{id:'flask',count:3,rarity:2},{id:'splash',count:2,rarity:2}]),pick(random,[{id:'medkit',count:1,rarity:1},{id:'splash',count:2,rarity:2},{id:'impulse',count:2,rarity:3},{id:'launchpad',count:1,rarity:3}])].map(i=>({...i}));
+ const rarity=()=>random()<.5?3:4;
+ const gun=pool=>({id:pick(random,pool).id,weapon:true,count:1,rarity:rarity()});
+ const supply=pool=>{const [id,count]=pick(random,pool);return {id,count,rarity:rarity()};};
+ return [gun(rifles),gun(shotguns),gun(lightGuns),
+  supply([['impulse',2],['launchpad',1]]),
+  supply([['mini',6],['flask',3],['splash',2],['medkit',1]])];
 }
 // A straight, floor-supported pickup lane in the direction the player faces.
 export function zoneSpawnLootPoints(spawn){return Array.from({length:5},(_,i)=>({x:spawn.x-Math.sin(spawn.yaw)*(1+i*.8),y:spawn.y,z:spawn.z-Math.cos(spawn.yaw)*(1+i*.8)}));}

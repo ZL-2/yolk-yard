@@ -498,6 +498,7 @@ jobs:
           season_two_allowed.extend(['server/realtime/economy.js', 'src/christmas-catalog.js', 'src/christmas-models.js', 'src/christmas-ui.css', 'src/egg-wallet.js', 'src/frontier-art.js', 'src/halloween-catalog.js', 'src/humanoid.js', 'src/lobby-scene.js', 'src/lobby-ui.js', 'src/shop-catalog.js', 'src/shop-front.js', 'src/shop-models.js', 'src/spawn-island.js', 'tests/economy-authority.test.js'])
           season_two_allowed.extend(['server/realtime/host-watchdog.js', 'src/box-fight-ui.js', 'src/career-ui.js', 'src/chat-ui.js', 'src/competitive-career.js', 'src/display-player-name.js', 'src/leaderboard-ui.js', 'src/lobby-comms.js', 'src/match-end-ui.js', 'src/mode-activity.js', 'src/network.js', 'src/owner-console.js', 'src/owner-fair-play.js', 'src/owner-free-camera.js', 'src/owner-replay.js', 'src/player-population.js', 'src/spectator-status.js', 'src/tournament-ui.js', 'src/voice-ui.js', 'src/zombies-ui.js', 'src/zone-wars-ui.js', 'tests/match-flow-194.test.js', 'tests/operator-refresh.test.js'])
           season_two_allowed.extend(['server/realtime/owner.js', 'server/realtime/lobby-chat.js', 'server/realtime/relay.js', 'src/action-network.js', 'src/chat.js', 'src/snapshot-interest.js', 'src/zone-wars.js', 'tests/chat.test.js', 'tests/zone-elimination-loot.test.js'])
+          season_two_allowed.extend(['src/building.js','src/zone-wars-rules.js','tests/zone-wars.test.js'])
           season_two_files=set(subprocess.check_output(['git','diff','--name-only','a479fddb87bcee126e533a1aa3a70b1af5ccf9ed','HEAD'],text=True).splitlines())
           season_two={'src/season-two-landscape.js','src/season-two-dressing.js'}<=season_two_files and season_two_files<=set(season_two_allowed)
           feature_release=feature_release or season_two
@@ -522,7 +523,7 @@ jobs:
       - run: npm ci
       - name: Gifts, Icon earnings, collision, tournament and ranking regressions
         if: needs.scope.outputs.community_gameplay == 'true'
-        run: node --test --test-concurrency=2 tests/chat.test.js tests/zone-elimination-loot.test.js tests/owner-gameplay.test.js tests/operator-refresh.test.js tests/tournament-minimum.test.js tests/blackout.test.js tests/halloween.test.js tests/emergency-bus.test.js tests/economy-authority.test.js tests/royale-prestige.test.js tests/world-overhaul.test.js tests/crowns-bosses-emotes.test.js tests/terrain-detail.test.js tests/weapon-presentation.test.js tests/map-editor.test.js tests/boss-awareness-audio.test.js
+        run: node --test --test-concurrency=2 tests/building*.test.js tests/zone-wars.test.js tests/chat.test.js tests/zone-elimination-loot.test.js tests/owner-gameplay.test.js tests/operator-refresh.test.js tests/tournament-minimum.test.js tests/blackout.test.js tests/halloween.test.js tests/emergency-bus.test.js tests/economy-authority.test.js tests/royale-prestige.test.js tests/world-overhaul.test.js tests/crowns-bosses-emotes.test.js tests/terrain-detail.test.js tests/weapon-presentation.test.js tests/map-editor.test.js tests/boss-awareness-audio.test.js
       - name: Community goal, economy and announcement regressions
         if: needs.scope.outputs.community_goal == 'true'
         run: node --test --test-concurrency=2 tests/community-goal.test.js tests/update-199.test.js tests/economy-authority.test.js tests/deployment.test.js tests/replay-storage-budget.test.js
