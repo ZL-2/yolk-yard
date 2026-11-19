@@ -18,6 +18,9 @@ export function nextReleaseHistory(build, notes, previous) {
       throw new Error("Release numbers must be positive and strictly descending");
     if(typeof r.title!=='string'||!Array.isArray(r.changes))throw new Error("Invalid published release entry");
   });
+  // Correct the published entry in place for this wording-only update.
+  if (previous.releases[0].number === '249' && previous.releases[0].title === 'Zone Wars and Box Fights' && notes[0].number === '249' && notes[0].title === 'Game improvements')
+    return { ...previous, build, releases: [{ number:'249', title:'Game improvements', changes:['Game improvements.'] }, ...previous.releases.slice(1)] };
   if (previous.build === build) return previous;
   const latest = notes[0];
   const alreadyPublished = previous.releases.some(r => r.title === latest.title && JSON.stringify(r.changes) === JSON.stringify(latest.changes));
