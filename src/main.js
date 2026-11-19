@@ -404,7 +404,7 @@ function sendMatchChat(payload){
   return net?.chat(payload)||{ok:false,reason:'disconnected'};
 }
 const chat = new ChatPanel($("#app"), {
-  context: () => ({state, localId, preference:settings.chatMode, connected:!!net?.ready && !net.closed && screen!=="menu", host:!!net?.isHost, enabled:net?.chatEnabled, roomMuted:ownerNotices.active('mute')?[...(net?.chatMuted||[]),localId]:net?.chatMuted||[]}),
+  context: () => ({state, localId, developer:!!developerChatToken(), preference:settings.chatMode, connected:!!net?.ready && !net.closed && screen!=="menu", host:!!net?.isHost, enabled:net?.chatEnabled, roomMuted:ownerNotices.active('mute')?[...(net?.chatMuted||[]),localId]:net?.chatMuted||[]}),
   setPreference: value => {settings.chatMode=value;save("yolk-settings",settings);},
   privateCommand:command=>void ownerPanel.command(command),
   send: sendMatchChat,
@@ -1327,6 +1327,7 @@ function processEvents() {
   const confirmation=combatConfirmation.takeSound();if(confirmation&&confirmation!=='elimination')sound.hit(confirmation);
 }
 const hudText=(node,value)=>{const text=String(value);if(node.textContent!==text)node.textContent=text;};
+const hudMarkup=(node,markup)=>{if(node._markup!==markup){node.innerHTML=markup;node._markup=markup;}};
 function hud() {
   if (screen !== "game" || !state) return;
   const authoritative = state.players.find((p) => p.id === localId);
@@ -1388,16 +1389,16 @@ function hud() {
   $("#respawn").style.display =
     p.health <= 0 && !p.spectating && state.phase === "playing" ? "block" : "none";
   const killer = p.health <= 0 && state.players.find(k => k.id === p.killerId);
-  hudText($("#spectator-stats"), killer
-    ? `${killer.health > 0 ? "Spectating" : "Eliminated"} ${displayPlayerName(killer.name)} · Health ${Math.ceil(killer.health)} · ${gun(killer).name} · ${killer.kills} K / ${killer.deaths} D · ${Math.floor(killer.points)} pts`
+  hudMarkup($("#spectator-stats"), killer
+    ? `${killer.health > 0 ? "Spectating" : "Eliminated"} ${playerNameMarkup(killer.name)} · Health ${Math.ceil(killer.health)} · ${esc(gun(killer).name)} · ${killer.kills} K / ${killer.deaths} D · ${Math.floor(killer.points)} pts`
     : "");
   const watching = !!p.spectating && state.phase === "playing";
   $("#spectate-panel").hidden = !watching;
   $("#hud").classList.toggle("spectating", watching);
   $('#spectate-panel [data-action=rejoin]').hidden=!!p.friendSpectator||!!state.royale||!!state.zombies;
   const target = state.players.find(k => k.id === spectateTarget);
-  hudText($("#spectate-info"), target && watching
-    ? `${displayPlayerName(target.name)} · Health ${Math.ceil(target.health)} · ${state.royale?itemInfo(target.inventory?.[target.slot]).name:gun(target).name} · ${target.kills} K / ${target.deaths} D`
+  hudMarkup($("#spectate-info"), target && watching
+    ? `${playerNameMarkup(target.name)} · Health ${Math.ceil(target.health)} · ${esc(state.royale?itemInfo(target.inventory?.[target.slot]).name:gun(target).name)} · ${target.kills} K / ${target.deaths} D`
     : "Waiting for a player to spawn…");
   const delay = Math.max(0, Math.ceil(p.respawnAt - state.time));
   hudText($("#spawn-heading"), p.awaitingEntry ? "OPERATOR READY" : "OPERATOR ELIMINATED");

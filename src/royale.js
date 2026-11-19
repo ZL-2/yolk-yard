@@ -173,7 +173,7 @@ export class RoyaleSimulation extends Simulation {
   let job=battlePreparation.get(this);
   if(!job){
    // A separate saved seed keeps results independent of frame timing and bot RNG.
-   const world={map:this.battleMap(),random:rng(this.battleLootSeed??this.options.seed??1),loot:[],chests:[],lootId:0,lootVersion:0,time:0,dropLoot:this.dropLoot};
+   const world={map:this.battleMap(),random:rng(this.battleLootSeed??this.options.seed??1),loot:[],chests:[],lootId:0,lootVersion:0,time:0,dropLoot:this.dropLoot,spawnDroppedLoot:this.spawnDroppedLoot};
    resetBuilding(world);job={world,steps:(function*(){yield* seedIslandLootSteps(world);world.nav=yield* navigationSteps(getMap("sunnybreak",this.mapLayouts));}).call(this),done:false};battlePreparation.set(this,job);
   }
   const deadline=performance.now()+1;

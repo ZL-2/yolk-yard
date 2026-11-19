@@ -1,6 +1,6 @@
 {
   "name": "ravelfront",
-  "version": "6.40.3",
+  "version": "6.40.4",
   "private": true,
   "type": "module",
   "scripts": {

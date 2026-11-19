@@ -179,3 +179,31 @@ test('only verified developer chat bypasses the text filter and stays scoped to 
  assert.match(playerNameMarkup('Zach'),/<svg.+Developer/);
  assert.equal(playerNameMarkup('<Zach>'),'&lt;Zach&gt;');
 });
+
+test('developer chat reaches a real match through the authenticated social relay',async()=>{
+ const {fixture,until}=await import('./helpers/public-match.js');
+ const code='8392047165839204',f=await fixture({serverOptions:{ownerCode:code}});
+ try{
+  const base='http://127.0.0.1:'+f.app.server.address().port;
+  const response=await fetch(base+'/owner/login',{method:'POST',headers:{Origin:'https://zl-2.github.io','Content-Type':'text/plain'},body:JSON.stringify({code})});
+  assert.equal(response.status,200);
+  const {token}=await response.json();
+  const a=await f.user('Zach'),b=await f.user('Guest Player'),received=[];
+  b.ws.on('message',raw=>received.push(JSON.parse(raw)));
+  await assert.rejects(a.ask('lobby-chat',{channel:'universal',text:'fuck'}),/friendly/);
+  assert.equal((await a.ask('lobby-chat',{channel:'universal',text:'fuck',ownerToken:token})).text,'fuck');
+  for(const user of [a,b])await user.ask('select',{mode:'zonewars',access:'public'});
+  await a.ask('queue');const host=await f.game(a);
+  await b.ask('queue');await f.game(b);
+  await until(()=>f.app.relay.parties.matchLocation(f.app.relay.parties.users.get(a.id))?.roomChat?.players.length===2,'Chat roster published');
+  const request={code:host.net.code,matchId:host.sim.matchId,channel:'room',text:'fuck',ownerToken:token};
+  await assert.rejects(a.ask('developer-match-chat',{...request,ownerToken:'forged'}),/Unlock developer/);
+  assert.equal((await a.ask('developer-match-chat',request)).ok,true);
+  await until(()=>received.some(m=>m.type==='developer-match-chat'),'Developer message delivered');
+  const message=received.find(m=>m.type==='developer-match-chat');
+  assert.equal(message.message.sender,host.net.id);assert.equal(message.message.text,'fuck');
+  assert.equal(message.matchId,host.sim.matchId);
+  f.app.owner.tokens.delete(token);
+  await assert.rejects(a.ask('developer-match-chat',{...request,text:'next message'}),/Unlock developer/);
+ }finally{await f.close();}
+});

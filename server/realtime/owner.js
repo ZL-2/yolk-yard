@@ -39,7 +39,7 @@ export class OwnerService {
  sanction(id,kind){if(!id||!this.db.db)return null;return this.db.get('SELECT * FROM sanctions WHERE player=? AND kind=? AND revoked IS NULL AND (expires IS NULL OR expires>?) ORDER BY created DESC LIMIT 1',id,kind,this.now());}
  assertPlayer(id){const ban=this.sanction(id,'ban');if(ban)throw Error('This browser identity is suspended'+(ban.expires?' until '+new Date(ban.expires).toISOString():'')+'. '+ban.reason);}
  assertAdmission(id,mode,access='public'){
-  if(this.db.db&&this.db.get("SELECT id FROM owner_match_notices WHERE player=? AND read_at IS NULL AND json_extract(data,'$.requiredRead')=1 LIMIT 1",id))throw Error('Read and acknowledge your official notice before playing.');
+  if(id&&this.db.db&&this.db.get("SELECT id FROM owner_match_notices WHERE player=? AND read_at IS NULL AND json_extract(data,'$.requiredRead')=1 LIMIT 1",id))throw Error('Read and acknowledge your official notice before playing.');
   this.assertPlayer(id);this.db.assert();this.relay?.fairPlay?.assertPlay(id);if(this.controls.maintenance)throw Error(this.controls.maintenanceMessage);
   if(this.controls.modes[mode]?.[access]===false)throw Error('This mode is temporarily closed to '+access+' matchmaking.');
  }

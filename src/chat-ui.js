@@ -18,14 +18,14 @@ export class ChatPanel {
     this.peek=el('div',undefined,'chat-peek'); this.peek.hidden=true;
     this.panel=el('dialog'); this.panel.id='chat-panel'; this.panel.setAttribute('aria-labelledby','chat-title');
     this.panel.innerHTML=`<header class="chat-head"><div><span class="chat-eyebrow">RAVELFRONT • LIVE</span><h2 id="chat-title">Player controls</h2></div><button type="button" class="chat-close" aria-label="Close chat">×</button></header>
-      <div class="chat-toolbar"><label>Channel<select id="chat-channel" aria-label="Chat channel"><option value="room">Room</option><option value="team">Team</option></select></label><button class="chat-hud-close" type="button" aria-label="Close chat">×</button><span class="chat-shield">◈ Filter always on</span></div>
+      <div class="chat-toolbar"><label>Channel<select id="chat-channel" aria-label="Chat channel"><option value="room">Room</option><option value="team">Team</option></select></label><button class="chat-hud-close" type="button" aria-label="Close chat">×</button><span class="chat-shield">Filter on</span></div>
       <p class="chat-audience" id="chat-audience"></p>
       <div class="chat-log" role="log" aria-live="polite" aria-relevant="additions" aria-label="Chat messages" tabindex="0"></div>
       <p class="chat-status" role="status"></p>
       <form class="chat-compose"><label class="chat-sr" for="chat-input">Message</label><input id="chat-input" maxlength="${CHAT_LIMIT}" placeholder="Type a message…" autocomplete="off" spellcheck="true" enterkeyhint="send" aria-describedby="chat-count chat-privacy"><button class="chat-send" type="submit">Send ↗</button></form>
       <div class="chat-input-meta"><span id="chat-privacy">Messages are filtered before sharing.</span><span id="chat-count">0/${CHAT_LIMIT}</span></div>
       <details class="chat-quick"><summary>Quick messages</summary><div class="chat-quick-grid"></div></details>
-      <details class="chat-safety"><summary>Players & safety</summary><label class="chat-preference">Show chat<select id="chat-preference" aria-label="Chat preference"><option value="all">Filtered messages</option><option value="quick">Quick messages only</option><option value="off">Off</option></select></label><div class="chat-players"></div><div class="chat-host-controls"></div><p class="chat-fine">Mute hides a player for you for this room. Reports go to the room host. Leaving clears chat history.</p></details>`;
+      <details class="chat-safety"><summary>Players & safety</summary><label class="chat-preference">Show chat<select id="chat-preference" aria-label="Chat preference"><option value="all">All messages</option><option value="quick">Quick messages only</option><option value="off">Off</option></select></label><div class="chat-players"></div><div class="chat-host-controls"></div><p class="chat-fine">Mute hides a player for you for this room. Reports go to the room host. Leaving clears chat history.</p></details>`;
     this.hud=el('section',undefined,'chat-hud');this.hud.id='chat-hud';this.hud.hidden=true;this.hud.setAttribute('aria-label','Match chat');
     for(const selector of ['.chat-toolbar','.chat-audience','.chat-log','.chat-status','.chat-compose','.chat-input-meta'])this.hud.append(this.panel.querySelector(selector));
     root.append(this.toggle,this.hud,this.panel);
@@ -122,6 +122,10 @@ export class ChatPanel {
   update() {
     const ctx=this.context();this.toggle.hidden=!ctx.connected;this.toggle.textContent='Enter to chat';this.hud.hidden=!ctx.connected||ctx.preference==='off'&&!this.opened;
     if(!ctx.connected){this.hud.hidden=true;return;}
+    const filterLabel=ctx.developer?'Developer · Filter bypass':'Filter on';
+    const shield=this.hud.querySelector('.chat-shield');if(shield.textContent!==filterLabel)shield.textContent=filterLabel;
+    const privacy=this.hud.querySelector('#chat-privacy'),privacyText=ctx.developer?'Developer messages bypass the text filter.':'Messages are filtered before sharing.';
+    if(privacy.textContent!==privacyText)privacy.textContent=privacyText;
     const me=ctx.state?.players.find(p=>p.id===ctx.localId);
     const spectator=me?.spectating&&ctx.state?.phase==='playing';
     const teams=(ctx.state?.options.mode==='teams'||ctx.state?.options.mode==='royale'&&[2,3,4].includes(ctx.state.options.teamSize))&&!me?.spectating;
