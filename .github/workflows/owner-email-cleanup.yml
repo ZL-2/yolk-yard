@@ -1,0 +1,84 @@
+name: Authorized commit email cleanup
+on:
+  push:
+    branches: [maintenance-owner-email-cleanup]
+permissions:
+  contents: write
+  actions: write
+jobs:
+  rewrite:
+    if: github.repository == 'ZL-2/yolk-yard'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify and atomically replace authorized branch history
+        shell: python
+        run: |
+          import base64,functools,hashlib,json,os,re,subprocess
+          from pathlib import Path
+          os.chdir(os.environ['GITHUB_WORKSPACE'])
+          def git(*args,data=None):return subprocess.check_output(['git',*args],input=data)
+          def save(kind,data):return git('hash-object','-w','-t',kind,'--stdin',data=data).strip()
+          refs={r.split(maxsplit=1)[1].decode():r.split()[0] for r in git('ls-remote','--heads','origin').splitlines()}
+          migration='refs/heads/maintenance-owner-email-cleanup'
+          assert refs.pop(migration).decode()==os.environ['GITHUB_SHA']
+          assert len(refs)==73 and not git('ls-remote','--tags','origin').strip()
+          old_email=git('show','-s','--format=%ae',refs['refs/heads/main']).strip()
+          assert old_email.endswith(b'@gmail.com')
+          new_email=b'317452799+ZL-2@users.noreply.github.com'
+          order=git('rev-list','--reverse','--topo-order',*refs.values()).splitlines()
+          mapping={}; prefixes={}
+          for sha in order:
+           for n in (7,8,9,10,11,12,40):
+            k=sha[:n];prefixes[k]=sha if k not in prefixes else None
+          pattern=re.compile(rb'(?<![\da-f])(?:[\da-f]{40}|[\da-f]{7,12})(?![\da-f])')
+          @functools.cache
+          def rewrite_blob(sha):
+           raw=git('cat-file','blob',sha)
+           def replace(m):
+            old=prefixes.get(m[0])
+            if old is None:return m[0]
+            if old not in mapping:raise ValueError('forward commit reference '+m[0].decode())
+            return mapping[old][:len(m[0])]
+           out=pattern.sub(replace,raw)
+           return sha if out==raw else save('blob',out)
+          @functools.cache
+          def rewrite_tree(tree,stage):
+           raw=git('ls-tree','-z',tree);out=[]
+           for entry in raw.rstrip(b'\0').split(b'\0') if raw else []:
+            meta,name=entry.split(b'\t',1);mode,kind,sha=meta.split();new=sha
+            if (stage,name) in [(0,b'.github'),(1,b'workflows'),(0,b'scripts')]:
+             new=rewrite_tree(sha,3 if name==b'scripts' else stage+1)
+            elif (stage==2 and name.endswith((b'.yml',b'.yaml'))) or (stage==3 and name==b'update-204-performance.mjs'):
+             new=rewrite_blob(sha)
+            out.append(b' '.join((mode,kind,new))+b'\t'+name+b'\0')
+           result=b''.join(out)
+           return tree if result==raw else git('mktree','-z',data=result).strip()
+          for old in order:
+           raw=git('cat-file','commit',old);head,msg=raw.split(b'\n\n',1)
+           head=re.sub(rb'\n(?:gpgsig(?:-sha256)?|mergetag) [^\n]*(?:\n [^\n]*)*',b'',head)
+           head=re.sub(rb'(?m)^parent ([0-9a-f]{40})$',lambda m:b'parent '+mapping[m[1]],head)
+           head=re.sub(rb'(?m)^tree ([0-9a-f]{40})$',lambda m:b'tree '+rewrite_tree(m[1],0),head)
+           new=save('commit',head.replace(old_email,new_email)+b'\n\n'+msg.replace(old_email,new_email))
+           mapping[old]=new
+          tips={r:[old.decode(),mapping[old].decode()] for r,old in refs.items()}
+          newtips=[x[1] for x in tips.values()]
+          assert len(order)==int(git('rev-list','--count',*newtips))
+          assert old_email.lower() not in git('log','--format=%ae%n%ce%n%B',*newtips).lower()
+          for r,(old,new) in tips.items():
+           changed=git('diff','--name-only',old,new).decode().splitlines()
+           assert all(p.startswith('.github/workflows/') or p=='scripts/update-204-performance.mjs' for p in changed),changed
+          assert hashlib.sha256(json.dumps(tips,sort_keys=True).encode()).hexdigest()=='94f9444b8349aa735d985b469b2e3632e5cf798e2836759223ceb5f90d6aff2f'
+          leases=['--force-with-lease='+r+':'+old for r,(old,new) in tips.items()]
+          leases+=['--force-with-lease='+migration+':'+os.environ['GITHUB_SHA']]
+          updates=[new+':'+r for r,(old,new) in tips.items()]+[':'+migration]
+          git('push','--atomic',*leases,'origin',*updates)
+          assert all(line.split()[0].decode()==tips[line.split()[1].decode()][1] for line in git('ls-remote','--heads','origin').splitlines())
+          print('Verified replacement branch tips')
+      - name: Republish verified game
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main
