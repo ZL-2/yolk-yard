@@ -9,9 +9,17 @@ const readBody=async(req,limit=8192)=>{const parts=[];let size=0;for await(const
 const clean=(s,max=500)=>String(s??'').replace(/[\u0000-\u001f]/g,' ').trim().slice(0,max);
 const reasonOf=body=>{const reason=clean(body.reason);if(reason.length<3)throw Error('Add a reason of at least three characters.');return reason;};
 export class OwnerService {
- constructor({code=process.env.YOLK_OWNER_CODE,storePath,dbPath,now=Date.now}={}){
+ constructor({code=process.env.YOLK_OWNER_CODE,storePath,dbPath,resetId=process.env.YOLK_OWNER_RESET_ID,now=Date.now}={}){
   this.now=now;this.salt=randomBytes(24);this.digest=/^\d{12,32}$/.test(code||'')?scryptSync(code,this.salt,64):null;
   this.tokens=new Map();this.attempts=new Map();this.openedAt=now();this.db=new OwnerStore({...(dbPath!==undefined?{path:dbPath}:storePath!==undefined?{path:storePath?storePath+'.sqlite':null}:{}),legacyPath:storePath??process.env.YOLK_OWNER_DATA_PATH,now});this.ready=Promise.resolve();this.errors=new Map();this.match=new OwnerMatchService(this);this.controls=this.db.db?this.db.policy():ownerDefaults();
+  if(resetId){
+   if(!this.digest || !this.db.db)throw Error('Owner recovery requires a configured code and database');
+   const stored=this.db.meta('accessHash');
+   if(stored?.resetId!==resetId){
+    this.db.setMeta('accessHash',{resetId,salt:this.salt.toString('hex'),digest:this.digest.toString('hex')});
+    this.db.event('access-code-changed','Owner code reset by hosting administrator');
+   }
+  }
  }
  attach(relay){
   this.relay=relay;relay.owner=this;relay.parties.store.ownerArchive=ticket=>this.recordTicket(ticket);
@@ -122,7 +130,7 @@ export class OwnerService {
   }else if(body.action==='revoke-sessions'){const current=this.token(req,body);for(const token of this.tokens.keys())if(token!==current)this.tokens.delete(token);this.audit(req,body,'access-revoked',reason);}
   else if(body.action==='rotate-code'){
    if(!this.checkCode(body.currentCode))throw Error('Current access code is incorrect');if(!/^\d{12,32}$/.test(body.newCode||'')||body.newCode!==body.repeatCode||body.newCode===body.currentCode)throw Error('Use a different matching numeric code, 12–32 digits long');
-   const salt=randomBytes(24),digest=scryptSync(body.newCode,salt,64);this.db.setMeta('accessHash',{salt:salt.toString('hex'),digest:digest.toString('hex')});const current=this.token(req,body);for(const token of this.tokens.keys())if(token!==current)this.tokens.delete(token);this.audit(req,body,'access-code-changed',reason);
+   const salt=randomBytes(24),digest=scryptSync(body.newCode,salt,64);this.db.setMeta('accessHash',{resetId:this.db.meta('accessHash')?.resetId,salt:salt.toString('hex'),digest:digest.toString('hex')});const current=this.token(req,body);for(const token of this.tokens.keys())if(token!==current)this.tokens.delete(token);this.audit(req,body,'access-code-changed',reason);
   }else throw Error('Unknown owner action');
   this.db.event('action',reason,body.player||body.room||'',{action:body.action,result,fingerprint,actor:this.actor(req,body)},'action:'+body.requestId);return result;
  }
