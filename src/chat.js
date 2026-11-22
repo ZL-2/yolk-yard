@@ -112,7 +112,7 @@ export class ChatInbox {
     const text=developerChatText(message.text);
     if(!sender||!text||this.muted.has(sender.id)||!chatChannel(sender,message.channel,state)||
        !audienceFor(sender,message.channel,state).includes(localId))return null;
-    const row={id:message.id,sender:sender.id,name:safeName(sender.name),channel:message.channel,text};
+    const row={id:message.id,sender:sender.id,name:safeName(sender.name),channel:message.channel,text,verifiedDeveloper:true};
     this.rows.push(row);if(this.rows.length>60)this.rows.shift();
     return row;
   }

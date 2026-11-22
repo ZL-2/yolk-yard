@@ -176,7 +176,8 @@ test('only verified developer chat bypasses the text filter and stays scoped to 
  assert.equal(inbox.acceptDeveloper(messages[0].message,state,'b','quick'),null);
  assert.equal(inbox.acceptDeveloper(messages[0].message,state,'b').text,text);
  inbox.mute('a');assert.equal(inbox.acceptDeveloper({...messages[0].message,id:'dev:next'},state,'b'),null);
- assert.match(playerNameMarkup('Zach'),/<svg.+Developer/);
+ assert.equal(playerNameMarkup('Zach'),'Zach');
+ assert.match(playerNameMarkup('Zach',true),/<svg.+Developer/);
  assert.equal(playerNameMarkup('<Zach>'),'&lt;Zach&gt;');
 });
 

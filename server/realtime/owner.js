@@ -5,7 +5,19 @@ import {OwnerStore,OWNER_MODES,ownerDefaults,ownerMode} from './owner-store.js';
 import {rankPublicPlayers} from './leaderboards.js';
 const WINDOW=30*60_000,DAY=86400000;
 const json=(res,status,data,origin)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...(origin?{'Access-Control-Allow-Origin':origin,'Vary':'Origin'}:{})});res.end(JSON.stringify(data));};
-const readBody=async(req,limit=8192)=>{const parts=[];let size=0;for await(const part of req){size+=part.length;if(size>limit)throw Object.assign(Error('Upload exceeds the size limit'),{status:413});parts.push(part);}return JSON.parse(Buffer.concat(parts).toString('utf8')||'{}');};
+// Bound concurrent buffering as well as the size of each upload.
+let bufferedBytes=0;
+async function readBody(req,limit=8192){
+ const parts=[];let size=0;
+ try{
+  for await(const part of req){
+   if(size+part.length>limit)throw Object.assign(Error('Upload exceeds the size limit'),{status:413});
+   if(bufferedBytes+part.length>32_000_000)throw Object.assign(Error('Server is busy'),{status:503});
+   size+=part.length;bufferedBytes+=part.length;parts.push(part);
+  }
+  return JSON.parse(Buffer.concat(parts).toString('utf8')||'{}');
+ }finally{bufferedBytes-=size;}
+}
 const clean=(s,max=500)=>String(s??'').replace(/[\u0000-\u001f]/g,' ').trim().slice(0,max);
 const reasonOf=body=>{const reason=clean(body.reason);if(reason.length<3)throw Error('Add a reason of at least three characters.');return reason;};
 export class OwnerService {
@@ -23,7 +35,11 @@ export class OwnerService {
  }
  attach(relay){
   this.relay=relay;relay.owner=this;relay.parties.store.ownerArchive=ticket=>this.recordTicket(ticket);
-  if(this.db.db){this.db.event('deployment','Relay started','',{build:process.env.RENDER_GIT_COMMIT||'local',version:relay.deployment?.version||null});this.capture();this.timer=setInterval(()=>this.capture(),15000);this.timer.unref?.();}
+  if(this.db.db){if(process.env.RENDER_SERVICE_ID){
+    const counts=this.db.all("SELECT kind,COUNT(*) AS total,MAX(at) AS latest FROM events WHERE at>=? AND kind IN ('access-unlocked','access-denied','access-code-changed','access-revoked','action','marks-granted','settings') GROUP BY kind",this.now()-7*DAY);
+    console.info('Owner audit (last 7 days)',JSON.stringify(counts));
+   }
+   this.db.event('deployment','Relay started','',{build:process.env.RENDER_GIT_COMMIT||'local',version:relay.deployment?.version||null});this.capture();this.timer=setInterval(()=>this.capture(),15000);this.timer.unref?.();}
  }
  recordReceipt(account,r){try{if(this.db.db){
    if(account.socialId&&r.amount>0){const spent=this.db.get('SELECT coalesce(sum(marks),0) n FROM results WHERE player=? AND at>?',account.socialId,Math.round(r.time*1000)-3600000).n;r.amount=Math.max(0,Math.min(600,900-spent,Math.floor(r.amount)));}
@@ -144,9 +160,13 @@ export class OwnerService {
    if(route==='/owner/client-error'&&req.method==='POST'){const body=await readBody(req,2048);if(!/^[-a-f0-9]{36}$/.test(body.id||''))throw Error('Invalid session');const previous=this.errors.get(body.id)||0;if(this.now()-previous<60000){json(res,429,{error:'Report limit reached'},origin);return;}if(this.errors.size>2000)this.errors.clear();this.errors.set(body.id,this.now());this.systemEvent('client-error',clean(body.message,500),body.id,{file:clean(body.file,120).split('?')[0],line:Math.max(0,Number(body.line)||0),mode:ownerMode(body.mode)});json(res,200,{ok:true},origin);return;}
    if(route==='/owner/login'&&req.method==='POST'){
     const key=req.socket?.remoteAddress||'local',now=this.now(),attempts=(this.attempts.get(key)||[]).filter(t=>now-t<15*60000);if(!this.authHash().digest){json(res,503,{error:'Owner access is not configured'},origin);return;}if(attempts.length>=5){json(res,429,{error:'Too many attempts. Wait 15 minutes.'},origin);return;}
-    const body=await readBody(req,2048);attempts.push(now);this.attempts.set(key,attempts);if(this.attempts.size>2000)this.attempts.delete(this.attempts.keys().next().value);
+    attempts.push(now);this.attempts.set(key,attempts);if(this.attempts.size>2000)this.attempts.delete(this.attempts.keys().next().value);
+    const body=await readBody(req,2048);
     if(!this.checkCode(body.code)){this.systemEvent('access-denied','An owner sign-in was rejected');json(res,401,{error:'Incorrect code'},origin);return;}
     this.attempts.delete(key);if(this.tokens.size>=10)this.tokens.delete(this.tokens.keys().next().value);const token=randomBytes(32).toString('hex');this.tokens.set(token,now+WINDOW);this.systemEvent('access-unlocked','Owner signed in');json(res,200,{token,expires:now+WINDOW},origin);return;
+   }
+   if(![...this.tokens.values()].some(expiry=>expiry>this.now())){
+    json(res,401,{error:'Owner access expired. Unlock Owner Access again.'},origin);return;
    }
    const limit=route==='/owner/import'?25_000_000:route==='/owner/map-assets'?12_000_000:route==='/owner/maps'?1_100_000:16384;
    const body=req.method==='POST'?await readBody(req,limit):{};

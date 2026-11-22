@@ -107,7 +107,7 @@ export class ChatPanel {
 
   messageNode(row) {
     const node=el('div',undefined,'chat-message');node.dataset.chatId=String(row.id);
-    const head=el('div',undefined,'chat-message-head');head.append(playerNameNode(safeName(row.name)),el('span',row.channel==='team'?'TEAM':row.channel==='spectators'?'SPECTATORS':'ROOM'));
+    const head=el('div',undefined,'chat-message-head');head.append(playerNameNode(safeName(row.name),row.verifiedDeveloper),el('span',row.channel==='team'?'TEAM':row.channel==='spectators'?'SPECTATORS':'ROOM'));
     node.append(head,el('p',row.text));return node;
   }
   renderLog() {

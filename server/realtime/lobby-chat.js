@@ -56,7 +56,7 @@ export class LobbyChat {
   const devText=this.developerAuthorized(m.ownerToken)?developerChatText(m.text):null;
   const result=devText?{ok:true,text:devText}:moderateText(m.text);if(!result.ok)throw Error('Please keep chat friendly and avoid personal information.');
   if(u.lastLobbyChat?.text===result.text&&Date.now()-u.lastLobbyChat.at<20000)throw Error('Please avoid repeating messages.');
-  const message={id:randomUUID(),sender:u.id,name:u.profile.name,channel:scope.channel,to:scope.to,text:result.text,at:Date.now(),party:scope.channel==='universal'?null:u.party};
+  const message={id:randomUUID(),sender:u.id,name:u.profile.name,verifiedDeveloper:!!devText,channel:scope.channel,to:scope.to,text:result.text,at:Date.now(),party:scope.channel==='universal'?null:u.party};
   u.lastLobbyChat=message;
   for(const [key,rows]of this.rooms)if(Date.now()-rows.at(-1).at>30*60000)this.rooms.delete(key);
   if(!this.rooms.has(scope.key)&&this.rooms.size>=512)this.rooms.delete(this.rooms.keys().next().value);

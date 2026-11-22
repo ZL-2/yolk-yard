@@ -1,4 +1,3 @@
-import {isDeveloperName} from './display-player-name.js';
 import {updateIconGear} from './icon-bundle-models.js';
 import {GpuFrameTimer} from './gpu-frame-timer.js';
 import {DamageNumbers} from './damage-numbers.js';
@@ -962,7 +961,7 @@ export class View {
             teammates(state.options,p,local)
               ? teamStyle(state.players,p).color
               : p.boss?"#ffda82":"#ffffff",
-            !!state.zonewars,false,null,isDeveloperName(p.name),
+            !!state.zonewars,false,null,false,
           );
           name.position.y = 2.15;model.userData.nameplate=name;
           name.visible = p.id!==local?.id&&(!!p.boss||!!state.zonewars||!state.royale||teammates(state.options,p,local));
