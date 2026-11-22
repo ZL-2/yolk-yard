@@ -38,6 +38,9 @@ export class OwnerService {
   if(this.db.db){if(process.env.RENDER_SERVICE_ID){
     const counts=this.db.all("SELECT kind,COUNT(*) AS total,MAX(at) AS latest FROM events WHERE at>=? AND kind IN ('access-unlocked','access-denied','access-code-changed','access-revoked','action','marks-granted','settings') GROUP BY kind",this.now()-7*DAY);
     console.info('Owner audit (last 7 days)',JSON.stringify(counts));
+    const actions=this.db.all("SELECT at,json_extract(data,'$.action') AS action FROM events WHERE kind='action' AND at>=? ORDER BY at DESC LIMIT 20",this.now()-7*DAY);
+    const grants=this.db.all('SELECT at,amount FROM grants WHERE at>=? ORDER BY at DESC LIMIT 20',this.now()-7*DAY);
+    console.info('Recent owner operations',JSON.stringify({actions,grants}));
    }
    this.db.event('deployment','Relay started','',{build:process.env.RENDER_GIT_COMMIT||'local',version:relay.deployment?.version||null});this.capture();this.timer=setInterval(()=>this.capture(),15000);this.timer.unref?.();}
  }
