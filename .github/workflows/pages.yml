@@ -1523,6 +1523,7 @@ jobs:
     permissions:
       contents: read
       pages: write
+      actions: read
       id-token: write
     concurrency:
       group: pages-publish
@@ -1544,8 +1545,22 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+          name: pages-${{ github.run_attempt }}
+      - name: Wait for the Pages artifact to be indexed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_NAME: pages-${{ github.run_attempt }}
+        run: |
+          for attempt in {1..20}; do
+            count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$ARTIFACT_NAME" --jq '.total_count') || count=0
+            if [ "$count" = 1 ]; then exit 0; fi
+            sleep 3
+          done
+          exit 1
       - uses: actions/deploy-pages@v4
         id: deployment
+        with:
+          artifact_name: pages-${{ github.run_attempt }}
   verify-live:
     needs: [scope, deploy]
     if: always() && needs.deploy.result == 'success'
